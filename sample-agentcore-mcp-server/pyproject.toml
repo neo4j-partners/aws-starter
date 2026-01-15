@@ -1,0 +1,18 @@
+[project]
+name = "sample-two-mcp-server"
+version = "0.1.0"
+description = "Sample 2: MCP Server on Amazon Bedrock AgentCore (CDK)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aws-cdk-lib>=2.220.0",
+    "constructs>=10.0.79",
+    "boto3",
+    "awscrt",
+    "mcp>=1.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]

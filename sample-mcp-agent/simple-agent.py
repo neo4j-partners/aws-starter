@@ -48,6 +48,8 @@ DEMO_QUESTIONS = [
     ("Database Schema Overview", "What is the database schema? Give me a brief summary."),
     ("Count of Aircraft", "How many Aircraft are in the database?"),
     ("List Airports", "List 5 airports with their city and country."),
+    ("Recent Maintenance Events", "Show me 3 recent maintenance events with their severity."),
+    ("Flight Statistics", "How many flights are in the database and what operators fly them?"),
 ]
 
 

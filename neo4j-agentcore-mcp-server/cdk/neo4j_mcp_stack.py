@@ -426,6 +426,7 @@ class Neo4jMcpStack(Stack):
                 "NEO4J_MCP_HTTP_PORT": "8000",
                 "NEO4J_MCP_HTTP_AUTH_MODE": "env",
                 "NEO4J_LOG_LEVEL": "debug",
+                "NEO4J_READ_ONLY": "true",
             },
         )
 

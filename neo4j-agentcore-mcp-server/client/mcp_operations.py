@@ -112,8 +112,7 @@ async def get_tool_map(session: ClientSession) -> dict[str, str]:
         >>> print(tool_map)
         {
             'get-schema': 'neo4j-mcp-server-target___get-schema',
-            'read-cypher': 'neo4j-mcp-server-target___read-cypher',
-            'write-cypher': 'neo4j-mcp-server-target___write-cypher'
+            'read-cypher': 'neo4j-mcp-server-target___read-cypher'
         }
     """
     result = await session.list_tools()

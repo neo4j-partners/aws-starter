@@ -36,10 +36,9 @@ This project deploys the [Neo4j MCP server](https://github.com/neo4j/mcp) to AWS
 - **No User Accounts** - No username/password management required
 - **Automatic Token Exchange** - Gateway handles OAuth2 tokens with Runtime
 
-**MCP Tools Available:**
+**MCP Tools Available (Read-Only Mode):**
 - `neo4j-mcp-server-target___get-schema` - Get the database schema
 - `neo4j-mcp-server-target___read-cypher` - Execute read-only Cypher queries
-- `neo4j-mcp-server-target___write-cypher` - Execute write Cypher queries
 
 > **Note:** Tool names are prefixed with the Gateway target name when accessed via Gateway. See [ARCHITECTURE.md](./ARCHITECTURE.md#gateway-tool-name-mapping) for details.
 

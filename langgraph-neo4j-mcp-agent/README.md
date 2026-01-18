@@ -137,10 +137,9 @@ Initializing LLM (Bedrock, region: us-west-2)...
 Using: us.anthropic.claude-sonnet-4-20250514-v1:0
 
 Connecting to MCP server...
-Loaded 3 tools:
+Loaded 2 tools:
   - neo4j-mcp-server-target___get-schema
   - neo4j-mcp-server-target___read-cypher
-  - neo4j-mcp-server-target___write-cypher
 
 Creating agent...
 ======================================================================

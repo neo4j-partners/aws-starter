@@ -262,7 +262,8 @@ When MCP tools are accessed through AgentCore Gateway, tool names are automatica
 |---------------|--------------|
 | `get-schema` | `neo4j-mcp-server-target___get-schema` |
 | `read-cypher` | `neo4j-mcp-server-target___read-cypher` |
-| `write-cypher` | `neo4j-mcp-server-target___write-cypher` |
+
+> **Note:** Write tools are disabled (`NEO4J_READ_ONLY=true`).
 
 The delimiter is triple underscore (`___`).
 

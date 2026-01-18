@@ -101,6 +101,7 @@ def start_server() -> bool:
         "-e", "NEO4J_MCP_HTTP_PORT=8000",
         "-e", "NEO4J_MCP_HTTP_AUTH_MODE=env",
         "-e", "NEO4J_LOG_LEVEL=debug",
+        "-e", "NEO4J_READ_ONLY=true",
         "neo4j-mcp-server:latest",
     ]
 

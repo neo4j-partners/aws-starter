@@ -6,7 +6,7 @@ This repository contains a collection of samples and starter projects for workin
 
 ### 🚀 **Neo4j MCP Server (Working Solution)**
 
-*   **`simple-neo4j-mcp-server`**
+*   **`neo4j-agentcore-mcp-server`**
     *   **Status:** ✅ Works
     *   **Description:** Successfully deploys the Neo4j MCP server to AWS Bedrock AgentCore using **environment variable authentication** (`NEO4J_MCP_HTTP_AUTH_MODE=env`). This approach bypasses the HTTP `Authorization` header conflict between AgentCore and the Neo4j server by storing Neo4j credentials securely in environment variables rather than passing them per-request.
     *   **Key Features:** Single-tenant deployment, credentials passed via CDK/Env vars, CDK-based infrastructure-as-code deployment, Docker container packaging for AgentCore Runtime.
@@ -31,36 +31,27 @@ This repository contains a collection of samples and starter projects for workin
 
 ---
 
-### 📦 **Foundation Samples**
+### 📦 **Foundation Samples** (`foundation_samples/`)
 
-*   **`simple-agentcore-agent`**
+> These samples are adapted from the official [Amazon Bedrock AgentCore Samples](https://github.com/awslabs/amazon-bedrock-agentcore-samples) repository. They have been simplified and restructured with shell script wrappers to make them easy to run and understand without navigating the full samples repo.
+
+*   **`foundation_samples/simple-agentcore-agent`**
     *   **Status:** ✅ Works
     *   **Description:** A "Hello World" baseline sample that deploys a simple AI agent to AgentCore Runtime using the Strands Agents framework. This is the best starting point for verifying your AWS setup, CDK bootstrapping, and understanding the basic AgentCore deployment lifecycle.
     *   **Key Features:** Minimal dependencies, `@app.entrypoint` decorator pattern, local development with hot reload, one-command cloud deployment.
     *   **Use Case:** First-time AgentCore users, testing AWS permissions, learning the deployment workflow.
 
-*   **`sample-agentcore-mcp-server`**
+*   **`foundation_samples/sample-agentcore-mcp-server`**
     *   **Status:** ✅ Works
     *   **Description:** A generic MCP server example with Calculator and Greeter tools using the `FastMCP` framework. Demonstrates the foundational pattern for hosting custom Python MCP servers on AgentCore without the complexity of external databases or authentication.
     *   **Key Features:** FastMCP stateless HTTP transport, CloudFormation-based deployment, local development server, comprehensive test scripts.
     *   **Use Case:** Learning MCP server development, creating custom tool servers, prototyping before adding database integrations.
 
-*   **`simple-oauth-gateway`**
+*   **`foundation_samples/simple-oauth-gateway`**
     *   **Status:** ✅ Works
     *   **Description:** A comprehensive demo of setting up an OAuth2 Gateway with Role-Based Access Control (RBAC) and Lambda Interceptors. Shows how to secure MCP server access with Cognito-based authentication and implement custom authorization logic.
     *   **Key Features:** Cognito User Pool integration, machine-to-machine (M2M) OAuth flows, Lambda interceptors for request/response modification, RBAC patterns.
     *   **Use Case:** Production deployments requiring authentication, multi-tenant MCP servers, enterprise security compliance.
-
----
-
-### ⚠️ **Experimental / Non-Working**
-
-*   **`neo4j-mcp-server`**
-    *   **Status:** ❌ Not Working
-    *   **Description:** A documented attempt to deploy the Neo4j MCP server using **per-request HTTP authentication** rather than environment variables. This approach would allow multi-tenant deployments where each request carries its own Neo4j credentials.
-    *   **Why it doesn't work:** Demonstrates an unsolvable protocol conflict where both AgentCore (OAuth) and Neo4j (Basic Auth) require the single available `Authorization` HTTP header. Custom header workarounds with Gateway interceptors also failed because headers don't propagate from Gateway to Runtime.
-    *   **Value:** Useful as documentation of AgentCore limitations and as a reference for anyone attempting similar multi-tenant authentication patterns.
-    *   **See:** `STATUS.md` in this directory for a deep dive into the technical blockers.
 
 ## Getting Started
 
@@ -74,7 +65,7 @@ This repository contains a collection of samples and starter projects for workin
     Navigate to any project folder and follow its `README.md` for deployment instructions.
 
     ```bash
-    cd simple-neo4j-mcp-server
+    cd neo4j-agentcore-mcp-server
     # Follow instructions in README.md
     ```
 

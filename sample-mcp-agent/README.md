@@ -8,8 +8,8 @@ A ReAct agent that connects to the Neo4j MCP server via AWS Bedrock AgentCore Ga
 # Install dependencies
 ./agent.sh setup
 
-# Copy credentials from simple-neo4j-mcp-server deployment
-cp ../simple-neo4j-mcp-server/.mcp-credentials.json .
+# Copy credentials from neo4j-agentcore-mcp-server deployment
+cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
 # Run demo queries
 ./agent.sh
@@ -71,10 +71,10 @@ Auto-refreshes expired tokens using OAuth2 client credentials flow.
 
 ### Credentials File
 
-Copy `.mcp-credentials.json` from your `simple-neo4j-mcp-server` deployment:
+Copy `.mcp-credentials.json` from your `neo4j-agentcore-mcp-server` deployment:
 
 ```bash
-cp ../simple-neo4j-mcp-server/.mcp-credentials.json .
+cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 ```
 
 Required fields:
@@ -170,7 +170,7 @@ The `langchain-mcp-adapters` library handles this automatically - the LLM sees t
 1. **Python 3.10+** - Required runtime
 2. **uv** - Python package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
 3. **AWS CLI** - Configured with credentials that have Bedrock access
-4. **Deployed Neo4j MCP Server** - `simple-neo4j-mcp-server` with AgentCore Gateway
+4. **Deployed Neo4j MCP Server** - `neo4j-agentcore-mcp-server` with AgentCore Gateway
 
 ## How It Works
 
@@ -223,7 +223,7 @@ dependencies = [
 
 ## References
 
-- [simple-neo4j-mcp-server](../simple-neo4j-mcp-server/) - The MCP server this agent connects to
+- [neo4j-agentcore-mcp-server](../neo4j-agentcore-mcp-server/) - The MCP server this agent connects to
 - [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
 - [LangChain MCP Adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
 - [Model Context Protocol](https://modelcontextprotocol.io/)

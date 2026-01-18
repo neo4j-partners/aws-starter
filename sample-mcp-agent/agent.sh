@@ -9,7 +9,7 @@
 #   ./agent.sh "How many Aircraft are in the database?"
 #
 # Prerequisites:
-#   - .mcp-credentials.json (copy from simple-neo4j-mcp-server deployment)
+#   - .mcp-credentials.json (copy from neo4j-agentcore-mcp-server deployment)
 #   - AWS credentials configured (for Bedrock access)
 
 set -e
@@ -20,8 +20,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ ! -f "$SCRIPT_DIR/.mcp-credentials.json" ]; then
     echo "ERROR: Credentials file not found: .mcp-credentials.json"
     echo ""
-    echo "Copy credentials from your simple-neo4j-mcp-server deployment:"
-    echo "  cp ../simple-neo4j-mcp-server/.mcp-credentials.json ."
+    echo "Copy credentials from your neo4j-agentcore-mcp-server deployment:"
+    echo "  cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json ."
     echo ""
     echo "Required fields: gateway_url, token_url, client_id, client_secret, scope"
     exit 1
@@ -45,7 +45,7 @@ if [ "$1" = "help" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  ./agent.sh \"Find all airports in California\""
     echo ""
     echo "Prerequisites:"
-    echo "  1. Deploy simple-neo4j-mcp-server with AgentCore Gateway"
+    echo "  1. Deploy neo4j-agentcore-mcp-server with AgentCore Gateway"
     echo "  2. Copy .mcp-credentials.json from that deployment"
     echo "  3. AWS credentials configured (for Bedrock access)"
     echo ""

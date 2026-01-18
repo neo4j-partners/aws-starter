@@ -38,7 +38,7 @@ cd sample_1
 ### Sample 2: MCP Server on AgentCore (CloudFormation)
 
 ```bash
-cd sample-agentcore-mcp-server
+cd foundation_samples/sample-agentcore-mcp-server
 
 # Local Development
 ./server.sh start        # Start local MCP server (port 8000)

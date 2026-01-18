@@ -95,12 +95,12 @@ case "${1:-help}" in
         echo -e "${GREEN}Starting agent locally on port 8080...${NC}"
         echo "Test with: curl -X POST http://localhost:8080/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
-        uv run python agent.py
+        uv run python aircraft-agent.py
         ;;
 
     stop)
         echo -e "${YELLOW}Stopping local agent...${NC}"
-        pkill -f "python agent.py" 2>/dev/null || echo "No agent process found"
+        pkill -f "python aircraft-agent.py" 2>/dev/null || echo "No agent process found"
         echo -e "${GREEN}Stopped.${NC}"
         ;;
 
@@ -116,7 +116,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
         echo ""
-        uv run agentcore configure -e agent.py
+        uv run agentcore configure -e aircraft-agent.py
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"

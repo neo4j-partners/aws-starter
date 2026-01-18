@@ -8,13 +8,13 @@ and answers natural language questions about the database.
 Deployed on Amazon Bedrock AgentCore Runtime.
 
 Local testing:
-    python agent.py                     # Start server on port 8080
+    python aircraft-agent.py            # Start server on port 8080
     curl -X POST http://localhost:8080/invocations \
         -H "Content-Type: application/json" \
         -d '{"prompt": "What is the database schema?"}'
 
 Cloud deployment:
-    agentcore configure -e agent.py
+    agentcore configure -e aircraft-agent.py
     agentcore deploy
     agentcore invoke '{"prompt": "What is the database schema?"}'
 """

@@ -5,8 +5,8 @@ Invoke Agent Programmatically
 Demonstrates how to invoke the deployed Neo4j MCP Agent using boto3.
 
 Usage:
-    python invoke_agent.py                          # Uses default prompt
-    python invoke_agent.py "What is the schema?"    # Custom prompt
+    uv run python invoke_agent.py                          # Uses default prompt
+    uv run python invoke_agent.py "What is the schema?"    # Custom prompt
 
 Prerequisites:
     - Agent deployed to AgentCore Runtime (./agent.sh deploy)
@@ -22,19 +22,22 @@ import uuid
 import boto3
 import yaml
 
-# Configure logging
+# Configure logging (WARNING level to keep output clean)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
-def get_agent_arn() -> str:
+def get_agent_config() -> tuple[str, str]:
     """
-    Get the agent ARN from .bedrock_agentcore.yaml config file.
+    Get the agent ARN and region from .bedrock_agentcore.yaml config file.
 
     This file is created by 'agentcore configure' command.
+
+    Returns:
+        Tuple of (agent_arn, region)
     """
     config_file = ".bedrock_agentcore.yaml"
 
@@ -42,11 +45,21 @@ def get_agent_arn() -> str:
         with open(config_file) as f:
             config = yaml.safe_load(f)
 
-        arn = config.get("agent_runtime_arn")
-        if not arn:
-            raise ValueError(f"agent_runtime_arn not found in {config_file}")
+        # Get the default agent name
+        default_agent = config.get("default_agent")
+        if not default_agent:
+            raise ValueError(f"default_agent not found in {config_file}")
 
-        return arn
+        # Navigate to the agent's ARN
+        agents = config.get("agents", {})
+        agent_config = agents.get(default_agent, {})
+        arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
+        region = agent_config.get("aws", {}).get("region", "us-west-2")
+
+        if not arn:
+            raise ValueError(f"agent_arn not found for agent '{default_agent}' in {config_file}")
+
+        return arn, region
 
     except FileNotFoundError:
         logger.error(f"{config_file} not found")
@@ -66,13 +79,14 @@ def invoke_agent(prompt: str) -> dict:
     Returns:
         The agent's response as a dictionary
     """
-    agent_arn = get_agent_arn()
+    agent_arn, region = get_agent_config()
 
     logger.info(f"Agent ARN: {agent_arn}")
+    logger.info(f"Region: {region}")
     logger.info(f"Prompt: {prompt}")
 
     # Create the AgentCore client
-    client = boto3.client("bedrock-agentcore")
+    client = boto3.client("bedrock-agentcore", region_name=region)
 
     # Prepare the payload
     payload = json.dumps({"prompt": prompt}).encode()
@@ -92,10 +106,24 @@ def invoke_agent(prompt: str) -> dict:
     # Read and parse the streaming response
     content_parts = []
     errors = []
+    raw_buffer = ""
 
     for chunk in response.get("response", []):
+        raw_buffer += chunk.decode("utf-8")
+
+    # Parse SSE format - each message is "data: {...}\n\n"
+    for message in raw_buffer.split("\n\n"):
+        message = message.strip()
+        if not message:
+            continue
+
+        # Strip "data: " prefix if present
+        if message.startswith("data: "):
+            message = message[6:]
+
+        # Try to parse as JSON
         try:
-            chunk_data = json.loads(chunk.decode("utf-8"))
+            chunk_data = json.loads(message)
 
             # Handle different response types
             if chunk_data.get("type") == "chunk":
@@ -103,24 +131,28 @@ def invoke_agent(prompt: str) -> dict:
             elif chunk_data.get("type") == "error":
                 errors.append(chunk_data.get("error", "Unknown error"))
             elif chunk_data.get("type") == "complete":
-                logger.info("Response complete")
+                pass  # End of response
             else:
                 # Handle legacy format (direct response)
                 if "response" in chunk_data:
                     content_parts.append(chunk_data["response"])
                 elif "data" in chunk_data:
                     content_parts.append(chunk_data["data"])
-
         except json.JSONDecodeError:
-            # Raw text chunk
-            content_parts.append(chunk.decode("utf-8"))
+            # Not JSON, could be raw text
+            if message:
+                content_parts.append(message)
+
+    # Join content and clean up escaped newlines
+    full_response = "".join(content_parts)
+    full_response = full_response.replace("\\n", "\n")
 
     if errors:
         return {"status": "error", "errors": errors}
 
     return {
         "status": "success",
-        "response": "".join(content_parts),
+        "response": full_response,
     }
 
 
@@ -129,7 +161,7 @@ def main():
     if len(sys.argv) > 1:
         prompt = " ".join(sys.argv[1:])
     else:
-        prompt = "What is the database schema?"
+        prompt = "How many aircraft are in the database?"
 
     print("=" * 70)
     print("Neo4j MCP Agent - Programmatic Invocation")

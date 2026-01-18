@@ -39,7 +39,7 @@ cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
 **What this does:** The agent needs OAuth2 credentials to authenticate with the AgentCore Gateway. The `.mcp-credentials.json` file is generated when you deploy the Neo4j MCP server and contains everything the agent needs to obtain access tokens and call the Gateway.
 
-**How the code uses credentials:** The `agent.py` file loads this JSON file at startup using the `load_credentials()` function. Before each request, it checks if the OAuth2 access token is expired using `check_token_expiry()`. If expired or missing, it calls `refresh_token()` which makes an HTTP POST request to the Cognito token endpoint using the client credentials grant flow. The refreshed token is saved back to the file for subsequent requests.
+**How the code uses credentials:** The `aircraft-agent.py` file loads this JSON file at startup using the `load_credentials()` function. Before each request, it checks if the OAuth2 access token is expired using `check_token_expiry()`. If expired or missing, it calls `refresh_token()` which makes an HTTP POST request to the Cognito token endpoint using the client credentials grant flow. The refreshed token is saved back to the file for subsequent requests.
 
 **Required fields in `.mcp-credentials.json`:**
 
@@ -66,9 +66,9 @@ In another terminal, test with:
 ./agent.sh test
 ```
 
-**What this does:** The `start` command runs `agent.py` directly using the Python interpreter. The agent creates an HTTP server on port 8080 that accepts POST requests to the `/invocations` endpoint.
+**What this does:** The `start` command runs `aircraft-agent.py` directly using the Python interpreter. The agent creates an HTTP server on port 8080 that accepts POST requests to the `/invocations` endpoint.
 
-**How the agent works:** When a request arrives, the `invoke()` function in `agent.py` is called (decorated with `@app.entrypoint`). This function:
+**How the agent works:** When a request arrives, the `invoke()` function in `aircraft-agent.py` is called (decorated with `@app.entrypoint`). This function:
 
 1. Extracts the user's prompt from the request payload
 2. Loads credentials and refreshes the OAuth2 token if needed
@@ -79,7 +79,7 @@ In another terminal, test with:
 7. Runs the agent loop which reasons about the question, calls tools as needed, and generates a final response
 8. Streams the response back to the client
 
-The agent includes a system prompt (defined in `agent.py`) that instructs Claude how to use the Neo4j tools effectively—first retrieving the schema to understand the database structure, then formulating appropriate Cypher queries.
+The agent includes a system prompt (defined in `aircraft-agent.py`) that instructs Claude how to use the Neo4j tools effectively—first retrieving the schema to understand the database structure, then formulating appropriate Cypher queries.
 
 Stop the local agent with Ctrl+C or `./agent.sh stop`.
 
@@ -91,16 +91,18 @@ Run the AgentCore configure command:
 ./agent.sh configure
 ```
 
-**What this does:** This runs the `agentcore configure` CLI command which analyzes your `agent.py` file and creates a `.bedrock_agentcore.yaml` configuration file. This YAML file contains:
+Accept all the defaults when prompted.
 
-- The entrypoint file path (`agent.py`)
+**What this does:** This runs the `agentcore configure` CLI command which analyzes your `aircraft-agent.py` file and creates a `.bedrock_agentcore.yaml` configuration file. This YAML file contains:
+
+- The entrypoint file path (`aircraft-agent.py`)
 - The AWS region for deployment
 - Runtime configuration settings
 - After deployment, the agent runtime ARN is also stored here
 
 The configure command also prompts for deployment preferences and validates that your AWS credentials have the necessary permissions for AgentCore operations.
 
-For a specific region, you can run: `uv run agentcore configure -e agent.py -r us-east-1`
+For a specific region, you can run: `uv run agentcore configure -e aircraft-agent.py -r us-east-1`
 
 ### Step 5: Deploy to AgentCore Runtime
 
@@ -112,13 +114,15 @@ Deploy the agent to AWS:
 
 **What this does:** The `agentcore deploy` command packages your agent code and deploys it to Amazon Bedrock AgentCore Runtime. This process:
 
-1. **Packages the code** - Bundles `agent.py`, dependencies, and the `.mcp-credentials.json` file
+1. **Packages the code** - Bundles `aircraft-agent.py`, dependencies, and the `.mcp-credentials.json` file
 2. **Creates an ECR image** - Builds a container image with your agent code and pushes it to Amazon ECR
 3. **Provisions the runtime** - Creates an AgentCore Runtime resource that runs your containerized agent
 4. **Sets up IAM roles** - Creates the necessary IAM roles for the agent to access Bedrock and other AWS services
 5. **Configures CloudWatch** - Sets up log groups for monitoring agent execution
 
 This process typically takes several minutes. The output includes the Agent ARN which uniquely identifies your deployed agent.
+
+The deployment output also includes a **GenAI Observability Dashboard** URL. Open this URL in your browser to monitor your agent's performance and trace requests as you test it in the following steps.
 
 Check deployment status anytime with:
 
@@ -149,7 +153,7 @@ This validates that the entire end-to-end flow works in the cloud environment.
 Use the `invoke_agent.py` script to call the deployed agent from Python:
 
 ```bash
-python invoke_agent.py "What is the database schema?"
+uv run python invoke_agent.py "What is the database schema?"
 ```
 
 **What this does:** The `invoke_agent.py` script demonstrates how to call your deployed agent from application code using the AWS SDK (boto3). This is the pattern you would use to integrate the agent into a larger application.
@@ -282,7 +286,7 @@ After running `./agent.sh deploy`, the output includes:
 **How the components interact:**
 
 1. **User Input** arrives via HTTP POST to the `/invocations` endpoint
-2. **BedrockAgentCoreApp** (in `agent.py`) receives the request and extracts the prompt
+2. **BedrockAgentCoreApp** (in `aircraft-agent.py`) receives the request and extracts the prompt
 3. **LangChain ReAct Agent** reasons about the question and decides which tools to call
 4. **langchain-mcp-adapters** converts MCP tool calls into the proper format and sends them through the Gateway
 5. **AgentCore Gateway** authenticates the request using the OAuth2 JWT token and forwards it to the MCP server
@@ -308,7 +312,7 @@ After running `./agent.sh deploy`, the output includes:
 
 | File | Description |
 |------|-------------|
-| `agent.py` | Main agent implementation with the `@app.entrypoint` handler, OAuth2 token management, MCP client setup, and ReAct agent creation |
+| `aircraft-agent.py` | Main agent implementation with the `@app.entrypoint` handler, OAuth2 token management, MCP client setup, and ReAct agent creation |
 | `agent.sh` | Bash wrapper script that provides a simple CLI for all agent operations |
 | `invoke_agent.py` | Example script showing how to invoke the deployed agent programmatically using boto3 |
 | `simple-agent.py` | Simplified version of the agent for local testing and experimentation |

@@ -27,7 +27,8 @@ from pathlib import Path
 
 import httpx
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from langchain_aws import ChatBedrockConverse
+from langchain.agents import create_react_agent
+from langchain.chat_models import init_chat_model
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 # Configure logging
@@ -141,9 +142,12 @@ def refresh_token(credentials: dict) -> dict:
 
 def get_llm(region: str = AWS_REGION):
     """Get the LLM to use for the agent (AWS Bedrock Claude via Converse API)."""
-    return ChatBedrockConverse(
+    import boto3
+    bedrock_client = boto3.client("bedrock-runtime", region_name=region)
+    return init_chat_model(
+        client=bedrock_client,
         model=MODEL_ID,
-        region_name=region,
+        model_provider="bedrock_converse",
         temperature=0,
     )
 
@@ -238,28 +242,25 @@ async def invoke(payload: dict = None):
         tools = await mcp_client.get_tools()
         logger.info(f"Loaded {len(tools)} tools: {[t.name for t in tools]}")
 
-        # Create the ReAct agent
-        from langchain.agents import create_react_agent
-        from langchain_core.prompts import ChatPromptTemplate
+        # Create the ReAct agent (LangGraph best practice pattern)
+        agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
 
-        # Create the agent
-        from langchain.agents import create_tool_calling_agent, AgentExecutor
-
-        prompt_template = ChatPromptTemplate.from_messages([
-            ("system", SYSTEM_PROMPT),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ])
-
-        agent = create_tool_calling_agent(llm, tools, prompt_template)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
-
-        # Run the agent
+        # Run the agent with streaming
         logger.info("Running agent...")
-        result = await agent_executor.ainvoke({"input": prompt})
+        response_text = ""
+        async for message_chunk, metadata in agent.astream(
+            {"messages": [("human", prompt)]},
+            stream_mode="messages"
+        ):
+            if message_chunk.content:
+                for content in message_chunk.content:
+                    if isinstance(content, dict) and 'text' in content:
+                        response_text += content['text']
+                    elif isinstance(content, str):
+                        response_text += content
 
-        # Extract and yield the response
-        response_text = result.get("output", "No response from agent")
+        if not response_text:
+            response_text = "No response from agent"
 
         # Stream the response in chunks (for compatibility with streaming clients)
         yield {"type": "chunk", "data": response_text}

@@ -15,8 +15,9 @@ import json
 import sys
 from pathlib import Path
 
+from langchain.chat_models import init_chat_model
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain.agents import create_agent
+from langgraph.prebuilt import create_react_agent
 
 
 CREDENTIALS_FILE = ".mcp-credentials.json"
@@ -67,10 +68,9 @@ def load_credentials() -> dict:
 
 def get_llm(region: str = "us-west-2"):
     """Get the LLM to use for the agent (AWS Bedrock Claude via Converse API)."""
-    from langchain_aws import ChatBedrockConverse
-
-    return ChatBedrockConverse(
-        model=MODEL_ID,
+    return init_chat_model(
+        MODEL_ID,
+        model_provider="bedrock_converse",
         region_name=region,
         temperature=0,
     )
@@ -95,7 +95,7 @@ async def run_agent(question: str):
     # Initialize LLM
     print(f"Initializing LLM (Bedrock, region: {region})...")
     llm = get_llm(region)
-    print(f"Using: {llm.model_id}")
+    print(f"Using: {MODEL_ID}")
     print()
 
     # Connect to MCP server
@@ -122,11 +122,7 @@ async def run_agent(question: str):
 
     # Create the ReAct agent
     print("Creating agent...")
-    agent = create_agent(
-        llm,
-        tools,
-        system_prompt=SYSTEM_PROMPT,
-    )
+    agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
 
     # Run the agent
     print("=" * 70)
@@ -134,7 +130,7 @@ async def run_agent(question: str):
     print("=" * 70)
     print()
 
-    result = await agent.ainvoke({"messages": [("user", question)]})
+    result = await agent.ainvoke({"messages": [("human", question)]})
 
     # Extract and print the final response
     messages = result.get("messages", [])

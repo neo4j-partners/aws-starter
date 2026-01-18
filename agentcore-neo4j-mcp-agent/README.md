@@ -255,11 +255,100 @@ AccessDeniedException: You don't have access to the model
 ```
 Enable Claude Sonnet 4 model access in your AWS Bedrock console.
 
+### Port 8080 Already in Use
+```
+{"timestamp":"...","status":404,"error":"Not Found","path":"/invocations"}
+```
+If you get a 404 error or unexpected response format (especially JSON with "timestamp" field), another service may be running on port 8080.
+
+Check what's using the port:
+```bash
+lsof -i :8080
+```
+
+Kill conflicting processes:
+```bash
+# Kill by PID (replace 12345 with actual PID from lsof output)
+kill 12345
+
+# Or kill all processes on port 8080
+lsof -ti :8080 | xargs kill
+```
+
+Then restart the agent with `./agent.sh start`.
+
 ### Deployment Failed
 ```
 agentcore deploy failed
 ```
 Check `./agent.sh status` for details. Ensure you have proper IAM permissions for bedrock-agentcore actions.
+
+## Observability & Monitoring
+
+### CloudWatch Logs
+
+Agent logs are automatically stored in CloudWatch Logs. After deployment, find your logs at:
+
+```
+/aws/bedrock-agentcore/runtimes/{agent-id}-DEFAULT
+```
+
+**View logs via CLI:**
+
+```bash
+# Get your agent runtime ID from status
+./agent.sh status
+
+# Tail logs (replace with your agent ID)
+aws logs tail /aws/bedrock-agentcore/runtimes/<agent-id>-DEFAULT --follow
+
+# View recent logs
+aws logs tail /aws/bedrock-agentcore/runtimes/<agent-id>-DEFAULT --since 1h
+```
+
+### AWS Console
+
+View agent resources in the AWS Management Console:
+
+| Resource | Console Location |
+|----------|------------------|
+| Agent Logs | **CloudWatch** → Log groups → `/aws/bedrock-agentcore/runtimes/{agent-id}-DEFAULT` |
+| Agent Runtime | **Bedrock AgentCore** → Runtimes |
+| Memory Resources | **Bedrock AgentCore** → Memory |
+| IAM Role | **IAM** → Roles → Search "BedrockAgentCore" |
+
+### Enabling Transaction Search (Tracing)
+
+For enhanced tracing and observability, enable CloudWatch Transaction Search before deploying:
+
+1. Open the AWS Console
+2. Navigate to **CloudWatch** → **Settings** → **Transaction Search**
+3. Follow the [AgentCore Observability Setup Guide](https://docs.aws.amazon.com/bedrock-agentcore/latest/userguide/runtime-observability.html)
+
+### CLI Commands for Monitoring
+
+```bash
+# Check deployment status and resource health
+./agent.sh status
+
+# Or directly with agentcore CLI
+uv run agentcore status
+
+# List all deployed agent runtimes
+aws bedrock-agentcore-control list-agent-runtimes --region us-west-2
+
+# Get details for a specific runtime
+aws bedrock-agentcore-control get-agent-runtime \
+    --agent-runtime-id <agent-id> \
+    --region us-west-2
+```
+
+### Deployment Output
+
+After running `./agent.sh deploy`, the output includes:
+- **Agent ARN** - Full Amazon Resource Name for invoking the agent
+- **CloudWatch Log Group** - Location for debugging and monitoring
+- **Endpoint URL** - For direct API invocation
 
 ## References
 

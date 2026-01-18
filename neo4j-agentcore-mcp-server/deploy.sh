@@ -6,8 +6,7 @@
 #
 # Usage:
 #   ./deploy.sh              # Full deployment (build, push, stack)
-#   ./deploy.sh build        # Build ARM64 image only
-#   ./deploy.sh push         # Push to ECR only (assumes image exists)
+#   ./deploy.sh redeploy     # Fast redeploy (build, push, update runtime)
 #   ./deploy.sh stack        # Deploy CDK stack only (assumes image in ECR)
 #   ./deploy.sh synth        # Synthesize CloudFormation template (dry run)
 #   ./deploy.sh status       # Show stack status and outputs
@@ -485,6 +484,66 @@ cmd_cleanup() {
 }
 
 # ============================================================================
+# Redeploy Command (build + push + update runtime)
+# ============================================================================
+
+cmd_redeploy() {
+    log_step "Redeploying MCP Server (build + push + update runtime)"
+
+    if ! stack_exists; then
+        log_error "Stack '$STACK_NAME' does not exist. Run './deploy.sh' for initial deployment."
+        exit 1
+    fi
+
+    # Build and push new image
+    cmd_build
+    cmd_push
+
+    # Get runtime info from stack outputs
+    log_info "Getting runtime configuration from stack..."
+
+    local runtime_id role_arn
+    runtime_id=$(aws cloudformation describe-stacks \
+        --stack-name "$STACK_NAME" \
+        --query 'Stacks[0].Outputs[?OutputKey==`MCPServerRuntimeId`].OutputValue' \
+        --output text \
+        --region "$AWS_REGION")
+
+    role_arn=$(aws cloudformation describe-stacks \
+        --stack-name "$STACK_NAME" \
+        --query 'Stacks[0].Outputs[?OutputKey==`AgentExecutionRoleArn`].OutputValue' \
+        --output text \
+        --region "$AWS_REGION")
+
+    if [[ -z "$runtime_id" ]] || [[ -z "$role_arn" ]]; then
+        log_error "Could not retrieve runtime info from stack outputs"
+        exit 1
+    fi
+
+    local account_id ecr_uri full_image_uri
+    account_id=$(get_account_id)
+    ecr_uri=$(get_ecr_uri "$account_id")
+    full_image_uri="${ecr_uri}:${IMAGE_TAG}"
+
+    log_step "Updating AgentCore Runtime"
+    log_info "Runtime ID: $runtime_id"
+    log_info "New Image: $full_image_uri"
+    echo ""
+
+    # Update the runtime with new container image
+    aws bedrock-agentcore-control update-agent-runtime \
+        --agent-runtime-id "$runtime_id" \
+        --agent-runtime-artifact "{\"containerConfiguration\":{\"containerUri\":\"$full_image_uri\"}}" \
+        --role-arn "$role_arn" \
+        --network-configuration "{\"networkMode\":\"PUBLIC\"}" \
+        --region "$AWS_REGION"
+
+    log_success "Runtime update initiated"
+    log_info "The runtime will redeploy with the new image."
+    log_info "Check status with: ./deploy.sh status"
+}
+
+# ============================================================================
 # Credentials Command
 # ============================================================================
 
@@ -675,8 +734,7 @@ Usage: $0 [command] [options]
 
 Commands:
   (none)       Full deployment: build image, push to ECR, deploy stack
-  build        Build the ARM64 Docker image only
-  push         Push to ECR only (assumes image already built)
+  redeploy     Fast redeploy: build, push, and update runtime (no stack changes)
   stack        Deploy CDK stack only (assumes image in ECR)
   synth        Synthesize CloudFormation template (dry run)
   status       Show stack status and outputs
@@ -702,9 +760,8 @@ Environment Variables (from .env):
 
 Examples:
   $0                   # Full deployment (build + push + stack)
+  $0 redeploy          # Fast redeploy (build + push + update runtime)
   $0 --skip-build      # Push existing image and deploy stack
-  $0 build             # Build image only
-  $0 push              # Push to ECR only
   $0 stack             # Deploy stack only
   $0 synth             # Generate CloudFormation template
   $0 status            # Check deployment status
@@ -744,7 +801,7 @@ main() {
     # Test Neo4j connectivity before any deployment steps
     # Skip for commands that don't need Neo4j
     case "$command" in
-        status|cleanup|credentials|help)
+        status|cleanup|credentials|redeploy|help)
             # These commands don't need Neo4j connectivity
             ;;
         *)
@@ -768,11 +825,8 @@ main() {
             cmd_push
             cmd_stack
             ;;
-        build)
-            cmd_build
-            ;;
-        push)
-            cmd_push
+        redeploy)
+            cmd_redeploy
             ;;
         stack)
             cmd_stack

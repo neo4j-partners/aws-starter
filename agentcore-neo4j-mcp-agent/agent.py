@@ -27,7 +27,7 @@ from pathlib import Path
 
 import httpx
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from langchain.agents import create_react_agent
+from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
@@ -243,7 +243,7 @@ async def invoke(payload: dict = None):
         logger.info(f"Loaded {len(tools)} tools: {[t.name for t in tools]}")
 
         # Create the ReAct agent (LangGraph best practice pattern)
-        agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+        agent = create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 
         # Run the agent with streaming
         logger.info("Running agent...")

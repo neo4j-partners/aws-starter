@@ -15,9 +15,9 @@ import json
 import sys
 from pathlib import Path
 
+from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
 
 
 CREDENTIALS_FILE = ".mcp-credentials.json"
@@ -122,7 +122,7 @@ async def run_agent(question: str):
 
     # Create the ReAct agent
     print("Creating agent...")
-    agent = create_react_agent(llm, tools, prompt=SYSTEM_PROMPT)
+    agent = create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 
     # Run the agent
     print("=" * 70)

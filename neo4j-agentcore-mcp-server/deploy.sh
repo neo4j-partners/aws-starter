@@ -22,7 +22,7 @@ set -e
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/../.env"
+ENV_FILE=".env"
 NEO4J_MCP_REPO="/Users/ryanknight/projects/mcp"
 CDK_DIR="$SCRIPT_DIR/cdk"
 
@@ -58,7 +58,7 @@ log_step() {
 # Load environment variables from .env file
 load_env() {
     if [[ ! -f "$ENV_FILE" ]]; then
-        log_error ".env file not found at $ENV_FILE"
+        log_error ".env file not found in current directory"
         log_error "Copy .env.sample to .env and fill in your credentials"
         exit 1
     fi
@@ -88,6 +88,44 @@ validate_env() {
         for var in "${missing[@]}"; do
             log_error "  - $var"
         done
+        exit 1
+    fi
+}
+
+# Test Neo4j connectivity
+test_neo4j_connection() {
+    log_info "Testing Neo4j connectivity..."
+
+    # Check for cypher-shell
+    if ! command -v cypher-shell &> /dev/null; then
+        log_error "cypher-shell not found - cannot verify Neo4j connectivity"
+        log_error "Install with: brew install cypher-shell"
+        log_error "Continuing without connectivity check..."
+        return 0
+    fi
+
+    # Test connection
+    if echo "RETURN 1 AS test;" | cypher-shell \
+        -a "$NEO4J_URI" \
+        -u "$NEO4J_USERNAME" \
+        -p "$NEO4J_PASSWORD" \
+        -d "$NEO4J_DATABASE" \
+        --non-interactive \
+        --format plain &> /dev/null; then
+        log_success "Neo4j connection successful"
+        return 0
+    else
+        log_error "Cannot connect to Neo4j database"
+        log_error "  URI:      $NEO4J_URI"
+        log_error "  Database: $NEO4J_DATABASE"
+        log_error "  Username: $NEO4J_USERNAME"
+        log_error ""
+        log_error "Please verify:"
+        log_error "  - Neo4j credentials are correct"
+        log_error "  - Neo4j database is running and accessible"
+        log_error "  - Network connectivity (firewall, VPN, etc.)"
+        log_error ""
+        log_error "Test manually with: ./test-neo4j-connection.sh"
         exit 1
     fi
 }
@@ -702,6 +740,17 @@ main() {
     # Load and validate environment
     load_env
     validate_env
+
+    # Test Neo4j connectivity before any deployment steps
+    # Skip for commands that don't need Neo4j
+    case "$command" in
+        status|cleanup|credentials|help)
+            # These commands don't need Neo4j connectivity
+            ;;
+        *)
+            test_neo4j_connection
+            ;;
+    esac
 
     log_info "Configuration:"
     log_info "  Region: $AWS_REGION"

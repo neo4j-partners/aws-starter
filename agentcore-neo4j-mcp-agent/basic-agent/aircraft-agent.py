@@ -47,43 +47,73 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 app = BedrockAgentCoreApp()
 
 # Configuration
-CREDENTIALS_FILE = Path(__file__).parent / ".mcp-credentials.json"
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
-SYSTEM_PROMPT = """You are a helpful Neo4j database assistant with access to tools that let you query a Neo4j graph database.
+# In-memory caches (loaded once at startup, never written to disk)
+_CREDENTIALS: dict | None = None
+_CACHED_SCHEMA: str | None = None
 
-Your capabilities include:
-- Retrieve the database schema to understand node labels, relationship types, and properties
+SYSTEM_PROMPT_TEMPLATE = """You are a helpful Neo4j database assistant with access to tools that let you query a Neo4j graph database.
+
+## Database Schema (Pre-loaded)
+
+The database schema is already known - DO NOT call get-schema, use this instead:
+
+{schema}
+
+## Your Capabilities
+
 - Execute read-only Cypher queries to answer questions about the data
 - Do not execute any write Cypher queries
 
-When answering questions about the database:
-1. First retrieve the schema to understand the database structure
-2. Formulate appropriate Cypher queries based on the actual schema
-3. If a query returns no results, explain what you looked for and suggest alternatives
-4. Format results in a clear, human-readable way
-5. Cite the actual data returned in your response
+## Query Guidelines
 
-Important Cypher notes:
+When answering questions:
+1. Use the schema above to formulate Cypher queries - no need to retrieve it
+2. If a query returns no results, explain what you looked for and suggest alternatives
+3. Format results in a clear, human-readable way
+4. Cite the actual data returned in your response
+
+## CRITICAL: Always Use LIMIT
+
+**ALWAYS add LIMIT to every query that returns rows (not aggregations):**
+- For listing/browsing queries: use `LIMIT 10` (or `LIMIT 25` max)
+- For sample data: use `LIMIT 5`
+- For aggregations (COUNT, SUM, AVG): LIMIT is optional
+- NEVER return unlimited result sets
+
+Examples:
+- MATCH (a:Aircraft) RETURN a LIMIT 10  ✓
+- MATCH (a:Aircraft) RETURN a  ✗ (missing LIMIT)
+- MATCH (a:Aircraft) RETURN count(a)  ✓ (aggregation, LIMIT optional)
+
+## Other Cypher Notes
+
 - Use MATCH patterns that align with the actual schema
 - For counting, use MATCH (n:Label) RETURN count(n)
-- For listing items, add LIMIT to avoid overwhelming results
 - Handle potential NULL values gracefully
 
 Be concise but thorough in your responses."""
 
 
 def load_credentials() -> dict:
-    """Load credentials from .mcp-credentials.json."""
-    if not CREDENTIALS_FILE.exists():
-        raise FileNotFoundError(
-            f"Credentials file not found: {CREDENTIALS_FILE}\n"
-            "Create .mcp-credentials.json with gateway_url, access_token, etc."
-        )
+    """Load credentials from in-memory cache (loaded once at startup)."""
+    global _CREDENTIALS
 
-    with open(CREDENTIALS_FILE) as f:
-        return json.load(f)
+    if _CREDENTIALS is None:
+        # Load from file once at startup
+        credentials_file = Path(__file__).parent / ".mcp-credentials.json"
+        if not credentials_file.exists():
+            raise FileNotFoundError(
+                f"Credentials file not found: {credentials_file}\n"
+                "Create .mcp-credentials.json with gateway_url, access_token, etc."
+            )
+        with open(credentials_file) as f:
+            _CREDENTIALS = json.load(f)
+        logger.info("Credentials loaded into memory")
+
+    return _CREDENTIALS
 
 
 def check_token_expiry(credentials: dict) -> bool:
@@ -101,7 +131,7 @@ def check_token_expiry(credentials: dict) -> bool:
 
 
 def refresh_token(credentials: dict) -> dict:
-    """Refresh the OAuth2 access token using client credentials."""
+    """Refresh the OAuth2 access token using client credentials (in-memory only)."""
     token_url = credentials.get("token_url")
     client_id = credentials.get("client_id")
     client_secret = credentials.get("client_secret")
@@ -130,13 +160,11 @@ def refresh_token(credentials: dict) -> dict:
     expires_in = token_data.get("expires_in", 3600)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
+    # Update in-memory credentials only (no file writes for cloud compatibility)
     credentials["access_token"] = token_data["access_token"]
     credentials["token_expires_at"] = expires_at.isoformat()
 
-    with open(CREDENTIALS_FILE, "w") as f:
-        json.dump(credentials, f, indent=2)
-
-    logger.info(f"Token refreshed. Expires: {expires_at.isoformat()}")
+    logger.info(f"Token refreshed (in-memory). Expires: {expires_at.isoformat()}")
     return credentials
 
 
@@ -150,6 +178,57 @@ def get_llm(region: str = AWS_REGION):
         model_provider="bedrock_converse",
         temperature=0,
     )
+
+
+async def fetch_schema(gateway_url: str, access_token: str) -> str:
+    """Fetch schema from the MCP server."""
+    from datetime import timedelta
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamablehttp_client
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    async with streamablehttp_client(
+        gateway_url, headers, timeout=timedelta(seconds=60), terminate_on_close=False
+    ) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            # Get tool map to handle Gateway prefixing
+            result = await session.list_tools()
+            tool_map = {}
+            for tool in result.tools:
+                full_name = tool.name
+                if "___" in full_name:
+                    base_name = full_name.split("___", 1)[1]
+                else:
+                    base_name = full_name
+                tool_map[base_name] = full_name
+
+            # Call get-schema
+            schema_tool = tool_map.get("get-schema")
+            if not schema_tool:
+                return "Schema not available"
+
+            result = await session.call_tool(schema_tool, {})
+            if result.content:
+                return result.content[0].text
+            return "Schema not available"
+
+
+async def get_cached_schema(gateway_url: str, access_token: str) -> str:
+    """Get schema from cache or fetch it."""
+    global _CACHED_SCHEMA
+
+    if _CACHED_SCHEMA is None:
+        logger.info("Fetching schema from MCP server (first request)...")
+        _CACHED_SCHEMA = await fetch_schema(gateway_url, access_token)
+        logger.info(f"Schema cached ({len(_CACHED_SCHEMA)} bytes)")
+
+    return _CACHED_SCHEMA
 
 
 def extract_prompt_from_payload(payload: dict) -> tuple[str | None, str, str]:
@@ -221,6 +300,10 @@ async def invoke(payload: dict = None):
         logger.info(f"Gateway: {gateway_url}")
         logger.info(f"Model: {MODEL_ID}")
 
+        # Get cached schema (fetched once on first request)
+        schema = await get_cached_schema(gateway_url, access_token)
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(schema=schema)
+
         # Initialize LLM
         llm = get_llm(region)
 
@@ -243,7 +326,7 @@ async def invoke(payload: dict = None):
         logger.info(f"Loaded {len(tools)} tools: {[t.name for t in tools]}")
 
         # Create the ReAct agent (LangGraph best practice pattern)
-        agent = create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
+        agent = create_agent(llm, tools, system_prompt=system_prompt)
 
         # Run the agent with streaming
         logger.info("Running agent...")
@@ -273,7 +356,6 @@ async def invoke(payload: dict = None):
         yield {
             "type": "error",
             "error": str(e),
-            "hint": "Ensure .mcp-credentials.json exists with gateway_url and access_token",
         }
     except httpx.HTTPStatusError as e:
         logger.error(f"HTTP error: {e.response.status_code} - {e.response.text}")

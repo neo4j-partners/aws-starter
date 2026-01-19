@@ -92,10 +92,11 @@ case "${1:-help}" in
             echo "  cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json ."
             exit 1
         fi
-        echo -e "${GREEN}Starting agent locally on port 8080...${NC}"
+        echo -e "${GREEN}Starting agent locally on port 8080 with OTEL instrumentation...${NC}"
         echo "Test with: curl -X POST http://localhost:8080/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
-        uv run python aircraft-agent.py
+        # Use opentelemetry-instrument for automatic tracing (ADOT)
+        uv run opentelemetry-instrument python aircraft-agent.py
         ;;
 
     stop)

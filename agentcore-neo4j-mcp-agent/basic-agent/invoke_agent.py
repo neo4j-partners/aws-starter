@@ -7,6 +7,7 @@ Demonstrates how to invoke the deployed Neo4j MCP Agent using boto3.
 Usage:
     uv run python invoke_agent.py                          # Uses default prompt
     uv run python invoke_agent.py "What is the schema?"    # Custom prompt
+    uv run python invoke_agent.py load-test                # Load test mode (random queries every 5s)
 
 Prerequisites:
     - Agent deployed to AgentCore Runtime (./agent.sh deploy)
@@ -16,8 +17,12 @@ Prerequisites:
 
 import json
 import logging
+import random
+import re
 import sys
+import time
 import uuid
+from pathlib import Path
 
 import boto3
 import yaml
@@ -156,7 +161,85 @@ def invoke_agent(prompt: str) -> dict:
     }
 
 
+def load_queries() -> list[str]:
+    """Load queries from queries.txt file."""
+    queries_file = Path(__file__).parent / "queries.txt"
+
+    if not queries_file.exists():
+        logger.error(f"queries.txt not found at {queries_file}")
+        return []
+
+    queries = []
+    with open(queries_file) as f:
+        for line in f:
+            # Match lines starting with a number followed by a period
+            match = re.match(r'^\d+\.\s+(.+)$', line.strip())
+            if match:
+                queries.append(match.group(1))
+
+    return queries
+
+
+def run_load_test():
+    """Run continuous load test with random queries every 5 seconds."""
+    queries = load_queries()
+
+    if not queries:
+        print("ERROR: No queries found in queries.txt")
+        sys.exit(1)
+
+    print("=" * 70)
+    print("Neo4j MCP Agent - Load Test Mode")
+    print("=" * 70)
+    print(f"Loaded {len(queries)} queries from queries.txt")
+    print("Running a random query every 5 seconds...")
+    print("Press Ctrl+C to stop")
+    print("=" * 70)
+    print("")
+
+    iteration = 1
+
+    try:
+        while True:
+            # Select a random query
+            query_idx = random.randint(0, len(queries) - 1)
+            query = queries[query_idx]
+
+            print("=" * 70)
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Iteration {iteration} - Query #{query_idx + 1}")
+            print("=" * 70)
+            print(f"Query: {query}")
+            print("-" * 70)
+            print("")
+
+            result = invoke_agent(query)
+
+            if result.get("status") == "success":
+                print(result.get("response", "No response"))
+            else:
+                print(f"ERROR: {result.get('errors', ['Unknown error'])}")
+
+            print("")
+            print("-" * 70)
+            print("Waiting 5 seconds before next query...")
+            print("")
+
+            iteration += 1
+            time.sleep(5)
+
+    except KeyboardInterrupt:
+        print("")
+        print("=" * 70)
+        print(f"Load test stopped after {iteration - 1} iterations")
+        print("=" * 70)
+
+
 def main():
+    # Check for load-test mode
+    if len(sys.argv) > 1 and sys.argv[1] == "load-test":
+        run_load_test()
+        return
+
     # Get prompt from command line or use default
     if len(sys.argv) > 1:
         prompt = " ".join(sys.argv[1:])

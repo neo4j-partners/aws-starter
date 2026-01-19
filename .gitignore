@@ -156,6 +156,10 @@ samconfig.toml
 packaged.yaml
 *.zip
 
+# Amazon Bedrock AgentCore
+.bedrock_agentcore.yaml
+.bedrock_agentcore/
+
 # CloudFormation / CDK
 cdk.out/
 .cdk.staging/

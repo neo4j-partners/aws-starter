@@ -6,7 +6,7 @@ A supervisor agent that routes queries to specialized workers:
 - Maintenance Agent: reliability, faults, components, sensors
 - Operations Agent: flights, delays, routes, airports
 
-Uses LangGraph Supervisor pattern for multi-agent orchestration.
+Uses LangGraph StateGraph for multi-agent orchestration.
 
 Local testing:
     python orchestrator_agent.py
@@ -24,17 +24,21 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal, TypedDict, Annotated
 
 import boto3
 import httpx
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from langchain_aws import ChatBedrockConverse
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph_supervisor import create_supervisor
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 
-from maintenance_agent import create_maintenance_agent
-from operations_agent import create_operations_agent
+from maintenance_agent import MAINTENANCE_SYSTEM_PROMPT
+from operations_agent import OPERATIONS_SYSTEM_PROMPT
 
 # Configure logging
 logging.basicConfig(
@@ -57,11 +61,10 @@ AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
 # In-memory caches
 _CREDENTIALS: dict | None = None
-_CACHED_SCHEMA: str | None = None
 
 
 # =============================================================================
-# Credential Management (same as basic-agent)
+# Credential Management
 # =============================================================================
 
 def load_credentials() -> dict:
@@ -163,63 +166,132 @@ async def get_mcp_tools(gateway_url: str, access_token: str) -> list:
 
 
 # =============================================================================
-# Multi-Agent Orchestrator
+# Multi-Agent Orchestrator State
 # =============================================================================
 
-ORCHESTRATOR_PROMPT = """You are the Query Router for an aviation fleet management system.
+class OrchestratorState(TypedDict):
+    """State for the orchestrator graph."""
+    messages: Annotated[list[BaseMessage], add_messages]
+    next_agent: str  # Which agent to route to
 
-Your job is to understand user queries and delegate them to the appropriate specialist agent.
 
-## Available Specialists
+# =============================================================================
+# Router Node - Classifies and routes queries
+# =============================================================================
 
-1. **maintenance_agent**: Expert in aircraft health, reliability, and technical queries
-   - Handles: faults, failures, components, sensors, readings, maintenance events
-   - Keywords: maintenance, fault, failure, component, system, reliability, sensor, reading, repair
+ROUTER_PROMPT = """You are a query router for an aviation fleet management system.
 
-2. **operations_agent**: Expert in flight operations, scheduling, and delays
-   - Handles: flights, delays, routes, airports, operators, schedules
-   - Keywords: flight, delay, route, airport, operator, schedule, departure, arrival, on-time
+Analyze the user's question and determine which specialist should handle it.
 
-## Routing Rules
+MAINTENANCE keywords: maintenance, fault, failure, component, system, reliability, sensor, reading, repair, hydraulic, engine, avionics, critical, severity
+OPERATIONS keywords: flight, delay, route, airport, operator, schedule, departure, arrival, on-time, airline, carrier
 
-- Analyze the user's question to determine the domain
-- If the query is about aircraft health, components, or maintenance -> delegate to maintenance_agent
-- If the query is about flights, delays, or operations -> delegate to operations_agent
-- If the query spans both domains (e.g., "maintenance issues causing delays") -> delegate to BOTH agents sequentially and synthesize
-- For general questions (schema, counts) -> delegate to operations_agent (broader scope)
+Respond with ONLY one word: either "maintenance" or "operations"
 
-## Important
+If the query is ambiguous or general (like "schema" or "count"), respond with "operations"."""
 
-- Always delegate to a specialist - do not answer directly
-- After receiving specialist responses, synthesize a clear answer for the user
-- Note which specialist(s) handled the query in your response"""
+
+def create_router_node(llm):
+    """Create the router node that classifies queries."""
+
+    async def router(state: OrchestratorState) -> dict:
+        """Route the query to the appropriate specialist."""
+        logger.info("[Router] Classifying query...")
+
+        # Get the user's question from messages
+        user_message = None
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                user_message = msg.content
+                break
+
+        if not user_message:
+            return {"next_agent": "operations"}
+
+        # Ask LLM to classify
+        response = await llm.ainvoke([
+            {"role": "system", "content": ROUTER_PROMPT},
+            {"role": "user", "content": user_message}
+        ])
+
+        classification = response.content.strip().lower()
+        logger.info(f"[Router] Classification: {classification}")
+
+        if "maintenance" in classification:
+            return {"next_agent": "maintenance"}
+        else:
+            return {"next_agent": "operations"}
+
+    return router
+
+
+# =============================================================================
+# Specialist Agents
+# =============================================================================
+
+def create_maintenance_node(llm, tools):
+    """Create the maintenance specialist node."""
+    agent = create_react_agent(llm, tools, prompt=MAINTENANCE_SYSTEM_PROMPT)
+
+    async def maintenance_node(state: OrchestratorState) -> dict:
+        logger.info("[Maintenance Agent] Processing query...")
+        result = await agent.ainvoke({"messages": state["messages"]})
+        logger.info("[Maintenance Agent] Done")
+        return {"messages": result["messages"]}
+
+    return maintenance_node
+
+
+def create_operations_node(llm, tools):
+    """Create the operations specialist node."""
+    agent = create_react_agent(llm, tools, prompt=OPERATIONS_SYSTEM_PROMPT)
+
+    async def operations_node(state: OrchestratorState) -> dict:
+        logger.info("[Operations Agent] Processing query...")
+        result = await agent.ainvoke({"messages": state["messages"]})
+        logger.info("[Operations Agent] Done")
+        return {"messages": result["messages"]}
+
+    return operations_node
+
+
+# =============================================================================
+# Build the Orchestrator Graph
+# =============================================================================
+
+def route_to_agent(state: OrchestratorState) -> Literal["maintenance", "operations"]:
+    """Conditional edge function to route to the correct agent."""
+    return state["next_agent"]
 
 
 async def create_orchestrator_graph(llm, tools):
-    """
-    Create the multi-agent orchestrator using LangGraph Supervisor pattern.
-
-    The supervisor routes queries to specialized workers based on intent.
-    """
+    """Create the multi-agent orchestrator graph."""
     logger.info("Creating orchestrator graph...")
 
-    # Create specialist agents
-    maintenance_agent = create_maintenance_agent(llm, tools)
-    operations_agent = create_operations_agent(llm, tools)
+    # Build the graph
+    graph = StateGraph(OrchestratorState)
 
-    # Create supervisor that coordinates the specialists
-    orchestrator = create_supervisor(
-        agents=[maintenance_agent, operations_agent],
-        model=llm,
-        prompt=ORCHESTRATOR_PROMPT,
+    # Add nodes
+    graph.add_node("router", create_router_node(llm))
+    graph.add_node("maintenance", create_maintenance_node(llm, tools))
+    graph.add_node("operations", create_operations_node(llm, tools))
+
+    # Add edges
+    graph.add_edge(START, "router")
+    graph.add_conditional_edges(
+        "router",
+        route_to_agent,
+        {"maintenance": "maintenance", "operations": "operations"}
     )
+    graph.add_edge("maintenance", END)
+    graph.add_edge("operations", END)
 
-    # Compile with memory for conversation context
+    # Compile with memory
     memory = MemorySaver()
-    graph = orchestrator.compile(checkpointer=memory)
+    compiled = graph.compile(checkpointer=memory)
 
-    logger.info("Orchestrator graph created with 2 specialist agents")
-    return graph
+    logger.info("Orchestrator graph created: Router -> [Maintenance | Operations]")
+    return compiled
 
 
 # =============================================================================
@@ -284,17 +356,17 @@ async def invoke(payload: dict = None):
         logger.info("[Orchestrator] Running multi-agent graph...")
         config = {"configurable": {"thread_id": session_id}}
 
-        response_text = ""
-        async for event in graph.astream(
-            {"messages": [("human", prompt)]},
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(content=prompt)], "next_agent": ""},
             config=config,
-            stream_mode="values",
-        ):
-            # Get the last message from the event
-            if "messages" in event and event["messages"]:
-                last_msg = event["messages"][-1]
-                if hasattr(last_msg, "content") and last_msg.content:
-                    response_text = last_msg.content
+        )
+
+        # Get the final response
+        response_text = ""
+        if result.get("messages"):
+            last_msg = result["messages"][-1]
+            if hasattr(last_msg, "content"):
+                response_text = last_msg.content
 
         if not response_text:
             response_text = "No response from orchestrator"

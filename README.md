@@ -1,6 +1,21 @@
 # AWS Bedrock AgentCore Starter Kit
 
-This repository contains a collection of samples and starter projects for working with Amazon Bedrock AgentCore, focusing on deploying MCP (Model Context Protocol) servers and AI agents.
+This repository is primarily focused on **deploying the Neo4j MCP server to AWS Bedrock AgentCore** and demonstrating various approaches to calling that agent. Beyond basic deployment, the samples explore advanced AgentCore patterns including agent orchestration, observability, and production deployment strategies.
+
+The core workflow centers on:
+1. **Deploying an MCP server** (Neo4j graph database tools) to AgentCore Runtime
+2. **Connecting AI agents** to the deployed MCP server via AgentCore Gateway
+3. **Exploring advanced patterns** like multi-agent orchestration, memory management, and cloud-native agent deployment
+
+## Recommended Learning Path
+
+| Step | Project | Purpose |
+|------|---------|---------|
+| 1 | [`neo4j-agentcore-mcp-server`](./neo4j-agentcore-mcp-server/) | Deploy the Neo4j MCP server to AgentCore |
+| 2 | [`langgraph-neo4j-mcp-agent`](./langgraph-neo4j-mcp-agent/) | Run locally to verify deployment and test MCP tools |
+| 3 | [`agentcore-neo4j-mcp-agent`](./agentcore-neo4j-mcp-agent/) | Deploy the agent itself to AgentCore for orchestration and observability |
+
+---
 
 ## Project Overview
 
@@ -28,9 +43,9 @@ This repository contains a collection of samples and starter projects for workin
 
 *   **[`agentcore-neo4j-mcp-agent`](./agentcore-neo4j-mcp-agent/)**
     *   **Status:** ✅ Ready to Run
-    *   **Description:** A LangGraph ReAct agent that deploys to AgentCore Runtime. Uses the `BedrockAgentCoreApp` pattern with `@app.entrypoint` decorator for cloud deployment via the AgentCore CLI (`agentcore configure`, `agentcore deploy`).
-    *   **Key Features:** AgentCore Runtime deployment, CLI-based workflow, programmatic invocation via boto3, LangChain + MCP integration.
-    *   **Use Case:** Deploying AI agents to AgentCore Runtime for managed scaling, observability, and enterprise deployment.
+    *   **Description:** A LangGraph ReAct agent that deploys to AgentCore Runtime. Uses the `BedrockAgentCoreApp` pattern with `@app.entrypoint` decorator for cloud deployment via the AgentCore CLI (`agentcore configure`, `agentcore deploy`). This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration patterns.
+    *   **Key Features:** AgentCore Runtime deployment, CLI-based workflow, programmatic invocation via boto3, LangChain + MCP integration, CloudWatch observability, managed infrastructure.
+    *   **Use Case:** Production deployments requiring managed scaling, observability dashboards, enterprise security, and advanced orchestration patterns like supervisor/worker agents.
 
 ---
 

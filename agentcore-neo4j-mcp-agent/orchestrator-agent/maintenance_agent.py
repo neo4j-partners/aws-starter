@@ -83,22 +83,25 @@ RETURN a.tailNumber, c.name, m.description LIMIT 10
 Be thorough but concise in your maintenance analysis."""
 
 
-def create_maintenance_agent(llm: BaseChatModel, tools: list) -> any:
+def create_maintenance_agent(llm: BaseChatModel, tools: list):
     """
-    Create the Maintenance & Reliability specialist agent.
+    Create the Maintenance & Reliability specialist agent as a compiled graph.
 
     Args:
         llm: The language model to use
         tools: MCP tools for Neo4j queries
 
     Returns:
-        A compiled ReAct agent for maintenance queries
+        A compiled ReAct agent graph for maintenance queries
     """
     logger.info("Creating Maintenance Agent with %d tools", len(tools))
 
-    return create_react_agent(
+    # Create and compile the agent - returns a Pregel graph
+    agent = create_react_agent(
         model=llm,
         tools=tools,
         prompt=MAINTENANCE_SYSTEM_PROMPT,
         name="maintenance_agent",
     )
+
+    return agent

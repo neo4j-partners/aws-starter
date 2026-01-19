@@ -94,6 +94,8 @@ cp ../basic-agent/.mcp-credentials.json .
 | `./agent.sh deploy` | Deploy to AgentCore Runtime |
 | `./agent.sh status` | Check deployment status |
 | `./agent.sh invoke-cloud "prompt"` | Invoke deployed orchestrator |
+| `./agent.sh load-test` | Cloud load test (random queries every 5s) |
+| `./agent.sh load-test 10` | Cloud load test with custom interval |
 | `./agent.sh destroy` | Remove from AgentCore |
 
 ## Files
@@ -103,6 +105,8 @@ cp ../basic-agent/.mcp-credentials.json .
 | `orchestrator_agent.py` | Main entry point - supervisor that routes queries |
 | `maintenance_agent.py` | Worker for reliability/faults/components |
 | `operations_agent.py` | Worker for flights/delays/routes |
+| `invoke_agent.py` | Cloud invocation and load testing |
+| `queries.txt` | 20 test queries (10 maintenance, 10 operations) |
 | `pyproject.toml` | Dependencies including langgraph-supervisor |
 | `agent.sh` | CLI wrapper for all operations |
 
@@ -151,6 +155,45 @@ With 3 agents, CloudWatch traces show:
 **Cross-Domain (Both Agents):**
 ```bash
 ./agent.sh invoke-cloud "How do maintenance issues affect flight delays?"
+```
+
+## Load Testing
+
+Test routing and generate observability data with continuous queries:
+
+```bash
+# Deploy first
+./agent.sh configure
+./agent.sh deploy
+
+# Run load test (queries every 5 seconds)
+./agent.sh load-test
+
+# Custom interval (10 seconds)
+./agent.sh load-test 10
+```
+
+The load test:
+- Randomly selects from 20 queries in `queries.txt`
+- 10 maintenance queries (route to Maintenance Agent)
+- 10 operations queries (route to Operations Agent)
+- Shows expected agent and response time
+- Tracks statistics (M=Maintenance, O=Operations, E=Errors)
+
+Example output:
+```
+======================================================================
+[2026-01-18 20:55:00] Iteration 1
+Query #9 | Expected Agent: Maintenance
+======================================================================
+Query: Show me the maintenance events with the highest severity in the last year.
+----------------------------------------------------------------------
+
+Based on the analysis of maintenance events...
+
+----------------------------------------------------------------------
+Elapsed: 15.2s | Stats: M=1 O=0 E=0
+Waiting 5 seconds...
 ```
 
 ## Key Technologies

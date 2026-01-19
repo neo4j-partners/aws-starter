@@ -43,6 +43,8 @@ print_usage() {
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
     echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed orchestrator"
+    echo "  ./agent.sh load-test          Cloud load test (random queries every 5s)"
+    echo "  ./agent.sh load-test 10       Cloud load test with custom interval"
     echo "  ./agent.sh destroy            Remove from AgentCore"
     echo "  ./agent.sh help               Show this help message"
     echo ""
@@ -50,6 +52,7 @@ print_usage() {
     echo "  ./agent.sh test-maintenance   # Routes to Maintenance Agent"
     echo "  ./agent.sh test-operations    # Routes to Operations Agent"
     echo "  ./agent.sh invoke-cloud \"What are the most common faults?\""
+    echo "  ./agent.sh load-test          # Continuous cloud load testing"
 }
 
 ensure_deps() {
@@ -168,6 +171,18 @@ case "${1:-help}" in
         echo -e "${BLUE}Prompt: $PROMPT${NC}"
         echo ""
         uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
+        ;;
+
+    load-test)
+        ensure_deps
+        echo -e "${GREEN}Starting cloud load test...${NC}"
+        echo -e "${BLUE}Tests routing to Maintenance and Operations agents${NC}"
+        echo ""
+        if [ -n "$2" ]; then
+            uv run python invoke_agent.py load-test --interval "$2"
+        else
+            uv run python invoke_agent.py load-test
+        fi
         ;;
 
     destroy)

@@ -1,6 +1,6 @@
 # Neo4j MCP Agent
 
-A ReAct agent that connects to the Neo4j MCP server via AWS Bedrock AgentCore Gateway and answers natural language questions using Claude.
+This project provides two LangGraph ReAct agents that connect to a Neo4j MCP server via AWS Bedrock AgentCore Gateway and answer natural language questions using Claude. The **simple agent** is a minimal implementation for testing and learning, while the **production agent** adds automatic OAuth2 token refresh for long-running deployments.
 
 ## Quick Start
 

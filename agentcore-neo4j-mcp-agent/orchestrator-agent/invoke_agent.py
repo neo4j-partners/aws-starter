@@ -27,6 +27,7 @@ import uuid
 from pathlib import Path
 
 import boto3
+from botocore.config import Config
 import yaml
 
 # Configure logging
@@ -88,7 +89,13 @@ def invoke_agent(prompt: str, session_id: str = None) -> dict:
     """
     agent_arn, region = get_agent_config()
 
-    client = boto3.client("bedrock-agentcore", region_name=region)
+    # Longer timeout for multi-agent orchestration (default 60s is often too short)
+    config = Config(
+        read_timeout=300,  # 5 minutes for complex queries
+        connect_timeout=10,
+        retries={"max_attempts": 2, "mode": "adaptive"},
+    )
+    client = boto3.client("bedrock-agentcore", region_name=region, config=config)
 
     payload = json.dumps({"prompt": prompt}).encode()
 

@@ -49,6 +49,18 @@ The core workflow centers on:
 
 ---
 
+### 📊 **Databricks Integration** (`databrick_samples/`)
+
+*   **[`databrick_samples`](./databrick_samples/)**
+    *   **Status:** ✅ Ready to Run
+    *   **Description:** Demonstrates how to connect Databricks workspaces to the Neo4j MCP server deployed on AWS AgentCore. Uses Unity Catalog HTTP connections with OAuth2 M2M authentication to securely proxy MCP requests from Databricks notebooks and LangGraph agents to the AgentCore Gateway. Databricks handles token refresh automatically.
+    *   **Key Features:** Unity Catalog HTTP connection, OAuth2 M2M (Cognito), LangGraph agent with MLflow deployment, automatic token management, read-only Neo4j access.
+    *   **Use Case:** Data teams using Databricks for analytics who need to query Neo4j graph data via natural language, or deploy AI agents that combine Spark data processing with graph database intelligence.
+    *   **External Hosting** The official Neo4j MCP server is written in Go and runs as a compiled binary. Databricks Apps only supports Python/Node.js frameworks (Streamlit, Dash, Gradio) and cannot run Docker containers or compiled binaries. External hosting via AgentCore is the Databricks-recommended pattern for MCP servers that don't fit these constraints.
+    *   **Unity Catalog HTTP connection** Databricks Unity Catalog supports creating HTTP connections to external services with built-in OAuth2 authentication. This allows secure, managed access to the AgentCore Gateway without hardcoding tokens in notebooks or code.
+
+---
+
 ### 📦 **Foundation Samples** (`foundation_samples/`)
 
 > These samples are adapted from the official [Amazon Bedrock AgentCore Samples](https://github.com/awslabs/amazon-bedrock-agentcore-samples) repository. They have been simplified and restructured with shell script wrappers to make them easy to run and understand without navigating the full samples repo.
@@ -71,21 +83,7 @@ The core workflow centers on:
     *   **Key Features:** Cognito User Pool integration, machine-to-machine (M2M) OAuth flows, Lambda interceptors for request/response modification, RBAC patterns.
     *   **Use Case:** Production deployments requiring authentication, multi-tenant MCP servers, enterprise security compliance.
 
-## Getting Started
-
-1.  **Prerequisites:**
-    *   Python 3.10+
-    *   `uv` package manager
-    *   AWS CLI & CDK CLI
-    *   Docker
-
-2.  **Explore a Project:**
-    Navigate to any project folder and follow its `README.md` for deployment instructions.
-
-    ```bash
-    cd neo4j-agentcore-mcp-server
-    # Follow instructions in README.md
-    ```
+---
 
 ## Documentation
 

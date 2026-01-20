@@ -18,32 +18,46 @@ cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 ./agent.sh "How many aircraft are in the database?"
 ```
 
-## Two Agent Versions
+## Simple Agent
 
-| File | Description |
-|------|-------------|
-| `simple-agent.py` | Basic agent using bearer token auth (no token refresh) |
-| `agent.py` | Production agent with automatic OAuth2 token refresh |
+**File:** `simple-agent.py`
 
-### Simple Agent (basic)
+The simple agent is a minimal implementation designed for quick testing and learning. It reads the `access_token` directly from the credentials file and uses it as a static bearer token for all requests to the AgentCore Gateway.
 
-Uses the `access_token` from credentials file directly. Good for testing.
+**Key characteristics:**
+- Uses a pre-generated access token from `.mcp-credentials.json`
+- No automatic token refresh - when the token expires (typically after 1 hour), the agent stops working
+- Simpler codebase with fewer dependencies
+- Ideal for local development, demos, and understanding the core agent flow
+
+**When to use:** Quick tests, learning the agent architecture, or short-lived sessions where token expiration is not a concern.
 
 ```bash
 uv run python simple-agent.py                      # Run demo
 uv run python simple-agent.py "What is the schema?"
 ```
 
-### Production Agent (with token refresh)
+## Production Agent
 
-Auto-refreshes expired tokens using OAuth2 client credentials flow.
+**File:** `agent.py`
+
+The production agent is a robust implementation suitable for long-running applications and production deployments. It implements the OAuth2 client credentials flow to automatically refresh access tokens before they expire.
+
+**Key characteristics:**
+- Automatically refreshes tokens using OAuth2 client credentials grant
+- Proactively refreshes tokens that are about to expire (within 5 minutes of expiry)
+- Handles token refresh failures gracefully with clear error messages
+- Production-ready with proper credential management
+- Uses `httpx` for async HTTP requests to the Cognito token endpoint
+
+**When to use:** Production deployments, long-running sessions, automated pipelines, or any scenario where the agent needs to run for more than an hour without interruption.
 
 ```bash
 ./agent.sh                      # Run demo
 ./agent.sh "What is the schema?"
 ```
 
-## Architecture
+### Production Agent Architecture
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -66,6 +80,64 @@ Auto-refreshes expired tokens using OAuth2 client credentials flow.
                         │  (Converse API)  │
                         └──────────────────┘
 ```
+
+The production agent adds a token management layer that intercepts requests and ensures a valid OAuth2 token is always available. When a token is expired or nearing expiration, the agent automatically requests a new one from Amazon Cognito using the client credentials stored in the credentials file.
+
+### Token Refresh Flow
+
+The production agent handles OAuth2 token lifecycle automatically. Here's how it works:
+
+**1. Startup Check**
+
+When the agent starts, it loads the credentials file and checks if the stored access token is still valid. The agent considers a token invalid if:
+- No `token_expires_at` timestamp exists in the credentials file
+- The current time is within 5 minutes of the expiry time (proactive refresh)
+
+**2. Token Refresh Process**
+
+If the token needs refreshing, the agent performs an OAuth2 client credentials grant:
+
+1. Reads `token_url`, `client_id`, `client_secret`, and `scope` from `.mcp-credentials.json`
+2. Sends an HTTP POST request to the Amazon Cognito token endpoint (`token_url`)
+3. Includes the grant type (`client_credentials`), client ID, client secret, and scope in the request body
+4. Receives a new access token and its TTL (typically 3600 seconds / 1 hour)
+5. Calculates the new expiry timestamp and updates the credentials file
+6. Uses the fresh token for all subsequent MCP server requests
+
+**3. Credentials Used**
+
+The agent uses **two separate sets of credentials** for different purposes:
+
+| Credential Type | Source | Used For |
+|-----------------|--------|----------|
+| **OAuth2 Client Credentials** | `.mcp-credentials.json` | Authenticating with AgentCore Gateway via Cognito |
+| **AWS Credentials** | AWS CLI profile or environment variables | Calling AWS Bedrock for Claude LLM inference |
+
+**OAuth2 credentials** (`client_id`, `client_secret`) are specific to the AgentCore Gateway deployment. They are generated when you deploy the `neo4j-agentcore-mcp-server` and authorize access to the MCP server. These credentials authenticate requests to the gateway's Cognito user pool.
+
+**AWS credentials** are your standard AWS access credentials (access key ID and secret access key, or IAM role). These authenticate requests to AWS Bedrock's Converse API for Claude inference. The agent uses whichever credentials are configured in your environment:
+- `AWS_PROFILE` environment variable (named profile)
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables
+- Default AWS CLI profile
+- IAM instance role (when running on EC2/Lambda)
+
+**4. Token Storage**
+
+After a successful refresh, the agent writes the new token back to `.mcp-credentials.json`:
+- `access_token` - The new bearer token
+- `token_expires_at` - ISO 8601 timestamp of when the token expires
+
+This means subsequent agent runs within the token's validity period can skip the refresh step entirely.
+
+### Key Differences
+
+| Aspect | Simple Agent | Production Agent |
+|--------|--------------|------------------|
+| Token handling | Static bearer token | Auto-refreshing OAuth2 |
+| Session duration | Limited to token TTL (~1 hour) | Unlimited |
+| Complexity | Minimal | More complex |
+| Dependencies | Fewer | Includes `httpx` for token refresh |
+| Use case | Testing/learning | Production deployments |
 
 ## Configuration
 

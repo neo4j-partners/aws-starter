@@ -12,7 +12,8 @@
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
-#   ./agent.sh invoke-cloud "prompt"  Invoke deployed orchestrator
+#   ./agent.sh invoke-cloud           Send default question to deployed agent
+#   ./agent.sh invoke-cloud "prompt"  Send custom question to deployed agent
 #   ./agent.sh destroy            Remove from AgentCore
 
 set -e
@@ -42,7 +43,8 @@ print_usage() {
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
-    echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed orchestrator"
+    echo "  ./agent.sh invoke-cloud       Send default question to deployed agent"
+    echo "  ./agent.sh invoke-cloud \"q\"   Send custom question to deployed agent"
     echo "  ./agent.sh load-test          Cloud load test (random queries every 5s)"
     echo "  ./agent.sh load-test 10       Cloud load test with custom interval"
     echo "  ./agent.sh destroy            Remove from AgentCore"
@@ -162,11 +164,11 @@ case "${1:-help}" in
     invoke|invoke-cloud)
         ensure_deps
         if [ -z "$2" ]; then
-            echo -e "${RED}ERROR: Please provide a prompt${NC}"
-            echo "Usage: ./agent.sh invoke-cloud \"your question\""
-            exit 1
+            PROMPT="What are the most common maintenance faults across all aircraft?"
+            echo -e "${YELLOW}Using default question${NC}"
+        else
+            PROMPT="$2"
         fi
-        PROMPT="$2"
         echo -e "${GREEN}Invoking deployed orchestrator...${NC}"
         echo -e "${BLUE}Prompt: $PROMPT${NC}"
         echo ""

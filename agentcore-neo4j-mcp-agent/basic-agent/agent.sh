@@ -44,7 +44,10 @@ print_usage() {
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
-    echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed agent"
+    echo "  ./agent.sh invoke-cloud       Invoke deployed agent (default question)"
+    echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke with custom question"
+    echo "  ./agent.sh load-test          Run load test (5s interval)"
+    echo "  ./agent.sh load-test N        Run load test with custom interval"
     echo "  ./agent.sh destroy            Remove from AgentCore"
     echo "  ./agent.sh help               Show this help message"
     echo ""
@@ -53,7 +56,10 @@ print_usage() {
     echo "  ./agent.sh test"
     echo "  ./agent.sh configure"
     echo "  ./agent.sh deploy"
+    echo "  ./agent.sh invoke-cloud"
     echo "  ./agent.sh invoke-cloud \"What is the database schema?\""
+    echo "  ./agent.sh load-test"
+    echo "  ./agent.sh load-test 10"
     echo ""
     echo "Prerequisites:"
     echo "  1. AWS CLI configured with credentials"
@@ -145,15 +151,24 @@ case "${1:-help}" in
     invoke|invoke-cloud)
         ensure_deps
         if [ -z "$2" ]; then
-            echo -e "${RED}ERROR: Please provide a prompt${NC}"
-            echo "Usage: ./agent.sh invoke-cloud \"your question\""
-            exit 1
+            PROMPT="How many aircraft are in the database?"
+            echo -e "${GREEN}Invoking deployed agent with default question...${NC}"
+        else
+            PROMPT="$2"
+            echo -e "${GREEN}Invoking deployed agent...${NC}"
         fi
-        PROMPT="$2"
-        echo -e "${GREEN}Invoking deployed agent...${NC}"
         echo "Prompt: $PROMPT"
         echo ""
         uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
+        ;;
+
+    load-test)
+        ensure_deps
+        INTERVAL="${2:-5}"
+        echo -e "${GREEN}Starting load test (${INTERVAL}s interval)...${NC}"
+        echo "Press Ctrl+C to stop"
+        echo ""
+        uv run python invoke_agent.py load-test "$INTERVAL"
         ;;
 
     destroy)

@@ -25,7 +25,8 @@ This project demonstrates how to build and deploy an AI agent on **Amazon Bedroc
 |------|---------|
 | `aircraft-agent.py` | **Main agent** - Contains the `@app.entrypoint` handler, OAuth2 token management, MCP client connection, and ReAct agent logic |
 | `agent.sh` | **CLI wrapper** - Bash script providing simple commands for all agent operations (setup, deploy, test, etc.) |
-| `invoke_agent.py` | **SDK example** - Shows how to call the deployed agent programmatically using boto3 |
+| `invoke_agent.py` | **SDK example** - Shows how to call the deployed agent programmatically using boto3; supports load testing |
+| `queries.txt` | **Load test queries** - 20 pre-defined queries for load testing (discovery, fleet ops, maintenance, delays, analytics) |
 | `simple-agent.py` | **Local testing** - Simplified agent version for experimentation without full deployment |
 | `pyproject.toml` | **Dependencies** - Python project config for the uv package manager |
 | `.mcp-credentials.json` | **Credentials** - OAuth2 credentials for Gateway auth (copied from MCP server, not in git) |
@@ -40,7 +41,10 @@ This project demonstrates how to build and deploy an AI agent on **Amazon Bedroc
 ./agent.sh configure      # Generate AWS deployment config
 ./agent.sh deploy         # Deploy to AgentCore Runtime
 ./agent.sh status         # Check deployment status
-./agent.sh invoke-cloud "prompt"  # Query deployed agent
+./agent.sh invoke-cloud   # Query deployed agent (default question)
+./agent.sh invoke-cloud "prompt"  # Query deployed agent with custom question
+./agent.sh load-test      # Run load test (5s interval)
+./agent.sh load-test N    # Run load test with custom interval
 ./agent.sh destroy        # Remove from AWS
 ```
 
@@ -51,7 +55,9 @@ This project demonstrates how to build and deploy an AI agent on **Amazon Bedroc
 3. **Bedrock Claude Sonnet model access** enabled in AWS console
 4. **Deployed Neo4j MCP Server** with AgentCore Gateway (`.mcp-credentials.json`)
 
-## Step-by-Step Deployment Guide
+## Quick Start: Cloud Deployment
+
+This section covers deploying and testing the agent on **Amazon Bedrock AgentCore Runtime** in the cloud.
 
 ### Step 1: Setup
 
@@ -83,49 +89,7 @@ cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
 **How the code uses credentials:** The `aircraft-agent.py` file loads this JSON file at startup using the `load_credentials()` function. Before each request, it checks if the OAuth2 access token is expired using `check_token_expiry()`. If expired or missing, it calls `refresh_token()` which makes an HTTP POST request to the Cognito token endpoint using the client credentials grant flow. The refreshed token is saved back to the file for subsequent requests.
 
-**Required fields in `.mcp-credentials.json`:**
-
-| Field | Description |
-|-------|-------------|
-| `gateway_url` | The AgentCore Gateway endpoint URL that proxies requests to the MCP server |
-| `token_url` | The Cognito token endpoint for obtaining OAuth2 access tokens |
-| `client_id` | OAuth2 client ID registered in the Cognito User Pool |
-| `client_secret` | OAuth2 client secret for the client credentials grant |
-| `scope` | OAuth2 scope that grants permission to invoke the MCP server |
-| `region` | AWS region where Bedrock is accessed (for Claude model calls) |
-
-### Step 3: Test Locally
-
-Start the agent locally on port 8080:
-
-```bash
-./agent.sh start
-```
-
-In another terminal, test with:
-
-```bash
-./agent.sh test
-```
-
-**What this does:** The `start` command runs `aircraft-agent.py` directly using the Python interpreter. The agent creates an HTTP server on port 8080 that accepts POST requests to the `/invocations` endpoint.
-
-**How the agent works:** When a request arrives, the `invoke()` function in `aircraft-agent.py` is called (decorated with `@app.entrypoint`). This function:
-
-1. Extracts the user's prompt from the request payload
-2. Loads credentials and refreshes the OAuth2 token if needed
-3. Creates a connection to the MCP server through the AgentCore Gateway using `MultiServerMCPClient` from langchain-mcp-adapters
-4. Retrieves available tools from the MCP server (like `get_schema` and `execute_query`)
-5. Initializes the Claude Sonnet model via AWS Bedrock's Converse API
-6. Creates a ReAct agent using LangChain's `create_react_agent()` that combines the LLM with the MCP tools
-7. Runs the agent loop which reasons about the question, calls tools as needed, and generates a final response
-8. Streams the response back to the client
-
-The agent includes a system prompt (defined in `aircraft-agent.py`) that instructs Claude how to use the Neo4j tools effectively—first retrieving the schema to understand the database structure, then formulating appropriate Cypher queries.
-
-Stop the local agent with Ctrl+C or `./agent.sh stop`.
-
-### Step 4: Configure for AWS Deployment
+### Step 3: Configure for AWS Deployment
 
 Run the AgentCore configure command:
 
@@ -146,7 +110,7 @@ The configure command also prompts for deployment preferences and validates that
 
 For a specific region, you can run: `uv run agentcore configure -e aircraft-agent.py -r us-east-1`
 
-### Step 5: Deploy to AgentCore Runtime
+### Step 4: Deploy to AgentCore Runtime
 
 Deploy the agent to AWS:
 
@@ -172,13 +136,16 @@ Check deployment status anytime with:
 ./agent.sh status
 ```
 
-### Step 6: Test Deployed Agent
+### Step 5: Test Deployed Agent with CLI
 
 Invoke the deployed agent using the CLI:
 
 ```bash
+# Run with the default question ("How many aircraft are in the database?")
+./agent.sh invoke-cloud
+
+# Run with a specific question
 ./agent.sh invoke-cloud "What is the database schema?"
-./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
 
 **What this does:** The `invoke-cloud` command uses the `agentcore invoke` CLI to send a request to your deployed agent in AWS. The request travels through the AgentCore Runtime infrastructure, which:
@@ -190,21 +157,17 @@ Invoke the deployed agent using the CLI:
 
 This validates that the entire end-to-end flow works in the cloud environment.
 
-### Step 7: Invoke Your Agent Programmatically
+### Step 6: Test Deployed Agent Programmatically
 
 Use the `invoke_agent.py` script to call the deployed agent from Python:
 
 ```bash
+# Run with a specific question
 uv run python invoke_agent.py "What is the database schema?"
+
+# Run with the default question ("How many aircraft are in the database?")
+uv run python invoke_agent.py
 ```
-
-**Load testing mode:** You can also run a load test with multiple concurrent requests:
-
-```bash
-uv run python invoke_agent.py load-test
-```
-
-This sends multiple queries in parallel to test the agent's performance under load.
 
 **What this does:** The `invoke_agent.py` script demonstrates how to call your deployed agent from application code using the AWS SDK (boto3). This is the pattern you would use to integrate the agent into a larger application.
 
@@ -217,6 +180,43 @@ This sends multiple queries in parallel to test the agent's performance under lo
 5. Assembles and displays the final response
 
 This script serves as a reference implementation for integrating the Neo4j MCP Agent into your own applications.
+
+### Step 7: Run Load Test Against Cloud
+
+Run continuous load tests using queries from `queries.txt`:
+
+```bash
+# Load test with random queries every 5 seconds
+./agent.sh load-test
+
+# Custom interval (10 seconds between queries)
+./agent.sh load-test 10
+```
+
+Press Ctrl+C to stop the load test.
+
+**How load testing works:**
+
+1. Loads queries from `queries.txt` (20 pre-defined queries covering various scenarios)
+2. Randomly selects a query at the specified interval (default: 5 seconds)
+3. Invokes the cloud-deployed agent and displays the response
+4. Continues until manually stopped
+
+**The `queries.txt` file contains 20 queries organized by category:**
+
+| Category | Queries | Examples |
+|----------|---------|----------|
+| Basic Discovery | 1-4 | Schema, aircraft count, airports, manufacturers |
+| Fleet Operations | 5-8 | Operator aircraft, systems, sensors, flight routes |
+| Maintenance & Reliability | 9-13 | Common faults, critical events, component issues |
+| Flight Operations & Delays | 14-17 | Delay causes, worst routes, weather delays |
+| Advanced Analytics | 18-20 | System hierarchies, maintenance correlations, sensor analysis |
+
+This is useful for:
+- Validating agent stability under sustained load
+- Generating data for the observability dashboard
+- Testing cold start performance
+- Stress testing the Neo4j MCP server
 
 ### Step 8: Cleanup
 
@@ -234,6 +234,61 @@ Remove the agent from AgentCore Runtime:
 - Deletes CloudWatch log groups
 
 This ensures you are not billed for resources you are no longer using. The local files (`.bedrock_agentcore.yaml`, `.mcp-credentials.json`) are preserved so you can redeploy later if needed.
+
+---
+
+## Local Development & Testing
+
+This section covers running and testing the agent locally on your machine before deploying to the cloud.
+
+### Start the Agent Locally
+
+After completing Steps 1-2 above (setup and credentials), start the agent locally on port 8080:
+
+```bash
+./agent.sh start
+```
+
+**What this does:** The `start` command runs `aircraft-agent.py` directly using the Python interpreter. The agent creates an HTTP server on port 8080 that accepts POST requests to the `/invocations` endpoint.
+
+**How the agent works:** When a request arrives, the `invoke()` function in `aircraft-agent.py` is called (decorated with `@app.entrypoint`). This function:
+
+1. Extracts the user's prompt from the request payload
+2. Loads credentials and refreshes the OAuth2 token if needed
+3. Creates a connection to the MCP server through the AgentCore Gateway using `MultiServerMCPClient` from langchain-mcp-adapters
+4. Retrieves available tools from the MCP server (like `get_schema` and `execute_query`)
+5. Initializes the Claude Sonnet model via AWS Bedrock's Converse API
+6. Creates a ReAct agent using LangChain's `create_react_agent()` that combines the LLM with the MCP tools
+7. Runs the agent loop which reasons about the question, calls tools as needed, and generates a final response
+8. Streams the response back to the client
+
+The agent includes a system prompt (defined in `aircraft-agent.py`) that instructs Claude how to use the Neo4j tools effectively—first retrieving the schema to understand the database structure, then formulating appropriate Cypher queries.
+
+### Test the Local Agent
+
+In another terminal, send a test request:
+
+```bash
+./agent.sh test
+```
+
+This sends the default test question "What is the database schema?" to the local agent.
+
+You can also test with curl directly:
+
+```bash
+curl -X POST http://localhost:8080/invocations \
+    -H "Content-Type: application/json" \
+    -d '{"prompt": "How many aircraft are in the database?"}'
+```
+
+### Stop the Local Agent
+
+Stop the local agent with Ctrl+C or:
+
+```bash
+./agent.sh stop
+```
 
 ## Observability & Monitoring
 
@@ -433,7 +488,10 @@ After running `./agent.sh deploy`, the output includes:
 | `./agent.sh configure` | Generate AWS deployment configuration in `.bedrock_agentcore.yaml` |
 | `./agent.sh deploy` | Package and deploy the agent to AgentCore Runtime |
 | `./agent.sh status` | Check the deployment status and health of the agent |
-| `./agent.sh invoke-cloud "prompt"` | Send a prompt to the deployed agent in AWS |
+| `./agent.sh invoke-cloud` | Send default question to deployed agent ("How many aircraft are in the database?") |
+| `./agent.sh invoke-cloud "prompt"` | Send a custom prompt to the deployed agent in AWS |
+| `./agent.sh load-test` | Run continuous load test with random queries every 5 seconds |
+| `./agent.sh load-test N` | Run load test with custom interval (N seconds between queries) |
 | `./agent.sh destroy` | Remove the agent and all associated AWS resources |
 | `./agent.sh help` | Display help message with all available commands |
 
@@ -444,6 +502,7 @@ After running `./agent.sh deploy`, the output includes:
 | `aircraft-agent.py` | Main agent implementation with the `@app.entrypoint` handler, OAuth2 token management, MCP client setup, and ReAct agent creation |
 | `agent.sh` | Bash wrapper script that provides a simple CLI for all agent operations |
 | `invoke_agent.py` | Example script showing how to invoke the deployed agent programmatically using boto3 |
+| `queries.txt` | 20 pre-defined natural language queries for load testing (organized by category: discovery, fleet ops, maintenance, delays, analytics) |
 | `simple-agent.py` | Simplified version of the agent for local testing and experimentation |
 | `pyproject.toml` | Python project configuration with all dependencies for the uv package manager |
 | `.mcp-credentials.json` | OAuth2 credentials for Gateway authentication (copied from MCP server deployment, not committed to git) |

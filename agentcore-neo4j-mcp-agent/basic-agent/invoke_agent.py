@@ -8,6 +8,7 @@ Usage:
     uv run python invoke_agent.py                          # Uses default prompt
     uv run python invoke_agent.py "What is the schema?"    # Custom prompt
     uv run python invoke_agent.py load-test                # Load test mode (random queries every 5s)
+    uv run python invoke_agent.py load-test 10             # Load test with custom interval (10s)
 
 Prerequisites:
     - Agent deployed to AgentCore Runtime (./agent.sh deploy)
@@ -180,8 +181,8 @@ def load_queries() -> list[str]:
     return queries
 
 
-def run_load_test():
-    """Run continuous load test with random queries every 5 seconds."""
+def run_load_test(interval: int = 5):
+    """Run continuous load test with random queries at specified interval."""
     queries = load_queries()
 
     if not queries:
@@ -192,7 +193,7 @@ def run_load_test():
     print("Neo4j MCP Agent - Load Test Mode")
     print("=" * 70)
     print(f"Loaded {len(queries)} queries from queries.txt")
-    print("Running a random query every 5 seconds...")
+    print(f"Running a random query every {interval} seconds...")
     print("Press Ctrl+C to stop")
     print("=" * 70)
     print("")
@@ -221,11 +222,11 @@ def run_load_test():
 
             print("")
             print("-" * 70)
-            print("Waiting 5 seconds before next query...")
+            print(f"Waiting {interval} seconds before next query...")
             print("")
 
             iteration += 1
-            time.sleep(5)
+            time.sleep(interval)
 
     except KeyboardInterrupt:
         print("")
@@ -237,7 +238,15 @@ def run_load_test():
 def main():
     # Check for load-test mode
     if len(sys.argv) > 1 and sys.argv[1] == "load-test":
-        run_load_test()
+        # Parse optional interval argument (default 5 seconds)
+        interval = 5
+        if len(sys.argv) > 2:
+            try:
+                interval = int(sys.argv[2])
+            except ValueError:
+                print(f"ERROR: Invalid interval '{sys.argv[2]}'. Must be a number.")
+                sys.exit(1)
+        run_load_test(interval)
         return
 
     # Get prompt from command line or use default

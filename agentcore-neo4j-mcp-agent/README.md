@@ -11,34 +11,6 @@ Two agent implementations are provided, progressing from simple to multi-agent o
 | [basic-agent/](./basic-agent/) | Single ReAct agent | Simple queries, getting started |
 | [orchestrator-agent/](./orchestrator-agent/) | Multi-agent with routing | Rich observability, domain specialization |
 
-## Architecture
-
-```
-                    ┌─────────────────────────────────────────┐
-                    │         AgentCore Runtime               │
-                    │                                         │
-   User Query ─────▶│  ┌─────────────────────────────────┐   │
-                    │  │     Orchestrator (Router)        │   │
-                    │  └──────────────┬──────────────────┘   │
-                    │                 │                       │
-                    │    ┌────────────┴────────────┐         │
-                    │    ▼                         ▼         │
-                    │  ┌──────────┐          ┌──────────┐    │
-                    │  │Maintenance│          │Operations│    │
-                    │  │  Agent   │          │  Agent   │    │
-                    │  └────┬─────┘          └────┬─────┘    │
-                    │       │                     │          │
-                    └───────┼─────────────────────┼──────────┘
-                            │    AgentCore        │
-                            │     Gateway         │
-                            └──────────┬──────────┘
-                                       ▼
-                              ┌─────────────────┐
-                              │  Neo4j MCP      │
-                              │    Server       │
-                              └─────────────────┘
-```
-
 ## Quick Start
 
 ### Option 1: Basic Agent (Single Agent)

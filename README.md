@@ -7,6 +7,8 @@ The core workflow centers on:
 2. **Connecting AI agents** to the deployed MCP server via AgentCore Gateway
 3. **Exploring advanced patterns** like multi-agent orchestration, memory management, and cloud-native agent deployment
 
+For a detailed explanation of how all the pieces fit together, see the **[Architecture Documentation](./docs/ARCHITECTURE.md)** which includes Mermaid diagrams, component descriptions, and end-to-end request flows.
+
 ## Recommended Learning Path
 
 | Step | Project | Purpose |

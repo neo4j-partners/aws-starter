@@ -13,13 +13,26 @@ set -e
 REGION="${AWS_REGION:-us-west-2}"
 PROFILE_PREFIX="langgraph-lab"
 
-# Model options
-declare -A MODELS=(
-    ["haiku"]="arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0"
-    ["sonnet"]="arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
-    ["sonnet-3.5"]="arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
-    ["sonnet-4.5"]="arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
-)
+get_model_arn() {
+    local model_key="$1"
+    case "$model_key" in
+        haiku)
+            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0"
+            ;;
+        sonnet)
+            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
+            ;;
+        sonnet35)
+            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+            ;;
+        sonnet45)
+            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
 
 show_help() {
     echo "Usage: $0 [model|--list|--delete|--help]"
@@ -29,8 +42,8 @@ show_help() {
     echo "Models:"
     echo "  haiku       Claude 3.5 Haiku (default, fastest, cheapest)"
     echo "  sonnet      Claude Sonnet 4"
-    echo "  sonnet-3.5  Claude 3.5 Sonnet v2"
-    echo "  sonnet-4.5  Claude Sonnet 4.5"
+    echo "  sonnet35    Claude 3.5 Sonnet v2"
+    echo "  sonnet45    Claude Sonnet 4.5"
     echo ""
     echo "Options:"
     echo "  --list      List existing inference profiles"
@@ -50,7 +63,7 @@ list_profiles() {
     aws bedrock list-inference-profiles \
         --region "${REGION}" \
         --type-equals APPLICATION \
-        --query 'inferenceProfileSummaries[].{Name:inferenceProfileName,ARN:inferenceProfileArn,Status:status,Model:models[0].modelArn}' \
+        --query 'inferenceProfileSummaries[].{Name:inferenceProfileName,ARN:inferenceProfileArn,Status:status}' \
         --output table
 }
 
@@ -80,11 +93,11 @@ delete_profile() {
 
 create_profile() {
     local model_key="${1:-haiku}"
-    local model_arn="${MODELS[$model_key]}"
+    local model_arn=$(get_model_arn "$model_key")
 
     if [ -z "$model_arn" ]; then
         echo "Error: Unknown model '${model_key}'"
-        echo "Available models: ${!MODELS[*]}"
+        echo "Available models: haiku, sonnet, sonnet35, sonnet45"
         exit 1
     fi
 
@@ -125,8 +138,8 @@ create_profile() {
         --tags key=Purpose,value=LangGraphLab key=Model,value="${model_key}" \
         --output json)
 
-    local profile_arn=$(echo "$result" | grep -o '"inferenceProfileArn": "[^"]*"' | cut -d'"' -f4)
-    local status=$(echo "$result" | grep -o '"status": "[^"]*"' | cut -d'"' -f4)
+    local profile_arn=$(echo "$result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('inferenceProfileArn',''))")
+    local status=$(echo "$result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
 
     echo ""
     echo "Created successfully!"

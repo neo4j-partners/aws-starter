@@ -24,18 +24,22 @@ DATAZONE_DOMAIN_ID="${DATAZONE_DOMAIN_ID:-}"
 
 get_model_arn() {
     local model_key="$1"
+    local account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+
+    # Use cross-region inference profiles (like Bedrock IDE does)
+    # This creates multi-region capable application profiles
     case "$model_key" in
         haiku)
-            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0"
+            echo "arn:aws:bedrock:${REGION}:${account_id}:inference-profile/us.anthropic.claude-3-5-haiku-20241022-v1:0"
             ;;
         sonnet|sonnet35)
-            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+            echo "arn:aws:bedrock:${REGION}:${account_id}:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
             ;;
         sonnet4)
-            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
+            echo "arn:aws:bedrock:${REGION}:${account_id}:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0"
             ;;
         sonnet45)
-            echo "arn:aws:bedrock:${REGION}::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+            echo "arn:aws:bedrock:${REGION}:${account_id}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
             ;;
         *)
             echo ""

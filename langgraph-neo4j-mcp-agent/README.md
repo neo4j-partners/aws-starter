@@ -1,6 +1,81 @@
 # Neo4j MCP LangGraph ReAct Agents
 
-This project provides two LangGraph ReAct agents that connect to a Neo4j MCP server via AWS Bedrock AgentCore Gateway and answer natural language questions using Claude. The **simple agent** is a minimal implementation for testing and learning, while the **production agent** adds automatic OAuth2 token refresh for long-running deployments.
+This project provides LangGraph ReAct agents that connect to a Neo4j MCP server via AWS Bedrock AgentCore Gateway.
+
+---
+
+## Minimal LangGraph Agent (SageMaker Studio)
+
+A simple notebook to test LangGraph with Bedrock in **SageMaker Unified Studio**.
+
+### Prerequisites
+
+1. **Bedrock IDE Export**: Create any app in SageMaker Unified Studio → Bedrock IDE, then export it. This creates the `amazon-bedrock-ide-app-export-*` folder needed for auto-detection of DataZone IDs.
+
+2. **AWS CLI Access**: Run the setup script from your local machine or CloudShell (not from within SageMaker Studio notebooks).
+
+### Setup
+
+```bash
+# Create the inference profile (auto-detects DataZone IDs)
+./setup-inference-profile.sh sonnet
+
+# Output will show:
+# ==============================================
+#   COPY THIS TO YOUR NOTEBOOK
+# ==============================================
+#
+# INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:YOUR_ACCOUNT:application-inference-profile/YOUR_ID"
+#
+# ==============================================
+```
+
+### Using the Notebook
+
+1. Upload `minimal_langgraph_agent.ipynb` to SageMaker Studio
+2. Paste the `INFERENCE_PROFILE_ARN` from the script output into the configuration cell
+3. Run all cells
+
+### Script Commands
+
+| Command | Description |
+|---------|-------------|
+| `./setup-inference-profile.sh` | Create profile with Claude 3.5 Sonnet (default) |
+| `./setup-inference-profile.sh haiku` | Create profile with Claude 3.5 Haiku |
+| `./setup-inference-profile.sh sonnet4` | Create profile with Claude Sonnet 4 |
+| `./setup-inference-profile.sh --list` | List existing profiles |
+| `./setup-inference-profile.sh --delete` | Delete the lab profile |
+| `./setup-inference-profile.sh --help` | Show help |
+
+### How It Works
+
+The script creates an **application inference profile** that:
+- Copies from a cross-region inference profile (us.anthropic.claude-*)
+- Tags it with your DataZone project and domain IDs (auto-detected from Bedrock IDE export)
+- Enables the SageMaker Unified Studio permissions boundary to allow invocation
+
+### Troubleshooting
+
+**AccessDeniedException on InvokeModel**: The inference profile must be tagged with `AmazonDataZoneProject`. Run `./setup-inference-profile.sh --delete` then `./setup-inference-profile.sh sonnet` to recreate with proper tags.
+
+**"Model identifier is invalid"**: Make sure you're using the full ARN from the script output, not a model ID.
+
+**Can't auto-detect DataZone IDs**: Export an app from Bedrock IDE first. The script looks for `amazon-bedrock-ide-app-export-*` folders.
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `minimal_langgraph_agent.ipynb` | Jupyter notebook for SageMaker Studio |
+| `minimal_agent.py` | Python script version (for local testing) |
+| `setup-inference-profile.sh` | Creates Bedrock inference profiles |
+| `IAM-SETUP.md` | Detailed IAM permissions documentation |
+
+---
+
+## Neo4j MCP Agents
+
+The full-featured agents connect to a Neo4j MCP server via AWS Bedrock AgentCore Gateway and answer natural language questions using Claude. The **simple agent** is a minimal implementation for testing and learning, while the **production agent** adds automatic OAuth2 token refresh for long-running deployments.
 
 ## Quick Setup
 

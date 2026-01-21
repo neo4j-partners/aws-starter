@@ -48,9 +48,10 @@ get_model_arn() {
 }
 
 show_help() {
-    echo "Usage: $0 [model|--list|--delete|--detect|--help]"
+    echo "Usage: $0 [model|--list|--delete|--help]"
     echo ""
     echo "Creates an application inference profile for LangGraph labs."
+    echo "Automatically detects DataZone IDs from Bedrock IDE exports."
     echo ""
     echo "Models:"
     echo "  sonnet      Claude 3.5 Sonnet v2 (default, recommended)"
@@ -61,21 +62,12 @@ show_help() {
     echo "Options:"
     echo "  --list      List existing inference profiles"
     echo "  --delete    Delete the lab inference profile"
-    echo "  --detect    Auto-detect DataZone IDs from Bedrock IDE export"
     echo "  --help      Show this help"
     echo ""
-    echo "Environment Variables (for SageMaker Unified Studio):"
-    echo "  DATAZONE_PROJECT_ID  Your DataZone project ID"
-    echo "  DATAZONE_DOMAIN_ID   Your DataZone domain ID (dzd-...)"
-    echo "  AWS_REGION           Region (default: us-west-2)"
-    echo ""
     echo "Example:"
-    echo "  # Auto-detect from Bedrock IDE export and create profile"
-    echo "  eval \$($0 --detect)"
-    echo "  $0 sonnet"
-    echo ""
-    echo "  # Or set manually"
-    echo "  DATAZONE_PROJECT_ID=abc123 DATAZONE_DOMAIN_ID=dzd-xyz $0 sonnet"
+    echo "  $0 sonnet      # Create profile, copy ARN to notebook"
+    echo "  $0 --list      # See existing profiles"
+    echo "  $0 --delete    # Remove profile"
 }
 
 detect_datazone_ids() {
@@ -245,6 +237,26 @@ EOF
     echo "Config saved to: .inference-profile.env"
 }
 
+# Auto-detect DataZone IDs if not set
+auto_detect_datazone() {
+    if [ -z "$DATAZONE_PROJECT_ID" ] || [ -z "$DATAZONE_DOMAIN_ID" ]; then
+        # Look for Bedrock IDE export folders
+        for dir in ../amazon-bedrock-ide-app-export-* ./amazon-bedrock-ide-app-export-*; do
+            if [ -d "$dir" ]; then
+                local stack_file=$(ls "$dir"/amazon-bedrock-ide-app-stack-*.json 2>/dev/null | head -1)
+                if [ -f "$stack_file" ]; then
+                    DATAZONE_PROJECT_ID=$(grep -o '"exportProjectId": "[^"]*"' "$stack_file" 2>/dev/null | head -1 | cut -d'"' -f4)
+                    DATAZONE_DOMAIN_ID=$(grep -o 'dzd-[a-z0-9]*' "$stack_file" 2>/dev/null | head -1)
+                    if [ -n "$DATAZONE_PROJECT_ID" ] && [ -n "$DATAZONE_DOMAIN_ID" ]; then
+                        echo "Auto-detected DataZone IDs from: $stack_file"
+                        break
+                    fi
+                fi
+            fi
+        done
+    fi
+}
+
 # Main
 case "${1:-}" in
     --help|-h)
@@ -260,6 +272,7 @@ case "${1:-}" in
         detect_datazone_ids
         ;;
     *)
+        auto_detect_datazone
         create_profile "${1:-sonnet}"
         ;;
 esac

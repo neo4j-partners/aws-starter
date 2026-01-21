@@ -4,72 +4,57 @@ This project provides LangGraph ReAct agents that connect to a Neo4j MCP server 
 
 ---
 
-## Minimal LangGraph Agent (SageMaker Studio)
+## Minimal LangGraph Agent (SageMaker Unified Studio)
 
 A simple notebook to test LangGraph with Bedrock in **SageMaker Unified Studio**.
 
-### Prerequisites
+> **Important**: See [MODEL.md](MODEL.md) for details on model configuration challenges and the current workaround.
 
-1. **Bedrock IDE Export**: Create any app in SageMaker Unified Studio → Bedrock IDE, then export it. This creates the `amazon-bedrock-ide-app-export-*` folder needed for auto-detection of DataZone IDs.
+### The Challenge
 
-2. **AWS CLI Access**: Run the setup script from your local machine or CloudShell (not from within SageMaker Studio notebooks).
+SageMaker Unified Studio has a restrictive permissions boundary that blocks direct Bedrock model access. **Only inference profiles created through Bedrock IDE work.**
 
-### Setup
+### Setup (Current Workaround)
 
-```bash
-# Create the inference profile (auto-detects DataZone IDs)
-./setup-inference-profile.sh sonnet
+1. **Create an app in Bedrock IDE**
+   - Go to SageMaker Unified Studio → **Build** → **Bedrock IDE**
+   - Create any app (agent, chat, etc.) with your desired model
+   - Export the app
 
-# Output will show:
-# ==============================================
-#   COPY THIS TO YOUR NOTEBOOK
-# ==============================================
-#
-# INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:YOUR_ACCOUNT:application-inference-profile/YOUR_ID"
-#
-# ==============================================
-```
+2. **Get the inference profile ARN**
+   ```bash
+   grep "inferenceProfileArn" amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json
+   ```
 
-### Using the Notebook
+3. **Use in your notebook**
+   ```python
+   INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/PROFILE_ID"
 
-1. Upload `minimal_langgraph_agent.ipynb` to SageMaker Studio
-2. Paste the `INFERENCE_PROFILE_ARN` from the script output into the configuration cell
-3. Run all cells
-
-### Script Commands
-
-| Command | Description |
-|---------|-------------|
-| `./setup-inference-profile.sh` | Create profile with Claude 3.5 Sonnet (default) |
-| `./setup-inference-profile.sh haiku` | Create profile with Claude 3.5 Haiku |
-| `./setup-inference-profile.sh sonnet4` | Create profile with Claude Sonnet 4 |
-| `./setup-inference-profile.sh --list` | List existing profiles |
-| `./setup-inference-profile.sh --delete` | Delete the lab profile |
-| `./setup-inference-profile.sh --help` | Show help |
-
-### How It Works
-
-The script creates an **application inference profile** that:
-- Copies from a cross-region inference profile (us.anthropic.claude-*)
-- Tags it with your DataZone project and domain IDs (auto-detected from Bedrock IDE export)
-- Enables the SageMaker Unified Studio permissions boundary to allow invocation
-
-### Troubleshooting
-
-**AccessDeniedException on InvokeModel**: The inference profile must be tagged with `AmazonDataZoneProject`. Run `./setup-inference-profile.sh --delete` then `./setup-inference-profile.sh sonnet` to recreate with proper tags.
-
-**"Model identifier is invalid"**: Make sure you're using the full ARN from the script output, not a model ID.
-
-**Can't auto-detect DataZone IDs**: Export an app from Bedrock IDE first. The script looks for `amazon-bedrock-ide-app-export-*` folders.
+   llm = ChatBedrockConverse(
+       model=INFERENCE_PROFILE_ARN,
+       provider="anthropic",
+       region_name="us-west-2",
+       temperature=0,
+   )
+   ```
 
 ### Files
 
 | File | Description |
 |------|-------------|
 | `minimal_langgraph_agent.ipynb` | Jupyter notebook for SageMaker Studio |
-| `minimal_agent.py` | Python script version (for local testing) |
-| `setup-inference-profile.sh` | Creates Bedrock inference profiles |
-| `IAM-SETUP.md` | Detailed IAM permissions documentation |
+| `minimal_agent.py` | Python script version (for local/EC2 testing) |
+| `MODEL.md` | Model configuration details and known issues |
+| `IAM-SETUP.md` | IAM permissions documentation |
+| `setup-inference-profile.sh` | CLI tool (works outside SageMaker Unified Studio) |
+
+### What Doesn't Work
+
+- Direct model IDs (`anthropic.claude-*`)
+- Cross-region profiles (`us.anthropic.claude-*`)
+- CLI-created inference profiles (missing internal SageMaker bindings)
+
+See [MODEL.md](MODEL.md) for full details.
 
 ---
 

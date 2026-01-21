@@ -54,7 +54,6 @@ pytestdebug.log
 
 # Jupyter
 .ipynb_checkpoints
-*.ipynb
 
 # mypy
 .mypy_cache/

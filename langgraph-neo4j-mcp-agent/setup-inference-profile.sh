@@ -81,7 +81,11 @@ detect_datazone_ids() {
         if [ -d "$dir" ]; then
             local stack_file=$(ls "$dir"/amazon-bedrock-ide-app-stack-*.json 2>/dev/null | head -1)
             if [ -f "$stack_file" ]; then
-                project_id=$(grep -o '"exportProjectId": "[^"]*"' "$stack_file" 2>/dev/null | head -1 | cut -d'"' -f4)
+                # Extract project ID from bedrockServiceRoleArn (more reliable than exportProjectId)
+                # Format: AmazonBedrockServiceRole-{project_id}-{random}
+                project_id=$(grep -o '"bedrockServiceRoleArn"[^,]*' "$stack_file" 2>/dev/null | \
+                    grep -o 'AmazonBedrockServiceRole-[^-]*' | \
+                    sed 's/AmazonBedrockServiceRole-//' | head -1)
                 domain_id=$(grep -o 'dzd-[a-z0-9]*' "$stack_file" 2>/dev/null | head -1)
                 if [ -n "$project_id" ] && [ -n "$domain_id" ]; then
                     echo "# Found in: $stack_file" >&2
@@ -261,10 +265,15 @@ auto_detect_datazone() {
             if [ -d "$dir" ]; then
                 local stack_file=$(ls "$dir"/amazon-bedrock-ide-app-stack-*.json 2>/dev/null | head -1)
                 if [ -f "$stack_file" ]; then
-                    DATAZONE_PROJECT_ID=$(grep -o '"exportProjectId": "[^"]*"' "$stack_file" 2>/dev/null | head -1 | cut -d'"' -f4)
+                    # Extract project ID from bedrockServiceRoleArn (more reliable)
+                    DATAZONE_PROJECT_ID=$(grep -o '"bedrockServiceRoleArn"[^,]*' "$stack_file" 2>/dev/null | \
+                        grep -o 'AmazonBedrockServiceRole-[^-]*' | \
+                        sed 's/AmazonBedrockServiceRole-//' | head -1)
                     DATAZONE_DOMAIN_ID=$(grep -o 'dzd-[a-z0-9]*' "$stack_file" 2>/dev/null | head -1)
                     if [ -n "$DATAZONE_PROJECT_ID" ] && [ -n "$DATAZONE_DOMAIN_ID" ]; then
                         echo "Auto-detected DataZone IDs from: $stack_file"
+                        echo "  Project: $DATAZONE_PROJECT_ID"
+                        echo "  Domain:  $DATAZONE_DOMAIN_ID"
                         break
                     fi
                 fi

@@ -4,21 +4,34 @@
 
 To use Bedrock models in SageMaker Unified Studio notebooks:
 
-### 1. Get the Inference Profile ARN
-
-Create an app in **Bedrock IDE** (SageMaker Unified Studio → Build → Bedrock IDE), export it, then find the ARN:
+### Option A: Use the Setup Script (Recommended)
 
 ```bash
-grep -r '"model"' amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json | grep anthropic
+# From CLI/CloudShell (not in notebook)
+cd langgraph-neo4j-mcp-agent
+
+# Auto-detect DataZone IDs and create profile
+eval $(./setup-inference-profile.sh --detect)
+./setup-inference-profile.sh sonnet
+
+# Copy the ARN output to your notebook
 ```
 
-### 2. Install Dependencies
+### Option B: Use Existing Bedrock IDE Profile
+
+If you already created an app in Bedrock IDE, extract the ARN from the export:
+
+```bash
+grep -r '"inferenceProfileArn"' amazon-bedrock-ide-app-export-*/agent-stack.json
+```
+
+### 2. Install Dependencies (in notebook)
 
 ```python
 %pip install langgraph>=1.0.6 -q
 ```
 
-### 3. Configure the LLM
+### 3. Configure the LLM (in notebook)
 
 ```python
 from langchain_aws import ChatBedrockConverse
@@ -35,9 +48,9 @@ llm = ChatBedrockConverse(
 ```
 
 **Key points:**
-- Only profiles created by **Bedrock IDE** work (not CLI-created profiles)
 - The `provider="anthropic"` parameter is **required** when using an ARN
 - Direct model IDs (e.g., `us.anthropic.claude-*`) do NOT work in SageMaker Unified Studio
+- The `AmazonBedrockManaged=true` tag is required for SageMaker permissions boundary
 
 ---
 

@@ -151,7 +151,17 @@ create_profile() {
         exit 1
     fi
 
-    local profile_name="${PROFILE_PREFIX}"
+    # Use Bedrock IDE naming pattern if DataZone IDs are available
+    local profile_name
+    local description
+    if [ -n "$DATAZONE_PROJECT_ID" ] && [ -n "$DATAZONE_DOMAIN_ID" ]; then
+        # Bedrock IDE pattern: "{domain_id} {project_id}"
+        profile_name="${DATAZONE_DOMAIN_ID} ${DATAZONE_PROJECT_ID} lab"
+        description="Lab profile for domain ${DATAZONE_DOMAIN_ID} to provide access to Amazon Bedrock model in project ${DATAZONE_PROJECT_ID}"
+    else
+        profile_name="${PROFILE_PREFIX}"
+        description="LangGraph lab inference profile for ${model_key}"
+    fi
 
     echo "=============================================="
     echo "Creating Application Inference Profile"
@@ -166,6 +176,7 @@ create_profile() {
         echo "DataZone Tags (for SageMaker Unified Studio):"
         echo "  Project: ${DATAZONE_PROJECT_ID}"
         echo "  Domain:  ${DATAZONE_DOMAIN_ID}"
+        echo "  AmazonBedrockManaged: true"
     fi
     echo "=============================================="
 
@@ -187,7 +198,7 @@ create_profile() {
         exit 0
     fi
 
-    # Build tags
+    # Build tags - CRITICAL: Include AmazonBedrockManaged=true for SageMaker Unified Studio
     local tags="key=Purpose,value=LangGraphLab key=Model,value=${model_key}"
 
     if [ -n "$DATAZONE_PROJECT_ID" ]; then
@@ -198,12 +209,17 @@ create_profile() {
         tags="$tags key=AmazonDataZoneDomain,value=${DATAZONE_DOMAIN_ID}"
     fi
 
+    # CRITICAL: This tag is required for SageMaker Unified Studio permissions boundary
+    if [ -n "$DATAZONE_PROJECT_ID" ] && [ -n "$DATAZONE_DOMAIN_ID" ]; then
+        tags="$tags key=AmazonBedrockManaged,value=true"
+    fi
+
     # Create the profile
     local result=$(aws bedrock create-inference-profile \
         --region "${REGION}" \
         --inference-profile-name "${profile_name}" \
         --model-source "copyFrom=${model_arn}" \
-        --description "LangGraph lab inference profile for ${model_key}" \
+        --description "${description}" \
         --tags $tags \
         --output json)
 

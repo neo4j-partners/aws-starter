@@ -1,5 +1,46 @@
 # Model Configuration for SageMaker Unified Studio
 
+## Quick Start
+
+To use Bedrock models in SageMaker Unified Studio notebooks:
+
+### 1. Get the Inference Profile ARN
+
+Create an app in **Bedrock IDE** (SageMaker Unified Studio → Build → Bedrock IDE), export it, then find the ARN:
+
+```bash
+grep -r '"model"' amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json | grep anthropic
+```
+
+### 2. Install Dependencies
+
+```python
+%pip install langgraph>=1.0.6 -q
+```
+
+### 3. Configure the LLM
+
+```python
+from langchain_aws import ChatBedrockConverse
+
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/PROFILE_ID"
+REGION = "us-west-2"
+
+llm = ChatBedrockConverse(
+    model=INFERENCE_PROFILE_ARN,
+    provider="anthropic",  # Required when using ARN
+    region_name=REGION,
+    temperature=0,
+)
+```
+
+**Key points:**
+- Only profiles created by **Bedrock IDE** work (not CLI-created profiles)
+- The `provider="anthropic"` parameter is **required** when using an ARN
+- Direct model IDs (e.g., `us.anthropic.claude-*`) do NOT work in SageMaker Unified Studio
+
+---
+
 This document describes the model configuration challenges and solutions for running LangGraph agents with Bedrock in SageMaker Unified Studio.
 
 ## The Problem

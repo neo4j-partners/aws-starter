@@ -40,8 +40,10 @@ tools = [get_current_time, add_numbers]
 
 def get_llm():
     """Initialize Bedrock Claude model."""
+    # Base model ID (no us./eu. prefix) - works with standard bedrock:InvokeModel permissions
+    # For cross-region inference profiles, use: us.anthropic.claude-sonnet-4-20250514-v1:0
     return ChatBedrockConverse(
-        model="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        model="anthropic.claude-sonnet-4-20250514-v1:0",
         region_name="us-west-2",
         temperature=0,
     ).bind_tools(tools)

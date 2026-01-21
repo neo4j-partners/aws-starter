@@ -36,31 +36,78 @@ llm = ChatBedrockConverse(
 1. Go to SageMaker Unified Studio → **Build** → **Bedrock IDE**
 2. Create any app (agent, chat, etc.)
 3. Export the app
-4. Find the `inferenceProfileArn` in the export:
+4. Find the model in the export:
    ```bash
-   grep "inferenceProfileArn" amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json
+   grep -r "model" amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json | grep anthropic
    ```
 
-## What Does NOT Work
+## Git History: What Was Tried
+
+### Commit 3162797 - Cross-region model ID (FAILS in SageMaker Studio)
+```python
+MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+
+llm = ChatBedrockConverse(
+    model=MODEL_ID,
+    region_name=REGION,
+    temperature=0,
+)
+```
+- No `provider` parameter
+- Works outside SageMaker Unified Studio, but fails inside due to permissions boundary
+
+### Commit 4e0c3e8 - Base model ID (FAILS in SageMaker Studio)
+```python
+MODEL_ID = "anthropic.claude-sonnet-4-20250514-v1:0"
+
+llm = ChatBedrockConverse(
+    model=MODEL_ID,
+    region_name=REGION,
+    temperature=0,
+)
+```
+- Simplest format
+- Works outside SageMaker Unified Studio, but fails inside due to permissions boundary
+
+### Commit 7468b76 - Application inference profile ARN (WORKS if created by Bedrock IDE)
+```python
+MODEL_ID = "arn:aws:bedrock:us-west-2:159878781974:application-inference-profile/9p4fb3e8undd"
+
+llm = ChatBedrockConverse(
+    model=MODEL_ID,
+    provider="anthropic",  # REQUIRED when using ARN
+    region_name=REGION,
+    temperature=0,
+)
+```
+- Requires `provider="anthropic"` parameter
+- Only works if the profile was created by Bedrock IDE (not CLI)
+
+### Commit 8f442aa - Added setup-inference-profile.sh (BREAKS things)
+- Added complex auto-discovery logic
+- CLI-created profiles don't work in SageMaker Unified Studio
+
+### Current State - Variable Mismatch (BROKEN)
+- Config cell uses `INFERENCE_PROFILE_ARN` variable
+- LLM setup cell references `MODEL_ID` variable
+- Causes `NameError: name 'MODEL_ID' is not defined`
+
+## What Does NOT Work in SageMaker Unified Studio
 
 ### 1. Direct Model IDs
-
 ```python
 # FAILS - permissions boundary blocks direct model access
 MODEL_ID = "anthropic.claude-3-5-sonnet-20241022-v2:0"
 ```
 
 ### 2. Cross-Region Inference Profiles (us. prefix)
-
 ```python
 # FAILS - still blocked by permissions boundary
 MODEL_ID = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 ```
 
 ### 3. Manually Created Application Inference Profiles
-
 Even with correct DataZone tags, profiles created via CLI don't work:
-
 ```bash
 # Creates profile but it FAILS when used in SageMaker Studio
 aws bedrock create-inference-profile \
@@ -69,52 +116,75 @@ aws bedrock create-inference-profile \
   --tags key=AmazonDataZoneProject,value=PROJECT_ID key=AmazonDataZoneDomain,value=DOMAIN_ID
 ```
 
-## Key Differences
+## Model ID Formats Reference
+
+| Format | Example | `provider` param needed? | Works in SageMaker Studio? |
+|--------|---------|--------------------------|---------------------------|
+| Base model | `anthropic.claude-3-5-sonnet-20241022-v2:0` | No | No |
+| Cross-region | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | No | No |
+| App profile ARN (CLI-created) | `arn:aws:bedrock:...:application-inference-profile/ID` | **Yes** | No |
+| App profile ARN (Bedrock IDE) | `arn:aws:bedrock:...:application-inference-profile/ID` | **Yes** | **Yes** |
+
+## Things to Try
+
+### Fix 1: Ensure Variable Consistency
+The notebook has a variable mismatch. Ensure both cells use the same variable:
+
+```python
+# Configuration cell
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/ID"
+REGION = "us-west-2"
+
+# LLM setup cell - use SAME variable name
+llm = ChatBedrockConverse(
+    model=INFERENCE_PROFILE_ARN,  # Match the config variable
+    provider="anthropic",         # REQUIRED for ARN format
+    region_name=REGION,
+    temperature=0,
+)
+```
+
+### Fix 2: Add Missing `provider` Parameter
+When using an ARN, `provider="anthropic"` is required:
+
+```python
+llm = ChatBedrockConverse(
+    model=INFERENCE_PROFILE_ARN,
+    provider="anthropic",  # ADD THIS
+    region_name=REGION,
+    temperature=0,
+)
+```
+
+### Fix 3: Get Fresh Profile from Bedrock IDE Export
+The profile ARN from Bedrock IDE export should work:
+
+```bash
+# Find the model ID in latest export
+grep -r '"model"' amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json | grep anthropic
+```
+
+### Fix 4: Try Outside SageMaker Unified Studio
+If running locally or on EC2, use direct model ID:
+
+```python
+MODEL_ID = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+llm = ChatBedrockConverse(
+    model=MODEL_ID,
+    region_name=REGION,
+    temperature=0,
+)
+```
+
+## Key Differences: SageMaker-Created vs CLI-Created Profiles
 
 | Attribute | SageMaker-Created Profile | Script-Created Profile |
 |-----------|---------------------------|------------------------|
-| Works in Studio | ✅ Yes | ❌ No |
+| Works in Studio | Yes | No |
 | Description | `"Created by Amazon SageMaker Unified Studio for domain {domain} to provide access to Amazon Bedrock model in project {project}"` | `"LangGraph lab inference profile"` |
 | Internal associations | Has proper IAM/DataZone bindings | Missing internal bindings |
 | Tags | Auto-tagged by SageMaker | Manually tagged |
-
-## What Needs to be Fixed
-
-### Option 1: AWS Feature Request
-
-Request AWS add a way to create inference profiles with proper SageMaker Unified Studio bindings via CLI/API. Currently, the only way is through the Bedrock IDE UI.
-
-### Option 2: Use Bedrock IDE Export
-
-Current workaround:
-1. Create app in Bedrock IDE for each model you need
-2. Export to get the inference profile ARN
-3. Use that ARN in notebooks
-
-### Option 3: Different Compute Environment
-
-Run notebooks outside SageMaker Unified Studio:
-- SageMaker Classic Studio
-- SageMaker Notebook Instances
-- EC2
-- Local machine
-
-These environments don't have the restrictive permissions boundary.
-
-## Current Workaround
-
-1. Create an app in Bedrock IDE (SageMaker Unified Studio)
-2. Export the app
-3. Extract the inference profile ARN from the export
-4. Use that ARN in your notebook
-
-```bash
-# Find ARN in export
-grep "inferenceProfileArn" amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json
-
-# Output example:
-# "inferenceProfileArn": "arn:aws:bedrock:us-west-2:159878781974:application-inference-profile/hsl5b7kh1279"
-```
 
 ## Script Status
 

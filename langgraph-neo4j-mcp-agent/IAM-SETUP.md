@@ -8,6 +8,8 @@ This document describes the IAM permissions required to run LangGraph agents wit
 - [Model ID Formats](#model-id-formats)
 - [Minimum Required Permissions](#minimum-required-permissions)
 - [SageMaker Studio Setup](#sagemaker-studio-setup)
+- [SageMaker Unified Studio (DataZone)](#sagemaker-unified-studio-datazone)
+- [Creating Inference Profiles](#creating-inference-profiles)
 - [Additional Useful Permissions](#additional-useful-permissions)
 - [Cross-Region Inference Profiles](#cross-region-inference-profiles)
 - [Troubleshooting](#troubleshooting)
@@ -200,6 +202,136 @@ Some setups require Bedrock in the trust relationship:
         ]
       },
       "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+---
+
+## SageMaker Unified Studio (DataZone)
+
+SageMaker Unified Studio enforces that Bedrock access goes through **tagged inference profiles** for governance. Direct foundation model calls are blocked by the permissions boundary.
+
+### The Constraint
+
+The `SageMakerStudioProjectUserRolePermissionsBoundary` has conditions:
+
+```json
+{
+  "Action": ["bedrock:InvokeModel"],
+  "Condition": {
+    "Null": {
+      "bedrock:InferenceProfileArn": "false"
+    }
+  }
+}
+```
+
+This means: **You must use an inference profile**, not direct model IDs.
+
+### Solutions for SageMaker Unified Studio
+
+**Option 1: Use Bedrock IDE** (Creates tagged profiles automatically)
+1. In SageMaker Unified Studio → **Build** → **Bedrock IDE**
+2. Create an app - it auto-creates inference profiles
+3. Export the app to get the profile ARN
+
+**Option 2: Create Application Inference Profile via CLI**
+```bash
+# Run from local machine or CloudShell (not from notebook)
+./setup-inference-profile.sh haiku
+```
+
+**Option 3: Use Python in notebook**
+```python
+import boto3
+bedrock = boto3.client('bedrock', region_name='us-west-2')
+
+response = bedrock.create_inference_profile(
+    inferenceProfileName='langgraph-lab',
+    modelSource={'copyFrom': 'arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0'},
+    description='LangGraph lab profile'
+)
+print(response['inferenceProfileArn'])
+```
+
+### Using Inference Profile in Code
+
+```python
+from langchain_aws import ChatBedrockConverse
+
+# Use the full ARN (not model ID)
+MODEL_ID = "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123"
+
+llm = ChatBedrockConverse(
+    model=MODEL_ID,
+    provider="anthropic",  # Required when using ARN!
+    region_name="us-west-2",
+    temperature=0,
+)
+```
+
+---
+
+## Creating Inference Profiles
+
+### Via CLI Script
+
+```bash
+# Create profile (default: Claude 3.5 Haiku)
+./setup-inference-profile.sh
+
+# Create with specific model
+./setup-inference-profile.sh sonnet      # Claude Sonnet 4
+./setup-inference-profile.sh sonnet-4.5  # Claude Sonnet 4.5
+
+# List existing profiles
+./setup-inference-profile.sh --list
+
+# Delete profile
+./setup-inference-profile.sh --delete
+```
+
+### Via AWS CLI Directly
+
+```bash
+# Create application inference profile
+aws bedrock create-inference-profile \
+  --region us-west-2 \
+  --inference-profile-name "my-lab-profile" \
+  --model-source 'copyFrom=arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0' \
+  --description "Lab inference profile" \
+  --tags key=Purpose,value=Lab
+
+# List application inference profiles
+aws bedrock list-inference-profiles \
+  --region us-west-2 \
+  --type-equals APPLICATION
+
+# Delete profile
+aws bedrock delete-inference-profile \
+  --region us-west-2 \
+  --inference-profile-identifier "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123"
+```
+
+### IAM Permissions for Creating Profiles
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageInferenceProfiles",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:CreateInferenceProfile",
+        "bedrock:DeleteInferenceProfile",
+        "bedrock:GetInferenceProfile",
+        "bedrock:ListInferenceProfiles",
+        "bedrock:TagResource"
+      ],
+      "Resource": "*"
     }
   ]
 }

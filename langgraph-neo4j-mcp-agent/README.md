@@ -8,53 +8,110 @@ This project provides LangGraph ReAct agents that connect to a Neo4j MCP server 
 
 A simple notebook to test LangGraph with Bedrock in **SageMaker Unified Studio**.
 
-> **Important**: See [MODEL.md](MODEL.md) for details on model configuration challenges and the current workaround.
+### Quick Start
 
-### The Challenge
+#### Step 1: Create an Inference Profile (One-Time Setup)
 
-SageMaker Unified Studio has a restrictive permissions boundary that blocks direct Bedrock model access. **Only inference profiles created through Bedrock IDE work.**
+Run this from CLI/CloudShell (**not** inside a notebook):
 
-### Setup (Current Workaround)
+```bash
+cd langgraph-neo4j-mcp-agent
 
-1. **Create an app in Bedrock IDE**
-   - Go to SageMaker Unified Studio → **Build** → **Bedrock IDE**
-   - Create any app (agent, chat, etc.) with your desired model
-   - Export the app
+# See available options
+./setup-inference-profile.sh --help
 
-2. **Get the inference profile ARN**
-   ```bash
-   grep "inferenceProfileArn" amazon-bedrock-ide-app-export-*/amazon-bedrock-ide-app-stack-*.json
-   ```
+# Create a profile (choose one):
+./setup-inference-profile.sh haiku      # Fast & cheap - great for testing
+./setup-inference-profile.sh sonnet     # Balanced - recommended for production
+./setup-inference-profile.sh sonnet4    # Latest Claude Sonnet 4
+./setup-inference-profile.sh --all      # Create ALL model profiles
 
-3. **Use in your notebook**
-   ```python
-   INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/PROFILE_ID"
+# Create and test in one step:
+./setup-inference-profile.sh --test haiku
+```
 
-   llm = ChatBedrockConverse(
-       model=INFERENCE_PROFILE_ARN,
-       provider="anthropic",
-       region_name="us-west-2",
-       temperature=0,
-   )
-   ```
+#### Step 2: Copy the ARN to Your Notebook
+
+The script will output something like:
+```
+╔════════════════════════════════════════════════════════════╗
+║              COPY THIS TO YOUR NOTEBOOK                    ║
+╚════════════════════════════════════════════════════════════╝
+
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:123456789:application-inference-profile/abc123"
+```
+
+#### Step 3: Paste into Notebook
+
+Open `minimal_langgraph_agent.ipynb` and paste the ARN in the configuration cell:
+
+```python
+#################################################
+# CONFIGURATION - Paste your inference profile ARN
+#################################################
+
+INFERENCE_PROFILE_ARN = "PASTE_YOUR_ARN_HERE"
+REGION = "us-west-2"
+
+#################################################
+```
+
+### Script Commands Reference
+
+```bash
+# Interactive menu
+./setup-inference-profile.sh
+
+# Create specific model profile
+./setup-inference-profile.sh haiku
+./setup-inference-profile.sh sonnet
+./setup-inference-profile.sh sonnet4
+./setup-inference-profile.sh sonnet45
+
+# Create and test profile
+./setup-inference-profile.sh --test haiku
+
+# Create all model profiles at once
+./setup-inference-profile.sh --all
+
+# List existing profiles (shows which have the magic tag)
+./setup-inference-profile.sh --list
+
+# Delete profiles
+./setup-inference-profile.sh --delete haiku
+./setup-inference-profile.sh --delete-all
+
+# Show detected DataZone IDs
+./setup-inference-profile.sh --detect
+```
+
+### Available Models
+
+| Model | Command | Description |
+|-------|---------|-------------|
+| Claude 3.5 Haiku | `./setup-inference-profile.sh haiku` | Fast & cheap - great for testing |
+| Claude 3.5 Sonnet v2 | `./setup-inference-profile.sh sonnet` | Balanced - **recommended** |
+| Claude Sonnet 4 | `./setup-inference-profile.sh sonnet4` | Latest version |
+| Claude Sonnet 4.5 | `./setup-inference-profile.sh sonnet45` | Most capable |
 
 ### Files
 
 | File | Description |
 |------|-------------|
 | `minimal_langgraph_agent.ipynb` | Jupyter notebook for SageMaker Studio |
-| `minimal_agent.py` | Python script version (for local/EC2 testing) |
-| `MODEL.md` | Model configuration details and known issues |
-| `IAM-SETUP.md` | IAM permissions documentation |
-| `setup-inference-profile.sh` | CLI tool (works outside SageMaker Unified Studio) |
+| `test_models.ipynb` | Testing notebook for model configuration |
+| `setup-inference-profile.sh` | **CLI tool to create working inference profiles** |
+| `MODEL.md` | Detailed explanation of the secret sauce |
 
-### What Doesn't Work
+### Prerequisites
 
-- Direct model IDs (`anthropic.claude-*`)
-- Cross-region profiles (`us.anthropic.claude-*`)
-- CLI-created inference profiles (missing internal SageMaker bindings)
+Before running the script, you need a **Bedrock IDE export** in the parent directory. This provides the DataZone IDs needed for the magic tag.
 
-See [MODEL.md](MODEL.md) for full details.
+1. Go to SageMaker Unified Studio → **Build** → **Bedrock IDE**
+2. Create any app (agent, chat, etc.)
+3. Export the app (this creates `amazon-bedrock-ide-app-export-*` folder)
+
+The script auto-detects these IDs from the export.
 
 ---
 
@@ -353,3 +410,111 @@ dependencies = [
 - [LangChain MCP Adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [AWS Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
+
+---
+
+## Appendix: Why the Script Works (The Secret Sauce)
+
+### The Problem
+
+SageMaker Unified Studio has a **permissions boundary** (`SageMakerStudioProjectUserRolePermissionsBoundary`) that blocks direct Bedrock model access:
+
+```
+AccessDeniedException: User is not authorized to perform: bedrock:InvokeModel
+on resource: arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-*
+```
+
+**What doesn't work in SageMaker Unified Studio:**
+- Direct model IDs (`anthropic.claude-3-5-sonnet-20241022-v2:0`)
+- Cross-region profiles (`us.anthropic.claude-3-5-sonnet-20241022-v2:0`)
+- CLI-created inference profiles without the magic tag
+
+### The Discovery
+
+After extensive testing, we discovered the **one critical tag** that makes CLI-created inference profiles work:
+
+```
+AmazonBedrockManaged = true
+```
+
+### Why This Tag Works
+
+The SageMaker permissions boundary policy likely has a condition like:
+
+```json
+{
+  "Condition": {
+    "StringEquals": {
+      "aws:ResourceTag/AmazonBedrockManaged": "true"
+    }
+  }
+}
+```
+
+This means only resources **tagged as managed by Bedrock** are allowed through the permissions boundary.
+
+### What the Script Does
+
+The `setup-inference-profile.sh` script creates inference profiles with all the required elements:
+
+1. **Correct Naming Pattern**: `{domain_id} {project_id} {model}`
+   - Matches the pattern used by Bedrock IDE
+
+2. **Required Tags**:
+   ```
+   AmazonBedrockManaged = true      ← THE KEY!
+   AmazonDataZoneProject = {project_id}
+   AmazonDataZoneDomain = {domain_id}
+   ```
+
+3. **Auto-Detection**: Extracts the correct DataZone IDs from Bedrock IDE exports
+   - Project ID comes from `bedrockServiceRoleArn` (not `exportProjectId`!)
+   - Domain ID comes from the `dzd-*` pattern
+
+### Comparison: Before vs After
+
+| Profile Type | Has `AmazonBedrockManaged=true` | Works in Studio? |
+|--------------|--------------------------------|------------------|
+| Bedrock IDE created | ✅ Yes (automatic) | ✅ Yes |
+| Old CLI-created | ❌ No | ❌ No |
+| **Script-created** | ✅ Yes | ✅ **Yes!** |
+
+### Verifying Your Profiles
+
+Use the `--list` command to see which profiles have the magic tag:
+
+```bash
+./setup-inference-profile.sh --list
+```
+
+Output shows:
+```
+Profiles with AmazonBedrockManaged=true:
+  ✓ dzd-xxx yyy haiku        ← Will work
+  ✓ dzd-xxx yyy sonnet       ← Will work
+  ✗ langgraph-lab            ← Won't work (missing tag)
+```
+
+### The Notebook Configuration
+
+In your notebook, use the ARN with the `provider` parameter:
+
+```python
+from langchain_aws import ChatBedrockConverse
+
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/ID"
+REGION = "us-west-2"
+
+llm = ChatBedrockConverse(
+    model=INFERENCE_PROFILE_ARN,
+    provider="anthropic",  # REQUIRED when using ARN!
+    region_name=REGION,
+    temperature=0,
+)
+```
+
+**Important**: The `provider="anthropic"` parameter is **required** when using an ARN. Without it, you'll get errors.
+
+### For More Details
+
+See [MODEL.md](MODEL.md) for the full investigation history and troubleshooting guide.

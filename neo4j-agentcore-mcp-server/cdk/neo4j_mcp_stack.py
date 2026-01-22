@@ -166,6 +166,11 @@ class Neo4jMcpStack(Stack):
             allowed_o_auth_flows_user_pool_client=True,
             allowed_o_auth_scopes=[f"{self.stack_name.lower()}-mcp/invoke"],
             supported_identity_providers=["COGNITO"],
+            # Token validity: 12 hours for access tokens
+            access_token_validity=12,
+            token_validity_units=cognito.CfnUserPoolClient.TokenValidityUnitsProperty(
+                access_token="hours",
+            ),
         )
         self.machine_client.add_dependency(self.resource_server)
 

@@ -1,6 +1,0 @@
-{
-  "agent_id": "strands_claude_getting_started-tBcDAsC6rb",
-  "agent_arn": "arn:aws:bedrock-agentcore:us-west-2:159878781974:runtime/strands_claude_getting_started-tBcDAsC6rb",
-  "ecr_uri": "159878781974.dkr.ecr.us-west-2.amazonaws.com/bedrock-agentcore-strands_claude_getting_started",
-  "region": "us-west-2"
-}

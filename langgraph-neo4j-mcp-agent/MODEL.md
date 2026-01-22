@@ -1,5 +1,47 @@
 # Model Configuration for SageMaker Unified Studio
 
+## THE SECRET SAUCE (What Fixed It)
+
+After extensive testing, we discovered the **one critical tag** that makes CLI-created inference profiles work in SageMaker Unified Studio:
+
+```
+AmazonBedrockManaged = true
+```
+
+### Why This Works
+
+SageMaker Unified Studio uses a **permissions boundary** that blocks direct Bedrock model access. The boundary policy checks for this tag:
+
+```json
+"Condition": {
+  "StringEquals": {
+    "aws:ResourceTag/AmazonBedrockManaged": "true"
+  }
+}
+```
+
+### The Complete Recipe
+
+To create a working inference profile via CLI:
+
+1. **Name format**: `{domain_id} {project_id} lab`
+2. **Required tags**:
+   - `AmazonBedrockManaged` = `true` ← **THE KEY!**
+   - `AmazonDataZoneProject` = `{your_project_id}`
+   - `AmazonDataZoneDomain` = `{your_domain_id}`
+
+3. **Get correct IDs** from Bedrock IDE export:
+   - Project ID: Extract from `bedrockServiceRoleArn` (not `exportProjectId`!)
+   - Domain ID: Look for `dzd-*` pattern
+
+### Before vs After
+
+| Without `AmazonBedrockManaged=true` | With `AmazonBedrockManaged=true` |
+|-------------------------------------|----------------------------------|
+| `AccessDeniedException` | Works! |
+
+---
+
 ## Quick Start
 
 To use Bedrock models in SageMaker Unified Studio notebooks:

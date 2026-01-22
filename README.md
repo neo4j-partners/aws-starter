@@ -9,13 +9,206 @@ The core workflow centers on:
 
 For a detailed explanation of how all the pieces fit together, see the **[Architecture Documentation](./docs/ARCHITECTURE.md)** which includes Mermaid diagrams, component descriptions, and end-to-end request flows.
 
-## Recommended Learning Path
+## AWS Labs Steps
 
-| Step | Project | Purpose |
-|------|---------|---------|
-| 1 | [`neo4j-agentcore-mcp-server`](./neo4j-agentcore-mcp-server/) | Deploy the Neo4j MCP server to AgentCore |
-| 2 | [`langgraph-neo4j-mcp-agent`](./langgraph-neo4j-mcp-agent/) | Run locally to verify deployment and test MCP tools |
-| 3 | [`agentcore-neo4j-mcp-agent`](./agentcore-neo4j-mcp-agent/) | Deploy the agent itself to AgentCore for orchestration and observability |
+A step-by-step guide to deploying and testing the Neo4j MCP server with AWS Bedrock AgentCore and SageMaker Unified Studio.
+
+> **⚠️ CRITICAL: Use `us-west-2` region for all steps.** AWS Bedrock AgentCore features (Runtime, Gateway) are currently available in limited regions. This guide assumes `us-west-2` (Oregon) for all deployments and notebook configurations.
+
+---
+
+### Step 1: Deploy the Neo4j MCP Server
+
+Deploy the Neo4j MCP server to AWS Bedrock AgentCore Runtime using CDK.
+
+**Project:** [`neo4j-agentcore-mcp-server/`](./neo4j-agentcore-mcp-server/README.md)
+
+This project packages the [official Neo4j MCP server](https://github.com/neo4j-contrib/neo4j-mcp) (written in Go) into a Docker container and deploys it to AgentCore Runtime with an OAuth2-protected Gateway. The server provides two tools for AI agents:
+- `get-schema` - Retrieve the database structure
+- `read-cypher` - Execute read-only Cypher queries
+
+```bash
+cd neo4j-agentcore-mcp-server
+
+# Deploy the MCP server (creates Runtime, Gateway, and Cognito)
+./deploy.sh
+
+# IMPORTANT: Generate OAuth2 credentials for client applications
+./deploy.sh credentials
+```
+
+> **Key step:** Run `./deploy.sh credentials` after deployment to generate the `.mcp-credentials.json` file containing the Gateway URL, OAuth2 client ID/secret, and access token needed by client applications.
+
+---
+
+### Step 2: Copy Credentials to the Agent Project
+
+Copy the OAuth2 credentials from the MCP server deployment to the LangGraph agent project.
+
+```bash
+cp neo4j-agentcore-mcp-server/.mcp-credentials.json langgraph-neo4j-mcp-agent/
+```
+
+This file contains:
+- `gateway_url` - AgentCore Gateway endpoint
+- `client_id` / `client_secret` - OAuth2 credentials for Cognito
+- `access_token` - Pre-generated bearer token (valid ~1 hour)
+- `token_url` - Cognito token endpoint for refresh
+
+**Optional: Test credentials locally**
+
+Verify the MCP server connection by running the simple agent from your local machine (requires AWS CLI credentials with Bedrock access):
+
+```bash
+cd langgraph-neo4j-mcp-agent
+uv sync
+uv run python simple-agent.py "What is the database schema?"
+```
+
+This uses [`simple-agent.py`](./langgraph-neo4j-mcp-agent/simple-agent.py) which reads credentials from `.mcp-credentials.json` and queries the Neo4j MCP server via the AgentCore Gateway.
+
+---
+
+### Step 3: Create a SageMaker Domain
+
+Navigate to AWS SageMaker and create a domain to access Amazon SageMaker Unified Studio.
+
+1. Go to **AWS Console** → **Amazon SageMaker** → **Domains**
+2. Click **Create domain** and follow the setup wizard
+3. Once created, note the **Amazon SageMaker Unified Studio URL**
+
+![SageMaker Domains](./images/Sagemaker%20Domains.png)
+
+The domain provides access to SageMaker Unified Studio where you can run Jupyter notebooks with pre-configured ML environments and Bedrock access.
+
+> **AWS Documentation:** [SageMaker Unified Studio](https://docs.aws.amazon.com/sagemaker/latest/dg/studio.html)
+
+---
+
+### Step 4: Open SageMaker Unified Studio and Start JupyterLab
+
+In SageMaker Unified Studio, create a JupyterLab notebook environment.
+
+1. Click **Open unified studio** from your domain
+2. Navigate to **Build** in the left sidebar
+3. Select **JupyterLab** to start a notebook environment
+
+![SageMaker UI Build](./images/sagemakeruibuild.png)
+
+The JupyterLab environment comes pre-installed with `langchain`, `langgraph`, `boto3`, and other ML libraries.
+
+---
+
+### Step 5: Clone the Repository
+
+Clone this repository into your SageMaker JupyterLab environment.
+
+```bash
+git clone https://github.com/neo4j-partners/aws-starter.git
+cd aws-starter
+```
+
+---
+
+### Step 6: Create an Inference Profile
+
+Create a Bedrock inference profile to enable Claude access from SageMaker notebooks.
+
+**Reference:** [`langgraph-neo4j-mcp-agent/README.md`](./langgraph-neo4j-mcp-agent/README.md#quick-start)
+
+SageMaker Unified Studio has a permissions boundary that blocks direct Bedrock model access. The `setup-inference-profile.sh` script creates properly-tagged inference profiles that work within these constraints.
+
+```bash
+cd langgraph-neo4j-mcp-agent
+
+# See available options
+./setup-inference-profile.sh --help
+
+# Create a profile (choose one)
+./setup-inference-profile.sh haiku      # Fast & cheap - great for testing
+./setup-inference-profile.sh sonnet     # Balanced - recommended
+./setup-inference-profile.sh --test haiku  # Create and test in one step
+```
+
+Copy the output ARN - you'll paste it into notebooks in the following steps.
+
+---
+
+### Step 7: Test LangGraph with a Minimal Agent
+
+Verify your Bedrock setup by running the minimal LangGraph agent notebook.
+
+**Notebook:** [`langgraph-neo4j-mcp-agent/minimal_langgraph_agent.ipynb`](./langgraph-neo4j-mcp-agent/minimal_langgraph_agent.ipynb)
+
+This notebook tests basic LangGraph functionality with simple tools (time, math) without requiring MCP or database connections:
+
+1. Open the notebook in JupyterLab
+2. Paste your inference profile ARN in the configuration cell
+3. Run all cells to verify Claude is working
+
+```python
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:123456789:application-inference-profile/abc123"
+REGION = "us-west-2"
+```
+
+---
+
+### Step 8: Run the Strands Agent with Neo4j MCP
+
+Test the Neo4j MCP connection using AWS Strands Agents.
+
+**Notebook:** [`langgraph-neo4j-mcp-agent/neo4j_strands_mcp_agent.ipynb`](./langgraph-neo4j-mcp-agent/neo4j_strands_mcp_agent.ipynb)
+
+Copy values from `.mcp-credentials.json` into the notebook's configuration cell:
+
+```python
+INFERENCE_PROFILE_ARN = "your-inference-profile-arn"
+GATEWAY_URL = "https://...amazonaws.com/mcp"  # from gateway_url
+ACCESS_TOKEN = "eyJ..."                        # from access_token
+REGION = "us-west-2"
+```
+
+This notebook uses the Strands Agents framework (AWS's native agent library) to query Neo4j.
+
+---
+
+### Step 9: Run the LangGraph MCP Agent
+
+Test the complete LangGraph + MCP integration with Neo4j.
+
+**Notebook:** [`langgraph-neo4j-mcp-agent/neo4j_simple_mcp_agent.ipynb`](./langgraph-neo4j-mcp-agent/neo4j_simple_mcp_agent.ipynb)
+
+Similar to Step 8, paste your credentials into the configuration cell:
+
+```python
+INFERENCE_PROFILE_ARN = "your-inference-profile-arn"
+GATEWAY_URL = "your-gateway-url"
+ACCESS_TOKEN = "your-access-token"
+REGION = "us-west-2"
+```
+
+This notebook demonstrates:
+- Low-level MCP client with `streamablehttp_client`
+- LangGraph `create_react_agent` with dynamically loaded MCP tools
+- ReAct reasoning pattern for multi-step database queries
+
+---
+
+### Step 10: Test Neo4j Aura Agents (Optional)
+
+If you have a Neo4j Aura account with an external agent configured, test the Aura Agents REST API.
+
+**Project:** [`aura-agents/`](./aura-agents/README.md)
+
+[Neo4j Aura Agents](https://neo4j.com/developer/genai-ecosystem/aura-agent/) is a managed agent platform that provides a REST API for querying Neo4j databases without deploying your own infrastructure.
+
+**Notebook:** [`aura-agents/aura_agent_demo.ipynb`](./aura-agents/aura_agent_demo.ipynb)
+
+1. Follow the setup instructions in the [aura-agents README](./aura-agents/README.md) to get your API credentials
+2. Open `aura_agent_demo.ipynb` in JupyterLab
+3. Configure your credentials in the notebook and run all cells
+
+This provides a simpler alternative when you don't need the full AgentCore deployment.
 
 ---
 

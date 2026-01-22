@@ -17,8 +17,44 @@ This client library provides:
 ## Prerequisites
 
 1. **Neo4j Aura Account** with an AuraDB instance
-2. **An Aura Agent** created in the Aura console with external visibility enabled
-3. **API Credentials** from your Neo4j user profile (Settings → API Keys)
+2. **An Aura Agent** with external endpoint enabled
+3. **API Credentials** (Client ID and Secret) from your Neo4j profile
+
+## Setting Up Your Aura Agent
+
+### Step 1: Create Your Aura Agent
+
+First, create your Aura Agent by following the hands-on lab:
+**[Neo4j Aura Agents Lab](https://github.com/neo4j-partners/hands-on-lab-neo4j-and-azure/tree/main/Lab_2_Aura_Agents)**
+
+**Important:** When creating your agent, select **"External endpoint"** to enable REST API access.
+
+### Step 2: Get Your Agent Endpoint URL
+
+After creating your agent:
+1. Click on your agent in the Aura console
+2. Copy the endpoint URL (it will look like `https://api.neo4j.io/v2beta1/projects/.../agents/.../invoke`)
+
+### Step 3: Get Your API Credentials
+
+To get your Client ID and Secret:
+1. Click on your **profile icon** in the top right corner
+2. Go to **Settings**
+3. Select the **API keys** tab
+4. Create a new API key to get your Client ID and Client Secret
+
+![Aura API Keys Settings](../images/auraagentsapikey.png)
+
+## Quick Start with Jupyter Notebook
+
+If you followed the lab setup in the main README.md, you can test your agent using the Jupyter notebook:
+
+1. Open [aura_agent_demo.ipynb](aura_agent_demo.ipynb)
+2. Copy your credentials and set the values in the notebook:
+   - `CLIENT_ID` - Your API key Client ID
+   - `CLIENT_SECRET` - Your API key Client Secret
+   - `AGENT_ENDPOINT` - Your agent's endpoint URL
+3. Run the notebook cells to test your agent
 
 ## Installation
 

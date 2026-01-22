@@ -1,7 +1,7 @@
 [project]
 name = "aura-agents"
 version = "0.1.0"
-description = "Add your description here"
+description = "Python client for calling external Neo4j Aura Agents via REST API"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

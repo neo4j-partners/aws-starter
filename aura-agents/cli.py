@@ -2,23 +2,31 @@
 """Command-line interface for Neo4j Aura Agent.
 
 Usage:
-    uv run python cli.py "What data is in the graph?"
-    uv run python cli.py --json "List all node types"
-    echo "What relationships exist?" | uv run python cli.py -
+    uv run python cli.py                    # Default: ask about capabilities
+    uv run python cli.py "Tell me about Apple"
+    uv run python cli.py --tools            # List available tools
+    uv run python cli.py --json "Query"     # JSON output
+    echo "Question" | uv run python cli.py -  # Read from stdin
 
 Examples:
-    # Single question
-    uv run python cli.py "What contracts mention Motorola?"
+    # No arguments - asks default question about capabilities
+    uv run python cli.py
+
+    # Ask about available tools
+    uv run python cli.py --tools
+
+    # Query a specific company
+    uv run python cli.py "Tell me about NVIDIA CORPORATION"
 
     # JSON output (for scripting)
     uv run python cli.py --json "Give me a summary" | jq .text
 
-    # Read from stdin
-    echo "What's in the graph?" | uv run python cli.py -
-
     # Verbose mode with debug output
     uv run python cli.py -v "Explain the schema"
 """
+
+DEFAULT_QUERY = "What information can you tell me about the data in your graph?"
+TOOLS_QUERY = "What tools do you have available? List each tool and what it does."
 import argparse
 import json
 import logging
@@ -38,8 +46,11 @@ def main() -> int:
     parser.add_argument(
         "question",
         nargs="?",
-        default="-",
-        help="Question to ask (use '-' to read from stdin)",
+        default=None,
+        help="Question to ask (use '-' to read from stdin, omit for default query)",
+    )
+    parser.add_argument(
+        "--tools", action="store_true", help="Ask the agent what tools it has available"
     )
     parser.add_argument(
         "--json", "-j", action="store_true", help="Output response as JSON"
@@ -65,16 +76,20 @@ def main() -> int:
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
     # Get the question
-    if args.question == "-":
+    if args.tools:
+        question = TOOLS_QUERY
+    elif args.question == "-":
         if sys.stdin.isatty():
             print("Reading from stdin (Ctrl+D to end):", file=sys.stderr)
         question = sys.stdin.read().strip()
-    else:
+        if not question:
+            print("Error: No question provided via stdin", file=sys.stderr)
+            return 1
+    elif args.question:
         question = args.question
-
-    if not question:
-        print("Error: No question provided", file=sys.stderr)
-        return 1
+    else:
+        # No question provided - use default
+        question = DEFAULT_QUERY
 
     # Create client
     try:

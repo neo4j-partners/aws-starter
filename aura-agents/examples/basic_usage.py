@@ -70,10 +70,10 @@ def main() -> None:
         # Show token usage if available
         if response.usage:
             print(f"\nToken Usage:")
-            if response.usage.input_tokens:
-                print(f"  Input: {response.usage.input_tokens}")
-            if response.usage.output_tokens:
-                print(f"  Output: {response.usage.output_tokens}")
+            if response.usage.request_tokens:
+                print(f"  Request: {response.usage.request_tokens}")
+            if response.usage.response_tokens:
+                print(f"  Response: {response.usage.response_tokens}")
             if response.usage.total_tokens:
                 print(f"  Total: {response.usage.total_tokens}")
 

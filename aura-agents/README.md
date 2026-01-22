@@ -74,18 +74,38 @@ print(response.text)
 ### CLI
 
 ```bash
-# Simple query
-uv run python cli.py "What types of nodes exist?"
+# No arguments - asks default question about agent capabilities
+uv run python cli.py
+
+# Ask what tools the agent has available
+uv run python cli.py --tools
+
+# Query a specific company
+uv run python cli.py "Tell me about NVIDIA CORPORATION"
 
 # JSON output (for scripting)
-uv run python cli.py --json "List all relationships" | jq .text
+uv run python cli.py --json "Give me a summary" | jq .text
 
-# Verbose mode
+# Raw API response (for debugging)
+uv run python cli.py --raw "What tools do you have?"
+
+# Verbose mode with debug output
 uv run python cli.py -v "Explain the schema"
 
 # Read from stdin
 echo "What's in the graph?" | uv run python cli.py -
 ```
+
+#### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `(no args)` | Ask default question about agent capabilities |
+| `--tools` | List the tools available to the agent |
+| `--json`, `-j` | Output response as formatted JSON |
+| `--raw`, `-r` | Output raw API response (for debugging) |
+| `--verbose`, `-v` | Enable debug logging |
+| `--timeout`, `-t` | Request timeout in seconds (default: 60) |
 
 ### Interactive Chat
 
@@ -105,6 +125,26 @@ Run an example:
 ```bash
 uv run python examples/basic_usage.py
 ```
+
+## Discovering Agent Tools
+
+You can ask the agent what tools it has available:
+
+```bash
+$ uv run python cli.py --tools
+
+I have one tool available:
+
+*   **`get_company_overview(company_name: str)`**: This tool provides a
+    comprehensive overview of a company. It can retrieve information such
+    as SEC filings, identified risk factors, and major institutional owners.
+```
+
+The tools available depend on how the agent was configured in the Aura console. Common tools include:
+
+| Tool | Parameters | Description |
+|------|------------|-------------|
+| `get_company_overview` | `company_name: str` | Retrieves SEC filings, risk factors, and institutional owners |
 
 ## API Reference
 
@@ -134,11 +174,86 @@ class AuraAgentClient:
 ```python
 class AgentResponse:
     text: str | None           # Formatted response text
-    thinking: str | None       # Agent reasoning steps
+    thinking: str | None       # Agent reasoning steps (shows agent's logic)
     tool_uses: list[ToolUse]   # Tools used during invocation
     status: str | None         # Request status (SUCCESS)
     usage: AgentUsage | None   # Token usage metrics
     raw_response: dict | None  # Full JSON for debugging
+```
+
+### AgentUsage
+
+```python
+class AgentUsage:
+    request_tokens: int | None   # Tokens in the request
+    response_tokens: int | None  # Tokens in the response
+    total_tokens: int | None     # Total tokens used
+```
+
+## Example Output
+
+### Text Response
+
+```bash
+$ uv run python cli.py "Tell me about Apple Inc"
+
+Apple Inc. (ticker: AAPL) has several SEC filings...
+
+Some of their top risk factors include:
+*   Geography
+*   Aggressive price competition
+*   Frequent introduction of new products
+...
+
+Major asset managers holding Apple Inc. include:
+*   BlackRock Inc.
+*   Berkshire Hathaway Inc
+*   Vanguard Group Inc
+...
+```
+
+### JSON Response
+
+```bash
+$ uv run python cli.py --json "What tools do you have?" | jq .
+```
+
+```json
+{
+  "text": "I have one tool available: `get_company_overview`...",
+  "status": "SUCCESS",
+  "thinking": "The user wants to know my capabilities...",
+  "tool_uses": null,
+  "usage": {
+    "request_tokens": 122,
+    "response_tokens": 100,
+    "total_tokens": 222
+  }
+}
+```
+
+### Raw API Response
+
+```bash
+$ uv run python cli.py --raw "Hello" | jq .
+```
+
+```json
+{
+  "content": [
+    { "type": "thinking", "thinking": "..." },
+    { "type": "text", "text": "..." }
+  ],
+  "end_reason": "FINAL_ANSWER_PROVIDED",
+  "role": "assistant",
+  "status": "SUCCESS",
+  "type": "message",
+  "usage": {
+    "request_tokens": 128,
+    "response_tokens": 163,
+    "total_tokens": 291
+  }
+}
 ```
 
 ## How Aura Agents Work

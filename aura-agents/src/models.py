@@ -16,8 +16,8 @@ class TokenResponse(BaseModel):
 class AgentUsage(BaseModel):
     """Token usage metrics from agent invocation."""
 
-    input_tokens: int | None = None
-    output_tokens: int | None = None
+    request_tokens: int | None = None
+    response_tokens: int | None = None
     total_tokens: int | None = None
 
 
@@ -49,30 +49,60 @@ class AgentResponse(BaseModel):
     def from_api_response(cls, data: dict[str, Any]) -> "AgentResponse":
         """Parse API response into AgentResponse model.
 
-        The Aura Agent API response structure can vary, so this handles
-        different formats gracefully.
+        The Aura Agent API response structure uses a content array:
+        {
+            "content": [
+                {"type": "thinking", "thinking": "..."},
+                {"type": "text", "text": "..."},
+                {"type": "tool_use", ...}
+            ],
+            "status": "SUCCESS",
+            "usage": {...}
+        }
         """
-        tool_uses = None
-        if "tool_uses" in data:
-            tool_uses = [ToolUse(**tu) for tu in data.get("tool_uses", [])]
-        elif "tool_use_id" in data:
-            # Single tool use at top level
-            tool_uses = [
-                ToolUse(
-                    tool_use_id=data.get("tool_use_id"),
-                    type=data.get("type"),
-                    output=data.get("output"),
+        text = None
+        thinking = None
+        tool_uses = []
+
+        # Parse the content array
+        content = data.get("content", [])
+        for item in content:
+            item_type = item.get("type")
+            if item_type == "text":
+                text = item.get("text")
+            elif item_type == "thinking":
+                thinking = item.get("thinking")
+            elif item_type == "tool_use":
+                tool_uses.append(
+                    ToolUse(
+                        tool_use_id=item.get("id"),
+                        type=item.get("name"),
+                        output=item.get("input"),
+                    )
                 )
-            ]
+            elif item_type == "tool_result":
+                tool_uses.append(
+                    ToolUse(
+                        tool_use_id=item.get("tool_use_id"),
+                        type="tool_result",
+                        output=item.get("content"),
+                    )
+                )
+
+        # Fallback for legacy response format
+        if not text and "text" in data:
+            text = data.get("text")
+        if not thinking and "thinking" in data:
+            thinking = data.get("thinking")
 
         usage = None
         if "usage" in data:
             usage = AgentUsage(**data["usage"])
 
         return cls(
-            text=data.get("text"),
-            thinking=data.get("thinking"),
-            tool_uses=tool_uses,
+            text=text,
+            thinking=thinking,
+            tool_uses=tool_uses if tool_uses else None,
             status=data.get("status"),
             usage=usage,
             raw_response=data,

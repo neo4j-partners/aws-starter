@@ -1,100 +1,114 @@
 # Model Configuration for SageMaker Unified Studio
 
-## THE SECRET SAUCE (What Fixed It)
+## TL;DR - Three Keys to Success
 
-After extensive testing, we discovered the **one critical tag** that makes CLI-created inference profiles work in SageMaker Unified Studio:
+### 1. `AmazonBedrockManaged=true` Tag
+SageMaker Unified Studio's permissions boundary only allows `bedrock:InvokeModel` on inference profiles with this tag.
 
-```
-AmazonBedrockManaged = true
-```
+### 2. `base_model_id` Parameter
+The `langchain-aws` library calls `bedrock:GetInferenceProfile` which SageMaker roles don't have. Bypass it:
 
-### Why This Works
-
-SageMaker Unified Studio uses a **permissions boundary** that blocks direct Bedrock model access. The boundary policy checks for this tag:
-
-```json
-"Condition": {
-  "StringEquals": {
-    "aws:ResourceTag/AmazonBedrockManaged": "true"
-  }
-}
+```python
+llm = ChatBedrockConverse(
+    model=INFERENCE_PROFILE_ARN,
+    provider="anthropic",
+    region_name="us-west-2",
+    base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",  # Bypasses GetInferenceProfile
+)
 ```
 
-### The Complete Recipe
-
-To create a working inference profile via CLI:
-
-1. **Name format**: `{domain_id} {project_id} lab`
-2. **Required tags**:
-   - `AmazonBedrockManaged` = `true` ← **THE KEY!**
-   - `AmazonDataZoneProject` = `{your_project_id}`
-   - `AmazonDataZoneDomain` = `{your_domain_id}`
-
-3. **Get correct IDs** from Bedrock IDE export:
-   - Project ID: Extract from `bedrockServiceRoleArn` (not `exportProjectId`!)
-   - Domain ID: Look for `dzd-*` pattern
-
-### Before vs After
-
-| Without `AmazonBedrockManaged=true` | With `AmazonBedrockManaged=true` |
-|-------------------------------------|----------------------------------|
-| `AccessDeniedException` | Works! |
+### 3. DataZone IDs from AWS CLI
+The setup script auto-detects DataZone IDs via `aws datazone list-domains` and `aws datazone list-projects` - no Bedrock IDE export folder needed.
 
 ---
 
 ## Quick Start
 
-To use Bedrock models in SageMaker Unified Studio notebooks:
-
-### Option A: Use the Setup Script (Recommended)
-
 ```bash
-# From CLI/CloudShell (not in notebook)
-cd langgraph-neo4j-mcp-agent
+# Run from CLI (auto-detects DataZone IDs)
+./setup-inference-profile.sh haiku
 
-# Auto-detect DataZone IDs and create profile
-eval $(./setup-inference-profile.sh --detect)
-./setup-inference-profile.sh sonnet
-
-# Copy the ARN output to your notebook
+# Output:
+# MODEL = "haiku"
+# INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:..."
 ```
 
-### Option B: Use Existing Bedrock IDE Profile
-
-If you already created an app in Bedrock IDE, extract the ARN from the export:
-
-```bash
-grep -r '"inferenceProfileArn"' amazon-bedrock-ide-app-export-*/agent-stack.json
-```
-
-### 2. Install Dependencies (in notebook)
+Copy both values to your notebook:
 
 ```python
-%pip install langgraph>=1.0.6 -q
-```
-
-### 3. Configure the LLM (in notebook)
-
-```python
-from langchain_aws import ChatBedrockConverse
-
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/PROFILE_ID"
+MODEL = "haiku"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/ID"
 REGION = "us-west-2"
+
+BASE_MODEL_IDS = {
+    "haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
+    "sonnet": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "sonnet4": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "sonnet45": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+}
 
 llm = ChatBedrockConverse(
     model=INFERENCE_PROFILE_ARN,
-    provider="anthropic",  # Required when using ARN
+    provider="anthropic",
     region_name=REGION,
-    temperature=0,
+    base_model_id=BASE_MODEL_IDS[MODEL],
 )
 ```
 
-**Key points:**
-- The `provider="anthropic"` parameter is **required** when using an ARN
-- Direct model IDs (e.g., `us.anthropic.claude-*`) do NOT work in SageMaker Unified Studio
-- The `AmazonBedrockManaged=true` tag is required for SageMaker permissions boundary
+---
+
+## Common Errors and Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `AccessDeniedException: bedrock:InvokeModel` | Profile missing `AmazonBedrockManaged=true` tag | Recreate with `./setup-inference-profile.sh` |
+| `AccessDeniedException: bedrock:GetInferenceProfile` | SageMaker role lacks this permission | Add `base_model_id` parameter |
+| `ValidationException: provider` | Using ARN without provider param | Add `provider="anthropic"` |
 
 ---
+
+## Why This Works
+
+SageMaker Unified Studio uses a **permissions boundary** that blocks direct Bedrock model access:
+
+```json
+{
+  "Action": ["bedrock:InvokeModel"],
+  "Condition": {
+    "StringEquals": {
+      "aws:ResourceTag/AmazonBedrockManaged": "true"
+    }
+  }
+}
+```
+
+The setup script creates profiles with all required tags:
+- `AmazonBedrockManaged` = `true` ← **THE KEY!**
+- `AmazonDataZoneProject` = `{project_id}`
+- `AmazonDataZoneDomain` = `{domain_id}`
+
+---
+
+## Script Features
+
+The `setup-inference-profile.sh` script:
+
+1. **Auto-detects DataZone IDs** from AWS CLI (no export folder needed)
+2. **Interactive selection** if multiple domains/projects exist
+3. **Creates properly tagged profiles** with `AmazonBedrockManaged=true`
+4. **Outputs both MODEL and ARN** for notebook configuration
+
+```bash
+./setup-inference-profile.sh --help     # See all options
+./setup-inference-profile.sh --list     # Show profiles with tag status
+./setup-inference-profile.sh --detect   # Show detected DataZone IDs
+./setup-inference-profile.sh haiku      # Create haiku profile
+./setup-inference-profile.sh --test haiku  # Create and test
+```
+
+---
+
+## Detailed Documentation
 
 This document describes the model configuration challenges and solutions for running LangGraph agents with Bedrock in SageMaker Unified Studio.
 

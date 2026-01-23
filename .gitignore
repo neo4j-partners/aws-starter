@@ -186,6 +186,7 @@ logs/
 !.env.sample
 !.env.example
 .envrc
+.inference-profile*.env
 
 # Secrets (never commit these)
 *.pem

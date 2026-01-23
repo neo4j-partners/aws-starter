@@ -262,15 +262,19 @@ print(response['inferenceProfileArn'])
 from langchain_aws import ChatBedrockConverse
 
 # Use the full ARN (not model ID)
-MODEL_ID = "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123"
+MODEL_ARN = "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123"
 
 llm = ChatBedrockConverse(
-    model=MODEL_ID,
+    model=MODEL_ARN,
     provider="anthropic",  # Required when using ARN!
     region_name="us-west-2",
     temperature=0,
+    # Optional: provide base_model_id to skip bedrock:GetInferenceProfile API call
+    # base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",
 )
 ```
+
+**Note:** If you get `AccessDeniedException` on `bedrock:GetInferenceProfile`, either add the IAM permission (see [Troubleshooting](#error-accessdeniedexception-on-getinferenceprofile)) or uncomment `base_model_id` with the correct model for your profile.
 
 ---
 
@@ -329,9 +333,14 @@ aws bedrock delete-inference-profile \
         "bedrock:DeleteInferenceProfile",
         "bedrock:GetInferenceProfile",
         "bedrock:ListInferenceProfiles",
-        "bedrock:TagResource"
+        "bedrock:TagResource",
+        "bedrock:UntagResource",
+        "bedrock:ListTagsForResource"
       ],
-      "Resource": "*"
+      "Resource": [
+        "arn:aws:bedrock:*:*:inference-profile/*",
+        "arn:aws:bedrock:*:*:application-inference-profile/*"
+      ]
     }
   ]
 }
@@ -433,7 +442,17 @@ If you need cross-region inference (using `us.`, `eu.`, `apac.` prefixes), add:
         "arn:aws:bedrock:*::foundation-model/anthropic.*",
         "arn:aws:bedrock:*:*:inference-profile/us.anthropic.*",
         "arn:aws:bedrock:*:*:inference-profile/eu.anthropic.*",
-        "arn:aws:bedrock:*:*:inference-profile/apac.anthropic.*"
+        "arn:aws:bedrock:*:*:inference-profile/apac.anthropic.*",
+        "arn:aws:bedrock:*:*:application-inference-profile/*"
+      ]
+    },
+    {
+      "Sid": "BedrockGetInferenceProfile",
+      "Effect": "Allow",
+      "Action": "bedrock:GetInferenceProfile",
+      "Resource": [
+        "arn:aws:bedrock:*:*:inference-profile/*",
+        "arn:aws:bedrock:*:*:application-inference-profile/*"
       ]
     }
   ]
@@ -460,7 +479,8 @@ For development and testing, this comprehensive policy covers most use cases:
       "Resource": [
         "arn:aws:bedrock:*::foundation-model/anthropic.*",
         "arn:aws:bedrock:*::foundation-model/amazon.*",
-        "arn:aws:bedrock:*:*:inference-profile/*"
+        "arn:aws:bedrock:*:*:inference-profile/*",
+        "arn:aws:bedrock:*:*:application-inference-profile/*"
       ]
     },
     {
@@ -484,9 +504,68 @@ For development and testing, this comprehensive policy covers most use cases:
 }
 ```
 
+**Important:** The `bedrock:GetInferenceProfile` permission is required by `langchain-aws` when using application inference profiles. Without it, you'll get `AccessDeniedException`.
+
 ---
 
 ## Troubleshooting
+
+### Error: AccessDeniedException on GetInferenceProfile
+
+**Problem:**
+```
+AccessDeniedException: User is not authorized to perform: bedrock:GetInferenceProfile
+on resource: arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123
+because no identity-based policy allows the bedrock:GetInferenceProfile action
+```
+
+**Cause:** The `langchain-aws` library calls `bedrock:GetInferenceProfile` to resolve the base model when you use an application inference profile ARN. The `SageMakerStudioFullAccess` policy includes `bedrock:ListInferenceProfiles` but **not** `bedrock:GetInferenceProfile`.
+
+**Solution 1: Add IAM Permission (Recommended)**
+
+Add this inline policy to your SageMaker execution role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BedrockGetInferenceProfile",
+      "Effect": "Allow",
+      "Action": "bedrock:GetInferenceProfile",
+      "Resource": [
+        "arn:aws:bedrock:*:*:inference-profile/*",
+        "arn:aws:bedrock:*:*:application-inference-profile/*"
+      ]
+    }
+  ]
+}
+```
+
+**Solution 2: Bypass the API Call (No IAM changes)**
+
+Provide the `base_model_id` parameter to skip the `GetInferenceProfile` call:
+
+```python
+from langchain_aws import ChatBedrockConverse
+
+llm = ChatBedrockConverse(
+    model=INFERENCE_PROFILE_ARN,
+    provider="anthropic",
+    region_name="us-west-2",
+    temperature=0,
+    base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",  # Bypasses GetInferenceProfile
+)
+```
+
+Use the correct `base_model_id` for your profile:
+
+| Profile | base_model_id |
+|---------|---------------|
+| haiku | `anthropic.claude-3-5-haiku-20241022-v1:0` |
+| sonnet | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| sonnet4 | `anthropic.claude-sonnet-4-20250514-v1:0` |
+| sonnet45 | `anthropic.claude-sonnet-4-5-20250929-v1:0` |
 
 ### Error: AccessDeniedException on inference-profile
 
@@ -552,13 +631,17 @@ aws bedrock-runtime invoke-model \
 | Resource Type | ARN Format |
 |---------------|------------|
 | Foundation Model | `arn:aws:bedrock:REGION::foundation-model/MODEL_ID` |
-| Inference Profile | `arn:aws:bedrock:REGION:ACCOUNT:inference-profile/PROFILE_ID` |
+| Inference Profile (System) | `arn:aws:bedrock:REGION:ACCOUNT:inference-profile/PROFILE_ID` |
+| Application Inference Profile | `arn:aws:bedrock:REGION:ACCOUNT:application-inference-profile/PROFILE_ID` |
 | Provisioned Model | `arn:aws:bedrock:REGION:ACCOUNT:provisioned-model/NAME` |
 | Guardrail | `arn:aws:bedrock:REGION:ACCOUNT:guardrail/ID` |
 | Custom Model | `arn:aws:bedrock:REGION:ACCOUNT:custom-model/NAME` |
 | Model Invocation Job | `arn:aws:bedrock:REGION:ACCOUNT:model-invocation-job/ID` |
 
-Note: Foundation models have no account ID in the ARN (uses `::` double colon).
+**Notes:**
+- Foundation models have no account ID in the ARN (uses `::` double colon)
+- System inference profiles are AWS-managed (e.g., `us.anthropic.claude-*` for cross-region)
+- Application inference profiles are user-created via CLI, SDK, or Bedrock IDE
 
 ---
 
@@ -568,9 +651,15 @@ Note: Foundation models have no account ID in the ARN (uses `::` double colon).
 - [Actions, resources, and condition keys for Amazon Bedrock](https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazonbedrock.html)
 - [How Amazon Bedrock works with IAM](https://docs.aws.amazon.com/bedrock/latest/userguide/security_iam_service-with-iam.html)
 - [AWS managed policies for Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/security-iam-awsmanpol.html)
+- [Prerequisites for inference profiles](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-prereq.html)
+- [GetInferenceProfile API Reference](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_GetInferenceProfile.html)
+- [View information about an inference profile](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-view.html)
+- [Resolve AccessDeniedException in Amazon Bedrock](https://repost.aws/knowledge-center/bedrock-access-denied-exception)
 - [Simplified model access in Amazon Bedrock](https://aws.amazon.com/blogs/security/simplified-amazon-bedrock-model-access/)
 - [Implementing least privilege access for Amazon Bedrock](https://aws.amazon.com/blogs/security/implementing-least-privilege-access-for-amazon-bedrock/)
 - [Access Amazon Bedrock foundation models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)
 - [Grant Users Permissions for Bedrock in SageMaker Canvas](https://docs.aws.amazon.com/sagemaker/latest/dg/canvas-fine-tuning-permissions.html)
+- [AmazonDataZoneBedrockModelManagementRole](https://docs.aws.amazon.com/sagemaker-unified-studio/latest/adminguide/AmazonDataZoneBedrockModelManagementRole.html)
 - [SageMakerStudioBedrockFunctionExecutionRolePolicy](https://docs.aws.amazon.com/sagemaker-unified-studio/latest/adminguide/security-iam-awsmanpol-SageMakerStudioBedrockFunctionExecutionRolePolicy.html)
 - [Configure fine-grained access to Amazon Bedrock models using SageMaker Unified Studio](https://aws.amazon.com/blogs/machine-learning/configure-fine-grained-access-to-amazon-bedrock-models-using-amazon-sagemaker-unified-studio/)
+- [langchain-aws ChatBedrockConverse source](https://github.com/langchain-ai/langchain-aws/blob/main/libs/aws/langchain_aws/chat_models/bedrock_converse.py)

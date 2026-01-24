@@ -2,6 +2,39 @@
 
 This project demonstrates how to build and deploy AI agents on **Amazon Bedrock AgentCore Runtime** that use the **Model Context Protocol (MCP)** to query a Neo4j graph database containing aviation fleet data.
 
+
+## Agent Comparison
+
+| Feature | Basic Agent | Orchestrator Agent |
+|---------|-------------|-------------------|
+| Architecture | Single ReAct loop | Router + 2 specialists |
+| Observability | Basic traces | Rich multi-agent traces |
+| Domain handling | Generic prompts | Specialized prompts per domain |
+| Best for | Getting started | Production demos, observability |
+
+## Domain Specialists (Orchestrator)
+
+| Agent | Handles | Example Queries |
+|-------|---------|-----------------|
+| **Maintenance** | Faults, components, sensors, reliability | "Most common maintenance faults", "Hydraulic system issues" |
+| **Operations** | Flights, delays, routes, airports | "Common delay causes", "Busiest routes" |
+
+## Prerequisites
+
+1. **Python 3.10+** and **uv** package manager
+2. **AWS CLI** configured with credentials
+3. **Bedrock Claude Sonnet model access** enabled in AWS console
+4. **Deployed Neo4j MCP Server** with AgentCore Gateway (see [neo4j-agentcore-mcp-server](../neo4j-agentcore-mcp-server/))
+
+## Key Technologies
+
+- **Amazon Bedrock AgentCore** - Managed runtime for deploying and scaling AI agents
+- **Model Context Protocol (MCP)** - Standard protocol for connecting LLMs to external tools and data sources
+- **LangGraph** - Multi-agent orchestration with StateGraph and conditional routing
+- **LangChain** - ReAct agent pattern and MCP tool adapters
+- **Claude Sonnet 4** - LLM powering agent reasoning (via Bedrock Converse API)
+- **OpenTelemetry** - Observability with AWS Distro for OpenTelemetry (ADOT)
+
 ## Overview
 
 Two agent implementations are provided, progressing from simple to multi-agent orchestration:
@@ -42,37 +75,51 @@ cd orchestrator-agent
 
 See [orchestrator-agent/README.md](./orchestrator-agent/README.md) for multi-agent architecture details.
 
-## Agent Comparison
+### Option 3: Local Docker Testing
 
-| Feature | Basic Agent | Orchestrator Agent |
-|---------|-------------|-------------------|
-| Architecture | Single ReAct loop | Router + 2 specialists |
-| Observability | Basic traces | Rich multi-agent traces |
-| Domain handling | Generic prompts | Specialized prompts per domain |
-| Best for | Getting started | Production demos, observability |
+Test agents locally using Docker before deploying:
 
-## Domain Specialists (Orchestrator)
+```bash
+# Install dependencies (run from agentcore-neo4j-mcp-agent/)
+uv sync
 
-| Agent | Handles | Example Queries |
-|-------|---------|-----------------|
-| **Maintenance** | Faults, components, sensors, reliability | "Most common maintenance faults", "Hydraulic system issues" |
-| **Operations** | Flights, delays, routes, airports | "Common delay causes", "Busiest routes" |
+# Sync credentials from MCP server to agent directories
+uv run local-test sync-credentials
 
-## Prerequisites
+# Build and test an agent (all-in-one)
+uv run local-test all basic-agent
 
-1. **Python 3.10+** and **uv** package manager
-2. **AWS CLI** configured with credentials
-3. **Bedrock Claude Sonnet model access** enabled in AWS console
-4. **Deployed Neo4j MCP Server** with AgentCore Gateway (see [neo4j-agentcore-mcp-server](../neo4j-agentcore-mcp-server/))
+# Or step by step:
+uv run local-test build basic-agent      # Build Docker image
+uv run local-test run basic-agent        # Start container
+uv run local-test test basic-agent       # Send test request
+uv run local-test logs basic-agent       # View logs
+uv run local-test stop basic-agent       # Stop container
 
-## Key Technologies
+# Check status of all containers
+uv run local-test status
+```
 
-- **Amazon Bedrock AgentCore** - Managed runtime for deploying and scaling AI agents
-- **Model Context Protocol (MCP)** - Standard protocol for connecting LLMs to external tools and data sources
-- **LangGraph** - Multi-agent orchestration with StateGraph and conditional routing
-- **LangChain** - ReAct agent pattern and MCP tool adapters
-- **Claude Sonnet 4** - LLM powering agent reasoning (via Bedrock Converse API)
-- **OpenTelemetry** - Observability with AWS Distro for OpenTelemetry (ADOT)
+### Option 4: CloudFormation Deployment
+
+Deploy to AgentCore using raw CloudFormation (no CDK):
+
+```bash
+cd cfn
+
+# Deploy basic-agent
+./deploy.sh basic-agent
+
+# Deploy orchestrator-agent
+./deploy.sh orchestrator-agent
+
+# Custom stack name
+./deploy.sh basic-agent my-custom-stack
+
+# Cleanup
+./cleanup.sh basic-agent
+./cleanup.sh basic-agent my-custom-stack --delete-ecr
+```
 
 ## References
 

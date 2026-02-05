@@ -1,0 +1,9 @@
+[project]
+name = "neo4j-mcp-cdk"
+version = "0.1.0"
+description = "CDK stack for Neo4j MCP server on AgentCore"
+requires-python = ">=3.10"
+dependencies = [
+    "aws-cdk-lib>=2.202.0",
+    "constructs>=10.4.4",
+]

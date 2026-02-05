@@ -93,17 +93,10 @@ echo "Scope: $SCOPE"
 echo "Runtime ARN: $RUNTIME_ARN"
 echo ""
 
-# Ensure venv exists
-if [[ ! -d "$SCRIPT_DIR/.venv" ]]; then
-    echo "Creating virtual environment..."
-    python3 -m venv "$SCRIPT_DIR/.venv"
-    source "$SCRIPT_DIR/.venv/bin/activate"
-    pip install --quiet boto3 "botocore[crt]" httpx
-else
-    source "$SCRIPT_DIR/.venv/bin/activate"
-fi
+# Install dependencies via uv
+uv sync --quiet --directory "$SCRIPT_DIR"
 
-python3 << PYEOF
+uv run --directory "$SCRIPT_DIR" python3 << PYEOF
 import os
 import sys
 import json

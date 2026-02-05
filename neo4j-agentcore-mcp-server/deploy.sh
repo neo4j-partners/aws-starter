@@ -156,20 +156,10 @@ stack_exists() {
         >/dev/null 2>&1
 }
 
-# Setup CDK virtual environment
-setup_cdk_venv() {
-    if [[ ! -d "$CDK_DIR/.venv" ]]; then
-        log_info "Creating CDK virtual environment..."
-        python3 -m venv "$CDK_DIR/.venv"
-    fi
-
-    source "$CDK_DIR/.venv/bin/activate"
-
-    # Install dependencies if needed
-    if ! pip show aws-cdk-lib >/dev/null 2>&1; then
-        log_info "Installing CDK dependencies..."
-        pip install -q -r "$CDK_DIR/requirements.txt"
-    fi
+# Install CDK dependencies via uv
+setup_cdk_deps() {
+    log_info "Installing CDK dependencies..."
+    (cd "$CDK_DIR" && uv sync --quiet)
 }
 
 # ============================================================================
@@ -270,7 +260,7 @@ cmd_stack() {
     echo ""
 
     # Setup CDK environment
-    setup_cdk_venv
+    setup_cdk_deps
 
     # Check if CDK is bootstrapped
     if ! aws cloudformation describe-stacks \
@@ -354,7 +344,7 @@ cmd_synth() {
     local full_image_uri="${ecr_uri}:${IMAGE_TAG}"
 
     # Setup CDK environment
-    setup_cdk_venv
+    setup_cdk_deps
 
     cd "$CDK_DIR"
     JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 \
@@ -454,7 +444,7 @@ cmd_cleanup() {
         log_info "Deleting CDK stack: $STACK_NAME"
 
         # Setup CDK environment
-        setup_cdk_venv
+        setup_cdk_deps
 
         cd "$CDK_DIR"
         JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 \
@@ -601,16 +591,10 @@ cmd_credentials() {
     # Get client secret and JWT token using Python
     log_info "Fetching client secret and JWT token..."
 
-    # Ensure venv exists
-    if [[ ! -d "$SCRIPT_DIR/.venv" ]]; then
-        python3 -m venv "$SCRIPT_DIR/.venv"
-        source "$SCRIPT_DIR/.venv/bin/activate"
-        pip install --quiet boto3 httpx
-    else
-        source "$SCRIPT_DIR/.venv/bin/activate"
-    fi
+    # Install dependencies via uv
+    uv sync --quiet --directory "$SCRIPT_DIR"
 
-    python3 << PYEOF
+    uv run --directory "$SCRIPT_DIR" python3 << PYEOF
 import json
 import base64
 import socket

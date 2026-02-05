@@ -44,31 +44,22 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Setup Python virtual environment if needed
-setup_venv() {
-    if [[ ! -d "$SCRIPT_DIR/.venv" ]]; then
-        echo "INFO  Setting up Python virtual environment..."
-        python3 -m venv "$SCRIPT_DIR/.venv"
-        source "$SCRIPT_DIR/.venv/bin/activate"
-        pip install --quiet --upgrade pip
-        pip install --quiet mcp httpx
-        echo "OK    Virtual environment ready"
-        echo ""
-    else
-        source "$SCRIPT_DIR/.venv/bin/activate"
-    fi
+# Install Python dependencies via uv
+setup_deps() {
+    uv sync --quiet --directory "$SCRIPT_DIR"
 }
 
 # Map empty command to 'help'
 command="${1:-help}"
 shift 2>/dev/null || true
 
-# Help doesn't need venv
+# Help still needs deps for imports
 if [[ "$command" == "help" || "$command" == "--help" || "$command" == "-h" ]]; then
-    python3 "$SCRIPT_DIR/client/mcp_local_client.py" help
+    setup_deps
+    uv run --directory "$SCRIPT_DIR" python3 "$SCRIPT_DIR/client/mcp_local_client.py" help
     exit 0
 fi
 
-# Setup venv and run
-setup_venv
-python3 "$SCRIPT_DIR/client/mcp_local_client.py" "$command" "$@"
+# Install deps and run
+setup_deps
+uv run --directory "$SCRIPT_DIR" python3 "$SCRIPT_DIR/client/mcp_local_client.py" "$command" "$@"

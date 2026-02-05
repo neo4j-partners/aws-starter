@@ -54,33 +54,24 @@ check_credentials() {
     fi
 }
 
-# Setup Python virtual environment if needed
-setup_venv() {
-    if [[ ! -d "$SCRIPT_DIR/.venv" ]]; then
-        echo "INFO  Setting up Python virtual environment..."
-        python3 -m venv "$SCRIPT_DIR/.venv"
-        source "$SCRIPT_DIR/.venv/bin/activate"
-        pip install --quiet --upgrade pip
-        pip install --quiet mcp httpx
-        echo "OK    Virtual environment ready"
-        echo ""
-    else
-        source "$SCRIPT_DIR/.venv/bin/activate"
-    fi
+# Install Python dependencies via uv
+setup_deps() {
+    uv sync --quiet --directory "$SCRIPT_DIR"
 }
 
 # Map empty command to 'test' for backwards compatibility
 command="${1:-test}"
 
-# Help doesn't need venv or credentials
+# Help still needs deps for imports
 if [[ "$command" == "help" || "$command" == "--help" || "$command" == "-h" ]]; then
-    python3 "$SCRIPT_DIR/client/gateway_client.py" help
+    setup_deps
+    uv run --directory "$SCRIPT_DIR" python3 "$SCRIPT_DIR/client/gateway_client.py" help
     exit 0
 fi
 
 # Check credentials exist
 check_credentials
 
-# Setup venv and run
-setup_venv
-python3 "$SCRIPT_DIR/client/gateway_client.py" "$command"
+# Install deps and run
+setup_deps
+uv run --directory "$SCRIPT_DIR" python3 "$SCRIPT_DIR/client/gateway_client.py" "$command"

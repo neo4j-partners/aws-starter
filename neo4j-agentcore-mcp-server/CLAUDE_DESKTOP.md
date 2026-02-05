@@ -50,8 +50,7 @@ Generate a JWT token using the provided script:
 
 ```bash
 cd /path/to/neo4j-agentcore-mcp-server
-source .venv/bin/activate
-python3 get_token.py <COGNITO_CLIENT_ID> <USERNAME> <PASSWORD> <AWS_REGION>
+uv run python3 get_token.py <COGNITO_CLIENT_ID> <USERNAME> <PASSWORD> <AWS_REGION>
 ```
 
 Or source your `.env` and run:

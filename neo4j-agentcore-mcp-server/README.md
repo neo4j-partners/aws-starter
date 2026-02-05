@@ -250,7 +250,7 @@ neo4j-agentcore-mcp-server/
 │   │   ├── oauth_provider/           # Lambda for OAuth2 credential provider
 │   │   └── runtime_health_check/     # Lambda for runtime health check
 │   ├── cdk.json                      # CDK configuration
-│   └── requirements.txt              # Python dependencies
+│   └── pyproject.toml                # Python dependencies (uv)
 ├── client/
 │   ├── gateway_client.py             # Gateway client (uses .mcp-credentials.json)
 │   └── mcp_operations.py             # MCP operation helpers

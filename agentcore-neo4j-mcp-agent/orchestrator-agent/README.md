@@ -69,7 +69,10 @@ Expert for flight operations:
 # 1. Install dependencies
 ./agent.sh setup
 
-# 2. Copy credentials from basic-agent
+# 2. Copy credentials (from parent directory, copies to both agents):
+../sync-credentials.sh
+
+# Or copy manually:
 cp ../basic-agent/.mcp-credentials.json .
 ```
 

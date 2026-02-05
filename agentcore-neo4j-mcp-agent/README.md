@@ -46,6 +46,14 @@ Two agent implementations are provided, progressing from simple to multi-agent o
 
 ## Quick Start
 
+### Step 0: Sync Credentials
+
+Copy `.mcp-credentials.json` from the MCP server deployment to both agent directories:
+
+```bash
+./sync-credentials.sh
+```
+
 ### Option 1: Basic Agent (Single Agent)
 
 A single ReAct agent that handles all queries:

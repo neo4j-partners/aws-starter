@@ -82,6 +82,10 @@ After setup completes, a `.venv` directory is created containing the isolated Py
 Copy the credentials file from your Neo4j MCP server deployment:
 
 ```bash
+# From the agentcore-neo4j-mcp-agent/ parent directory (copies to both agents):
+../sync-credentials.sh
+
+# Or copy manually:
 cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 ```
 

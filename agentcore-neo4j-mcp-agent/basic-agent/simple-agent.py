@@ -21,7 +21,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
 CREDENTIALS_FILE = ".mcp-credentials.json"
-MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+MODEL_ID = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 SYSTEM_PROMPT = """You are a helpful Neo4j database assistant with access to tools that let you query a Neo4j graph database.
 

@@ -7,7 +7,6 @@
 # Deployed on Amazon Bedrock AgentCore Runtime.
 #
 # Usage:
-#   ./agent.sh setup              Install dependencies
 #   ./agent.sh start              Start agent locally (port 8080)
 #   ./agent.sh test               Test local agent
 #   ./agent.sh configure          Configure for AWS deployment
@@ -37,7 +36,6 @@ print_usage() {
     echo "A ReAct agent that queries Neo4j via AgentCore Gateway."
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh setup              Install dependencies"
     echo "  ./agent.sh start              Start agent locally (port 8080)"
     echo "  ./agent.sh stop               Stop local agent"
     echo "  ./agent.sh test               Test local agent with curl"
@@ -77,18 +75,6 @@ ensure_deps() {
 }
 
 case "${1:-help}" in
-    setup)
-        echo -e "${GREEN}Installing dependencies...${NC}"
-        uv sync
-        echo ""
-        echo -e "${GREEN}Setup complete!${NC}"
-        echo ""
-        echo "Next steps:"
-        echo "  1. Copy .mcp-credentials.json from your Neo4j MCP server deployment"
-        echo "  2. Run './agent.sh start' to test locally"
-        echo "  3. Run './agent.sh configure' to set up AWS deployment"
-        ;;
-
     start)
         ensure_deps
         if [ ! -f ".mcp-credentials.json" ]; then

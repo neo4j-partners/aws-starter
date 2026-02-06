@@ -32,7 +32,7 @@ This project demonstrates how to build and deploy AI agents on **Amazon Bedrock 
 - **Model Context Protocol (MCP)** - Standard protocol for connecting LLMs to external tools and data sources
 - **LangGraph** - Multi-agent orchestration with StateGraph and conditional routing
 - **LangChain** - ReAct agent pattern and MCP tool adapters
-- **Claude Sonnet 4** - LLM powering agent reasoning (via Bedrock Converse API)
+- **Claude Sonnet 4.5** - LLM powering agent reasoning (via Bedrock Converse API, Global inference profile)
 - **OpenTelemetry** - Observability with AWS Distro for OpenTelemetry (ADOT)
 
 ## Overview
@@ -60,7 +60,7 @@ A single ReAct agent that handles all queries:
 
 ```bash
 cd basic-agent
-./agent.sh setup          # Install dependencies
+uv sync                   # Install dependencies
 ./agent.sh start          # Run locally (port 8080)
 ./agent.sh test           # Test local agent
 ./agent.sh deploy         # Deploy to AgentCore
@@ -73,7 +73,7 @@ Routes queries to specialized Maintenance or Operations agents:
 
 ```bash
 cd orchestrator-agent
-./agent.sh setup          # Install dependencies
+uv sync                   # Install dependencies
 ./agent.sh start          # Run locally (port 8080)
 ./agent.sh test-maintenance   # Test routing to Maintenance Agent
 ./agent.sh test-operations    # Test routing to Operations Agent

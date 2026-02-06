@@ -35,7 +35,7 @@ This project demonstrates how to build and deploy an AI agent on **Amazon Bedroc
 ### Commands
 
 ```bash
-./agent.sh setup          # Install dependencies
+uv sync                   # Install dependencies
 ./agent.sh start          # Run agent locally (port 8080)
 ./agent.sh test           # Test local agent
 ./agent.sh configure      # Generate AWS deployment config
@@ -61,13 +61,13 @@ This section covers deploying and testing the agent on **Amazon Bedrock AgentCor
 
 ### Step 1: Setup
 
-Run the setup command to install all required dependencies:
+Install all required dependencies:
 
 ```bash
-./agent.sh setup
+uv sync
 ```
 
-**What this does:** The `agent.sh` script uses the `uv` package manager to create a virtual environment and install all dependencies defined in `pyproject.toml`. These include:
+**What this does:** The `uv` package manager creates a virtual environment and installs all dependencies defined in `pyproject.toml`. These include:
 
 - **bedrock-agentcore** and **bedrock-agentcore-starter-toolkit** - AWS libraries for deploying and running agents on AgentCore Runtime
 - **langchain**, **langgraph**, and **langchain-aws** - The LangChain framework for building the ReAct agent pattern with AWS Bedrock integration
@@ -485,7 +485,7 @@ After running `./agent.sh deploy`, the output includes:
 
 | Command | Description |
 |---------|-------------|
-| `./agent.sh setup` | Install dependencies using uv package manager |
+| `uv sync` | Install dependencies using uv package manager |
 | `./agent.sh start` | Start the agent locally on port 8080 for testing |
 | `./agent.sh stop` | Stop the locally running agent process |
 | `./agent.sh test` | Send a test request to the local agent using curl |

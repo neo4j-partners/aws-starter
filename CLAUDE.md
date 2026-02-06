@@ -42,7 +42,7 @@ cd langgraph-neo4j-mcp-agent
 # Copy credentials from MCP server deployment
 cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
-./agent.sh setup             # Install dependencies
+uv sync                      # Install dependencies
 ./agent.sh "query"           # Run production agent (auto-refresh OAuth2)
 uv run python simple-agent.py "query"  # Simple agent (static token)
 
@@ -60,7 +60,7 @@ cd agentcore-neo4j-mcp-agent
 
 # Basic Agent (single ReAct loop)
 cd basic-agent
-./agent.sh setup             # Install dependencies
+uv sync                      # Install dependencies
 ./agent.sh start             # Run locally (port 8080)
 ./agent.sh test              # Test local agent
 ./agent.sh deploy            # Deploy to AgentCore Runtime

@@ -418,7 +418,7 @@ flowchart TB
 
 ```bash
 cd basic-agent
-./agent.sh setup          # Install dependencies
+uv sync                   # Install dependencies
 ./agent.sh start          # Run locally (port 8080)
 ./agent.sh test           # Test local agent
 python simple-agent.py "What is the database schema?"
@@ -541,7 +541,7 @@ flowchart LR
 
 ```bash
 cd orchestrator-agent
-./agent.sh setup              # Install dependencies
+uv sync                       # Install dependencies
 ./agent.sh start              # Run locally (port 8080)
 ./agent.sh test-maintenance   # Test routing to Maintenance Agent
 ./agent.sh test-operations    # Test routing to Operations Agent

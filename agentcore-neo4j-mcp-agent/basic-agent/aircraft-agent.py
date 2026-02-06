@@ -47,7 +47,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 app = BedrockAgentCoreApp()
 
 # Configuration
-MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
+MODEL_ID = os.getenv("MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
 # In-memory caches (loaded once at startup, never written to disk)

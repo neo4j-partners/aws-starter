@@ -50,18 +50,8 @@ if [ "$1" = "help" ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  3. AWS credentials configured (for Bedrock access)"
     echo ""
     echo "Commands:"
-    echo "  ./agent.sh setup    Install dependencies"
+    echo "  uv sync             Install dependencies"
     echo "  ./agent.sh help     Show this help message"
-    exit 0
-fi
-
-# Setup command - install dependencies
-if [ "$1" = "setup" ]; then
-    echo "Installing dependencies..."
-    cd "$SCRIPT_DIR"
-    uv sync
-    echo ""
-    echo "Setup complete!"
     exit 0
 fi
 

@@ -123,7 +123,7 @@ The full-featured agents connect to a Neo4j MCP server via AWS Bedrock AgentCore
 
 ```bash
 # Install dependencies
-./agent.sh setup
+uv sync
 
 # Copy credentials from neo4j-agentcore-mcp-server deployment
 cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
@@ -287,7 +287,7 @@ The agent automatically refreshes tokens when they expire using the client crede
 |---------|-------------|
 | `./agent.sh` | Run demo queries |
 | `./agent.sh "<question>"` | Ask a question |
-| `./agent.sh setup` | Install dependencies |
+| `uv sync` | Install dependencies |
 | `./agent.sh help` | Show help |
 
 ## Example Questions (Aircraft Maintenance Database)

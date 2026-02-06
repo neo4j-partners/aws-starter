@@ -6,7 +6,6 @@
 # - Operations Agent: flights, delays, routes, airports
 #
 # Usage:
-#   ./agent.sh setup              Install dependencies
 #   ./agent.sh start              Start orchestrator locally (port 8080)
 #   ./agent.sh test               Test local orchestrator
 #   ./agent.sh configure          Configure for AWS deployment
@@ -34,7 +33,6 @@ print_usage() {
     echo "Routes queries to Maintenance and Operations specialist agents."
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh setup              Install dependencies"
     echo "  ./agent.sh start              Start orchestrator locally (port 8080)"
     echo "  ./agent.sh stop               Stop local orchestrator"
     echo "  ./agent.sh test               Test local orchestrator"
@@ -76,17 +74,6 @@ ensure_credentials() {
 }
 
 case "${1:-help}" in
-    setup)
-        echo -e "${GREEN}Installing dependencies...${NC}"
-        uv sync
-        echo ""
-        echo -e "${GREEN}Setup complete!${NC}"
-        echo ""
-        echo "Next steps:"
-        echo "  1. Copy .mcp-credentials.json: cp ../basic-agent/.mcp-credentials.json ."
-        echo "  2. Run './agent.sh start' to test locally"
-        ;;
-
     start)
         ensure_deps
         ensure_credentials

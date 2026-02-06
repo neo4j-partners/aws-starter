@@ -75,6 +75,9 @@ AWS_REGION=us-west-2
 ### 2. Deploy
 
 ```bash
+# If using a non-default AWS profile:
+export AWS_PROFILE=my-profile
+
 ./deploy.sh
 ```
 

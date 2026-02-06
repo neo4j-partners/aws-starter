@@ -67,7 +67,7 @@ Expert for flight operations:
 
 ```bash
 # 1. Install dependencies
-./agent.sh setup
+uv sync
 
 # 2. Copy credentials (from parent directory, copies to both agents):
 ../sync-credentials.sh
@@ -160,7 +160,7 @@ Run and test the orchestrator locally before deploying.
 
 | Command | Description |
 |---------|-------------|
-| `./agent.sh setup` | Install dependencies |
+| `uv sync` | Install dependencies |
 | `./agent.sh start` | Start orchestrator locally (port 8080) |
 | `./agent.sh stop` | Stop local orchestrator |
 | `./agent.sh test` | Test with general query |

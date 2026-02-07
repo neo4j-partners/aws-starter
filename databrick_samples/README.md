@@ -218,10 +218,14 @@ From your local machine:
 
 ```bash
 cd databrick_samples
-./setup_databricks_secrets.sh
+./setup_databricks_secrets.sh                              # Uses default profile
+./setup_databricks_secrets.sh --profile my-workspace       # Use a specific Databricks CLI profile
+./setup_databricks_secrets.sh my-scope --profile staging   # Custom scope + profile
 ```
 
 This reads the OAuth2 credentials from `.mcp-credentials.json` and stores them securely in Databricks secrets.
+
+The `--profile` flag specifies which Databricks CLI profile to use (as configured in `~/.databrickscfg`). If omitted, the default profile is used. To set up a profile: `databricks auth login --profile my-workspace`.
 
 **Step 3: Import and Run the Notebook**
 

@@ -83,6 +83,15 @@ When users ask questions about the data:
 
 IMPORTANT: You can only read data. Write operations are not permitted.
 Always use valid Cypher syntax and handle query results appropriately.
+
+CYPHER QUERY GUIDELINES:
+- To count nodes by label, use: MATCH (n) RETURN labels(n) AS nodeLabels, count(n) AS count ORDER BY count DESC
+- To count relationships by type, use: MATCH ()-[r]->() RETURN type(r) AS relType, count(r) AS count ORDER BY count DESC
+- To get labels, use: CALL db.labels() YIELD label RETURN label
+- To get relationship types, use: CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType
+- Do NOT use YIELD with columns that don't exist in the procedure output (e.g. avoid YIELD nodeType, nodeCount)
+- Do NOT use db.schema.nodeTypeProperties() — use get-schema tool instead for schema info
+- Prefer simple MATCH patterns over procedure calls for counting and aggregation
 """
 
 ############################################

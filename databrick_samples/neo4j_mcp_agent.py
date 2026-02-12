@@ -31,7 +31,7 @@ from databricks_langchain import (
     DatabricksMCPServer,
     DatabricksMultiServerMCPClient,
 )
-from langchain.messages import AIMessage, AIMessageChunk, AnyMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, AnyMessage
 from langchain_core.language_models import LanguageModelLike
 from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langchain_core.tools import BaseTool
@@ -187,7 +187,7 @@ def create_tool_calling_agent(
     )
     workflow.add_edge("tools", "agent")
 
-    return workflow.compile()
+    return workflow.compile(recursion_limit=20)
 
 
 ############################################
@@ -241,7 +241,7 @@ class LangGraphResponsesAgent(ResponsesAgent):
                         yield ResponsesAgentStreamEvent(
                             **self.create_text_delta(delta=content, item_id=chunk.id),
                         )
-                except:
+                except Exception:
                     pass
 
     def predict_stream(

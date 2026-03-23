@@ -212,6 +212,33 @@ This provides a simpler alternative when you don't need the full AgentCore deplo
 
 ---
 
+### Step 11: Run the Finance Agent with Aura Agent MCP (Optional)
+
+Connect a LangGraph ReAct agent to the **Neo4j Aura Agent MCP server** to explore SEC filing data, company financials, risk factors, and institutional ownership.
+
+**Project:** [`agentcore-neo4j-mcp-agent/finance-agent/`](./agentcore-neo4j-mcp-agent/finance-agent/README.md)
+
+Unlike the previous steps that use the Neo4j MCP server (raw Cypher), this agent connects to a Neo4j Aura Agent which provides high-level, domain-specific tools auto-generated from your graph schema.
+
+```bash
+cd agentcore-neo4j-mcp-agent/finance-agent
+uv sync
+
+# Set your Aura Agent MCP endpoint
+export AURA_MCP_URL="https://your-aura-agent-mcp-endpoint"
+export AURA_API_KEY="your-api-key"   # optional
+
+# Run demo queries
+uv run python simple-agent.py
+
+# Or ask a specific question
+uv run python simple-agent.py "Tell me about Apple Inc"
+```
+
+The agent auto-discovers tools from the Aura Agent MCP server and uses Bedrock Claude to answer questions about companies, SEC filings, risk factors, and institutional ownership.
+
+---
+
 ## Project Overview
 
 ### 🚀 **Neo4j MCP Server**
@@ -241,6 +268,9 @@ This provides a simpler alternative when you don't need the full AgentCore deplo
     *   **Description:** A LangGraph ReAct agent that deploys to AgentCore Runtime. Uses the `BedrockAgentCoreApp` pattern with `@app.entrypoint` decorator for cloud deployment via the AgentCore CLI (`agentcore configure`, `agentcore deploy`). This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration patterns.
     *   **Key Features:** AgentCore Runtime deployment, CLI-based workflow, programmatic invocation via boto3, LangChain + MCP integration, CloudWatch observability, managed infrastructure.
     *   **Use Case:** Production deployments requiring managed scaling, observability dashboards, enterprise security, and advanced orchestration patterns like supervisor/worker agents.
+    *   **Includes:**
+        *   **[`basic-agent/`](./agentcore-neo4j-mcp-agent/basic-agent/)** — Aircraft fleet operations agent using Neo4j MCP server via AgentCore Gateway (raw Cypher queries)
+        *   **[`finance-agent/`](./agentcore-neo4j-mcp-agent/finance-agent/)** — SEC filing & corporate finance agent using Neo4j Aura Agent MCP server (high-level domain tools, no Cypher)
 
 ---
 
@@ -277,6 +307,26 @@ This provides a simpler alternative when you don't need the full AgentCore deplo
     *   **Description:** A comprehensive demo of setting up an OAuth2 Gateway with Role-Based Access Control (RBAC) and Lambda Interceptors. Shows how to secure MCP server access with Cognito-based authentication and implement custom authorization logic.
     *   **Key Features:** Cognito User Pool integration, machine-to-machine (M2M) OAuth flows, Lambda interceptors for request/response modification, RBAC patterns.
     *   **Use Case:** Production deployments requiring authentication, multi-tenant MCP servers, enterprise security compliance.
+
+---
+
+## Using Claude Code with This Repository
+
+This repository includes an `.mcp.json` configuration that connects Claude Code to a [Neo4j Aura Agent MCP server](https://neo4j.com/developer/genai-ecosystem/aura-agent/). Before launching Claude Code, set the `AURA_AGENT_MCP_SERVER` environment variable to your Aura Agent endpoint URL:
+
+```bash
+export AURA_AGENT_MCP_SERVER="https://your-aura-agent-endpoint.neo4j.io/mcp"
+```
+
+Then start Claude Code from the repository root:
+
+```bash
+claude
+```
+
+Claude Code will automatically connect to the Neo4j Aura Agent MCP server along with the AWS Documentation and AWS Diagram MCP servers configured in `.mcp.json`.
+
+> **Note:** If `AURA_AGENT_MCP_SERVER` is not set, the Neo4j Aura Agent MCP server will fail to connect. The AWS MCP servers will still work independently.
 
 ---
 

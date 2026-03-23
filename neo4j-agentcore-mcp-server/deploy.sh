@@ -29,7 +29,7 @@ CDK_DIR="$SCRIPT_DIR/cdk"
 DEFAULT_REGION="us-west-2"
 DEFAULT_STACK_NAME="neo4j-agentcore-mcp-server"
 DEFAULT_ECR_REPO_NAME="neo4j-mcp-server"
-DEFAULT_IMAGE_TAG="latest"
+DEFAULT_IMAGE_TAG=""  # Auto-detected from git SHA
 
 # ============================================================================
 # Helper Functions
@@ -70,7 +70,18 @@ load_env() {
     AWS_REGION="${AWS_REGION:-$DEFAULT_REGION}"
     STACK_NAME="${STACK_NAME:-$DEFAULT_STACK_NAME}"
     ECR_REPO_NAME="${ECR_REPO_NAME:-$DEFAULT_ECR_REPO_NAME}"
-    IMAGE_TAG="${IMAGE_TAG:-$DEFAULT_IMAGE_TAG}"
+    # Auto-detect image tag from Neo4j MCP repo git SHA if not set
+    if [[ -z "${IMAGE_TAG:-}" ]] && [[ -z "$DEFAULT_IMAGE_TAG" ]]; then
+        if [[ -d "$NEO4J_MCP_REPO/.git" ]]; then
+            IMAGE_TAG=$(git -C "$NEO4J_MCP_REPO" rev-parse --short=7 HEAD)
+            log_info "Image tag from git SHA: $IMAGE_TAG"
+        else
+            IMAGE_TAG="latest"
+            log_info "No git repo found at $NEO4J_MCP_REPO, using tag: latest"
+        fi
+    else
+        IMAGE_TAG="${IMAGE_TAG:-$DEFAULT_IMAGE_TAG}"
+    fi
 }
 
 # Validate required environment variables
@@ -180,14 +191,15 @@ cmd_build() {
     fi
 
     log_info "Repository: $NEO4J_MCP_REPO"
-    log_info "Image: ${ECR_REPO_NAME}:${IMAGE_TAG}"
+    log_info "Image: ${ECR_REPO_NAME}:${IMAGE_TAG} + latest"
     log_info "Platform: linux/arm64"
     echo ""
 
-    # Build for ARM64 using buildx
+    # Build for ARM64 using buildx (tag with both version and latest)
     docker buildx build \
         --platform linux/arm64 \
         --tag "${ECR_REPO_NAME}:${IMAGE_TAG}" \
+        --tag "${ECR_REPO_NAME}:latest" \
         --load \
         "$NEO4J_MCP_REPO"
 
@@ -230,14 +242,16 @@ cmd_push() {
     aws ecr get-login-password --region "$AWS_REGION" | \
         docker login --username AWS --password-stdin "${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-    # Tag and push
+    # Tag and push (both version tag and latest)
     log_info "Tagging image..."
     docker tag "${ECR_REPO_NAME}:${IMAGE_TAG}" "${ecr_uri}:${IMAGE_TAG}"
+    docker tag "${ECR_REPO_NAME}:${IMAGE_TAG}" "${ecr_uri}:latest"
 
     log_info "Pushing image to ECR..."
     docker push "${ecr_uri}:${IMAGE_TAG}"
+    docker push "${ecr_uri}:latest"
 
-    log_success "Image pushed successfully: ${ecr_uri}:${IMAGE_TAG}"
+    log_success "Image pushed successfully: ${ecr_uri}:${IMAGE_TAG} + latest"
 }
 
 # ============================================================================
@@ -740,7 +754,7 @@ Environment Variables (from .env):
     AWS_REGION         AWS region (default: us-west-2)
     STACK_NAME         CDK stack name (default: neo4j-agentcore-mcp-server)
     ECR_REPO_NAME      ECR repository name (default: neo4j-mcp-server)
-    IMAGE_TAG          Docker image tag (default: latest)
+    IMAGE_TAG          Docker image tag (default: git short SHA from MCP repo)
 
 Examples:
   $0                   # Full deployment (build + push + stack)

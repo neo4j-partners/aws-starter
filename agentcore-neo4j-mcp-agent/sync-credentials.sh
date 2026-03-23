@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE="$SCRIPT_DIR/../neo4j-agentcore-mcp-server/.mcp-credentials.json"
-TARGETS=("basic-agent" "orchestrator-agent")
+TARGETS=("basic-agent" "orchestrator-agent" "finance-agent-gateway")
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

@@ -7,7 +7,17 @@ Sample notebooks for integrating Neo4j MCP Server with Databricks via AWS AgentC
 ### Prerequisites
 
 - **Neo4j MCP server deployed** to AWS AgentCore (`neo4j-agentcore-mcp-server/`)
-- **Databricks CLI** installed and authenticated (`databricks auth login`)
+- **Databricks CLI** installed and authenticated:
+  ```bash
+  # Initial login (creates a profile in ~/.databrickscfg)
+  databricks auth login --host <workspace-url> --profile <profile-name>
+
+  # Refresh expired credentials
+  databricks auth login --profile <profile-name>
+
+  # Verify authentication
+  databricks auth describe --profile <profile-name>
+  ```
 - **Databricks cluster** running Runtime 15.4 LTS or later with [required libraries](#cluster-setup) installed
 - **Unity Catalog** enabled on your workspace
 - **jq** installed (`brew install jq` on macOS)

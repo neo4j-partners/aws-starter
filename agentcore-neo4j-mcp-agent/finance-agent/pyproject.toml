@@ -1,0 +1,13 @@
+[project]
+name = "finance-agent"
+version = "0.1.0"
+description = "Finance ReAct agent demo using Neo4j Aura Agent MCP server"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain>=1.2.0",
+    "langgraph>=1.0.6",
+    "langchain-aws>=1.2.0",
+    "langchain-mcp-adapters>=0.2.0",
+    "mcp>=1.3.0",
+    "boto3>=1.42.0",
+]

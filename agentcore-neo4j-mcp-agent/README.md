@@ -1,18 +1,52 @@
 # Neo4j MCP Agent - AgentCore Runtime
 
-This project demonstrates how to build and deploy AI agents on **Amazon Bedrock AgentCore Runtime** that use the **Model Context Protocol (MCP)** to query a Neo4j graph database containing aviation fleet data.
+AI agents deployed on **Amazon Bedrock AgentCore Runtime** that use **MCP** to query a Neo4j graph database. Each agent connects to the Neo4j MCP server via AgentCore Gateway, uses Claude Sonnet for reasoning, and executes Cypher queries through MCP tools.
 
+## Quick Start (Finance Agent)
 
-## Agent Comparison
+The fastest way to deploy an agent — no Docker required:
 
-| Feature | Basic Agent | Orchestrator Agent |
-|---------|-------------|-------------------|
-| Architecture | Single ReAct loop | Router + 2 specialists |
-| Observability | Basic traces | Rich multi-agent traces |
-| Domain handling | Generic prompts | Specialized prompts per domain |
-| Best for | Getting started | Production demos, observability |
+```bash
+# 1. Sync credentials from the MCP server deployment
+./sync-credentials.sh
 
-## Domain Specialists (Orchestrator)
+# 2. Deploy to AgentCore
+cd finance-agent-gateway
+uv sync
+agentcore deploy
+
+# 3. Test the deployed agent
+agentcore invoke '{"prompt": "What companies are in the database?"}'
+```
+
+## How It Works
+
+```
+User Query → AgentCore Runtime → Agent (Claude ReAct loop)
+                                   ↓
+                              MCP Client (streamable HTTP)
+                                   ↓
+                            AgentCore Gateway (JWT auth)
+                                   ↓
+                          Neo4j MCP Server → Neo4j Database
+```
+
+1. **Agent receives a query** via the AgentCore Runtime `/invocations` endpoint
+2. **Loads credentials** from `.mcp-credentials.json` (gateway URL + Bearer token)
+3. **Connects to the Neo4j MCP server** through AgentCore Gateway using `MultiServerMCPClient`
+4. **Discovers MCP tools** (e.g., `read-cypher`, `write-cypher`, `get-schema`)
+5. **Runs a ReAct loop** — Claude reasons about the query, calls MCP tools to execute Cypher queries, and synthesizes a response
+
+## Agents
+
+| Agent | Domain | Deployment | Description |
+|-------|--------|------------|-------------|
+| [finance-agent-gateway/](./finance-agent-gateway/) | SEC filings, companies, risk factors | `agentcore deploy` (no Docker) | Simple ReAct agent for financial analysis |
+| [basic-agent/](./basic-agent/) | Aviation fleet data | `agentcore deploy` or Docker | Single ReAct agent with schema caching and token refresh |
+| [orchestrator-agent/](./orchestrator-agent/) | Aviation fleet data | Docker | Multi-agent with routing to Maintenance and Operations specialists |
+| [finance-agent/](./finance-agent/) | SEC filings | Local only | Connects directly to Neo4j Aura Agent MCP (no Gateway) |
+
+### Domain Specialists (Orchestrator)
 
 | Agent | Handles | Example Queries |
 |-------|---------|-----------------|
@@ -32,31 +66,42 @@ This project demonstrates how to build and deploy AI agents on **Amazon Bedrock 
 - **Model Context Protocol (MCP)** - Standard protocol for connecting LLMs to external tools and data sources
 - **LangGraph** - Multi-agent orchestration with StateGraph and conditional routing
 - **LangChain** - ReAct agent pattern and MCP tool adapters
-- **Claude Sonnet 4.5** - LLM powering agent reasoning (via Bedrock Converse API, Global inference profile)
+- **Claude Sonnet** - LLM powering agent reasoning (via Bedrock Converse API)
 - **OpenTelemetry** - Observability with AWS Distro for OpenTelemetry (ADOT)
 
-## Overview
-
-Two agent implementations are provided, progressing from simple to multi-agent orchestration:
-
-| Agent | Description | Use Case |
-|-------|-------------|----------|
-| [basic-agent/](./basic-agent/) | Single ReAct agent | Simple queries, getting started |
-| [orchestrator-agent/](./orchestrator-agent/) | Multi-agent with routing | Rich observability, domain specialization |
-
-## Quick Start
+## Deployment Options
 
 ### Step 0: Sync Credentials
 
-Copy `.mcp-credentials.json` from the MCP server deployment to both agent directories:
+Copy `.mcp-credentials.json` from the MCP server deployment to all agent directories:
 
 ```bash
 ./sync-credentials.sh
 ```
 
-### Option 1: Basic Agent (Single Agent)
+### Option 1: Finance Agent (Simplest — No Docker)
 
-A single ReAct agent that handles all queries:
+Deploy a finance-domain agent using `agentcore deploy` (zips Python code, no container build):
+
+```bash
+cd finance-agent-gateway
+uv sync
+agentcore deploy                                          # Deploy to AgentCore
+agentcore invoke '{"prompt": "Tell me about Apple Inc"}'  # Test deployed agent
+
+# Local testing
+uv run python agent.py                                   # Start on port 8080
+curl -X POST http://localhost:8080/invocations \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "What companies are in the database?"}'
+
+# CLI mode (no server)
+uv run python simple-agent.py "What are NVIDIA's risk factors?"
+```
+
+### Option 2: Basic Agent (Single Agent)
+
+A single ReAct agent with schema caching and automatic token refresh:
 
 ```bash
 cd basic-agent
@@ -67,7 +112,7 @@ uv sync                   # Install dependencies
 ./agent.sh invoke-cloud "What is the database schema?"
 ```
 
-### Option 2: Orchestrator Agent (Multi-Agent)
+### Option 3: Orchestrator Agent (Multi-Agent)
 
 Routes queries to specialized Maintenance or Operations agents:
 
@@ -83,7 +128,7 @@ uv sync                   # Install dependencies
 
 See [orchestrator-agent/README.md](./orchestrator-agent/README.md) for multi-agent architecture details.
 
-### Option 3: Local Docker Testing
+### Option 4: Local Docker Testing
 
 Test agents locally using Docker before deploying:
 
@@ -108,7 +153,7 @@ uv run local-test stop basic-agent       # Stop container
 uv run local-test status
 ```
 
-### Option 4: CloudFormation Deployment
+### Option 5: CloudFormation Deployment
 
 Deploy to AgentCore using raw CloudFormation (no CDK):
 

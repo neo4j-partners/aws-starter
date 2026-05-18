@@ -48,8 +48,8 @@ Understanding model ID formats is critical for IAM permissions:
 
 | Format | Type | Example | IAM Resource ARN |
 |--------|------|---------|------------------|
-| `anthropic.claude-*` | Base model | `anthropic.claude-sonnet-4-20250514-v1:0` | `arn:aws:bedrock:REGION::foundation-model/anthropic.claude-*` |
-| `us.anthropic.claude-*` | Cross-region inference profile | `us.anthropic.claude-sonnet-4-20250514-v1:0` | `arn:aws:bedrock:REGION:ACCOUNT:inference-profile/us.anthropic.claude-*` |
+| `anthropic.claude-*` | Base model | `anthropic.claude-haiku-4-5-20251001-v1:0` | `arn:aws:bedrock:REGION::foundation-model/anthropic.claude-*` |
+| `us.anthropic.claude-*` | Cross-region inference profile | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | `arn:aws:bedrock:REGION:ACCOUNT:inference-profile/us.anthropic.claude-*` |
 | `eu.anthropic.claude-*` | EU inference profile | `eu.anthropic.claude-sonnet-4-5-20250929-v1:0` | `arn:aws:bedrock:REGION:ACCOUNT:inference-profile/eu.anthropic.claude-*` |
 
 ### Recommended Model IDs (Base Models)
@@ -58,7 +58,6 @@ These work with standard `foundation-model` permissions:
 
 | Model | Model ID |
 |-------|----------|
-| Claude Sonnet 4 | `anthropic.claude-sonnet-4-20250514-v1:0` |
 | Claude Sonnet 4.5 | `anthropic.claude-sonnet-4-5-20250929-v1:0` |
 | Claude 3.5 Sonnet | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
 | Claude 3.5 Haiku | `anthropic.claude-3-5-haiku-20241022-v1:0` |
@@ -108,8 +107,8 @@ For production, restrict to specific models:
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
-        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
       ]
     }
   ]
@@ -132,7 +131,7 @@ Lock to specific regions:
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": [
-        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.*"
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.*"
       ]
     }
   ]
@@ -246,11 +245,11 @@ This means: **You must use an inference profile**, not direct model IDs.
 **Option 3: Use Python in notebook**
 ```python
 import boto3
-bedrock = boto3.client('bedrock', region_name='us-west-2')
+bedrock = boto3.client('bedrock', region_name='us-east-1')
 
 response = bedrock.create_inference_profile(
     inferenceProfileName='langgraph-lab',
-    modelSource={'copyFrom': 'arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0'},
+    modelSource={'copyFrom': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0'},
     description='LangGraph lab profile'
 )
 print(response['inferenceProfileArn'])
@@ -262,12 +261,12 @@ print(response['inferenceProfileArn'])
 from langchain_aws import ChatBedrockConverse
 
 # Use the full ARN (not model ID)
-MODEL_ARN = "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123"
+MODEL_ARN = "arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/abc123"
 
 llm = ChatBedrockConverse(
     model=MODEL_ARN,
     provider="anthropic",  # Required when using ARN!
-    region_name="us-west-2",
+    region_name="us-east-1",
     temperature=0,
     # Optional: provide base_model_id to skip bedrock:GetInferenceProfile API call
     # base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",
@@ -287,7 +286,7 @@ llm = ChatBedrockConverse(
 ./setup-inference-profile.sh
 
 # Create with specific model
-./setup-inference-profile.sh sonnet      # Claude Sonnet 4
+./setup-inference-profile.sh sonnet      # Claude 3.5 Sonnet
 ./setup-inference-profile.sh sonnet-4.5  # Claude Sonnet 4.5
 
 # List existing profiles
@@ -302,21 +301,21 @@ llm = ChatBedrockConverse(
 ```bash
 # Create application inference profile
 aws bedrock create-inference-profile \
-  --region us-west-2 \
+  --region us-east-1 \
   --inference-profile-name "my-lab-profile" \
-  --model-source 'copyFrom=arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0' \
+  --model-source 'copyFrom=arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-haiku-20241022-v1:0' \
   --description "Lab inference profile" \
   --tags key=Purpose,value=Lab
 
 # List application inference profiles
 aws bedrock list-inference-profiles \
-  --region us-west-2 \
+  --region us-east-1 \
   --type-equals APPLICATION
 
 # Delete profile
 aws bedrock delete-inference-profile \
-  --region us-west-2 \
-  --inference-profile-identifier "arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123"
+  --region us-east-1 \
+  --inference-profile-identifier "arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/abc123"
 ```
 
 ### IAM Permissions for Creating Profiles
@@ -515,7 +514,7 @@ For development and testing, this comprehensive policy covers most use cases:
 **Problem:**
 ```
 AccessDeniedException: User is not authorized to perform: bedrock:GetInferenceProfile
-on resource: arn:aws:bedrock:us-west-2:123456789012:application-inference-profile/abc123
+on resource: arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/abc123
 because no identity-based policy allows the bedrock:GetInferenceProfile action
 ```
 
@@ -552,7 +551,7 @@ from langchain_aws import ChatBedrockConverse
 llm = ChatBedrockConverse(
     model=INFERENCE_PROFILE_ARN,
     provider="anthropic",
-    region_name="us-west-2",
+    region_name="us-east-1",
     temperature=0,
     base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",  # Bypasses GetInferenceProfile
 )
@@ -564,7 +563,7 @@ Use the correct `base_model_id` for your profile:
 |---------|---------------|
 | haiku | `anthropic.claude-3-5-haiku-20241022-v1:0` |
 | sonnet | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
-| sonnet4 | `anthropic.claude-sonnet-4-20250514-v1:0` |
+| haiku45 | `anthropic.claude-haiku-4-5-20251001-v1:0` |
 | sonnet45 | `anthropic.claude-sonnet-4-5-20250929-v1:0` |
 
 ### Error: AccessDeniedException on inference-profile
@@ -572,11 +571,11 @@ Use the correct `base_model_id` for your profile:
 **Problem:**
 ```
 AccessDeniedException: User is not authorized to perform: bedrock:InvokeModel
-on resource: arn:aws:bedrock:us-west-2:123456789012:inference-profile/us.anthropic.claude-*
+on resource: arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-*
 ```
 
 **Solution:** Either:
-1. Use base model ID without prefix: `anthropic.claude-sonnet-4-20250514-v1:0`
+1. Use base model ID without prefix: `anthropic.claude-haiku-4-5-20251001-v1:0`
 2. Add inference-profile to IAM policy resource
 
 ### Error: AccessDeniedException on foundation-model
@@ -584,7 +583,7 @@ on resource: arn:aws:bedrock:us-west-2:123456789012:inference-profile/us.anthrop
 **Problem:**
 ```
 AccessDeniedException: User is not authorized to perform: bedrock:InvokeModel
-on resource: arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-*
+on resource: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-*
 ```
 
 **Solution:**
@@ -613,12 +612,12 @@ Test your permissions with AWS CLI:
 aws sts get-caller-identity
 
 # List available Bedrock models
-aws bedrock list-foundation-models --region us-west-2
+aws bedrock list-foundation-models --region us-east-1
 
 # Test model invocation (simple)
 aws bedrock-runtime invoke-model \
   --model-id anthropic.claude-3-5-haiku-20241022-v1:0 \
-  --region us-west-2 \
+  --region us-east-1 \
   --body '{"anthropic_version":"bedrock-2023-05-31","max_tokens":100,"messages":[{"role":"user","content":"Hello"}]}' \
   --content-type application/json \
   output.json

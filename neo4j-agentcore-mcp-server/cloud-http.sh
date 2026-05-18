@@ -20,7 +20,7 @@
 #   2. tools/list (JSON-RPC)
 #
 # ENVIRONMENT (from .env):
-#   AWS_REGION      AWS region (default: us-west-2)
+#   AWS_REGION      AWS region (default: us-east-1)
 #   STACK_NAME      CDK stack name (default: neo4j-agentcore-mcp-server)
 #
 # SEE ALSO:
@@ -43,7 +43,7 @@ fi
 
 # Defaults
 STACK_NAME="${STACK_NAME:-neo4j-agentcore-mcp-server}"
-REGION="${AWS_REGION:-us-west-2}"
+REGION="${AWS_REGION:-us-east-1}"
 
 # Get stack outputs
 echo "=== Direct Runtime HTTP Test ==="

@@ -22,11 +22,11 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE=".env"
-NEO4J_MCP_REPO="/Users/ryanknight/projects/mcp"
+# NEO4J_MCP_REPO is read from .env (path to the local Neo4j MCP server repo to build)
 CDK_DIR="$SCRIPT_DIR/cdk"
 
 # Defaults (can be overridden in .env)
-DEFAULT_REGION="us-west-2"
+DEFAULT_REGION="us-east-1"
 DEFAULT_STACK_NAME="neo4j-agentcore-mcp-server"
 DEFAULT_ECR_REPO_NAME="neo4j-mcp-server"
 DEFAULT_IMAGE_TAG=""  # Auto-detected from git SHA
@@ -92,6 +92,7 @@ validate_env() {
     [[ -z "$NEO4J_DATABASE" ]] && missing+=("NEO4J_DATABASE")
     [[ -z "$NEO4J_USERNAME" ]] && missing+=("NEO4J_USERNAME")
     [[ -z "$NEO4J_PASSWORD" ]] && missing+=("NEO4J_PASSWORD")
+    [[ -z "$NEO4J_MCP_REPO" ]] && missing+=("NEO4J_MCP_REPO")
 
     if [[ ${#missing[@]} -gt 0 ]]; then
         log_error "Missing required environment variables in .env:"
@@ -751,7 +752,7 @@ Environment Variables (from .env):
     NEO4J_PASSWORD     Neo4j password (passed to container)
 
   Optional:
-    AWS_REGION         AWS region (default: us-west-2)
+    AWS_REGION         AWS region (default: us-east-1)
     STACK_NAME         CDK stack name (default: neo4j-agentcore-mcp-server)
     ECR_REPO_NAME      ECR repository name (default: neo4j-mcp-server)
     IMAGE_TAG          Docker image tag (default: git short SHA from MCP repo)

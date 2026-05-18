@@ -33,7 +33,9 @@ from aws_cdk import (
     aws_ecr as ecr,
     aws_iam as iam,
     aws_lambda as lambda_,
+    aws_logs as logs,
     aws_cognito as cognito,
+    aws_secretsmanager as secretsmanager,
     aws_bedrockagentcore as bedrockagentcore,
 )
 from constructs import Construct
@@ -64,8 +66,9 @@ class SimpleOAuthStack(Stack):
         # =====================================================================
 
         # User Pool
+        # No explicit user_pool_name: a generated name avoids cross-deploy
+        # collisions and replacement churn.
         user_pool = cognito.UserPool(self, "UserPool",
-            user_pool_name=f"{self.stack_name}-user-pool",
             removal_policy=RemovalPolicy.DESTROY,
             password_policy=cognito.PasswordPolicy(
                 min_length=8,
@@ -158,6 +161,22 @@ class SimpleOAuthStack(Stack):
             precedence=5  # Lower number = higher precedence
         )
 
+        # Shared test-user password, generated at deploy time and stored in
+        # Secrets Manager. No credential is committed to source; setup_users.py,
+        # client/demo.py, and test.sh read it from the secret name in the
+        # stack outputs. RBAC is enforced by group membership, not the
+        # password, so both test users share one generated password.
+        test_user_password = secretsmanager.Secret(self, "TestUserPassword",
+            description=f"{self.stack_name} demo test-user password (generated)",
+            removal_policy=RemovalPolicy.DESTROY,
+            generate_secret_string=secretsmanager.SecretStringGenerator(
+                # Cognito-safe: alphanumeric, length well above the pool's
+                # 8-char minimum policy.
+                exclude_punctuation=True,
+                password_length=20,
+            )
+        )
+
         # Construct OAuth URLs
         cognito_domain = f"https://{self.stack_name.lower()}-{self.account}.auth.{self.region}.amazoncognito.com"
         discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{user_pool.user_pool_id}/.well-known/openid-configuration"
@@ -168,8 +187,17 @@ class SimpleOAuthStack(Stack):
 
         # Runtime Execution Role
         runtime_role = iam.Role(self, "RuntimeRole",
-            role_name=f"{self.stack_name}-runtime-role",
-            assumed_by=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            # Confused-deputy protection: only AgentCore acting for this
+            # account/service may assume the role.
+            assumed_by=iam.ServicePrincipal(
+                "bedrock-agentcore.amazonaws.com",
+                conditions={
+                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "ArnLike": {
+                        "aws:SourceArn": f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:*"
+                    },
+                },
+            ),
             inline_policies={
                 "RuntimePolicy": iam.PolicyDocument(
                     statements=[
@@ -184,10 +212,21 @@ class SimpleOAuthStack(Stack):
                             resources=[ecr_repository.repository_arn]
                         ),
                         iam.PolicyStatement(
+                            # ecr:GetAuthorizationToken does not support
+                            # resource-level scoping; "*" is API-mandated.
                             sid="ECRTokenAccess",
                             effect=iam.Effect.ALLOW,
                             actions=["ecr:GetAuthorizationToken"],
                             resources=["*"]
+                        ),
+                        iam.PolicyStatement(
+                            # logs:DescribeLogGroups is evaluated against
+                            # log-group:* and cannot be scoped to one group;
+                            # keep it separate so the runtime starts cleanly.
+                            sid="CloudWatchLogsDescribe",
+                            effect=iam.Effect.ALLOW,
+                            actions=["logs:DescribeLogGroups"],
+                            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:*"]
                         ),
                         iam.PolicyStatement(
                             sid="CloudWatchLogs",
@@ -196,12 +235,16 @@ class SimpleOAuthStack(Stack):
                                 "logs:CreateLogGroup",
                                 "logs:CreateLogStream",
                                 "logs:PutLogEvents",
-                                "logs:DescribeLogStreams",
-                                "logs:DescribeLogGroups"
+                                "logs:DescribeLogStreams"
                             ],
-                            resources=["*"]
+                            resources=[
+                                f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/*",
+                                f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/*:log-stream:*"
+                            ]
                         ),
                         iam.PolicyStatement(
+                            # X-Ray write APIs do not support resource-level
+                            # scoping; "*" is API-mandated.
                             sid="XRayTracing",
                             effect=iam.Effect.ALLOW,
                             actions=[
@@ -217,8 +260,17 @@ class SimpleOAuthStack(Stack):
 
         # Gateway Execution Role
         gateway_role = iam.Role(self, "GatewayRole",
-            role_name=f"{self.stack_name}-gateway-role",
-            assumed_by=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            # Confused-deputy protection: only AgentCore acting for this
+            # account/service may assume the role.
+            assumed_by=iam.ServicePrincipal(
+                "bedrock-agentcore.amazonaws.com",
+                conditions={
+                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "ArnLike": {
+                        "aws:SourceArn": f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:*"
+                    },
+                },
+            ),
             inline_policies={
                 "GatewayPolicy": iam.PolicyDocument(
                     statements=[
@@ -255,7 +307,9 @@ class SimpleOAuthStack(Stack):
                             resources=[
                                 f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:token-vault/*",
                                 f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:workload-identity-directory/*",
-                                f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:*"
+                                # AgentCore Identity stores OAuth provider
+                                # credentials under the bedrock-agentcore prefix.
+                                f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:bedrock-agentcore*"
                             ]
                         ),
                         # Bedrock model access
@@ -267,15 +321,11 @@ class SimpleOAuthStack(Stack):
                                 "arn:aws:bedrock:*::foundation-model/*",
                                 f"arn:aws:bedrock:*:{self.account}:inference-profile/*"
                             ]
-                        ),
-                        # Lambda interceptor invoke permission
-                        # The Gateway needs this to call the REQUEST interceptor Lambda
-                        iam.PolicyStatement(
-                            sid="InvokeLambdaInterceptor",
-                            effect=iam.Effect.ALLOW,
-                            actions=["lambda:InvokeFunction"],
-                            resources=[f"arn:aws:lambda:{self.region}:{self.account}:function:{self.stack_name}-auth-interceptor"]
                         )
+                        # lambda:InvokeFunction for the interceptor is granted
+                        # below via auth_interceptor_lambda.grant_invoke(), so
+                        # the resource tracks the function reference instead of
+                        # a hand-built ARN string.
                     ]
                 )
             }
@@ -283,7 +333,6 @@ class SimpleOAuthStack(Stack):
 
         # Custom Resource Lambda Role
         custom_resource_role = iam.Role(self, "CustomResourceRole",
-            role_name=f"{self.stack_name}-custom-resource-role",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole")
@@ -311,6 +360,9 @@ class SimpleOAuthStack(Stack):
                             resources=["*"]
                         ),
                         iam.PolicyStatement(
+                            # The OAuth2 credential provider stores its
+                            # credentials under the bedrock-agentcore Identity
+                            # secret prefix; scope to that prefix.
                             sid="SecretsManagerAccess",
                             effect=iam.Effect.ALLOW,
                             actions=[
@@ -319,7 +371,9 @@ class SimpleOAuthStack(Stack):
                                 "secretsmanager:GetSecretValue",
                                 "secretsmanager:PutSecretValue"
                             ],
-                            resources=["*"]
+                            resources=[
+                                f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:bedrock-agentcore*"
+                            ]
                         ),
                         iam.PolicyStatement(
                             sid="CognitoAccess",
@@ -336,40 +390,57 @@ class SimpleOAuthStack(Stack):
         # LAMBDA FUNCTIONS (using external code files)
         # =====================================================================
 
+        # Each Lambda gets an explicit, short-retention log group that is
+        # destroyed with the stack. No function_name: a generated name avoids
+        # cross-deploy collisions, and the custom log group keeps the logs
+        # tied to the function regardless of the generated name.
+        def _log_group(construct_id: str) -> logs.LogGroup:
+            return logs.LogGroup(self, construct_id,
+                retention=logs.RetentionDays.ONE_WEEK,
+                removal_policy=RemovalPolicy.DESTROY
+            )
+
         # OAuth Provider Lambda
         oauth_provider_lambda = lambda_.Function(self, "OAuthProviderLambda",
-            function_name=f"{self.stack_name}-oauth-provider",
-            runtime=lambda_.Runtime.PYTHON_3_11,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="oauth_provider_lambda.handler",
             timeout=Duration.minutes(5),
             role=custom_resource_role,
             description="Creates OAuth2 Credential Provider for Gateway",
-            code=lambda_.Code.from_asset(LAMBDA_DIR)
+            code=lambda_.Code.from_asset(LAMBDA_DIR),
+            log_group=_log_group("OAuthProviderLambdaLogs")
         )
 
         # Runtime Health Check Lambda
         runtime_health_check_lambda = lambda_.Function(self, "RuntimeHealthCheckLambda",
-            function_name=f"{self.stack_name}-runtime-health-check",
-            runtime=lambda_.Runtime.PYTHON_3_11,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="runtime_health_check_lambda.handler",
             timeout=Duration.minutes(10),
             role=custom_resource_role,
             description="Waits for Runtime to be ready before creating GatewayTarget",
-            code=lambda_.Code.from_asset(LAMBDA_DIR)
+            code=lambda_.Code.from_asset(LAMBDA_DIR),
+            log_group=_log_group("RuntimeHealthCheckLambdaLogs")
         )
 
         # Auth Interceptor Lambda (REQUEST interceptor for RBAC)
         auth_interceptor_lambda = lambda_.Function(self, "AuthInterceptorLambda",
-            function_name=f"{self.stack_name}-auth-interceptor",
-            runtime=lambda_.Runtime.PYTHON_3_11,
+            runtime=lambda_.Runtime.PYTHON_3_13,
             handler="auth_interceptor_lambda.handler",
             timeout=Duration.seconds(30),
             memory_size=128,
             description="Extracts JWT claims and enforces group-based access control",
-            code=lambda_.Code.from_asset(LAMBDA_DIR)
+            code=lambda_.Code.from_asset(LAMBDA_DIR),
+            log_group=_log_group("AuthInterceptorLambdaLogs")
         )
 
-        # Grant Gateway permission to invoke the interceptor
+        # Identity policy on the Gateway role to invoke the interceptor,
+        # referencing the function instead of a hand-built ARN string.
+        auth_interceptor_lambda.grant_invoke(gateway_role)
+
+        # Resource-based permission for the AgentCore Gateway service principal.
+        # Scoped to gateway/* (not a specific gateway ARN) because the Gateway
+        # is created after this Lambda and references the interceptor ARN,
+        # so a gateway-id-specific scope would be a circular dependency.
         auth_interceptor_lambda.add_permission(
             "GatewayInvokePermission",
             principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
@@ -564,7 +635,13 @@ class SimpleOAuthStack(Stack):
             export_name=f"{self.stack_name}-AuthInterceptorLambdaArn"
         )
 
+        CfnOutput(self, "TestUserSecretName",
+            description="Secrets Manager secret holding the generated test-user password",
+            value=test_user_password.secret_name,
+            export_name=f"{self.stack_name}-TestUserSecretName"
+        )
+
         CfnOutput(self, "DemoCommand",
             description="Command to run the demo",
-            value="python client/demo.py"
+            value="uv run python client/demo.py"
         )

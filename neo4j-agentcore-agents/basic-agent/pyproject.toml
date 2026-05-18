@@ -1,0 +1,34 @@
+[project]
+name = "neo4j-mcp-agent"
+version = "0.1.0"
+description = "Neo4j MCP basic agent — LangGraph and Strands variants over a shared common/ core"
+requires-python = ">=3.10"
+dependencies = [
+    # Shared core
+    "bedrock-agentcore",
+    "bedrock-agentcore-starter-toolkit",
+    "mcp>=1.3.0",
+    "httpx>=0.28.0",
+    "boto3>=1.42.0",
+    "pyyaml>=6.0",
+    # Observability - ADOT for automatic tracing to CloudWatch
+    "aws-opentelemetry-distro>=0.10.0",
+    # LangGraph variant
+    "langchain>=1.2.0",
+    "langgraph>=1.0.6",
+    "langchain-aws>=1.2.0",
+    "langchain-mcp-adapters>=0.2.0",
+    # Strands variant
+    "strands-agents",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Install the shared `common` package into the venv so both variants can
+# `from common import ...` without any sys.path manipulation. The agent root
+# is never placed on sys.path, so the `langgraph/` and `strands/`
+# subdirectories cannot shadow the installed langchain/strands packages.
+[tool.hatch.build.targets.wheel]
+packages = ["common"]

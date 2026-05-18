@@ -23,7 +23,7 @@ The system consists of three main components:
 
 1. **Neo4j MCP Server** (`/Users/ryanknight/projects/mcp`) - Official Neo4j Model Context Protocol server written in Go
 2. **MCP Server Deployment** (`neo4j-agentcore-mcp-server/`) - AWS CDK infrastructure to deploy the MCP server on AgentCore
-3. **AI Agents** (`agentcore-neo4j-mcp-agent/`) - LangGraph-based agents that query Neo4j via the MCP server
+3. **AI Agents** (`neo4j-agentcore-agents/`) - LangGraph-based agents that query Neo4j via the MCP server
 
 ```mermaid
 flowchart TB
@@ -368,7 +368,7 @@ sequenceDiagram
 
 ## AI Agents Architecture
 
-Two agent implementations are provided in `agentcore-neo4j-mcp-agent/`:
+Two agent implementations are provided in `neo4j-agentcore-agents/`:
 
 ### Basic Agent
 

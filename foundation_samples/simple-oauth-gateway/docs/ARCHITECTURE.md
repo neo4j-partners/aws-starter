@@ -174,14 +174,24 @@ flowchart TB
 
 ### Error Response (Access Denied)
 
-When a non-admin user attempts to call an admin-only tool:
+When a non-admin user attempts to call an admin-only tool, the interceptor
+short-circuits with a `transformedGatewayResponse`. MCP surfaces the failure as
+a successful JSON-RPC result whose `result.isError` is `true`:
 ```json
 {
   "interceptorOutputVersion": "1.0",
   "mcp": {
-    "immediateGatewayResponse": {
+    "transformedGatewayResponse": {
       "statusCode": 200,
-      "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32600,\"message\":\"Access denied: 'admin_action' requires admin group membership\"}}"
+      "headers": { "Content-Type": "application/json" },
+      "body": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "isError": true,
+          "content": [{ "type": "text", "text": "Access denied: Tool 'admin_action' requires 'admin' group. Your groups: users" }]
+        }
+      }
     }
   }
 }
@@ -338,26 +348,22 @@ graph LR
     G --> R5
 ```
 
-**CRITICAL**: The Gateway role MUST have `lambda:InvokeFunction` permission for the interceptor Lambda. This is in addition to the Lambda's resource-based policy. Both are required:
+**CRITICAL**: The Gateway role MUST have `lambda:InvokeFunction` permission for the interceptor Lambda. This is in addition to the Lambda's resource-based policy. Both are granted via the CDK construct, which references the function instead of a hand-built ARN string (`simple_oauth_stack.py:438`):
 
 ```python
-# In Gateway Role inline policy (simple_oauth_stack.py)
-iam.PolicyStatement(
-    sid="InvokeLambdaInterceptor",
-    effect=iam.Effect.ALLOW,
-    actions=["lambda:InvokeFunction"],
-    resources=[f"arn:aws:lambda:{self.region}:{self.account}:function:{self.stack_name}-auth-interceptor"]
-)
+# Identity policy on the Gateway role to invoke the interceptor
+auth_interceptor_lambda.grant_invoke(gateway_role)
 ```
 
 ### Interceptor Lambda Permission (Resource-Based Policy)
 
-The Lambda also requires a resource-based policy allowing Gateway invocation:
+The Lambda also requires a resource-based policy allowing the Gateway service principal to invoke it (`simple_oauth_stack.py:444-449`):
 
 ```python
-# simple_oauth_stack.py
-auth_interceptor_lambda.add_permission("GatewayInvoke",
+auth_interceptor_lambda.add_permission(
+    "GatewayInvokePermission",
     principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+    action="lambda:InvokeFunction",
     source_arn=f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/*"
 )
 ```
@@ -392,13 +398,14 @@ simple-oauth-gateway/
 
 The interceptor in `infra_utils/auth_interceptor_lambda.py` performs three key functions:
 
-**1. JWT Claim Extraction** (`auth_interceptor_lambda.py:45-66`):
+**1. JWT Claim Extraction** (`auth_interceptor_lambda.py:102-123`):
 ```python
-def _decode_jwt_claims(token: str) -> dict:
+def _decode_jwt(auth_header: str) -> dict[str, Any] | None:
     """Decode JWT payload without verification (Gateway already validated)."""
+    token = auth_header.replace("Bearer ", "").strip()
     parts = token.split(".")
     if len(parts) != 3:
-        return {}
+        return None
     payload = parts[1]
     # Add padding for base64url decoding
     padding = 4 - len(payload) % 4
@@ -408,40 +415,47 @@ def _decode_jwt_claims(token: str) -> dict:
     return json.loads(decoded)
 ```
 
-**2. RBAC Enforcement** (`auth_interceptor_lambda.py:89-102`):
+**2. RBAC Enforcement** (`auth_interceptor_lambda.py:61-72`):
 ```python
-# Check if requesting admin tool without admin group
-if tool_name in ADMIN_TOOLS and "admin" not in groups:
-    return _error_response(
-        rpc_id=rpc_id,
-        message=f"Access denied: '{tool_name}' requires admin group membership"
-    )
+if method == "tools/call":
+    tool_name = body.get("params", {}).get("name", "")
+    # Remove target prefix (e.g., "mcp-server-target___admin_action")
+    base_tool_name = tool_name.split("___")[-1]
+
+    if base_tool_name in ADMIN_TOOLS and "admin" not in groups:
+        return _deny_request(
+            rpc_id,
+            f"Access denied: Tool '{base_tool_name}' requires 'admin' group. "
+            f"Your groups: {groups or 'none'}"
+        )
 ```
 
-**3. Header Injection** (`auth_interceptor_lambda.py:104-118`):
+**3. Header Injection** (`auth_interceptor_lambda.py:126-148`):
 ```python
-return {
-    "interceptorOutputVersion": "1.0",
-    "mcp": {
-        "transformedGatewayRequest": {
-            "headers": {
-                **headers,
-                "X-User-Id": user_id,
-                "X-User-Groups": ",".join(groups),
-                "X-Client-Id": client_id,
-            },
-            "body": body,
-        }
+def _allow_request(auth_header, body, user_id, groups, client_id) -> dict[str, Any]:
+    return {
+        "interceptorOutputVersion": INTERCEPTOR_VERSION,
+        "mcp": {
+            "transformedGatewayRequest": {
+                "headers": {
+                    "Authorization": auth_header,
+                    "Content-Type": "application/json",
+                    "X-User-Id": user_id,
+                    "X-User-Groups": ",".join(groups),
+                    "X-Client-Id": client_id,
+                },
+                "body": body,
+            }
+        },
     }
-}
 ```
 
 ### User Authentication with SECRET_HASH
 
-The demo client in `client/demo.py:162-246` implements user password authentication:
+The demo client in `client/demo.py` implements user password authentication:
 
 ```python
-# client/demo.py:205-212 - SECRET_HASH calculation
+# client/demo.py:206-212 - SECRET_HASH calculation
 message = username + client_id
 dig = hmac.new(
     client_secret.encode("utf-8"),
@@ -450,7 +464,7 @@ dig = hmac.new(
 ).digest()
 secret_hash = base64.b64encode(dig).decode()
 
-# client/demo.py:215-224 - Authentication
+# client/demo.py:216-224 - Authentication
 auth_response = cognito.initiate_auth(
     ClientId=client_id,
     AuthFlow="USER_PASSWORD_AUTH",
@@ -466,41 +480,48 @@ auth_response = cognito.initiate_auth(
 
 The server in `mcp-server/server.py` reads identity headers:
 
-**Header Extraction** (`server.py:45-72`):
+**Header Extraction** (`server.py:65-92`):
 ```python
 def _get_user_context() -> dict:
     headers = _request_headers.get()
     user_id = headers.get("x-user-id", "unknown")
     groups_str = headers.get("x-user-groups", "")
+    client_id = headers.get("x-client-id", "unknown")
     groups = [g.strip() for g in groups_str.split(",") if g.strip()]
     return {
         "user_id": user_id,
         "groups": groups,
+        "client_id": client_id,
         "authenticated": user_id != "unknown"
     }
 ```
 
-**Admin Tool with Defense-in-Depth** (`server.py:134-173`):
+**Admin Tool with Defense-in-Depth** (`server.py:154-193`):
 ```python
 @mcp.tool()
 def admin_action(action: str) -> dict:
     ctx = _get_user_context()
-    # Secondary check (interceptor should have blocked non-admins)
+    # Defense-in-depth: the Gateway interceptor should have already
+    # blocked non-admins
     if ctx["authenticated"] and "admin" not in ctx["groups"]:
         return {
             "success": False,
-            "error": "Unauthorized: admin group membership required"
+            "error": "Unauthorized: admin group membership required",
+            "user": ctx["user_id"],
+            "groups": ctx["groups"]
         }
     return {
         "success": True,
         "action": action,
-        "performed_by": ctx["user_id"]
+        "performed_by": ctx["user_id"],
+        "user_groups": ctx["groups"],
+        "message": f"Admin action '{action}' completed successfully"
     }
 ```
 
 ### CDK Stack Updates for RBAC
 
-**Cognito User Groups** (`simple_oauth_stack.py:118-133`):
+**Cognito User Groups** (`simple_oauth_stack.py:149-162`):
 ```python
 users_group = cognito.CfnUserPoolGroup(self, "UsersGroup",
     user_pool_id=user_pool.user_pool_id,
@@ -516,7 +537,7 @@ admin_group = cognito.CfnUserPoolGroup(self, "AdminGroup",
 )
 ```
 
-**Interceptor Configuration** (`simple_oauth_stack.py:428-446`):
+**Interceptor Configuration** (`simple_oauth_stack.py:529-541`):
 ```python
 interceptor_configurations=[
     bedrockagentcore.CfnGateway.GatewayInterceptorConfigurationProperty(
@@ -538,20 +559,23 @@ interceptor_configurations=[
 The `setup_users.py` script creates users with group memberships:
 
 ```python
-# setup_users.py:29-42 - User definitions
+# setup_users.py - User definitions (no password in source)
 TEST_USERS = [
     {
         "username": "admin@example.com",
-        "password": "AdminPass123!",
         "groups": ["admin", "users"],
     },
     {
         "username": "user@example.com",
-        "password": "UserPass123!",
         "groups": ["users"],
     }
 ]
 ```
+
+The shared password is generated at deploy time by the CDK stack
+(`TestUserPassword` secret), stored in Secrets Manager, and read by
+`setup_users.py` / `client/demo.py` / `test.sh` from the stack's
+`TestUserSecretName` output. No credential is committed to source.
 
 ---
 
@@ -578,21 +602,18 @@ TEST_USERS = [
 
 Most documentation only shows the resource-based policy, but the Gateway role also needs `lambda:InvokeFunction` permission!
 
-**Solution**: Add BOTH permissions:
+**Solution**: Grant BOTH permissions:
 
 ```python
-# 1. Lambda resource-based policy (allows Gateway service principal)
-auth_interceptor_lambda.add_permission("GatewayInvoke",
-    principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
-    source_arn=f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/*"
-)
+# 1. Gateway role identity policy (allows role to invoke Lambda)
+auth_interceptor_lambda.grant_invoke(gateway_role)
 
-# 2. Gateway role inline policy (allows role to invoke Lambda)
-iam.PolicyStatement(
-    sid="InvokeLambdaInterceptor",
-    effect=iam.Effect.ALLOW,
-    actions=["lambda:InvokeFunction"],
-    resources=[f"arn:aws:lambda:{self.region}:{self.account}:function:{self.stack_name}-auth-interceptor"]
+# 2. Lambda resource-based policy (allows Gateway service principal)
+auth_interceptor_lambda.add_permission(
+    "GatewayInvokePermission",
+    principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+    action="lambda:InvokeFunction",
+    source_arn=f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:gateway/*"
 )
 ```
 
@@ -632,7 +653,7 @@ secret_hash = base64.b64encode(dig).decode()
 
 **Root Cause**: The event structure for Gateway interceptors is specific and documented.
 
-**Solution**: Use the correct structure (see `auth_interceptor_lambda.py:104-118`):
+**Solution**: Use the correct structure (see `auth_interceptor_lambda.py:126-148`):
 ```python
 return {
     "interceptorOutputVersion": "1.0",
@@ -645,7 +666,7 @@ return {
 }
 ```
 
-**Best Practice**: Follow the exact event structure. For errors, use `immediateGatewayResponse` with a JSON-RPC error body.
+**Best Practice**: Follow the exact event structure. For errors, return a `transformedGatewayResponse` whose body is a JSON-RPC result with `isError: true`.
 
 ### Mistake 6: Missing Gateway Role Permissions for OAuth Outbound
 
@@ -653,7 +674,7 @@ return {
 
 **Root Cause**: The Gateway Role was missing permissions required to retrieve OAuth tokens from the credential provider.
 
-**Solution**: Add these permissions to the Gateway Role (see `simple_oauth_stack.py:201-216`):
+**Solution**: Add these permissions to the Gateway Role (see `simple_oauth_stack.py:298-305`):
 
 - `bedrock-agentcore:GetOAuth2CredentialProvider`
 - `bedrock-agentcore:GetTokenVault` (CRITICAL - often missed)

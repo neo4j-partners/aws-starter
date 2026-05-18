@@ -76,6 +76,14 @@ done
 
 cd "$SCRIPT_DIR"
 
+# The CDK stack is environment-agnostic, so `cdk deploy/destroy` resolves its
+# target region from the ambient AWS environment, not from a CLI flag (cdk has
+# no --region). Export the chosen region so every `uv run cdk` call below
+# targets $REGION, matching the AWS CLI calls that already pass --region.
+export AWS_REGION="$REGION"
+export AWS_DEFAULT_REGION="$REGION"
+export CDK_DEFAULT_REGION="$REGION"
+
 # Check prerequisites
 print_step "Checking prerequisites..."
 
@@ -89,8 +97,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v python3 &> /dev/null; then
-    print_error "Python3 is not installed. Please install it first."
+if ! command -v uv &> /dev/null; then
+    print_error "uv is not installed. Install it: https://docs.astral.sh/uv/"
     exit 1
 fi
 
@@ -105,18 +113,14 @@ REPO_NAME=$(echo "$STACK_NAME" | tr '[:upper:]' '[:lower:]')-mcp-server
 echo "  AWS Account: $ACCOUNT_ID"
 echo "  Region: $REGION"
 
-# Setup Python virtual environment
-print_step "Setting up Python environment..."
-if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
-fi
-source .venv/bin/activate
-pip install -q -r requirements.txt
+# Setup Python environment (uv manages the venv and Python from pyproject.toml/uv.lock)
+print_step "Setting up Python environment (uv)..."
+uv sync --quiet
 
 # Handle destroy
 if [ "$DESTROY" = true ]; then
     print_step "Destroying stack..."
-    JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 cdk destroy --force
+    JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 uv run cdk destroy --force
     
     # Clean up ECR repository
     print_step "Cleaning up ECR repository..."
@@ -148,6 +152,10 @@ if [ "$SKIP_BUILD" = false ]; then
         docker buildx use arm64-builder
     fi
 
+    # demo limitation: the ECR repository lifecycle is managed by this script
+    # via the AWS CLI, outside the CDK stack. It is created here and deleted in
+    # the cleanup step, so a stack destroy alone does not remove it. Production
+    # code should model the repository as a CDK resource.
     # Create ECR repository if it doesn't exist
     print_step "Ensuring ECR repository exists..."
     if ! aws ecr describe-repositories --repository-names "$REPO_NAME" --region "$REGION" &> /dev/null; then
@@ -185,7 +193,7 @@ fi
 print_step "Deploying CDK stack..."
 
 # First attempt
-if JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 cdk deploy --require-approval never 2>&1; then
+if JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 uv run cdk deploy --require-approval never 2>&1; then
     echo "  Deployment succeeded on first attempt"
 else
     # Check if it failed due to GatewayTarget timing issue
@@ -204,7 +212,7 @@ else
 
         # Retry deployment
         print_step "Retrying deployment..."
-        JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 cdk deploy --require-approval never
+        JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1 uv run cdk deploy --require-approval never
     else
         print_error "Deployment failed with status: $STACK_STATUS"
         exit 1

@@ -1,0 +1,18 @@
+# CDK app + client tooling for the Simple OAuth2 M2M demo.
+# Managed with uv: `uv sync` to install, `uv run cdk deploy` to deploy.
+# The mcp-server container has its own pyproject.toml (built into the image).
+[project]
+name = "simple-oauth-gateway"
+version = "0.1.0"
+description = "Simple OAuth2 M2M demo: AgentCore Gateway + Cognito with group-based RBAC"
+requires-python = ">=3.11"
+dependencies = [
+    # CDK
+    "aws-cdk-lib>=2.220.0",
+    "constructs>=10.0.0",
+    # Client / setup tooling (client/demo.py, setup_users.py)
+    "boto3>=1.34.0",
+    "botocore[crt]",
+    "requests>=2.31.0",
+    "mcp>=1.10.0",
+]

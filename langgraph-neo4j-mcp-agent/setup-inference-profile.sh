@@ -40,8 +40,8 @@ get_model_info() {
         sonnet|sonnet35)
             echo "us.anthropic.claude-3-5-sonnet-20241022-v2:0|Claude 3.5 Sonnet v2|balanced"
             ;;
-        sonnet4)
-            echo "us.anthropic.claude-sonnet-4-20250514-v1:0|Claude Sonnet 4|latest"
+        haiku45)
+            echo "global.anthropic.claude-haiku-4-5-20251001-v1:0|Claude Haiku 4.5|latest haiku, fast"
             ;;
         sonnet45)
             echo "us.anthropic.claude-sonnet-4-5-20250929-v1:0|Claude Sonnet 4.5|most capable"
@@ -82,7 +82,7 @@ show_help() {
     echo -e "${YELLOW}MODELS AVAILABLE:${NC}"
     echo "  haiku       Claude 3.5 Haiku      (fast, cheap - good for testing)"
     echo "  sonnet      Claude 3.5 Sonnet v2  (balanced - recommended)"
-    echo "  sonnet4     Claude Sonnet 4       (latest)"
+    echo "  haiku45     Claude Haiku 4.5      (latest haiku, fast)"
     echo "  sonnet45    Claude Sonnet 4.5     (most capable)"
     echo ""
     echo -e "${YELLOW}COMMANDS:${NC}"
@@ -327,7 +327,7 @@ delete_profile() {
 delete_all_profiles() {
     echo -e "${YELLOW}Deleting all lab profiles...${NC}"
 
-    for model in haiku sonnet sonnet4 sonnet45; do
+    for model in haiku sonnet haiku45 sonnet45; do
         delete_profile "$model" 2>/dev/null || true
     done
 
@@ -343,7 +343,7 @@ create_profile() {
 
     if [ -z "$model_arn" ]; then
         echo -e "${RED}Error: Unknown model '${model_key}'${NC}"
-        echo "Available models: haiku, sonnet, sonnet4, sonnet45"
+        echo "Available models: haiku, sonnet, haiku45, sonnet45"
         exit 1
     fi
 
@@ -486,7 +486,7 @@ create_all_profiles() {
     echo -e "${BLUE}Creating profiles for all models...${NC}"
     echo ""
 
-    for model in haiku sonnet sonnet4 sonnet45; do
+    for model in haiku sonnet haiku45 sonnet45; do
         echo -e "${YELLOW}━━━ ${model} ━━━${NC}"
         create_profile "$model"
         echo ""
@@ -503,7 +503,7 @@ interactive_menu() {
     echo ""
     echo "  1) haiku     - Claude 3.5 Haiku      (fast, cheap - good for testing)"
     echo "  2) sonnet    - Claude 3.5 Sonnet v2  (balanced - recommended)"
-    echo "  3) sonnet4   - Claude Sonnet 4       (latest)"
+    echo "  3) haiku45   - Claude Haiku 4.5      (latest haiku, fast)"
     echo "  4) sonnet45  - Claude Sonnet 4.5     (most capable)"
     echo "  5) ALL       - Create all profiles"
     echo "  q) Quit"
@@ -513,7 +513,7 @@ interactive_menu() {
     case "$choice" in
         1) create_profile "haiku" ;;
         2) create_profile "sonnet" ;;
-        3) create_profile "sonnet4" ;;
+        3) create_profile "haiku45" ;;
         4) create_profile "sonnet45" ;;
         5) create_all_profiles ;;
         q|Q) exit 0 ;;
@@ -536,7 +536,7 @@ case "${1:-}" in
             delete_profile "$2"
         else
             echo "Usage: $0 --delete <model>"
-            echo "Models: haiku, sonnet, sonnet4, sonnet45"
+            echo "Models: haiku, sonnet, haiku45, sonnet45"
         fi
         ;;
     --delete-all)

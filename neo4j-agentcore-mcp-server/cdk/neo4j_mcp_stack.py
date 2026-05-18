@@ -208,6 +208,7 @@ class Neo4jMcpStack(Stack):
                             effect=iam.Effect.ALLOW,
                             actions=[
                                 "bedrock-agentcore:CreateOAuth2CredentialProvider",
+                                "bedrock-agentcore:UpdateOAuth2CredentialProvider",
                                 "bedrock-agentcore:DeleteOAuth2CredentialProvider",
                                 "bedrock-agentcore:GetOAuth2CredentialProvider",
                                 "bedrock-agentcore:ListOAuth2CredentialProviders",
@@ -430,7 +431,14 @@ class Neo4jMcpStack(Stack):
                 "NEO4J_MCP_HTTP_HOST": "0.0.0.0",
                 "NEO4J_MCP_HTTP_PORT": "8000",
                 "NEO4J_MCP_HTTP_AUTH_MODE": "env",
-                "NEO4J_LOG_LEVEL": "debug",
+                # Gateway discovers tools without Neo4j Basic Auth. These default to
+                # true in the canary server; set explicitly so the AgentCore
+                # dependency on unauthenticated discovery is visible and pinned.
+                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_PING": "true",
+                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_TOOLS_LIST": "true",
+                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_INITIALIZE": "true",
+                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_NOTIFICATIONS_INITIALIZE": "true",
+                "NEO4J_LOG_LEVEL": "info",
                 "NEO4J_READ_ONLY": "true",
             },
         )

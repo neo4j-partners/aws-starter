@@ -64,13 +64,23 @@ def find_existing_provider(agentcore_client, provider_name: str) -> str | None:
     """Check if a provider with this name already exists."""
     try:
         providers = agentcore_client.list_oauth2_credential_providers()
-        for provider in providers.get("items", []):
+        for provider in providers.get("credentialProviders", []):
             if provider["name"] == provider_name:
                 logger.info(f"Found existing provider: {provider['credentialProviderArn']}")
                 return provider["credentialProviderArn"]
     except Exception as e:
         logger.warning(f"Error checking existing providers: {e}")
     return None
+
+
+def _oauth2_config(discovery_url: str, client_id: str, client_secret: str) -> dict:
+    return {
+        "customOauth2ProviderConfig": {
+            "oauthDiscovery": {"discoveryUrl": discovery_url},
+            "clientId": client_id,
+            "clientSecret": client_secret,
+        }
+    }
 
 
 def create_oauth_provider(
@@ -84,16 +94,38 @@ def create_oauth_provider(
     response = agentcore_client.create_oauth2_credential_provider(
         name=provider_name,
         credentialProviderVendor="CustomOauth2",
-        oauth2ProviderConfigInput={
-            "customOauth2ProviderConfig": {
-                "oauthDiscovery": {"discoveryUrl": discovery_url},
-                "clientId": client_id,
-                "clientSecret": client_secret,
-            }
-        },
+        oauth2ProviderConfigInput=_oauth2_config(
+            discovery_url, client_id, client_secret
+        ),
     )
     provider_arn = response["credentialProviderArn"]
     logger.info(f"Created OAuth provider: {provider_arn}")
+    return provider_arn
+
+
+def update_oauth_provider(
+    agentcore_client,
+    provider_name: str,
+    discovery_url: str,
+    client_id: str,
+    client_secret: str,
+    provider_arn: str,
+) -> str:
+    """Reconcile an existing provider's discovery URL / client id / secret in place.
+
+    Updating keeps the same provider ARN, so the Gateway target keeps working
+    while picking up rotated credentials. The update API does not return the
+    ARN, so we pass through the ARN already resolved by find_existing_provider
+    (it is an immutable resource identifier that update cannot change).
+    """
+    agentcore_client.update_oauth2_credential_provider(
+        name=provider_name,
+        credentialProviderVendor="CustomOauth2",
+        oauth2ProviderConfigInput=_oauth2_config(
+            discovery_url, client_id, client_secret
+        ),
+    )
+    logger.info(f"Updated OAuth provider: {provider_arn}")
     return provider_arn
 
 
@@ -137,24 +169,27 @@ def handler(event: dict, context) -> dict:
         client_id = props["ClientId"]
         discovery_url = props["DiscoveryUrl"]
 
-        # Check for existing provider (idempotency)
-        existing_arn = find_existing_provider(agentcore_client, provider_name)
-        if existing_arn:
-            return send_cfn_response(
-                event,
-                "SUCCESS",
-                data={"ProviderArn": existing_arn},
-                physical_resource_id=provider_name,
-            )
-
-        # Get client secret from Cognito
+        # Always fetch the current secret — it may have rotated since last deploy.
         cognito_client = boto3.client("cognito-idp", region_name=region)
         client_secret = get_client_secret(cognito_client, user_pool_id, client_id)
 
-        # Create the provider
-        provider_arn = create_oauth_provider(
-            agentcore_client, provider_name, discovery_url, client_id, client_secret
-        )
+        # If the provider already exists, reconcile it in place (rotated secret,
+        # changed discovery URL/client id) instead of returning the stale ARN.
+        # Otherwise create it.
+        existing_arn = find_existing_provider(agentcore_client, provider_name)
+        if existing_arn:
+            provider_arn = update_oauth_provider(
+                agentcore_client,
+                provider_name,
+                discovery_url,
+                client_id,
+                client_secret,
+                existing_arn,
+            )
+        else:
+            provider_arn = create_oauth_provider(
+                agentcore_client, provider_name, discovery_url, client_id, client_secret
+            )
 
         return send_cfn_response(
             event,

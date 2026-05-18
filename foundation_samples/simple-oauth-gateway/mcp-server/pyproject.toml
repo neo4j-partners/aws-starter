@@ -1,0 +1,15 @@
+# Dependencies for the MCP server container image (built ARM64, pushed to ECR).
+# Installed in the Dockerfile via `uv sync --frozen --no-dev`.
+[project]
+name = "simple-oauth-mcp-server"
+version = "0.1.0"
+description = "MCP server with Gateway-injected identity headers and RBAC defense-in-depth"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.10.0",
+    # Imported directly by server.py for the identity-header middleware. Both
+    # are already transitive dependencies of mcp's streamable-http transport;
+    # declared here only to make the direct import explicit.
+    "starlette>=0.37",
+    "uvicorn>=0.30",
+]

@@ -23,7 +23,7 @@ cd langgraph-neo4j-mcp-agent
 # Create a profile (choose one):
 ./setup-inference-profile.sh haiku      # Fast & cheap - great for testing
 ./setup-inference-profile.sh sonnet     # Balanced - recommended for production
-./setup-inference-profile.sh sonnet4    # Latest Claude Sonnet 4
+./setup-inference-profile.sh haiku45    # Latest Claude Haiku 4.5
 ./setup-inference-profile.sh --all      # Create ALL model profiles
 
 # Create and test in one step:
@@ -38,7 +38,7 @@ The script will output something like:
 ║              COPY THIS TO YOUR NOTEBOOK                    ║
 ╚════════════════════════════════════════════════════════════╝
 
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:123456789:application-inference-profile/abc123"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:123456789:application-inference-profile/abc123"
 ```
 
 #### Step 3: Paste into Notebook
@@ -51,7 +51,7 @@ Open `minimal_langgraph_agent.ipynb` and paste the ARN in the configuration cell
 #################################################
 
 INFERENCE_PROFILE_ARN = "PASTE_YOUR_ARN_HERE"
-REGION = "us-west-2"
+REGION = "us-east-1"
 
 #################################################
 ```
@@ -65,7 +65,7 @@ REGION = "us-west-2"
 # Create specific model profile
 ./setup-inference-profile.sh haiku
 ./setup-inference-profile.sh sonnet
-./setup-inference-profile.sh sonnet4
+./setup-inference-profile.sh haiku45
 ./setup-inference-profile.sh sonnet45
 
 # Create and test profile
@@ -91,7 +91,7 @@ REGION = "us-west-2"
 |-------|---------|-------------|
 | Claude 3.5 Haiku | `./setup-inference-profile.sh haiku` | Fast & cheap - great for testing |
 | Claude 3.5 Sonnet v2 | `./setup-inference-profile.sh sonnet` | Balanced - **recommended** |
-| Claude Sonnet 4 | `./setup-inference-profile.sh sonnet4` | Latest version |
+| Claude Haiku 4.5 | `./setup-inference-profile.sh haiku45` | Latest Haiku |
 | Claude Sonnet 4.5 | `./setup-inference-profile.sh sonnet45` | Most capable |
 
 ### Files
@@ -187,7 +187,7 @@ The production agent is a robust implementation suitable for long-running applic
                                │ AWS Bedrock
                                ▼
                         ┌──────────────────┐
-                        │  Claude Sonnet 4 │
+                        │ Claude Haiku 4.5 │
                         │  (Converse API)  │
                         └──────────────────┘
 ```
@@ -316,8 +316,8 @@ Token refreshed. New expiry: 2026-01-06T21:10:25.158870+00:00
 Gateway: https://your-gateway.amazonaws.com/mcp
 Token expires: 2026-01-06T21:10:25.158870+00:00
 
-Initializing LLM (Bedrock, region: us-west-2)...
-Using: us.anthropic.claude-sonnet-4-20250514-v1:0
+Initializing LLM (Bedrock, region: us-east-1)...
+Using: global.anthropic.claude-haiku-4-5-20251001-v1:0
 
 Connecting to MCP server...
 Loaded 2 tools:
@@ -382,7 +382,7 @@ Configure AWS CLI: `aws configure` or set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_AC
 ```
 AccessDeniedException: You don't have access to the model
 ```
-Enable Claude Sonnet 4 model access in your AWS Bedrock console.
+Enable Claude Haiku 4.5 model access in your AWS Bedrock console.
 
 ### Connection Failed
 ```
@@ -421,7 +421,7 @@ SageMaker Unified Studio has a **permissions boundary** (`SageMakerStudioProject
 
 ```
 AccessDeniedException: User is not authorized to perform: bedrock:InvokeModel
-on resource: arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-*
+on resource: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-*
 ```
 
 **What doesn't work in SageMaker Unified Studio:**
@@ -502,8 +502,8 @@ In your notebook, use the ARN with the `provider` parameter:
 ```python
 from langchain_aws import ChatBedrockConverse
 
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/ID"
-REGION = "us-west-2"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:ACCOUNT:application-inference-profile/ID"
+REGION = "us-east-1"
 
 llm = ChatBedrockConverse(
     model=INFERENCE_PROFILE_ARN,

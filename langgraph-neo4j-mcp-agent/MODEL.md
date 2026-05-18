@@ -12,7 +12,7 @@ The `langchain-aws` library calls `bedrock:GetInferenceProfile` which SageMaker 
 llm = ChatBedrockConverse(
     model=INFERENCE_PROFILE_ARN,
     provider="anthropic",
-    region_name="us-west-2",
+    region_name="us-east-1",
     base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",  # Bypasses GetInferenceProfile
 )
 ```
@@ -30,20 +30,20 @@ The setup script auto-detects DataZone IDs via `aws datazone list-domains` and `
 
 # Output:
 # MODEL = "haiku"
-# INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:..."
+# INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:..."
 ```
 
 Copy both values to your notebook:
 
 ```python
 MODEL = "haiku"
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/ID"
-REGION = "us-west-2"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:ACCOUNT:application-inference-profile/ID"
+REGION = "us-east-1"
 
 BASE_MODEL_IDS = {
     "haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
     "sonnet": "anthropic.claude-3-5-sonnet-20241022-v2:0",
-    "sonnet4": "anthropic.claude-sonnet-4-20250514-v1:0",
+    "haiku45": "anthropic.claude-haiku-4-5-20251001-v1:0",
     "sonnet45": "anthropic.claude-sonnet-4-5-20250929-v1:0",
 }
 
@@ -118,7 +118,7 @@ SageMaker Unified Studio uses a **permissions boundary** (`SageMakerStudioProjec
 
 ```
 AccessDeniedException: User is not authorized to perform: bedrock:InvokeModel
-on resource: arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-*
+on resource: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-*
 ```
 
 ## What Works
@@ -131,12 +131,12 @@ When you create an app in **Bedrock IDE** (within SageMaker Unified Studio), it 
 
 ```python
 # Profile created by SageMaker Unified Studio (via Bedrock IDE)
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/PROFILE_ID"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:ACCOUNT:application-inference-profile/PROFILE_ID"
 
 llm = ChatBedrockConverse(
     model=INFERENCE_PROFILE_ARN,
     provider="anthropic",  # Required when using ARN
-    region_name="us-west-2",
+    region_name="us-east-1",
     temperature=0,
 )
 ```
@@ -181,7 +181,7 @@ llm = ChatBedrockConverse(
 
 ### Commit 7468b76 - Application inference profile ARN (WORKS if created by Bedrock IDE)
 ```python
-MODEL_ID = "arn:aws:bedrock:us-west-2:159878781974:application-inference-profile/9p4fb3e8undd"
+MODEL_ID = "arn:aws:bedrock:us-east-1:159878781974:application-inference-profile/9p4fb3e8undd"
 
 llm = ChatBedrockConverse(
     model=MODEL_ID,
@@ -222,7 +222,7 @@ Even with correct DataZone tags, profiles created via CLI don't work:
 # Creates profile but it FAILS when used in SageMaker Studio
 aws bedrock create-inference-profile \
   --inference-profile-name "my-profile" \
-  --model-source 'copyFrom=arn:aws:bedrock:us-west-2:ACCOUNT:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0' \
+  --model-source 'copyFrom=arn:aws:bedrock:us-east-1:ACCOUNT:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0' \
   --tags key=AmazonDataZoneProject,value=PROJECT_ID key=AmazonDataZoneDomain,value=DOMAIN_ID
 ```
 
@@ -242,8 +242,8 @@ The notebook has a variable mismatch. Ensure both cells use the same variable:
 
 ```python
 # Configuration cell
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:ACCOUNT:application-inference-profile/ID"
-REGION = "us-west-2"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:ACCOUNT:application-inference-profile/ID"
+REGION = "us-east-1"
 
 # LLM setup cell - use SAME variable name
 llm = ChatBedrockConverse(

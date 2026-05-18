@@ -15,7 +15,7 @@ Neo4jMcpStack(
     stack_name,
     env=cdk.Environment(
         account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
-        region=os.environ.get("AWS_REGION") or os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
+        region=os.environ.get("AWS_REGION") or os.environ.get("CDK_DEFAULT_REGION", "us-east-1"),
     ),
     description="Neo4j MCP Server on AgentCore Runtime with Cognito JWT authentication",
 )

@@ -62,8 +62,8 @@ def get_default_region() -> str:
 # TOKEN CACHE
 # =============================================================================
 
-_token_cache: Optional[str] = None
-_token_expiry: Optional[datetime] = None
+_token_cache: str | None = None
+_token_expiry: datetime | None = None
 TOKEN_REFRESH_BUFFER_SECONDS = 600
 
 
@@ -440,6 +440,16 @@ async def run_user_demo(
     print("  - User tokens include cognito:groups for RBAC")
 
 
+def get_test_user_password(secret_name: str, region: str) -> str:
+    """Read the shared test-user password from Secrets Manager.
+
+    The password is generated at deploy time by the CDK stack and stored in
+    Secrets Manager. No credential is committed to source.
+    """
+    sm = boto3.client("secretsmanager", region_name=region)
+    return sm.get_secret_value(SecretId=secret_name)["SecretString"]
+
+
 def get_stack_outputs(stack_name: str, region: str) -> dict:
     """Get outputs from CloudFormation stack."""
     cf = boto3.client("cloudformation", region_name=region)
@@ -468,8 +478,10 @@ Examples:
   python demo.py --mode user                          # Prompts for username
 
 Test Users (after running setup_users.py):
-  admin@example.com / AdminPass123!  -> groups: admin, users
-  user@example.com  / UserPass123!   -> groups: users
+  admin@example.com  -> groups: admin, users
+  user@example.com   -> groups: users
+  Password: generated at deploy, stored in Secrets Manager
+            (read automatically from the stack's TestUserSecretName output)
         """
     )
 
@@ -492,6 +504,11 @@ Test Users (after running setup_users.py):
     parser.add_argument(
         "--username",
         help="Username for user mode authentication"
+    )
+    parser.add_argument(
+        "--password",
+        help="Test user password (default: read from Secrets Manager via "
+             "the stack's TestUserSecretName output)"
     )
     parser.add_argument(
         "--scope",
@@ -545,8 +562,15 @@ Test Users (after running setup_users.py):
         if not username:
             username = input("Username: ")
 
-        # Get password
-        password = getpass.getpass("Password: ")
+        # Get password: explicit flag wins, otherwise read the deploy-time
+        # generated secret, otherwise fall back to an interactive prompt.
+        password = args.password
+        if not password:
+            secret_name = outputs.get("TestUserSecretName")
+            if secret_name:
+                password = get_test_user_password(secret_name, region)
+            else:
+                password = getpass.getpass("Password: ")
 
         asyncio.run(run_user_demo(
             user_pool_id=user_pool_id,

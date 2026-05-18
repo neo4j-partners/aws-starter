@@ -1,0 +1,61 @@
+[project]
+name = "finance-agent"
+version = "0.1.0"
+description = "Finance ReAct agent for Neo4j MCP via AgentCore Gateway — LangGraph and Strands variants over a shared common/ core"
+requires-python = ">=3.10"
+dependencies = [
+    # Shared core
+    "httpx>=0.28.1",
+    "boto3>=1.43.9",
+    # invoke_agent.py reads .bedrock_agentcore.yaml; declare pyyaml
+    # explicitly rather than rely on it arriving transitively via the toolkit.
+    "pyyaml>=6.0",
+    "mcp>=1.27.1",
+    "bedrock-agentcore>=1.9.1",
+    "bedrock-agentcore-starter-toolkit>=0.3.9",
+    # Observability — ADOT auto-instrumentation for AgentCore CloudWatch traces
+    "aws-opentelemetry-distro>=0.17.0",
+    # LangGraph variant
+    "langchain>=1.3.1",
+    "langgraph>=1.2.0",
+    "langchain-aws>=1.4.7",
+    "langchain-mcp-adapters>=0.2.2",
+    # Strands variant
+    "strands-agents>=1.40.0",
+    # Context Graph semantic memory (Strands tools). Not on PyPI; resolved
+    # from a wheel vendored under vendor/ so it ships inside the
+    # direct_code_deploy bundle. Rebuild with scripts/vendor-memory.sh.
+    "neo4j-agent-memory[strands]",
+]
+
+# Supply-chain caution: hold these transitive deps below releases published
+# within the last 48h (click 8.4.0 / python-multipart 0.0.29, 2026-05-17).
+[tool.uv]
+constraint-dependencies = [
+    "click<=8.3.3",
+    "python-multipart<=0.0.28",
+]
+
+# neo4j-agent-memory is not on PyPI. The vendored wheel lives inside the
+# project so it is included in the direct_code_deploy upload (CodeBuild has
+# no access to the local labs checkout). Refresh: scripts/vendor-memory.sh
+#
+# Cross-compile sensitivity: agentcore deploy installs deps for Linux ARM64
+# trying manylinux2014 → _2_17 → _2_28 in order, succeeding on the first.
+# The pinned numpy (a transitive dep of neo4j-agent-memory) only ships an
+# aarch64 wheel for manylinux_2_28, so deploy relies on that 3rd fallback.
+# If a future numpy bump drops _2_28 aarch64 wheels, the dependency build
+# will fail — pin numpy to a version that still publishes one.
+[tool.uv.sources]
+neo4j-agent-memory = { path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Install the shared `common` package into the venv so both variants can
+# `from common import ...` without any sys.path manipulation. The agent root
+# is never placed on sys.path, so the `langgraph/` and `strands/`
+# subdirectories cannot shadow the installed langchain/strands packages.
+[tool.hatch.build.targets.wheel]
+packages = ["common"]

@@ -22,7 +22,10 @@ a secondary check as defense-in-depth.
 import logging
 from contextvars import ContextVar
 
+import uvicorn
 from mcp.server.fastmcp import FastMCP
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,8 +40,26 @@ mcp = FastMCP(
     stateless_http=True
 )
 
-# Context variable for storing request headers (set by middleware if available)
+# Context variable for storing request headers, populated per request by
+# IdentityHeaderMiddleware below. Tools run outside the HTTP request scope,
+# so the middleware stashes the headers here for _get_user_context() to read.
 _request_headers: ContextVar[dict] = ContextVar("request_headers", default={})
+
+
+class IdentityHeaderMiddleware(BaseHTTPMiddleware):
+    """Copy the Gateway-interceptor-injected identity headers into a ContextVar.
+
+    The Gateway interceptor validates the JWT and injects X-User-Id /
+    X-User-Groups / X-Client-Id. Without this middleware those headers never
+    reach the tools and the RBAC defense-in-depth check is dead code.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        token = _request_headers.set(dict(request.headers))
+        try:
+            return await call_next(request)
+        finally:
+            _request_headers.reset(token)
 
 
 def _get_user_context() -> dict:
@@ -209,4 +230,9 @@ def server_info() -> dict:
 
 if __name__ == "__main__":
     logger.info("Starting Simple OAuth Demo MCP Server with RBAC")
-    mcp.run(transport="streamable-http")
+    # Serve the streamable-http app directly so the identity-header middleware
+    # is installed. This is what mcp.run(transport="streamable-http") does
+    # internally, plus the middleware.
+    app = mcp.streamable_http_app()
+    app.add_middleware(IdentityHeaderMiddleware)
+    uvicorn.run(app, host=mcp.settings.host, port=mcp.settings.port)

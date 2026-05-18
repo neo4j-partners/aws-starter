@@ -14,6 +14,7 @@
 #   ./test.sh --m2m        # Test M2M mode only
 #   ./test.sh --admin      # Test admin user only
 #   ./test.sh --user       # Test regular user only
+#   ./test.sh --region us-east-1  # Target a region (default: us-east-1)
 #
 # Prerequisites:
 #   Stack deployed: ./deploy.sh
@@ -31,11 +32,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Test user credentials
+# Test users. The password is generated at deploy time and stored in
+# Secrets Manager; client/demo.py reads it automatically from the stack's
+# TestUserSecretName output, so no password is kept here.
 ADMIN_USER="admin@example.com"
-ADMIN_PASS="AdminPass123!"
 REGULAR_USER="user@example.com"
-REGULAR_PASS="UserPass123!"
+
+# Default region. Overridable with --region. Exported below so setup_users.py,
+# client/demo.py, and the stack-status check all target the same region (it
+# must match the region passed to ./deploy.sh).
+REGION="us-east-1"
 
 # Test counters
 TESTS_PASSED=0
@@ -82,11 +88,10 @@ check_result() {
     fi
 }
 
-# Activate virtual environment
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
-else
-    echo -e "${RED}Error: Virtual environment not found. Run ./deploy.sh first.${NC}"
+# uv manages the environment; every Python call below uses `uv run` (which
+# auto-syncs from uv.lock). Just verify uv is installed.
+if ! command -v uv &> /dev/null; then
+    echo -e "${RED}Error: uv is not installed. See https://docs.astral.sh/uv/${NC}"
     exit 1
 fi
 
@@ -95,7 +100,7 @@ setup_users() {
     print_info "Creating admin and regular test users in Cognito..."
     echo ""
 
-    python setup_users.py
+    uv run python setup_users.py
 
     echo ""
     print_success "Test users created"
@@ -107,7 +112,7 @@ run_m2m_test() {
     echo ""
 
     # Capture output
-    OUTPUT=$(python client/demo.py --mode m2m 2>&1)
+    OUTPUT=$(uv run python client/demo.py --mode m2m 2>&1)
 
     # Show relevant output
     echo "$OUTPUT" | grep -E "(Result:|admin_action|Access denied)" | head -5
@@ -124,12 +129,12 @@ run_m2m_test() {
 run_admin_test() {
     print_header "Test 2: Admin User Mode"
     print_info "User: $ADMIN_USER"
-    print_info "Password: $ADMIN_PASS"
+    print_info "Password: (read from Secrets Manager)"
     print_info "Expected: Full access (member of 'admin' group)"
     echo ""
 
-    # Capture output
-    OUTPUT=$(echo "$ADMIN_PASS" | python client/demo.py --mode user --username "$ADMIN_USER" 2>&1)
+    # Capture output (demo.py reads the password from Secrets Manager)
+    OUTPUT=$(uv run python client/demo.py --mode user --username "$ADMIN_USER" 2>&1)
 
     # Show relevant output
     echo "$OUTPUT" | grep -E "(Result:|User groups:|success)" | head -5
@@ -147,12 +152,12 @@ run_admin_test() {
 run_user_test() {
     print_header "Test 3: Regular User Mode"
     print_info "User: $REGULAR_USER"
-    print_info "Password: $REGULAR_PASS"
+    print_info "Password: (read from Secrets Manager)"
     print_info "Expected: Admin tools BLOCKED (not in 'admin' group)"
     echo ""
 
-    # Capture output
-    OUTPUT=$(echo "$REGULAR_PASS" | python client/demo.py --mode user --username "$REGULAR_USER" 2>&1)
+    # Capture output (demo.py reads the password from Secrets Manager)
+    OUTPUT=$(uv run python client/demo.py --mode user --username "$REGULAR_USER" 2>&1)
 
     # Show relevant output
     echo "$OUTPUT" | grep -E "(Result:|User groups:|Access denied)" | head -5
@@ -223,8 +228,12 @@ while [[ $# -gt 0 ]]; do
             RUN_ALL=false
             shift
             ;;
+        --region)
+            REGION="$2"
+            shift 2
+            ;;
         --help|-h)
-            head -20 "$0" | tail -17 | sed 's/^#//' | sed 's/^ //'
+            head -21 "$0" | tail -18 | sed 's/^#//' | sed 's/^ //'
             exit 0
             ;;
         *)
@@ -235,10 +244,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Export the chosen region so setup_users.py, client/demo.py, and any uv-run
+# tooling resolve the same region as the AWS CLI calls below (must match the
+# region passed to ./deploy.sh).
+export AWS_REGION="$REGION"
+export AWS_DEFAULT_REGION="$REGION"
+export CDK_DEFAULT_REGION="$REGION"
+
 # Check stack is deployed
 print_step "Checking stack deployment..."
 STACK_STATUS=$(aws cloudformation describe-stacks \
     --stack-name SimpleOAuthDemo \
+    --region "$REGION" \
     --query "Stacks[0].StackStatus" \
     --output text 2>/dev/null || echo "NOT_FOUND")
 

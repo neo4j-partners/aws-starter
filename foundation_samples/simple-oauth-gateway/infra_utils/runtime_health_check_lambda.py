@@ -72,6 +72,9 @@ def wait_for_runtime_ready(agentcore_client, runtime_id: str) -> tuple[bool, str
     terminal_states = {'FAILED', 'DELETING', 'DELETED'}
     ready_states = {'ACTIVE', 'READY'}
 
+    # demo limitation: this blocks a single Lambda invocation for up to ~10
+    # minutes of inline polling. Production code should use a Step Functions
+    # waiter or an async custom resource so the function is not held open.
     for attempt in range(1, MAX_POLL_ATTEMPTS + 1):
         try:
             status = get_runtime_status(agentcore_client, runtime_id)

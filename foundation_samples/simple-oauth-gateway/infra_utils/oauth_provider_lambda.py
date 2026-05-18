@@ -34,6 +34,9 @@ def send_cfn_response(event: dict, status: str, reason: str = None,
 
     logger.info(f'Sending CFN response: Status={status}, PhysicalResourceId={response_body["PhysicalResourceId"]}')
 
+    # demo limitation: this CFN-response PUT is unguarded. A failed PUT here
+    # leaves the stack waiting until the custom-resource timeout. Production
+    # code should retry and fall back to a FAILED signal.
     http = urllib3.PoolManager()
     http.request(
         'PUT',
@@ -121,6 +124,10 @@ def handler(event: dict, context) -> dict:
             delete_oauth_provider(agentcore_client, provider_name)
             return send_cfn_response(event, 'SUCCESS', physical_resource_id=provider_name)
 
+        # demo limitation: Create and Update share one path. An Update with
+        # changed properties does not reconfigure an existing provider; it only
+        # short-circuits on name match below. Production code should diff and
+        # update the provider on the Update request type.
         # Handle Create/Update
         user_pool_id = props['UserPoolId']
         client_id = props['ClientId']

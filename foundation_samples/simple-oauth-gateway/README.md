@@ -59,7 +59,7 @@ A comprehensive example demonstrating OAuth2 authentication with role-based acce
 ### Prerequisites
 
 - AWS CLI configured with appropriate credentials
-- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) (manages Python and dependencies)
 - Docker (for building ARM64 container image)
 - Node.js 18+ and npm
 - AWS CDK CLI v2.220.0+ (`npm install -g aws-cdk`)
@@ -67,15 +67,13 @@ A comprehensive example demonstrating OAuth2 authentication with role-based acce
 ### 1. Set Up Python Environment
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv sync   # Installs deps and the Python toolchain from uv.lock
 ```
 
 ### 2. Deploy the Stack
 
 ```bash
-cdk bootstrap  # First time only
+uv run cdk bootstrap  # First time only
 ./deploy.sh
 ```
 
@@ -84,12 +82,14 @@ Deployment takes approximately 5-7 minutes.
 ### 3. Create Test Users
 
 ```bash
-python setup_users.py
+uv run python setup_users.py
 ```
 
-This creates:
-- `admin@example.com` / `AdminPass123!` → groups: admin, users
-- `user@example.com` / `UserPass123!` → groups: users
+This creates two users that share one password generated at deploy time and
+stored in Secrets Manager (read automatically from the stack's
+`TestUserSecretName` output, never committed to source):
+- `admin@example.com` → groups: admin, users
+- `user@example.com` → groups: users
 
 ### 4. Run the Tests
 
@@ -110,19 +110,32 @@ Or run the demo manually:
 
 ```bash
 # M2M mode (no groups, admin tools blocked)
-python client/demo.py
+uv run python client/demo.py
 
 # User mode - as admin (full access)
-python client/demo.py --mode user --username admin@example.com
+uv run python client/demo.py --mode user --username admin@example.com
 
 # User mode - as regular user (admin tools blocked)
-python client/demo.py --mode user --username user@example.com
+uv run python client/demo.py --mode user --username user@example.com
 ```
 
 ### 5. Cleanup
 
 ```bash
 ./deploy.sh --destroy
+```
+
+This runs `cdk destroy` and removes the ECR repository. The Lambda log groups,
+Cognito user pool, and the generated test-user secret are destroyed with the
+stack. AgentCore creates its own runtime log groups under
+`/aws/bedrock-agentcore/runtimes/*` that CDK does not manage; delete these
+manually if you want a fully clean account:
+
+```bash
+aws logs describe-log-groups \
+  --log-group-name-prefix /aws/bedrock-agentcore/runtimes/ \
+  --query 'logGroups[].logGroupName' --output text
+# then: aws logs delete-log-group --log-group-name <name>
 ```
 
 ## Authentication Modes
@@ -137,16 +150,16 @@ python client/demo.py --mode user --username user@example.com
 
 ```bash
 # M2M mode (default)
-python client/demo.py
+uv run python client/demo.py
 
 # User mode with specific user
-python client/demo.py --mode user --username admin@example.com
+uv run python client/demo.py --mode user --username admin@example.com
 
 # User mode (prompts for username)
-python client/demo.py --mode user
+uv run python client/demo.py --mode user
 
 # Different stack or region
-python client/demo.py --stack MyStack --region us-east-1
+uv run python client/demo.py --stack MyStack --region us-east-1
 ```
 
 ## What Gets Deployed

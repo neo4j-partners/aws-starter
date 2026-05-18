@@ -13,7 +13,7 @@ For a detailed explanation of how all the pieces fit together, see the **[Archit
 
 A step-by-step guide to deploying and testing the Neo4j MCP server with AWS Bedrock AgentCore and SageMaker Unified Studio.
 
-> **⚠️ CRITICAL: Use `us-west-2` region for all steps.** AWS Bedrock AgentCore features (Runtime, Gateway) are currently available in limited regions. This guide assumes `us-west-2` (Oregon) for all deployments and notebook configurations.
+> **⚠️ CRITICAL: Use `us-east-1` region for all steps.** AWS Bedrock AgentCore features (Runtime, Gateway) are currently available in limited regions. This guide assumes `us-east-1` (N. Virginia) for all deployments and notebook configurations (`us-west-2` is also supported).
 
 ---
 
@@ -147,8 +147,8 @@ This notebook tests basic LangGraph functionality with simple tools (time, math)
 3. Run all cells to verify Claude is working
 
 ```python
-INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-west-2:123456789:application-inference-profile/abc123"
-REGION = "us-west-2"
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:123456789:application-inference-profile/abc123"
+REGION = "us-east-1"
 ```
 
 ---
@@ -165,7 +165,7 @@ Copy values from `.mcp-credentials.json` into the notebook's configuration cell:
 INFERENCE_PROFILE_ARN = "your-inference-profile-arn"
 GATEWAY_URL = "https://...amazonaws.com/mcp"  # from gateway_url
 ACCESS_TOKEN = "eyJ..."                        # from access_token
-REGION = "us-west-2"
+REGION = "us-east-1"
 ```
 
 This notebook uses the Strands Agents framework (AWS's native agent library) to query Neo4j.
@@ -184,7 +184,7 @@ Similar to Step 8, paste your credentials into the configuration cell:
 INFERENCE_PROFILE_ARN = "your-inference-profile-arn"
 GATEWAY_URL = "your-gateway-url"
 ACCESS_TOKEN = "your-access-token"
-REGION = "us-west-2"
+REGION = "us-east-1"
 ```
 
 This notebook demonstrates:
@@ -212,30 +212,28 @@ This provides a simpler alternative when you don't need the full AgentCore deplo
 
 ---
 
-### Step 11: Run the Finance Agent with Aura Agent MCP (Optional)
+### Step 11: Run the Finance Agent (Optional)
 
-Connect a LangGraph ReAct agent to the **Neo4j Aura Agent MCP server** to explore SEC filing data, company financials, risk factors, and institutional ownership.
+Run a ReAct agent that explores SEC filings, company financials, risk factors, and institutional ownership through the Neo4j MCP server.
 
-**Project:** [`agentcore-neo4j-mcp-agent/finance-agent/`](./agentcore-neo4j-mcp-agent/finance-agent/README.md)
+**Project:** [`neo4j-agentcore-agents/finance-agent/`](./neo4j-agentcore-agents/finance-agent/README.md)
 
-Unlike the previous steps that use the Neo4j MCP server (raw Cypher), this agent connects to a Neo4j Aura Agent which provides high-level, domain-specific tools auto-generated from your graph schema.
+This is the simplest AgentCore agent to deploy. `agentcore deploy` zips the Python source with no Docker build. The agent ships two framework variants over one shared `common/` core: `langgraph/` and `strands/`. Both reach Neo4j through the same AgentCore Gateway path using `.mcp-credentials.json`.
 
 ```bash
-cd agentcore-neo4j-mcp-agent/finance-agent
+cd neo4j-agentcore-agents/finance-agent
 uv sync
+cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
-# Set your Aura Agent MCP endpoint
-export AURA_MCP_URL="https://your-aura-agent-mcp-endpoint"
-export AURA_API_KEY="your-api-key"   # optional
+# CLI mode, no server
+uv run python langgraph/simple-agent.py "Tell me about Apple Inc"
 
-# Run demo queries
-uv run python simple-agent.py
-
-# Or ask a specific question
-uv run python simple-agent.py "Tell me about Apple Inc"
+# Or run the AgentCore server locally on port 8080
+langgraph/agent.sh start
+langgraph/agent.sh test
 ```
 
-The agent auto-discovers tools from the Aura Agent MCP server and uses Bedrock Claude to answer questions about companies, SEC filings, risk factors, and institutional ownership.
+Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-backed semantic memory when `NEO4J_URI` and `NEO4J_PASSWORD` are set. See the [finance-agent README](./neo4j-agentcore-agents/finance-agent/README.md) for cloud deployment and the full command set.
 
 ---
 
@@ -263,14 +261,15 @@ The agent auto-discovers tools from the Aura Agent MCP server and uses Bedrock C
 
 ### 🤖 **AgentCore Neo4j MCP Agent**
 
-*   **[`agentcore-neo4j-mcp-agent`](./agentcore-neo4j-mcp-agent/)**
+*   **[`neo4j-agentcore-agents`](./neo4j-agentcore-agents/)**
     *   **Status:** ✅ Ready to Run
-    *   **Description:** A LangGraph ReAct agent that deploys to AgentCore Runtime. Uses the `BedrockAgentCoreApp` pattern with `@app.entrypoint` decorator for cloud deployment via the AgentCore CLI (`agentcore configure`, `agentcore deploy`). This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration patterns.
-    *   **Key Features:** AgentCore Runtime deployment, CLI-based workflow, programmatic invocation via boto3, LangChain + MCP integration, CloudWatch observability, managed infrastructure.
-    *   **Use Case:** Production deployments requiring managed scaling, observability dashboards, enterprise security, and advanced orchestration patterns like supervisor/worker agents.
+    *   **Description:** Three ReAct agents that deploy to AgentCore Runtime using the `BedrockAgentCoreApp` pattern with the `@app.entrypoint` decorator and the AgentCore CLI (`agentcore configure`, `agentcore deploy`). The `basic-agent` and `finance-agent` each ship two framework variants over a shared `common/` core: a `langgraph/` variant using LangChain `create_react_agent` and a `strands/` variant using the Strands `Agent`. This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration.
+    *   **Key Features:** AgentCore Runtime deployment, LangGraph and Strands variants over one core, programmatic invocation via boto3, MCP integration through an OAuth2 Gateway with in-memory token refresh, CloudWatch observability, managed infrastructure.
+    *   **Use Case:** Production deployments requiring managed scaling, observability dashboards, enterprise security, and supervisor/worker orchestration.
     *   **Includes:**
-        *   **[`basic-agent/`](./agentcore-neo4j-mcp-agent/basic-agent/)** — Aircraft fleet operations agent using Neo4j MCP server via AgentCore Gateway (raw Cypher queries)
-        *   **[`finance-agent/`](./agentcore-neo4j-mcp-agent/finance-agent/)** — SEC filing & corporate finance agent using Neo4j Aura Agent MCP server (high-level domain tools, no Cypher)
+        *   **[`finance-agent/`](./neo4j-agentcore-agents/finance-agent/)** — SEC filings and corporate finance agent. Simplest to deploy, no Docker. Strands variant adds Neo4j-backed semantic memory.
+        *   **[`basic-agent/`](./neo4j-agentcore-agents/basic-agent/)** — Aviation fleet agent. Single ReAct agent with database-schema caching and OAuth2 token refresh.
+        *   **[`orchestrator-agent/`](./neo4j-agentcore-agents/orchestrator-agent/)** — Multi-agent supervisor. Classifies intent and routes to Maintenance or Operations specialists, then synthesizes cross-domain answers.
 
 ---
 

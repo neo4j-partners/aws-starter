@@ -68,5 +68,5 @@ This policy covers both the setup script and all notebooks:
 
 - The script creates application inference profiles with the `AmazonBedrockManaged=true` tag
 - This tag is required for SageMaker Unified Studio to access the profiles
-- Region defaults to `us-west-2` but can be overridden via `AWS_REGION`
+- Region defaults to `us-east-1` but can be overridden via `AWS_REGION`
 - MCP Gateway authentication uses Bearer tokens, not IAM credentials

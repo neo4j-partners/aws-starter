@@ -107,6 +107,10 @@ case "${1:-help}" in
     start)
         ensure_deps
         load_env
+        # AgentCore requires the deployed container on 8080 (runtime_app.py
+        # defaults there). Locally we override to 7070 to avoid colliding
+        # with a service already bound to 8080.
+        export AGENT_PORT=7070
         echo -e "${GREEN}Starting agent locally on port 7070 with OTEL instrumentation...${NC}"
         echo "Test with: curl -X POST http://localhost:7070/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
@@ -120,11 +124,12 @@ case "${1:-help}" in
         ;;
 
     test)
+        # Route through the SSE-aware thin client: the runtime streams
+        # `data: {...}` events, which `python -m json.tool` cannot parse.
+        ensure_deps
         echo -e "${GREEN}Testing local agent...${NC}"
         echo ""
-        curl -s -X POST http://localhost:7070/invocations \
-            -H "Content-Type: application/json" \
-            -d '{"prompt": "What is the database schema?"}' | python -m json.tool
+        uv run python -m client.cli "What is the database schema?"
         ;;
 
     cli)

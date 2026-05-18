@@ -26,6 +26,7 @@ Cloud deployment:
 
 import asyncio
 import logging
+import os
 
 import neo4j
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
@@ -204,5 +205,11 @@ async def invoke(payload: dict | None = None):
 
 
 if __name__ == "__main__":
-    logger.info(f"Starting Neo4j Fleet Agent with model: {MODEL_ID}")
-    app.run(port=7070)
+    # AgentCore Runtime requires the deployed container to serve 8080, so
+    # that is the default. Local runs override via AGENT_PORT (./agent.sh
+    # start sets 7070) to avoid colliding with a local service on 8080.
+    port = int(os.environ.get("AGENT_PORT", "8080"))
+    logger.info(
+        f"Starting Neo4j Fleet Agent with model: {MODEL_ID} on port {port}"
+    )
+    app.run(port=port)

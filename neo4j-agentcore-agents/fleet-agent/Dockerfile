@@ -5,9 +5,10 @@
 # dev-only and intentionally not part of the runtime image:
 #
 #   docker build --platform linux/arm64 -t neo4j-fleet-agent .
-#   docker run -p 7070:7070 neo4j-fleet-agent
+#   docker run -p 8080:8080 neo4j-fleet-agent
 #
-# AgentCore Requirements: ARM64 (aarch64), port 7070, HTTP server on 7070.
+# AgentCore Requirements: ARM64 (aarch64), port 8080, HTTP server on 8080.
+# runtime_app.py defaults to 8080; AGENT_PORT overrides it for local runs.
 
 FROM python:3.12-slim
 
@@ -36,6 +37,6 @@ COPY runtime_app.py ./
 # Neo4j connection (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD) and AWS
 # credentials are supplied as Runtime environment variables, not baked in.
 
-EXPOSE 7070
+EXPOSE 8080
 
 CMD ["uv", "run", "python", "runtime_app.py"]

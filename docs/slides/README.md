@@ -14,6 +14,22 @@ npm run serve
 
 Opens at http://localhost:8080/ with the deck gallery.
 
+### Live Marp preview server
+
+`npm run preview` runs the Marp CLI live server (auto-reloads on edits):
+
+```bash
+npm run preview
+```
+
+Marp CLI has no `--port` flag; the server port comes from the `PORT` environment variable (default 8080). To run on port 8010:
+
+```bash
+PORT=8010 npm run preview
+```
+
+Then open http://localhost:8010/.
+
 ## Deck Gallery
 
 Build every deck in `aws-in-depth/` into `build/`:

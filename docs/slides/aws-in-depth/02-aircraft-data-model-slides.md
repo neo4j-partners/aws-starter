@@ -92,24 +92,6 @@ Behind the counts, the dataset captures a realistic fleet:
 
 ---
 
-## Step 1: Flat Tables with Foreign Keys
-
-![bg contain](images/step1-flat-tables-foreign-keys.png)
-
----
-
-## Step 2: Mapping Tables to Nodes and Relationships
-
-![bg contain](images/step2-spark-connector-mapping.png)
-
----
-
-## Step 3: A Connected Graph
-
-![bg contain](images/step3-connected-graph.png)
-
----
-
 ## What the Graph Looks Like
 
 - Graphs naturally model the real world

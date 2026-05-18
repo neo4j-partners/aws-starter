@@ -33,7 +33,14 @@ from strands import Agent
 from strands.models import BedrockModel
 from tools import graph_query_tool, vector_search_tool
 
-from common import AWS_REGION, MODEL_ID, SYSTEM_PROMPT_TEMPLATE, get_graph_schema
+from common import (
+    AWS_REGION,
+    MODEL_ID,
+    SYSTEM_PROMPT_TEMPLATE,
+    get_graph_schema,
+    graph_query,
+    vector_search,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -75,32 +82,86 @@ def extract_prompt_from_payload(
 
 @app.entrypoint
 async def invoke(payload: dict | None = None):
-    """AgentCore Runtime handler — direct Neo4j GraphRAG, streamed."""
-    logger.info(
-        f"Received request with payload keys: "
-        f"{list(payload.keys()) if payload else []}"
-    )
+    """AgentCore Runtime handler — direct Neo4j GraphRAG, streamed.
 
+    The runtime serves four surfaces off the single ``/invocations``
+    endpoint, selected by an optional ``mode`` field in the payload:
+
+    - ``{"mode": "schema"}`` — the live Neo4j schema string.
+    - ``{"mode": "graph_query", "query": "..."}`` — Text2Cypher directly.
+    - ``{"mode": "vector_search", "query": "...", "top_k": N}`` — the vector
+      retriever directly.
+    - no ``mode`` (or ``{"prompt": "..."}``) — the full ReAct agent, streamed.
+
+    The three data modes emit one ``chunk`` then ``complete``, so the SSE
+    parser in ``invoke_agent.py`` handles them with no special casing.
+    """
     if payload is None:
         payload = {}
 
-    prompt, session_id, user_id = extract_prompt_from_payload(payload)
-
-    if not prompt:
-        logger.warning("No prompt provided in request")
-        yield {
-            "type": "error",
-            "error": "No prompt provided. Please include 'prompt' in your request.",
-        }
-        return
-
+    mode = payload.get("mode")
     logger.info(
-        f"Processing query for user {user_id}, session {session_id}: "
-        f"{prompt[:100]}..."
+        f"Received request mode={mode!r} payload keys: "
+        f"{list(payload.keys())}"
     )
-    logger.info(f"Model: {MODEL_ID}")
 
     try:
+        if mode == "schema":
+            # Blocking (connects + fetches schema, cached after); off-loop.
+            schema = await asyncio.to_thread(get_graph_schema)
+            yield {"type": "chunk", "data": schema}
+            yield {"type": "complete"}
+            logger.info("Schema request completed successfully")
+            return
+
+        if mode in ("graph_query", "vector_search"):
+            query = (
+                payload.get("query")
+                or payload.get("prompt")
+                or payload.get("message")
+            )
+            if not query:
+                logger.warning("No query provided for mode=%s", mode)
+                yield {
+                    "type": "error",
+                    "error": (
+                        f"No query provided for mode '{mode}'. Include "
+                        f"'query' in your request."
+                    ),
+                }
+                return
+            logger.info(f"{mode} direct call: {query[:100]}...")
+            if mode == "graph_query":
+                result = await asyncio.to_thread(graph_query, query)
+            else:
+                top_k = int(payload.get("top_k", 5))
+                result = await asyncio.to_thread(
+                    vector_search, query, top_k
+                )
+            yield {"type": "chunk", "data": result}
+            yield {"type": "complete"}
+            logger.info(f"{mode} request completed successfully")
+            return
+
+        prompt, session_id, user_id = extract_prompt_from_payload(payload)
+
+        if not prompt:
+            logger.warning("No prompt provided in request")
+            yield {
+                "type": "error",
+                "error": (
+                    "No prompt provided. Please include 'prompt' in your "
+                    "request."
+                ),
+            }
+            return
+
+        logger.info(
+            f"Processing query for user {user_id}, session {session_id}: "
+            f"{prompt[:100]}..."
+        )
+        logger.info(f"Model: {MODEL_ID}")
+
         # First call connects to Neo4j + fetches the schema (cached after);
         # both are blocking, so keep them off the event loop.
         schema = await asyncio.to_thread(get_graph_schema)

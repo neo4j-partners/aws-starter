@@ -76,9 +76,7 @@ This deployment runs the server with `NEO4J_READ_ONLY=true`:
 
 ---
 
-## This Project: Goal
-
-> A prototype for learning the **AWS AgentCore Gateway**.
+## Neo4j AgentCore MCP Server Overview
 
 - Deploy the Neo4j MCP server to Amazon Bedrock AgentCore
 - Put it behind an AgentCore Gateway with OAuth2 authentication
@@ -89,9 +87,11 @@ This deployment runs the server with `NEO4J_READ_ONLY=true`:
 
 ## Deployment Architecture
 
-![bg right:55% contain](images/neo4j-mcp-agentcore-architecture.png)
-
 An AI agent authenticates to Cognito (M2M OAuth2), sends MCP requests with a JWT to the AgentCore Gateway, which forwards them to the AgentCore Runtime hosting the Neo4j MCP server, which queries the Neo4j database.
+
+---
+
+![bg contain](images/neo4j-mcp-agentcore-architecture.png)
 
 ---
 
@@ -132,19 +132,6 @@ No user accounts, no passwords to rotate. Agents use client credentials only.
 4. Runs custom resources for the OAuth provider and a Runtime health check
 
 Deployment takes roughly 5 to 10 minutes. The Neo4j database must be running and reachable first.
-
----
-
-## The CDK Stack
-
-`cdk/neo4j_mcp_stack.py` creates every AWS resource in four modules:
-
-| Module | Resources |
-|--------|-----------|
-| **Cognito** | User Pool, Domain, Resource Server (`mcp/invoke` scope), Machine Client |
-| **IAM** | Agent execution role, Gateway execution role, custom resource role |
-| **Lambda** | OAuth Provider function, Runtime Health Check function |
-| **AgentCore** | MCP Server Runtime, Gateway, Gateway Target |
 
 ---
 
@@ -231,5 +218,5 @@ Direct-Runtime testing isolates whether a failure is in the Gateway or the Runti
 - The Neo4j MCP server exposes a graph to agents through two read-only tools: `get-schema` and `read-cypher`
 - MCP removes the need for custom Neo4j integration code per agent
 - This project deploys it to AgentCore Runtime behind a Gateway with M2M OAuth2
-- A CDK stack builds Cognito, IAM, Lambda, and AgentCore resources, with custom resources to handle ordering
+- A single `./deploy.sh` builds the ARM64 image and deploys the stack, with custom resources handling OAuth provider and Runtime-readiness ordering
 - Gateway tool prefixing is handled with runtime tool discovery, and Claude Sonnet keeps the standard hyphenated tool names

@@ -59,11 +59,11 @@ Bedrock Titan v2, 1024 dims — overridable via `EMBED_MODEL_ID` /
 |------|-----|
 | `common/` | Neo4j driver + GraphRAG retrievers, model config, prompt |
 | `tools.py` | Strands tool wrappers over the `common` callables |
-| `runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `runtime_app.py` | AgentCore Runtime entrypoint; `mode`-dispatched surfaces, port 8080 or cloud |
 | `local_cli.py` | Simplified local experimentation |
-| `demo.py` | Console showcase of the full agent surface, section by section |
-| `agent.sh` | CLI wrapper for all operations |
-| `invoke_agent.py` | Invoke the deployed agent with boto3, supports load testing |
+| `demo.py` | Console showcase, section by section; `--remote` drives the deployed runtime |
+| `agent.sh` | CLI wrapper for the local run and deploy lifecycle |
+| `invoke_agent.py` | Invoke the deployed runtime with boto3, supports load testing |
 | `queries.txt` | 20 sample queries across discovery, fleet, maintenance, delays |
 
 ## Prerequisites
@@ -99,19 +99,28 @@ a time, each with a plain-English description of what it shows:
 3. the `vector_search` retriever alone (semantic search over manual chunks),
 4. the full Strands ReAct agent choosing tools by itself.
 
-No server is required. `demo.py` builds its own in-process Strands agent and
-connects straight to Neo4j, so you do not run `./agent.sh start` first. It
-needs only the three things in [Prerequisites](#prerequisites): `uv sync`, a
-`.env` with the Neo4j connection, and AWS credentials for Bedrock.
+`demo.py` runs in either of two modes, same four sections in both:
 
 ```bash
 uv sync
-uv run python demo.py
+uv run python demo.py            # local: in-process, straight to Neo4j
+uv run python demo.py --remote   # remote: drives the deployed runtime
 ```
+
+Default (local) builds its own in-process Strands agent and connects straight
+to Neo4j, so you do not run `./agent.sh start` first. It needs only the three
+things in [Prerequisites](#prerequisites): `uv sync`, a `.env` with the Neo4j
+connection, and AWS credentials for Bedrock.
+
+`--remote` serves every section from the deployed AgentCore runtime over
+boto3: `{"mode": "schema" | "graph_query" | "vector_search"}` for sections 1
+to 3 and `{"prompt": ...}` for section 4. It opens no local Neo4j connection
+and needs only AWS credentials and an agent already deployed
+([Remote Quick Start](#remote-quick-start)).
 
 Section 4 invokes Claude on Bedrock for several turns, so a full run takes a
 few minutes and incurs Bedrock usage. The data-only sections 1 to 3 return
-immediately.
+quickly.
 
 ## Quick Start: Cloud
 
@@ -120,7 +129,9 @@ uv sync
 
 ./agent.sh configure        # generates .bedrock_agentcore.yaml
 ./agent.sh deploy           # packages the code, provisions the runtime
-./agent.sh invoke-cloud "How many aircraft are in the database?"
+
+uv run python demo.py --remote                    # full showcase, deployed
+uv run python invoke_agent.py "How many aircraft are in the database?"
 ```
 
 `agentcore deploy` runs in `direct_code_deploy` mode: it uploads the code
@@ -149,15 +160,22 @@ aws sso login --sso-session <your-sso-session>
 ./agent.sh deploy            # provisions the runtime, injects the Neo4j env vars
 ./agent.sh status            # wait for Endpoint: DEFAULT READY
 
-# 4. Run the demo client against the remote runtime
-./agent.sh invoke-cloud "How many aircraft are in the database?"
+# 4. Run a demo client against the remote runtime
+uv run python demo.py --remote
 uv run python invoke_agent.py "What does the manual say about hydraulic leak detection?"
 ```
 
-`invoke_agent.py` is the remote demo client. It reads the Agent ARN from
-`.bedrock_agentcore.yaml`, calls `bedrock-agentcore` with boto3, and streams the
-answer to the terminal token by token. `uv run python invoke_agent.py load-test
-[seconds]` replays `queries.txt` on an interval against the deployed runtime.
+Two clients drive the deployed runtime, no `agent.sh` needed:
+
+- `demo.py --remote` walks all four sections against the deployed agent: the
+  schema, each retriever on its own, and the full agent.
+- `invoke_agent.py` sends one prompt (or `load-test [seconds]` to replay
+  `queries.txt` on an interval). It reads the Agent ARN from
+  `.bedrock_agentcore.yaml`, calls `bedrock-agentcore` with boto3, and streams
+  the answer token by token.
+
+Both reach the four surfaces of the single `/invocations` endpoint through a
+`mode` field in the payload; no `mode` runs the full agent.
 
 `./agent.sh deploy` passes the Neo4j connection from `.env` as Runtime
 environment variables. The container itself has no `.env`. Run
@@ -181,7 +199,9 @@ container by agent name. Pass the Neo4j env vars through to the container.
 
 ## Commands
 
-`./agent.sh <command>` accepts:
+`agent.sh` covers the local run and the deploy lifecycle. Invoking the
+deployed runtime is done with the Python clients above
+(`demo.py --remote`, `invoke_agent.py`), not `agent.sh`.
 
 | Command | Description |
 |---------|-------------|
@@ -190,8 +210,6 @@ container by agent name. Pass the Neo4j env vars through to the container.
 | `configure` | Generate AWS deployment config |
 | `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
 | `status` | Check deployment status |
-| `invoke-cloud "prompt"` | Invoke the deployed agent |
-| `load-test [N]` | Continuous cloud test, N-second interval |
 
 ## Environment Variables
 

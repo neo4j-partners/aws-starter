@@ -353,16 +353,37 @@ When you search, your question becomes an embedding, and the system finds chunks
 
 ---
 
-## Storing Vectors in Neo4j
+## Create the Vector Index
 
-When a knowledge graph pipeline processes documents:
+Create the index once, before any vectors are stored. The sample uses `neo4j_graphrag`:
+
+```python
+from neo4j_graphrag.indexes import create_vector_index
+
+create_vector_index(
+    driver,
+    name="maintenanceChunkEmbeddings",
+    label="Chunk",
+    embedding_property="embedding",
+    dimensions=1024,            # Amazon Bedrock Titan v2
+    similarity_fn="cosine",
+)
+```
+
+It is idempotent, so it is safe to run on every load.
+
+---
+
+## Store Vectors in Neo4j
+
+The knowledge graph pipeline then populates the index:
 
 1. Each chunk gets an embedding from Amazon Bedrock Titan v2 (1024 dimensions)
-2. The embedding is stored as a property on the Chunk node
-3. A vector index (`maintenanceChunkEmbeddings`) enables fast similarity search across all chunks
+2. The embedding is written to the `embedding` property on the Chunk node
+3. The `maintenanceChunkEmbeddings` index updates automatically
 
 ```cypher
-// Chunks have embedding properties
+// Verify embeddings were stored
 MATCH (c:Chunk)
 RETURN c.text, size(c.embedding) AS embeddingDimensions
 LIMIT 1

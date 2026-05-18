@@ -13,11 +13,18 @@ Walks the agent's full surface area, section by section, in plain English:
 Every section starts with a ``====`` banner and a one-line, plain-English
 statement of what it is showing. Run it straight through:
 
-    uv run python demo.py
+    uv run python demo.py            # in-process: connects straight to Neo4j
+    uv run python demo.py --remote   # drives the deployed AgentCore runtime
+
+In ``--remote`` mode every section is served by the same deployed runtime
+over boto3 (``{"mode": ...}`` for the data surfaces, ``{"prompt": ...}`` for
+the agent). It needs only AWS credentials and a deployed agent; no local
+Neo4j connection is opened.
 """
 
 from __future__ import annotations
 
+import argparse
 import logging
 import textwrap
 
@@ -34,6 +41,11 @@ from common import (
     graph_query,
     vector_search,
 )
+from invoke_agent import invoke_payload
+
+# Set by main() from the --remote flag. When True, every section calls the
+# deployed AgentCore runtime instead of the in-process retrievers/agent.
+REMOTE = False
 
 # The retrievers log at INFO (schema fetch, generated Cypher). Keep them, but
 # silence HTTP client chatter so the demo output stays readable.
@@ -73,6 +85,18 @@ def show(label: str, body: str) -> None:
     print()
 
 
+def remote(payload: dict) -> str:
+    """Call the deployed runtime and return its assembled text answer.
+
+    Streaming is suppressed so each section can format the result with
+    ``show()`` exactly as the in-process path does.
+    """
+    result = invoke_payload(payload, stream=False)
+    if result.get("status") != "success":
+        return f"[remote error] {result.get('errors', ['Unknown error'])}"
+    return result["response"]
+
+
 def section_schema() -> None:
     banner(
         "SECTION 1 — What the agent knows about the database",
@@ -80,7 +104,8 @@ def section_schema() -> None:
         "(node types and how they connect) once per process and puts it in "
         "its system prompt. This is that schema — the map it reasons over.",
     )
-    show("Live graph schema", get_graph_schema())
+    schema = remote({"mode": "schema"}) if REMOTE else get_graph_schema()
+    show("Live graph schema", schema)
 
 
 def section_graph_query() -> None:
@@ -105,7 +130,12 @@ def section_graph_query() -> None:
     ]
     for label, q in questions:
         print(f"Question ({label}): {q}")
-        show("graph_query result", graph_query(q))
+        body = (
+            remote({"mode": "graph_query", "query": q})
+            if REMOTE
+            else graph_query(q)
+        )
+        show("graph_query result", body)
 
 
 def section_vector_search() -> None:
@@ -122,7 +152,12 @@ def section_vector_search() -> None:
     ]
     for q in queries:
         print(f"Search text: {q}")
-        show("Top matching manual chunks", vector_search(q, top_k=2))
+        body = (
+            remote({"mode": "vector_search", "query": q, "top_k": 2})
+            if REMOTE
+            else vector_search(q, top_k=2)
+        )
+        show("Top matching manual chunks", body)
 
 
 def section_agent() -> None:
@@ -134,17 +169,19 @@ def section_agent() -> None:
         "writes a final answer. We feed it one structured question, one "
         "manual-text question, and one that needs both.",
     )
-    schema = get_graph_schema()
-    agent = Agent(
-        model=BedrockModel(
-            model_id=MODEL_ID,
-            region_name=AWS_REGION,
-            temperature=0.0,
-            streaming=False,
-        ),
-        tools=[graph_query_tool, vector_search_tool],
-        system_prompt=SYSTEM_PROMPT_TEMPLATE.format(schema=schema),
-    )
+    agent = None
+    if not REMOTE:
+        schema = get_graph_schema()
+        agent = Agent(
+            model=BedrockModel(
+                model_id=MODEL_ID,
+                region_name=AWS_REGION,
+                temperature=0.0,
+                streaming=False,
+            ),
+            tools=[graph_query_tool, vector_search_tool],
+            system_prompt=SYSTEM_PROMPT_TEMPLATE.format(schema=schema),
+        )
     questions = [
         ("Structured", "Which operator has the worst on-time performance, "
          "and how many delays do they have?"),
@@ -157,14 +194,35 @@ def section_agent() -> None:
     ]
     for label, q in questions:
         print(f"User ({label}): {q}")
-        result = agent(q)
-        show("Agent answer", str(result))
+        answer = remote({"prompt": q}) if REMOTE else str(agent(q))
+        show("Agent answer", answer)
 
 
 def main() -> None:
+    global REMOTE
+    parser = argparse.ArgumentParser(
+        description="Fleet Agent functionality showcase."
+    )
+    parser.add_argument(
+        "--remote",
+        action="store_true",
+        help=(
+            "Drive the deployed AgentCore runtime over boto3 instead of "
+            "running in-process. Requires a deployed agent and AWS "
+            "credentials; opens no local Neo4j connection."
+        ),
+    )
+    REMOTE = parser.parse_args().remote
+
+    mode_line = (
+        "REMOTE: deployed AgentCore runtime"
+        if REMOTE
+        else "LOCAL: in-process, direct to Neo4j"
+    )
     print()
     print("#" * WIDTH)
     print("#" + "FLEET AGENT — FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
+    print("#" + mode_line.center(WIDTH - 2) + "#")
     print("#" * WIDTH)
     try:
         section_schema()

@@ -100,6 +100,10 @@ Vector or fulltext search finds relevant chunks (standard RAG). What GraphRAG ad
 
 ---
 
+![bg contain](images/graphrag-retrieval-flow.png)
+
+---
+
 ## Choosing the Right Retriever
 
 | Question Pattern | Best Retriever |
@@ -387,14 +391,13 @@ Returns *all* components; events list is empty if none exist.
 
 **Text2Cypher solution:**
 
-1. User asks a question in natural language
-2. LLM generates a Cypher query from the question
-3. Query executes against the graph
-4. Precise, structured results returned
+1. User asks in natural language
+2. LLM generates Cypher from the question
+3. Query runs; structured results returned
 
 **Example:**
 
-- Question: "How many maintenance events affect aircraft AC1001?"
+- Q: "How many maintenance events affect aircraft AC1001?"
 - Generated: `MATCH (a:Aircraft {tail:'AC1001'})-[:HAS_SYSTEM]->(:System)-[:HAS_COMPONENT]->(:Component)-[:HAS_EVENT]->(e) RETURN count(e)`
 - Result: `12`
 
@@ -511,10 +514,35 @@ Text2Cypher executes LLM-generated queries. Important safeguards:
 | Question | Best Retriever | Why |
 |----------|---------------|-----|
 | "What is exhaust gas temperature?" | Vector | Semantic content |
-| "Which aircraft have components with critical maintenance events?" | Vector Cypher | Content + entities |
-| "How many maintenance events occurred on AC1001?" | Text2Cypher | Precise count |
+| "Which aircraft have components with critical events?" | Vector Cypher | Content + entities |
+| "How many maintenance events on AC1001?" | Text2Cypher | Precise count |
 | "Tell me about the CFM56 engine" | Vector | Exploratory content |
 | "List AC1001 components" | Text2Cypher | Specific entity facts |
+
+---
+
+## Each Retriever Becomes an Agent Tool
+
+In the fleet-agent sample, each retriever becomes one single-responsibility tool. Its docstring is the routing logic the LLM reads.
+
+```python
+@tool
+def vector_search_tool(query: str, top_k: int = 5) -> str:
+    """Semantic search over document chunks. Conceptual questions."""
+    return _vector_retriever().search(query_text=query, top_k=top_k)
+
+@tool
+def related_entities_tool(query: str, top_k: int = 5) -> str:
+    """Search, then traverse to connected components and events."""
+    return _vector_cypher_retriever().search(query_text=query, top_k=top_k)
+
+@tool
+def graph_query_tool(question: str) -> str:
+    """Generate and run read-only Cypher. Counts, lists, exact facts."""
+    return _text2cypher_retriever().search(query_text=question)
+```
+
+One tool per retriever; routing is driven by the model.
 
 ---
 
@@ -522,8 +550,8 @@ Text2Cypher executes LLM-generated queries. Important safeguards:
 
 Graph-enriched search gives you three retrieval patterns:
 
-- **Vector Retriever**: Semantic similarity search across chunks. Best for content questions and topic exploration. No graph relationships.
-- **Vector Cypher Retriever**: Vector search then graph traversal. The chunk is the anchor. Best for content AND relationships.
-- **Text2Cypher Retriever**: LLM generates Cypher from natural language, schema-guided. Best for facts, counts, and specific entities.
+- **Vector Retriever**: Semantic search across chunks. Best for content and topic exploration. No graph relationships.
+- **Vector Cypher Retriever**: Vector search then graph traversal, anchored on the chunk. Best for content AND relationships.
+- **Text2Cypher Retriever**: Schema-guided Cypher from natural language. Best for facts, counts, and specific entities.
 
-**Key takeaway:** Vector search finds the starting points; graph traversal enriches them. Choosing the right retriever for the question is what matters.
+**Key takeaway:** Vector search finds the starting points; graph traversal enriches them. Match the retriever to the question.

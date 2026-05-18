@@ -71,16 +71,6 @@ M2M-only: no user accounts, no interactive login, no passwords to rotate.
 
 ---
 
-## Why Not Fargate or Lambda?
-
-All can host an MCP server. AgentCore is purpose-built for agents:
-
-- **Session isolation**: each session runs in its own microVM with isolated CPU, memory, and filesystem, sanitized when the session ends
-- **Long-running sessions**: up to 8 hours, versus Lambda's 15-minute cap
-- **Automatic scaling**: AgentCore manages the Fargate backend for you, no cold-start tuning
-
----
-
 ## Built-In Observability
 
 Deploying to AgentCore gives you, with zero configuration:
@@ -102,16 +92,6 @@ The Gateway is a managed service providing one endpoint for many tools:
 
 ---
 
-## When Fargate or Lambda Still Fits
-
-AgentCore is not always the right choice:
-
-- **Proof of concept**: Lambda's pay-per-invocation model is cheap for low-volume testing
-- **Custom infrastructure**: very specific networking, security, or compliance needs that AgentCore does not support
-- **Simple, stateless tools**: no session state, memory, or complex tracing needed
-
----
-
 ## The Agents in This Repo
 
 Agents connect to the Neo4j MCP server through the Gateway:
@@ -123,25 +103,6 @@ Agents connect to the Neo4j MCP server through the Gateway:
 | **Orchestrator Agent** | Multi-agent supervisor with routing |
 
 Fleet Agent uses one `agent.sh` (`./agent.sh start`) with `runtime_app.py` and a Dockerfile over a shared `common/` core and uv project.
-
----
-
-## LangGraph ReAct Agent Pattern
-
-```python
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
-from langchain_aws import ChatBedrockConverse
-
-llm = ChatBedrockConverse(model="global.anthropic.claude-sonnet-4-5-...")
-client = MultiServerMCPClient({"server": {
-    "transport": "streamable_http", "url": url,
-    "headers": {"Authorization": f"Bearer {token}"}}})
-tools = await client.get_tools()
-agent = create_react_agent(llm, tools)
-```
-
-The agent loads MCP tools dynamically from the Gateway and reasons over them.
 
 ---
 
@@ -160,5 +121,4 @@ The agent loads MCP tools dynamically from the Gateway and reasons over them.
 - AgentCore Runtime runs agents and MCP servers with microVM isolation, long sessions, and managed scaling
 - The Gateway is one authenticated entry point with unified auth and semantic tool discovery
 - Observability and tracing are built in and emitted as OpenTelemetry
-- Fargate or Lambda still fit proofs of concept, custom infrastructure, or simple stateless tools
-- LangGraph and Strands agents connect to Neo4j through the Gateway, and an orchestrator routes across them
+- Agents connect to Neo4j through the Gateway, and an orchestrator routes across them

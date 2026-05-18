@@ -82,7 +82,10 @@ def get_agent_config() -> tuple[str, str]:
 
 
 def _handle_sse_event(
-    event: str, content_parts: list[str], errors: list[str]
+    event: str,
+    content_parts: list[str],
+    errors: list[str],
+    stream: bool = True,
 ) -> None:
     """Dispatch one SSE event from the Strands runtime, printing text live.
 
@@ -104,7 +107,8 @@ def _handle_sse_event(
         return
     if data.get("type") == "chunk":
         text = data.get("data", "")
-        print(text, end="", flush=True)
+        if stream:
+            print(text, end="", flush=True)
         content_parts.append(text)
     elif data.get("type") == "error":
         errors.append(data.get("error", "Unknown error"))
@@ -116,27 +120,29 @@ def _print_result(result: dict) -> None:
         print(f"ERROR: {result.get('errors', ['Unknown error'])}")
 
 
-def invoke_agent(prompt: str) -> dict:
-    """
-    Invoke the deployed agent with a prompt.
+def invoke_payload(payload: dict, stream: bool = True) -> dict:
+    """Invoke the deployed runtime with an arbitrary payload.
 
     Args:
-        prompt: The user's question
+        payload: The request body. ``{"prompt": "..."}`` runs the full agent;
+            ``{"mode": "schema"}``, ``{"mode": "graph_query", "query": "..."}``
+            and ``{"mode": "vector_search", "query": "...", "top_k": N}`` hit
+            the direct surfaces of the same runtime.
+        stream: When True, print ``chunk`` text live as it arrives. Set False
+            to collect the response silently and use the returned text.
 
     Returns:
-        The agent's response as a dictionary
+        ``{"status": "success", "response": "..."}`` or
+        ``{"status": "error", "errors": [...]}``.
     """
     agent_arn, region = get_agent_config()
 
     logger.info(f"Agent ARN: {agent_arn}")
     logger.info(f"Region: {region}")
-    logger.info(f"Prompt: {prompt}")
+    logger.info(f"Payload: {payload}")
 
     # Create the AgentCore client
     client = boto3.client("bedrock-agentcore", region_name=region)
-
-    # Prepare the payload
-    payload = json.dumps({"prompt": prompt}).encode()
 
     # Generate a unique session ID
     session_id = str(uuid.uuid4())
@@ -146,7 +152,7 @@ def invoke_agent(prompt: str) -> dict:
     response = client.invoke_agent_runtime(
         agentRuntimeArn=agent_arn,
         runtimeSessionId=session_id,
-        payload=payload,
+        payload=json.dumps(payload).encode(),
         qualifier="DEFAULT",
     )
 
@@ -161,11 +167,12 @@ def invoke_agent(prompt: str) -> dict:
         buffer += raw.decode("utf-8")
         while "\n\n" in buffer:
             event, buffer = buffer.split("\n\n", 1)
-            _handle_sse_event(event, content_parts, errors)
+            _handle_sse_event(event, content_parts, errors, stream)
     if buffer.strip():
-        _handle_sse_event(buffer, content_parts, errors)
+        _handle_sse_event(buffer, content_parts, errors, stream)
 
-    print()  # terminate the streamed line
+    if stream:
+        print()  # terminate the streamed line
 
     if errors:
         return {"status": "error", "errors": errors}
@@ -174,6 +181,11 @@ def invoke_agent(prompt: str) -> dict:
         "status": "success",
         "response": "".join(content_parts),
     }
+
+
+def invoke_agent(prompt: str, stream: bool = True) -> dict:
+    """Invoke the deployed agent with a prompt (the full ReAct surface)."""
+    return invoke_payload({"prompt": prompt}, stream=stream)
 
 
 def load_queries() -> list[str]:

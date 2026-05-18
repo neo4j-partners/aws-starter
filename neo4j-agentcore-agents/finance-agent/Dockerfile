@@ -1,6 +1,6 @@
 # Finance Agent — Dockerfile for AgentCore Runtime
 #
-# Build context is the agent root, so the shared `common/` package and the
+# Build context is the agent root, so the shared `core/` package and the
 # root pyproject.toml/uv.lock are available:
 #
 #   docker build --platform linux/arm64 -t finance-agent .
@@ -18,15 +18,16 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# The local project builds the `common` package, so it must be present
+# The local project builds the `core` package, so it must be present
 # before `uv sync` installs the project into the venv. `vendor/` holds the
 # neo4j-agent-memory wheel the lockfile pins by relative path.
 COPY pyproject.toml uv.lock ./
-COPY common ./common
+COPY core ./core
 COPY vendor ./vendor
 RUN uv sync --frozen --no-dev
 
-COPY runtime_app.py ./
+# Only the deployed runtime ships in the image; client/ is local-only tooling.
+COPY server ./server
 
 # Copy MCP credentials if present (wildcard avoids failure when absent).
 COPY .mcp-credentials.jso[n] ./
@@ -35,4 +36,4 @@ EXPOSE 8080
 
 # opentelemetry-instrument (from aws-opentelemetry-distro) wraps the process
 # so AgentCore emits traces/metrics to CloudWatch GenAI Observability.
-CMD ["uv", "run", "opentelemetry-instrument", "python", "runtime_app.py"]
+CMD ["uv", "run", "opentelemetry-instrument", "python", "server/runtime_app.py"]

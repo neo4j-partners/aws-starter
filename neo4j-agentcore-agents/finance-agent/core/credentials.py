@@ -16,7 +16,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Anchor to the agent root (parent of the `common` package), not to the
+# Anchor to the agent root (parent of the `core` package), not to the
 # current working directory, so credential resolution is stable.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
 CREDENTIALS_FILE = AGENT_ROOT / ".mcp-credentials.json"

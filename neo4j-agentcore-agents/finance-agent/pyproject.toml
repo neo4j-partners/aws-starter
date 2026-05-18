@@ -1,13 +1,13 @@
 [project]
 name = "finance-agent"
 version = "0.1.0"
-description = "Finance ReAct agent (Strands) for Neo4j MCP via AgentCore Gateway over a shared common/ core"
+description = "Finance ReAct agent (Strands) for Neo4j MCP via AgentCore Gateway over a shared core/ package"
 requires-python = ">=3.10"
 dependencies = [
     # Shared core
     "httpx>=0.28.1",
     "boto3>=1.43.9",
-    # invoke_agent.py reads .bedrock_agentcore.yaml; declare pyyaml
+    # client/remote.py reads .bedrock_agentcore.yaml; declare pyyaml
     # explicitly rather than rely on it arriving transitively via the toolkit.
     "pyyaml>=6.0",
     "mcp>=1.27.1",
@@ -41,7 +41,7 @@ neo4j-agent-memory = { path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Install the shared `common` package into the venv so the entrypoint can
-# `from common import ...` without any sys.path manipulation.
+# Install the shared `core` package into the venv so the entrypoint and the
+# client tooling can `from core import ...` without any sys.path manipulation.
 [tool.hatch.build.targets.wheel]
-packages = ["common"]
+packages = ["core"]

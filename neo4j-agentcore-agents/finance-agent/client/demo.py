@@ -6,17 +6,17 @@ Showcases graph-native questions against the Neo4j transaction graph
 
 By default it runs an in-process Strands agent that talks to the Neo4j MCP
 server through the AgentCore Gateway — no local server, no deployment, just
-``uv run python demo_client.py``. Pass ``--remote`` to send the same
+``uv run python client/demo.py``. Pass ``--remote`` to send the same
 questions to the deployed AgentCore Runtime agent instead, so you can show
 the identical demo locally and in the cloud.
 
 Usage:
-    uv run python demo_client.py                 # all questions, local
-    uv run python demo_client.py --remote        # all questions, deployed
-    uv run python demo_client.py --memory        # Context Graph memory demo
-    uv run python demo_client.py --list          # print questions, run none
-    uv run python demo_client.py -n 3            # only question 3, local
-    uv run python demo_client.py -n 3 --remote   # only question 3, deployed
+    uv run python client/demo.py                 # all questions, local
+    uv run python client/demo.py --remote        # all questions, deployed
+    uv run python client/demo.py --memory        # Context Graph memory demo
+    uv run python client/demo.py --list          # print questions, run none
+    uv run python client/demo.py -n 3            # only question 3, local
+    uv run python client/demo.py -n 3 --remote   # only question 3, deployed
 
 Prerequisites:
     - .mcp-credentials.json at the agent root (both modes use the Gateway)
@@ -33,9 +33,9 @@ import logging
 import sys
 from collections.abc import Callable
 
-# Configure logging before importing invoke_agent: logging.basicConfig is a
-# no-op once handlers exist, so claiming it here keeps the demo output clean
-# regardless of what the lazily-imported remote path would have set.
+# Configure logging before importing the remote client: logging.basicConfig
+# is a no-op once handlers exist, so claiming it here keeps the demo output
+# clean regardless of what the lazily-imported remote path would have set.
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -67,29 +67,13 @@ def make_local_runner() -> Callable[[str], None]:
     tools for every question. Imports are local so ``--remote`` never pays
     the Strands import cost.
     """
-    from mcp.client.streamable_http import streamablehttp_client
     from strands import Agent
-    from strands.models import BedrockModel
-    from strands.tools.mcp.mcp_client import MCPClient
 
-    from common import AWS_REGION, MODEL_ID, SYSTEM_PROMPT, get_active_credentials
+    from core import MODEL_ID, SYSTEM_PROMPT
+    from core.factory import build_mcp_client, build_model
 
-    model = BedrockModel(
-        model_id=MODEL_ID,
-        region_name=AWS_REGION,
-        temperature=0.0,
-        max_tokens=4096,
-        streaming=True,
-    )
-
-    def create_transport():
-        credentials = get_active_credentials()
-        return streamablehttp_client(
-            credentials["gateway_url"],
-            headers={"Authorization": f"Bearer {credentials['access_token']}"},
-        )
-
-    mcp_client = MCPClient(create_transport)
+    model = build_model()
+    mcp_client = build_mcp_client()
     print(f"Mode:  local in-process Strands agent (model: {MODEL_ID})")
 
     def run(question: str) -> None:
@@ -106,11 +90,11 @@ def make_local_runner() -> Callable[[str], None]:
 def make_remote_runner() -> Callable[[str], None]:
     """Build the deployed-agent runner used for ``--remote`` mode.
 
-    Reuses ``invoke_agent.invoke_agent``, which reads the runtime ARN from
+    Reuses ``remote.invoke_agent``, which reads the runtime ARN from
     ``.bedrock_agentcore.yaml`` and streams the SSE response to the terminal
     live. Errors are surfaced; success text has already been printed.
     """
-    from invoke_agent import invoke_agent
+    from remote import invoke_agent
 
     print("Mode:  deployed AgentCore Runtime agent (--remote)")
 
@@ -164,7 +148,7 @@ def _memory_section(
 ) -> None:
     """Run one labelled turn of the memory demo against the deployed agent.
 
-    ``invoke`` is ``invoke_agent.invoke_agent``; it streams the answer to the
+    ``invoke`` is ``remote.invoke_agent``; it streams the answer to the
     terminal and returns a status dict. The scope (``user_id`` plus a fresh
     ``session_id`` per section) is printed so it is obvious which turns share
     a user and which do not.
@@ -187,10 +171,10 @@ def _memory_section(
 def run_memory_demo() -> None:
     """Multi-section Context Graph memory showcase against the deployed agent.
 
-    Memory exists only in the deployed runtime: ``runtime_app.py`` wires the
+    Memory exists only in the deployed runtime: ``server/runtime_app.py`` wires the
     user-scoped Context Graph tools, while the in-process local runner here
     does not. So this always invokes the deployed agent through
-    ``invoke_agent.invoke_agent``. A per-run tag keeps the "before" section
+    ``remote.invoke_agent``. A per-run tag keeps the "before" section
     honest: a never-before-seen user starts with no memory regardless of how
     many times the demo has run.
 
@@ -203,7 +187,7 @@ def run_memory_demo() -> None:
     import time
     import uuid
 
-    from invoke_agent import invoke_agent
+    from remote import invoke_agent
 
     run_tag = uuid.uuid4().hex[:8]
     user = f"mem-demo-{run_tag}"
@@ -280,7 +264,7 @@ def run_memory_demo() -> None:
         "\n"
         "Ground-truth check (re-runs a teach/recall for this user, then\n"
         "queries Neo4j directly for the persisted :Message node):\n"
-        f"  uv run python invoke_agent.py memory-demo --user-id {user} "
+        f"  uv run python client/remote.py memory-demo --user-id {user} "
         "--verify-neo4j"
     )
     print("=" * 72)

@@ -31,9 +31,8 @@ import neo4j
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands import Agent
 from strands.models import BedrockModel
-from tools import graph_query_tool, vector_search_tool
 
-from common import (
+from agent import (
     AWS_REGION,
     MODEL_ID,
     SYSTEM_PROMPT_TEMPLATE,
@@ -41,6 +40,7 @@ from common import (
     graph_query,
     vector_search,
 )
+from agent.tools import graph_query_tool, vector_search_tool
 
 logging.basicConfig(
     level=logging.INFO,
@@ -94,7 +94,7 @@ async def invoke(payload: dict | None = None):
     - no ``mode`` (or ``{"prompt": "..."}``) — the full ReAct agent, streamed.
 
     The three data modes emit one ``chunk`` then ``complete``, so the SSE
-    parser in ``invoke_agent.py`` handles them with no special casing.
+    parser in ``client.transport`` handles them with no special casing.
     """
     if payload is None:
         payload = {}

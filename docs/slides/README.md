@@ -22,22 +22,21 @@ Build every deck in `aws-in-depth/` into `build/`:
 npm run build:all
 ```
 
-This creates a clickable gallery at `build/index.html` linking all seven decks:
+This creates a clickable gallery at `build/index.html` linking all six decks:
 
-- `01-aircraft-data-model-slides.html`
-- `02-dual-data-architecture-slides.html`
+- `01-neo4j-for-agentic-ai-slides.html`
+- `02-aircraft-data-model-slides.html`
 - `03-graphrag-and-genai-slides.html`
 - `04-graph-enriched-search-slides.html`
 - `05-neo4j-aura-and-agents-slides.html`
-- `06-neo4j-mcp-server-slides.html`
-- `07-aws-agentcore-architecture-slides.html`
+- `06-neo4j-on-aws-slides.html`
 
 The build script copies the `aws-in-depth/images/` assets into `build/images/` and writes `.nojekyll` so GitHub Pages serves the output as-is. The custom Marp themes in `themes/` (`finance`, `graph-lakehouse`) are registered during the build, so any deck can opt in through its frontmatter `theme:` field.
 
 Build a single deck:
 
 ```bash
-node scripts/build-theme-gallery.mjs 01-aircraft-data-model-slides.md
+node scripts/build-theme-gallery.mjs 02-aircraft-data-model-slides.md
 ```
 
 ## Publishing

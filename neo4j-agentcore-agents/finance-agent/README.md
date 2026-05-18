@@ -52,7 +52,7 @@ Neo4j directly.
                                           +--------------------+
 ```
 
-**How it uses the MCP server.** `common/credentials.py` reads
+**How it uses the MCP server.** `core/credentials.py` reads
 `.mcp-credentials.json` for the Gateway URL and OAuth2 client credentials. It
 runs an OAuth2 client-credentials flow to mint a bearer token, then refreshes
 that token in memory before it expires. The MCP client connects to the Gateway
@@ -70,14 +70,15 @@ AgentCore Runtime agent. No Docker image is built.
 
 **Yes, it deploys to AgentCore.** The deployed target is an Amazon Bedrock
 AgentCore Runtime agent. Invoke it with `agent.sh invoke-cloud` or with boto3
-via `invoke_agent.py`, which calls `bedrock-agentcore` `invoke_agent_runtime`
+via `client/remote.py`, which calls `bedrock-agentcore` `invoke_agent_runtime`
 against the deployed runtime ARN.
 
 ## Unique Features
 
-- **Shared core, thin entrypoint.** `common/` holds the framework-agnostic
-  credentials, token refresh, model config, and system prompt. The Strands
-  `runtime_app.py` is a thin wrapper over it.
+- **Shared core, thin entrypoint.** `core/` holds the credentials, token
+  refresh, model config, system prompt, MCP transport, and the Bedrock
+  model / MCP client factories. The Strands `server/runtime_app.py` and the
+  `client/` tooling are thin wrappers over it.
 - **Neo4j-backed semantic memory.** When `NEO4J_URI` and
   `NEO4J_PASSWORD` are set, the agent adds Context Graph memory
   tools: `search_context`, `get_entity_graph`, `add_memory`, and
@@ -90,12 +91,12 @@ against the deployed runtime ARN.
 
 | Path | Use |
 |------|-----|
-| `common/` | Shared credentials, token refresh, model config, prompt |
-| `runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
-| `demo_client.py` | Showcase client, runs the demo questions local or `--remote` |
-| `local_cli.py` | Local CLI, run a single query directly in the terminal |
+| `core/` | Shared credentials, token refresh, model config, prompt, MCP transport + model/client factories |
+| `server/runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `client/demo.py` | Showcase client, runs the demo questions local or `--remote` |
+| `client/local.py` | Local CLI, run a single query directly in the terminal |
+| `client/remote.py` | Call the deployed agent programmatically with boto3 |
 | `agent.sh` | CLI wrapper for start, test, deploy, invoke |
-| `invoke_agent.py` | Call the deployed agent programmatically with boto3 |
 
 ## Prerequisites
 
@@ -112,24 +113,24 @@ cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 uv sync
 
 # Showcase: runs ALL demo questions in-process, no server, no deploy
-uv run python demo_client.py
+uv run python client/demo.py
 
 # Same six questions against the deployed AgentCore agent instead
-uv run python demo_client.py --remote
+uv run python client/demo.py --remote
 
 # Pick one question, or just list them
-uv run python demo_client.py -n 4
-uv run python demo_client.py --list
+uv run python client/demo.py -n 4
+uv run python client/demo.py --list
 
 # One-off question, no server
-uv run python local_cli.py "Which accounts have the highest risk scores, and who do they transfer money to?"
+uv run python client/local.py "Which accounts have the highest risk scores, and who do they transfer money to?"
 
 # Or run the AgentCore server locally on port 8080
 ./agent.sh start          # in one terminal, leave running
 ./agent.sh test           # in another, sends the default demo query
 ```
 
-`demo_client.py` with no arguments runs every question in the
+`client/demo.py` with no arguments runs every question in the
 [Demo](#demo) table, locally and in process. It is the fastest way to see
 the agent work end to end after `uv sync`.
 
@@ -178,13 +179,13 @@ export AWS_PROFILE=<your-sso-profile>
 ./agent.sh deploy            # zips source, uploads, creates/updates the runtime
 
 # Run the full six-question demo against the deployed agent
-uv run python demo_client.py --remote
+uv run python client/demo.py --remote
 
 # Or a single question against the deployed agent
-uv run python demo_client.py --remote -n 1
+uv run python client/demo.py --remote -n 1
 ```
 
-`demo_client.py --remote` reuses `invoke_agent.py`, which reads the deployed
+`client/demo.py --remote` reuses `client/remote.py`, which reads the deployed
 runtime ARN from `.bedrock_agentcore.yaml` and streams the agent's answer back
 to the terminal. The same questions run identically in local mode by dropping
 `--remote`, so the demo is the same locally and in the cloud.
@@ -192,7 +193,7 @@ to the terminal. The same questions run identically in local mode by dropping
 Notes:
 
 - `agent.sh deploy` reads `default_agent` from `.bedrock_agentcore.yaml`. It
-  must point at `finance_agent` with `entrypoint: .../runtime_app.py`. If
+  must point at `finance_agent` with `entrypoint: .../server/runtime_app.py`. If
   `./agent.sh configure` cannot run interactively in your environment, set
   those two fields directly; everything else in that file is reused as is.
 - If the venv was created under a different path, console scripts such as
@@ -202,13 +203,13 @@ Notes:
 ## Demo
 
 These questions exercise the parts of the graph that a flat database cannot
-answer well. `demo_client.py` runs all of them in order: locally by default,
+answer well. `client/demo.py` runs all of them in order: locally by default,
 or against the deployed agent with `--remote`. They also work one at a time
-via `local_cli.py`, `curl`, or `./agent.sh invoke-cloud "..."`.
+via `client/local.py`, `curl`, or `./agent.sh invoke-cloud "..."`.
 
 ```bash
-uv run python demo_client.py            # all questions, local
-uv run python demo_client.py --remote   # all questions, deployed agent
+uv run python client/demo.py            # all questions, local
+uv run python client/demo.py --remote   # all questions, deployed agent
 ```
 
 | Question | What it shows |

@@ -8,12 +8,12 @@ agent's per-request memory directives bind to them.
 
 The stock ``neo4j_agent_memory`` 0.2.1 Strands tools accept ``user_id`` but
 ignore it (message search is a global vector query). The agent
-works around this with ``common.memory.user_scoped_context_graph_tools``, so
+works around this with ``core.memory.user_scoped_context_graph_tools``, so
 this agent *does* isolate by ``user_id`` and recalls across that user's
 sessions. The ``memory-demo`` therefore proves both cross-session recall and
 per-user isolation; ``verify_neo4j_persistence`` is the ground-truth check.
 
-Memory is wired into ``runtime_app.py`` (-> ``neo4j_agent_memory``). The
+Memory is wired into ``server/runtime_app.py`` (-> ``neo4j_agent_memory``). The
 ``memory-demo`` mode is only meaningful against a deployed agent that had
 ``NEO4J_URI``/``NEO4J_PASSWORD`` injected at deploy time.
 
@@ -24,13 +24,13 @@ event shapes the Strands runtime emits (``chunk``/``error``/``complete``); the
 deprecated direct-response shapes are not supported.
 
 Usage:
-    uv run python invoke_agent.py                       # default prompt
-    uv run python invoke_agent.py "Tell me about Apple" # one-shot
-    uv run python invoke_agent.py --user-id alice "..." # one-shot, scoped
-    uv run python invoke_agent.py memory-demo           # cross-session recall
-    uv run python invoke_agent.py memory-demo --user-id alice
-    uv run python invoke_agent.py load-test             # random queries / 5s
-    uv run python invoke_agent.py load-test --interval 10
+    uv run python client/remote.py                       # default prompt
+    uv run python client/remote.py "Tell me about Apple" # one-shot
+    uv run python client/remote.py --user-id alice "..." # one-shot, scoped
+    uv run python client/remote.py memory-demo           # cross-session recall
+    uv run python client/remote.py memory-demo --user-id alice
+    uv run python client/remote.py load-test             # random queries / 5s
+    uv run python client/remote.py load-test --interval 10
 
 Prerequisites:
     - Agent deployed (./agent.sh deploy)
@@ -59,8 +59,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = Path(__file__).parent / ".bedrock_agentcore.yaml"
-QUERIES_FILE = Path(__file__).parent / "queries.txt"
+# This module lives in client/; the uv project, .bedrock_agentcore.yaml and
+# queries.txt are at the agent root one level up. Anchor to that, not to the
+# current working directory, so paths resolve regardless of where it's run.
+AGENT_ROOT = Path(__file__).resolve().parent.parent
+
+CONFIG_FILE = AGENT_ROOT / ".bedrock_agentcore.yaml"
+QUERIES_FILE = AGENT_ROOT / "queries.txt"
 DEFAULT_PROMPT = "Which accounts have the highest risk scores, and who do they transfer money to?"
 DEFAULT_USER_ID = "demo-user"
 
@@ -74,8 +79,8 @@ TEACH_NEEDLES = ("energy", "nvidia")
 # agent.sh: project-local first, then the Neo4j MCP server's .env
 # (same database as the finance graph).
 ENV_FILES = (
-    Path(__file__).parent / ".env",
-    Path(__file__).parent / ".." / ".." / "neo4j-agentcore-mcp-server" / ".env",
+    AGENT_ROOT / ".env",
+    AGENT_ROOT / ".." / ".." / "neo4j-agentcore-mcp-server" / ".env",
 )
 
 
@@ -114,7 +119,7 @@ def _handle_sse_event(
 ) -> None:
     """Dispatch one SSE event from the Strands runtime, printing text live.
 
-    The Strands ``runtime_app`` emits exactly three JSON event shapes:
+    The Strands ``server/runtime_app`` emits exactly three JSON event shapes:
     ``{"type": "chunk", "data": ...}``, ``{"type": "error", "error": ...}``,
     and ``{"type": "complete"}``. ``chunk`` text is printed as it arrives and
     also collected so callers still get the assembled response. ``json.loads``
@@ -222,7 +227,7 @@ def run_memory_demo(user_id: str) -> None:
     Same ``user_id``, different ``session_id`` per turn: if the second turn
     answers using the preference stated in the first, cross-session
     persistence and semantic recall are working. Because the agent
-    uses ``common.memory``'s user-scoped tools, recall is also isolated per
+    uses ``core.memory``'s user-scoped tools, recall is also isolated per
     ``user_id`` (a different user would not see this memory).
     ``verify_neo4j_persistence`` is the ground-truth check.
     """
@@ -318,7 +323,7 @@ def verify_neo4j_persistence(user_id: str, within_minutes: int = 30) -> None:
 
     Ground-truth check: the memory-demo "teach" turn asks the agent to
     remember a low-risk-energy / NVIDIA preference, which the user-scoped
-    Strands tools (common.memory) persist as a :Message under a
+    Strands tools (core.memory) persist as a :Message under a
     :Conversation that is linked to ``(:User {identifier: user_id})`` and
     carries a denormalized ``user_identifier``. We look for a recent
     :Message whose content mentions the distinctive needles AND whose
@@ -383,7 +388,7 @@ def verify_neo4j_persistence(user_id: str, within_minutes: int = 30) -> None:
         print(f"FAIL: no memory scoped to user_id={user_id!r} found.")
         print("The agent may not have called add_memory, NEO4J_URI/")
         print("NEO4J_PASSWORD were not injected into the deployed runtime,")
-        print("or the runtime is not using common.memory's scoped tools.")
+        print("or the runtime is not using core.memory's scoped tools.")
         print("=" * 70)
         return
 
@@ -406,7 +411,7 @@ def verify_neo4j_persistence(user_id: str, within_minutes: int = 30) -> None:
         print("Note: some matched Conversations lack the")
         print("(:User)-[:HAS_CONVERSATION]-> link. Storage is still scoped via")
         print("the denormalized user_identifier; the explicit User edge is")
-        print("written on conversation creation by common.memory.add_memory.")
+        print("written on conversation creation by core.memory.add_memory.")
     print("=" * 70)
 
 

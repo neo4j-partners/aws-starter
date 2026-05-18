@@ -6,21 +6,21 @@ AgentCore Gateway, written the Strands way:
 
 - The Bedrock model and the MCP client are built once at module load.
 - The MCP transport factory resolves a *fresh* OAuth2 token on every context
-  entry (via ``common.get_active_credentials``), so a long-running runtime
+  entry (via ``core.transport``), so a long-running runtime
   never serves requests with an expired Bearer token.
 - Each request opens its own ``with mcp_client:`` scope, lists tools, builds
   an ``Agent``, and streams the answer with ``stream_async``.
 
 Context Graph semantic memory:
 
-- ``user_scoped_context_graph_tools`` (common.memory) adds four Strands
+- ``user_scoped_context_graph_tools`` (core.memory) adds four Strands
   tools (search_context, get_entity_graph, add_memory, get_user_preferences)
   backed by the *same* Neo4j instance as the finance graph, connected
   directly (driver + Bedrock embeddings), not through the MCP Gateway.
 - Memory is genuinely isolated per ``user_id``: writes link a ``:User``
   node and reads filter to it, so recall spans that user's sessions but
   never crosses tenants. (The stock ``neo4j_agent_memory`` 0.2.1 Strands
-  tools accept ``user_id`` but ignore it — see common/memory.py.) The
+  tools accept ``user_id`` but ignore it — see core/memory.py.) The
   ``user_id`` is resolved from the invoke payload and injected into the
   per-request system prompt so the model passes the right scope.
 - Memory tooling is best-effort: if the direct Neo4j env vars
@@ -44,13 +44,11 @@ import re
 from collections.abc import AsyncIterator
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
-from strands.models import BedrockModel
-from strands.tools.mcp.mcp_client import MCPClient
 
-from common import AWS_REGION, MODEL_ID, SYSTEM_PROMPT, get_active_credentials
-from common.memory import user_scoped_context_graph_tools
+from core import AWS_REGION, MODEL_ID, SYSTEM_PROMPT
+from core.factory import build_mcp_client, build_model
+from core.memory import user_scoped_context_graph_tools
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,31 +66,10 @@ logging.getLogger("neo4j_agent_memory").setLevel(logging.DEBUG)
 
 app = BedrockAgentCoreApp()
 
-# Built once; reused across requests.
-model = BedrockModel(
-    model_id=MODEL_ID,
-    region_name=AWS_REGION,
-    temperature=0.0,
-    max_tokens=4096,
-    streaming=True,
-)
-
-
-def create_transport():
-    """Transport factory — invoked on every ``with mcp_client:`` entry.
-
-    Resolving credentials here (not at module load) is what keeps the Bearer
-    token fresh: ``get_active_credentials`` refreshes the OAuth2 token in
-    memory whenever it is missing or close to expiring.
-    """
-    credentials = get_active_credentials()
-    return streamablehttp_client(
-        credentials["gateway_url"],
-        headers={"Authorization": f"Bearer {credentials['access_token']}"},
-    )
-
-
-mcp_client = MCPClient(create_transport)
+# Built once; reused across requests. The MCP transport factory resolves a
+# fresh OAuth2 token on every ``with mcp_client:`` entry (see core.transport).
+model = build_model()
+mcp_client = build_mcp_client()
 
 
 def _build_memory_tools():

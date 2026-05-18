@@ -1,13 +1,13 @@
-"""Strands-native tool wrappers over the framework-agnostic common callables.
+"""Strands-native tool wrappers over the framework-agnostic retrieval callables.
 
-Imported by both ``runtime_app.py`` and ``local_cli.py``: the agent root is
-``sys.path[0]`` for the script entrypoints, so this is a plain top-level
-module, not a package import.
+Imported by ``runtime_app.py`` (the only agent builder). The wrapped callables
+in :mod:`agent.retrieval` carry no Strands dependency; the ``@tool`` decorator
+and the docstrings the LLM sees live here.
 """
 
 from strands import tool
 
-from common import graph_query, vector_search
+from agent.retrieval import graph_query, vector_search
 
 
 @tool

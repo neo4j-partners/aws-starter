@@ -14,20 +14,18 @@ const SLIDE_DIR = "aws-in-depth";
 const DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
 
 const descriptions = {
-  "01-aircraft-data-model-slides.md":
-    "Aircraft digital-twin property graph and the data model.",
-  "02-dual-data-architecture-slides.md":
-    "Dual data architecture pairing operational and graph stores.",
+  "01-neo4j-for-agentic-ai-slides.md":
+    "Neo4j for agentic AI: managed graph database, GraphRAG retrieval, retrievers to agents.",
+  "02-aircraft-data-model-slides.md":
+    "Aircraft digital-twin property graph plus the dual analytics-and-graph data architecture.",
   "03-graphrag-and-genai-slides.md":
     "GraphRAG patterns and generative AI grounding.",
   "04-graph-enriched-search-slides.md":
     "Graph-enriched search beyond keyword retrieval.",
   "05-neo4j-aura-and-agents-slides.md":
     "Neo4j Aura and agent integration patterns.",
-  "06-neo4j-mcp-server-slides.md":
-    "Neo4j MCP server on Bedrock AgentCore.",
-  "07-aws-agentcore-architecture-slides.md":
-    "AWS AgentCore runtime and gateway architecture.",
+  "06-neo4j-on-aws-slides.md":
+    "Neo4j on AWS Bedrock AgentCore: MCP server, Gateway, and runtime.",
 };
 
 const decks = readdirSync(SLIDE_DIR)

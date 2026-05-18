@@ -28,9 +28,29 @@ ol > li {
 </style>
 
 
-# The Neo4j MCP Server
+# Neo4j on AWS Bedrock AgentCore
 
-What it provides, and how this project deploys it on Amazon Bedrock AgentCore
+The MCP server, the Gateway, and the runtime that turn a graph database into an authenticated agent tool
+
+---
+
+## What This Deck Covers
+
+- Deploy the open-source Neo4j MCP server to Amazon Bedrock AgentCore Runtime
+- Put it behind an AgentCore Gateway with machine-to-machine OAuth2
+- Any MCP-capable agent queries the graph through one authenticated endpoint
+- End to end: the platform, the server, the request flow, deployment, and the agents that connect
+
+---
+
+## What AgentCore Provides
+
+Amazon Bedrock AgentCore is purpose-built to run AI agents and their tools:
+
+- **Runtime**: hosts agents and MCP servers in isolated microVMs
+- **Gateway**: a single authenticated entry point that aggregates tools
+- **Built-in observability**: tracing of reasoning, tool calls, and model calls
+- **Managed scaling**: no auto-scaling groups, health checks, or cold-start tuning
 
 ---
 
@@ -67,18 +87,12 @@ This deployment runs the server with `NEO4J_READ_ONLY=true`:
 
 ---
 
-## Neo4j AgentCore MCP Server Overview
-
-- Deploy the Neo4j MCP server to Amazon Bedrock AgentCore
-- Put it behind an AgentCore Gateway with OAuth2 authentication
-- Restrict access to machine-to-machine (M2M) only, designed for agents
-- The Gateway provides unified auth, centralized access control, multi-target aggregation, and audit logging
-
----
-
 ## Deployment Architecture
 
 An AI agent authenticates to Cognito (M2M OAuth2), sends MCP requests with a JWT to the AgentCore Gateway, which forwards them to the AgentCore Runtime hosting the Neo4j MCP server, which queries the Neo4j database.
+
+- Access is restricted to machine-to-machine (M2M) only, designed for agents
+- The Gateway provides unified auth, centralized access control, multi-target aggregation, and audit logging
 
 ---
 
@@ -111,18 +125,7 @@ Gateway-> Runtime -> Neo4j MCP Server -> Neo4j
 | OAuth2 Provider | Gateway to Runtime token exchange |
 | Neo4j (env vars) | Database credentials inside the container |
 
-No user accounts, no passwords to rotate. Agents use client credentials only.
-
----
-
-## How `./deploy.sh` Sets It Up
-
-1. Builds the **ARM64** Docker image of the Neo4j MCP server
-2. Creates an Amazon ECR repository and pushes the image
-3. Deploys the CDK stack
-4. Runs custom resources for the OAuth provider and a Runtime health check
-
-Deployment takes roughly 5 to 10 minutes. The Neo4j database must be running and reachable first.
+M2M-only: no user accounts, no interactive login, no passwords to rotate. Agents use client credentials only.
 
 ---
 
@@ -161,13 +164,58 @@ Discover names at runtime. The same pattern works for Gateway (prefixed) and dir
 
 ---
 
+## Built-In Observability
+
+Deploying to AgentCore gives you, with zero configuration:
+
+- **End-to-end tracing**: every reasoning step, tool invocation, and model call as spans with timing and inputs and outputs
+- **OpenTelemetry format**: integrates with existing monitoring tools, no proprietary lock-in
+- **CloudWatch dashboards**: token usage, latency, session duration, error rates
+
+This is invaluable for debugging why an agent made a decision or why a tool call failed.
+
+---
+
+## Unified Agent-to-Tool Integration
+
+The Gateway is a managed service providing one endpoint for many tools:
+
+- **Tool discovery**: at scale, dozens or hundreds of MCP servers. Agents search for tools semantically across all of them
+- **Unified authentication**: the agent authenticates once to the Gateway, which handles credential exchange with each backend MCP server
+
+---
+
+## The Agents in This Repo
+
+Agents connect to the Neo4j MCP server through the Gateway:
+
+| Agent | Pattern |
+|-------|---------|
+| **Fleet Agent** | Strands agent over a shared core |
+| **Finance Agent** | Same LangGraph / Strands split over its own core |
+| **Orchestrator Agent** | Multi-agent supervisor with routing |
+
+Fleet Agent uses one `agent.sh` (`./agent.sh start`) with `runtime_app.py` and a Dockerfile over a shared `common/` core and uv project.
+
+---
+
+## Multi-Agent Orchestration
+
+- An **orchestrator** routes each question to the right specialized agent
+- Relationship and structure questions go to the Neo4j MCP agent
+- Numeric and aggregation questions go to an analytics agent
+- Questions needing both are answered in sequence and the results combined
+- The end user asks in plain English. No Cypher or SQL knowledge required
+
+---
+
 ## Summary
 
-- The Neo4j MCP server exposes a graph to agents through two read-only tools: `get-schema` and `read-cypher`
-- MCP removes the need for custom Neo4j integration code per agent
-- This project deploys it to AgentCore Runtime behind a Gateway with M2M OAuth2
+- The Neo4j MCP server exposes a graph to agents through two read-only tools: `get-schema` and `read-cypher`, removing the need for custom Neo4j integration code per agent
+- It runs on AgentCore Runtime with microVM isolation and managed scaling, behind a Gateway with M2M OAuth2 and semantic tool discovery
 - A single `./deploy.sh` builds the ARM64 image and deploys the stack, with custom resources handling OAuth provider and Runtime-readiness ordering
 - Gateway tool prefixing is handled with runtime tool discovery, and Claude Sonnet keeps the standard hyphenated tool names
+- Observability is built in and emitted as OpenTelemetry; an orchestrator routes across the agents that connect
 
 ---
 
@@ -181,6 +229,17 @@ Discover names at runtime. The same pattern works for Gateway (prefixed) and dir
 - An agent does not need a hand-written integration per data source
 - The agent asks the server "what tools do you have?", then calls them
 - Tools are described in natural language, so the LLM can choose them on its own
+
+---
+
+## How `./deploy.sh` Sets It Up
+
+1. Builds the **ARM64** Docker image of the Neo4j MCP server
+2. Creates an Amazon ECR repository and pushes the image
+3. Deploys the CDK stack
+4. Runs custom resources for the OAuth provider and a Runtime health check
+
+Deployment takes roughly 5 to 10 minutes. The Neo4j database must be running and reachable first.
 
 ---
 

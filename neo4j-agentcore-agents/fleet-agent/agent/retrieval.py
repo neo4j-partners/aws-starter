@@ -13,8 +13,8 @@ The embedder here MUST match the one ``sample-data`` used to populate the
 graph, or vector search returns noise. ``sample-data`` defaults to Amazon
 Bedrock Titan v2 (1024 dims); both are env-overridable.
 
-Nothing in this module imports Strands. ``tools.py`` wraps the two callables
-below as Strands-native tools.
+Nothing in this module imports Strands. ``agent.tools`` wraps the two
+callables below as Strands-native tools.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from neo4j_graphrag.retrievers import Text2CypherRetriever, VectorRetriever
 from neo4j_graphrag.schema import get_schema
 from neo4j_graphrag.types import RetrieverResultItem
 
-from common.config import (
+from agent.config import (
     AWS_REGION,
     EMBED_DIMENSIONS,
     EMBED_MODEL_ID,

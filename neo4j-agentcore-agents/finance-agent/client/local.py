@@ -6,19 +6,17 @@ Gateway. Uses the synchronous Strands agent call — the idiomatic form for a
 one-shot CLI.
 
 Usage:
-    uv run python local_cli.py                            # demo
-    uv run python local_cli.py "Tell me about Apple Inc"  # ask
+    uv run python client/local.py                            # demo
+    uv run python client/local.py "Tell me about Apple Inc"  # ask
 """
 
 import logging
 import sys
 
-from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent
-from strands.models import BedrockModel
-from strands.tools.mcp.mcp_client import MCPClient
 
-from common import AWS_REGION, MODEL_ID, SYSTEM_PROMPT, get_active_credentials
+from core import MODEL_ID, SYSTEM_PROMPT
+from core.factory import build_mcp_client, build_model
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -31,25 +29,8 @@ DEMO_QUESTIONS = [
     "Compare the risk factors between Apple and NVIDIA.",
 ]
 
-model = BedrockModel(
-    model_id=MODEL_ID,
-    region_name=AWS_REGION,
-    temperature=0.0,
-    max_tokens=4096,
-    streaming=True,
-)
-
-
-def create_transport():
-    """Transport factory — resolves a fresh token on every context entry."""
-    credentials = get_active_credentials()
-    return streamablehttp_client(
-        credentials["gateway_url"],
-        headers={"Authorization": f"Bearer {credentials['access_token']}"},
-    )
-
-
-mcp_client = MCPClient(create_transport)
+model = build_model()
+mcp_client = build_mcp_client()
 
 
 def run_query(question: str):

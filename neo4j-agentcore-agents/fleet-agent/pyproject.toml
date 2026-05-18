@@ -1,7 +1,7 @@
 [project]
 name = "neo4j-fleet-agent"
 version = "0.1.0"
-description = "Neo4j fleet agent — Strands, direct-to-Neo4j GraphRAG over a shared common/ core"
+description = "Neo4j fleet agent — Strands, direct-to-Neo4j GraphRAG over an agent/ core"
 requires-python = ">=3.10"
 dependencies = [
     # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)
@@ -22,7 +22,9 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Install the shared `common` package into the venv so the entrypoints can
-# `from common import ...` without any sys.path manipulation.
+# Install the `agent` core package into the venv so runtime_app.py can
+# `from agent import ...` without any sys.path manipulation. `client/` is
+# dev-only and runs via `python -m client.<mod>` from the project root, so
+# it is intentionally not packaged (keeps the runtime image minimal).
 [tool.hatch.build.targets.wheel]
-packages = ["common"]
+packages = ["agent"]

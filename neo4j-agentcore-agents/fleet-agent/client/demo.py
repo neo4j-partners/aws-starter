@@ -4,22 +4,24 @@
 Walks the agent's full surface area, section by section, in plain English:
 
   1. The live graph schema the agent reasons over.
-  2. The ``graph_query`` retriever on its own (Text2Cypher: Claude writes
-     read-only Cypher from the schema).
-  3. The ``vector_search`` retriever on its own (semantic search over
-     maintenance-manual chunks).
+  2. The ``graph_query`` retriever on its own (Text2Cypher).
+  3. The ``vector_search`` retriever on its own (semantic search).
   4. The full Strands ReAct agent, choosing tools by itself.
 
-Every section starts with a ``====`` banner and a one-line, plain-English
-statement of what it is showing. Run it straight through:
+This is a pure client. Every section is served by a running
+``runtime_app.py`` through the matching payload mode — nothing is built
+in-process:
 
-    uv run python demo.py            # in-process: connects straight to Neo4j
-    uv run python demo.py --remote   # drives the deployed AgentCore runtime
+  - section 1 -> ``{"mode": "schema"}``
+  - section 2 -> ``{"mode": "graph_query", "query": ...}``
+  - section 3 -> ``{"mode": "vector_search", "query": ..., "top_k": 2}``
+  - section 4 -> ``{"prompt": ...}``  (the full agent)
 
-In ``--remote`` mode every section is served by the same deployed runtime
-over boto3 (``{"mode": ...}`` for the data surfaces, ``{"prompt": ...}`` for
-the agent). It needs only AWS credentials and a deployed agent; no local
-Neo4j connection is opened.
+The per-section questions below are hand-written narration for the showcase;
+they are intentionally separate from ``queries.txt`` (the load/demo list).
+
+    uv run python -m client.demo            # local server (./agent.sh start)
+    uv run python -m client.demo --remote   # the deployed AgentCore runtime
 """
 
 from __future__ import annotations
@@ -28,42 +30,14 @@ import argparse
 import logging
 import textwrap
 
-from strands import Agent
-from strands.models import BedrockModel
-from tools import graph_query_tool, vector_search_tool
+from client.transport import Target, invoke
 
-from common import (
-    AWS_REGION,
-    MODEL_ID,
-    SYSTEM_PROMPT_TEMPLATE,
-    close,
-    get_graph_schema,
-    graph_query,
-    vector_search,
-)
-from invoke_agent import invoke_payload
-
-# Set by main() from the --remote flag. When True, every section calls the
-# deployed AgentCore runtime instead of the in-process retrievers/agent.
-REMOTE = False
-
-# The retrievers log at INFO (schema fetch, generated Cypher). Keep them, but
-# silence HTTP client chatter so the demo output stays readable.
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-for noisy in (
-    "httpx",
-    "httpcore",
-    "boto3",
-    "botocore",
-    "urllib3",
-    "strands",
-    "neo4j",
-):
-    logging.getLogger(noisy).setLevel(logging.WARNING)
-# The driver logs every server PERFORMANCE notice at WARNING; mute those.
-logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
+logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
 WIDTH = 78
+
+# Set by main(); selects the transport for every section.
+TARGET: Target = "local"
 
 
 def banner(title: str, plain_english: str) -> None:
@@ -85,15 +59,15 @@ def show(label: str, body: str) -> None:
     print()
 
 
-def remote(payload: dict) -> str:
-    """Call the deployed runtime and return its assembled text answer.
+def call(payload: dict) -> str:
+    """Send one payload to the runtime and return its assembled text answer.
 
     Streaming is suppressed so each section can format the result with
-    ``show()`` exactly as the in-process path does.
+    ``show()``.
     """
-    result = invoke_payload(payload, stream=False)
+    result = invoke(payload, target=TARGET, stream=False)
     if result.get("status") != "success":
-        return f"[remote error] {result.get('errors', ['Unknown error'])}"
+        return f"[error] {result.get('errors', ['Unknown error'])}"
     return result["response"]
 
 
@@ -104,8 +78,7 @@ def section_schema() -> None:
         "(node types and how they connect) once per process and puts it in "
         "its system prompt. This is that schema — the map it reasons over.",
     )
-    schema = remote({"mode": "schema"}) if REMOTE else get_graph_schema()
-    show("Live graph schema", schema)
+    show("Live graph schema", call({"mode": "schema"}))
 
 
 def section_graph_query() -> None:
@@ -130,12 +103,7 @@ def section_graph_query() -> None:
     ]
     for label, q in questions:
         print(f"Question ({label}): {q}")
-        body = (
-            remote({"mode": "graph_query", "query": q})
-            if REMOTE
-            else graph_query(q)
-        )
-        show("graph_query result", body)
+        show("graph_query result", call({"mode": "graph_query", "query": q}))
 
 
 def section_vector_search() -> None:
@@ -152,12 +120,10 @@ def section_vector_search() -> None:
     ]
     for q in queries:
         print(f"Search text: {q}")
-        body = (
-            remote({"mode": "vector_search", "query": q, "top_k": 2})
-            if REMOTE
-            else vector_search(q, top_k=2)
+        show(
+            "Top matching manual chunks",
+            call({"mode": "vector_search", "query": q, "top_k": 2}),
         )
-        show("Top matching manual chunks", body)
 
 
 def section_agent() -> None:
@@ -169,19 +135,6 @@ def section_agent() -> None:
         "writes a final answer. We feed it one structured question, one "
         "manual-text question, and one that needs both.",
     )
-    agent = None
-    if not REMOTE:
-        schema = get_graph_schema()
-        agent = Agent(
-            model=BedrockModel(
-                model_id=MODEL_ID,
-                region_name=AWS_REGION,
-                temperature=0.0,
-                streaming=False,
-            ),
-            tools=[graph_query_tool, vector_search_tool],
-            system_prompt=SYSTEM_PROMPT_TEMPLATE.format(schema=schema),
-        )
     questions = [
         ("Structured", "Which operator has the worst on-time performance, "
          "and how many delays do they have?"),
@@ -194,12 +147,11 @@ def section_agent() -> None:
     ]
     for label, q in questions:
         print(f"User ({label}): {q}")
-        answer = remote({"prompt": q}) if REMOTE else str(agent(q))
-        show("Agent answer", answer)
+        show("Agent answer", call({"prompt": q}))
 
 
 def main() -> None:
-    global REMOTE
+    global TARGET
     parser = argparse.ArgumentParser(
         description="Fleet Agent functionality showcase."
     )
@@ -207,36 +159,33 @@ def main() -> None:
         "--remote",
         action="store_true",
         help=(
-            "Drive the deployed AgentCore runtime over boto3 instead of "
-            "running in-process. Requires a deployed agent and AWS "
-            "credentials; opens no local Neo4j connection."
+            "Drive the deployed AgentCore runtime instead of the local "
+            "server on port 8080."
         ),
     )
-    REMOTE = parser.parse_args().remote
+    TARGET = "deployed" if parser.parse_args().remote else "local"
 
     mode_line = (
-        "REMOTE: deployed AgentCore runtime"
-        if REMOTE
-        else "LOCAL: in-process, direct to Neo4j"
+        "DEPLOYED: AgentCore runtime"
+        if TARGET == "deployed"
+        else "LOCAL: runtime_app.py on port 8080"
     )
     print()
     print("#" * WIDTH)
     print("#" + "FLEET AGENT — FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
     print("#" + mode_line.center(WIDTH - 2) + "#")
     print("#" * WIDTH)
-    try:
-        section_schema()
-        section_graph_query()
-        section_vector_search()
-        section_agent()
-        banner(
-            "DONE",
-            "You have seen the schema the agent reasons over, each GraphRAG "
-            "retriever on its own, and the full agent choosing tools "
-            "end to end.",
-        )
-    finally:
-        close()
+
+    section_schema()
+    section_graph_query()
+    section_vector_search()
+    section_agent()
+    banner(
+        "DONE",
+        "You have seen the schema the agent reasons over, each GraphRAG "
+        "retriever on its own, and the full agent choosing tools "
+        "end to end.",
+    )
 
 
 if __name__ == "__main__":

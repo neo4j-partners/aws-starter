@@ -1,7 +1,8 @@
 # Neo4j Fleet Agent (Strands) — Dockerfile for AgentCore Runtime
 #
-# Build context is the agent root, so the shared `common/` package and the
-# root pyproject.toml/uv.lock are available:
+# Build context is the agent root, so the `agent/` core package and the
+# root pyproject.toml/uv.lock are available. The `client/` package is
+# dev-only and intentionally not part of the runtime image:
 #
 #   docker build --platform linux/arm64 -t neo4j-fleet-agent .
 #   docker run -p 8080:8080 neo4j-fleet-agent
@@ -24,13 +25,13 @@ ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /app
 
-# The local project builds the `common` package, so it must be present
+# The local project builds the `agent` package, so it must be present
 # before `uv sync` installs the project into the venv.
 COPY pyproject.toml uv.lock ./
-COPY common ./common
+COPY agent ./agent
 RUN uv sync --frozen --no-dev
 
-COPY runtime_app.py tools.py ./
+COPY runtime_app.py ./
 
 # Neo4j connection (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD) and AWS
 # credentials are supplied as Runtime environment variables, not baked in.

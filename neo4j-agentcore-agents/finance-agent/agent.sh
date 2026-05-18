@@ -21,10 +21,11 @@
 
 set -e
 
-# This script, the entrypoint, and the uv project (pyproject.toml, uv.lock,
-# .venv, .mcp-credentials.json) all live at the agent root.
+# This script and the uv project (pyproject.toml, uv.lock, .venv,
+# .mcp-credentials.json) live at the agent root; the runtime entrypoint
+# lives in server/ and the local client tooling in client/.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENTRYPOINT="runtime_app.py"
+ENTRYPOINT="server/runtime_app.py"
 AGENT_NAME="finance_agent"
 cd "$ROOT_DIR"
 
@@ -168,7 +169,7 @@ case "${1:-help}" in
         echo ""
         DEMO_ARGS=(memory-demo)
         [ -n "$2" ] && DEMO_ARGS+=(--user-id "$2")
-        uv run python invoke_agent.py "${DEMO_ARGS[@]}"
+        uv run python client/remote.py "${DEMO_ARGS[@]}"
         ;;
 
     destroy)

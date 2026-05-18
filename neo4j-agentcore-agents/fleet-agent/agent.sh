@@ -9,6 +9,8 @@
 #   ./agent.sh start              Start locally (port 8080, ADOT tracing)
 #   ./agent.sh stop               Stop local agent
 #   ./agent.sh test               Test local agent with curl
+#   ./agent.sh cli "prompt"       Ask the local agent (thin client)
+#   ./agent.sh demo               Run the functionality showcase (local)
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
@@ -23,8 +25,9 @@
 
 set -e
 
-# The uv project (pyproject.toml, uv.lock, .venv, .env, invoke_agent.py),
-# the entrypoint (runtime_app.py), and this script all live at the agent root.
+# The uv project (pyproject.toml, uv.lock, .venv, .env), the agent core
+# (agent/), the thin clients (client/), the entrypoint (runtime_app.py), and
+# this script all live at the agent root.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -40,6 +43,8 @@ print_usage() {
     echo "  ./agent.sh start              Start locally (port 8080)"
     echo "  ./agent.sh stop               Stop local agent"
     echo "  ./agent.sh test               Test local agent with curl"
+    echo "  ./agent.sh cli \"prompt\"        Ask the local agent (thin client)"
+    echo "  ./agent.sh demo               Run the functionality showcase (local)"
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
@@ -122,6 +127,18 @@ case "${1:-help}" in
             -d '{"prompt": "What is the database schema?"}' | python -m json.tool
         ;;
 
+    cli)
+        # Thin client — talks to the running agent over the wire; needs no
+        # Neo4j credentials of its own (the server holds those).
+        ensure_deps
+        uv run python -m client.cli "${@:2}"
+        ;;
+
+    demo)
+        ensure_deps
+        uv run python -m client.demo "${@:2}"
+        ;;
+
     configure)
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
@@ -174,7 +191,7 @@ case "${1:-help}" in
         echo -e "${GREEN}Starting load test (${INTERVAL}s interval)...${NC}"
         echo "Press Ctrl+C to stop"
         echo ""
-        uv run python invoke_agent.py load-test "$INTERVAL"
+        uv run python -m client.invoke load-test "$INTERVAL"
         ;;
 
     destroy)

@@ -27,7 +27,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VARIANT="$(basename "$SCRIPT_DIR")"
-ENTRYPOINT="$VARIANT/agent.py"
+ENTRYPOINT="$VARIANT/runtime_app.py"
 AGENT_NAME="basic_${VARIANT}"
 cd "$ROOT_DIR"
 

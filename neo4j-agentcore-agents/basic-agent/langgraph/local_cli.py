@@ -4,12 +4,12 @@ Simple Neo4j MCP Agent (LangGraph)
 
 A simplified ReAct agent that connects to the Neo4j MCP server via AgentCore
 Gateway. Uses .mcp-credentials.json for authentication (no automatic token
-refresh) — this is the intentionally minimal CLI; use agent.py for the
+refresh) — this is the intentionally minimal CLI; use runtime_app.py for the
 schema-cached, auto-refreshing production path.
 
 Usage:
-    uv run python langgraph/simple-agent.py                  # demo queries
-    uv run python langgraph/simple-agent.py "your question"  # ask
+    uv run python langgraph/local_cli.py                  # demo queries
+    uv run python langgraph/local_cli.py "your question"  # ask
 """
 
 import asyncio

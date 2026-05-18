@@ -8,27 +8,20 @@ Deploy the Neo4j MCP server to Amazon Bedrock AgentCore with Gateway access for 
 
 This project deploys the [Neo4j MCP server](https://github.com/neo4j/mcp) to AWS via AgentCore Gateway, enabling LLM agents to query Neo4j databases using the Model Context Protocol (MCP). Access is restricted to machine-to-machine (M2M) authentication only, designed specifically for agent access.
 
-**Key Learning Objectives:**
+**Key Capabilities:**
 - AgentCore Gateway configuration with OAuth2 authentication
 - Gateway Target setup connecting Gateway to Runtime
 - M2M (machine-to-machine) authentication via Cognito
 - Gateway tool name prefixing and dynamic tool discovery
 - Claude Sonnet integration via AWS Bedrock for MCP tool calling
 
-**Architecture:**
+## Architecture
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   AI Agent  │────▶│   Cognito   │────▶│  AgentCore  │────▶│  AgentCore  │────▶│  Neo4j MCP  │
-│  (Claude)   │ M2M │  (OAuth2)   │ JWT │   Gateway   │OAuth│   Runtime   │     │   Server    │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                                                                                       │
-                                                                                       ▼
-                                                                                ┌─────────────┐
-                                                                                │  Neo4j Aura │
-                                                                                │  Database   │
-                                                                                └─────────────┘
-```
+![Simplified Architecture](./architecture-simplified.png)
+
+An AI agent authenticates to Cognito (M2M OAuth2), sends MCP requests with a JWT to the AgentCore Gateway, which forwards them to the AgentCore Runtime hosting the Neo4j MCP server, which in turn queries the Neo4j database.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed diagrams, the authentication sequence, CDK stack breakdown, and design rationale.
 
 **Key Features:**
 - **Gateway-Only Access** - All requests go through AgentCore Gateway (no direct Runtime access)

@@ -6,8 +6,8 @@ to answer questions about SEC filings, companies, and financial data. Runs
 directly in your terminal — no AgentCore Runtime involved.
 
 Usage:
-    uv run python langgraph/simple-agent.py                            # demo
-    uv run python langgraph/simple-agent.py "Tell me about Apple Inc"  # ask
+    uv run python langgraph/local_cli.py                            # demo
+    uv run python langgraph/local_cli.py "Tell me about Apple Inc"  # ask
 """
 
 import asyncio

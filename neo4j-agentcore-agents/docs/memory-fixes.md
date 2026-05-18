@@ -94,7 +94,7 @@ letting the agent talk over it.
 | File | Change |
 |---|---|
 | `common/memory.py` | Core fix. Added `_build_memory_client` (correct `username` field, primes the library cache so `get_entity_graph` reuses it), local `_run_async`, and `_log_failures` (traceback logging + re-raise) wrapping `search_context`, `add_memory`, `get_user_preferences`. |
-| `strands/agent.py` | Switched to `common.memory.user_scoped_context_graph_tools` for genuinely per-user memory. Raised the `neo4j_agent_memory` logger to DEBUG so library-level failures reach CloudWatch. |
+| `strands/runtime_app.py` | Switched to `common.memory.user_scoped_context_graph_tools` for genuinely per-user memory. Raised the `neo4j_agent_memory` logger to DEBUG so library-level failures reach CloudWatch. |
 | `invoke_agent.py` | Added `--verify-neo4j`: after the memory demo, queries Neo4j directly for the persisted `:Message` nodes and prints an honest pass/fail, instead of trusting the agent's wording. This is the ground-truth check that exposed the bug. |
 | `pyproject.toml` | Declared `pyyaml` explicitly (used by `invoke_agent.py`); added the numpy ARM64 manylinux cross-compile sensitivity note. |
 

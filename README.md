@@ -226,7 +226,7 @@ uv sync
 cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
 # CLI mode, no server
-uv run python langgraph/simple-agent.py "Tell me about Apple Inc"
+uv run python langgraph/local_cli.py "Tell me about Apple Inc"
 
 # Or run the AgentCore server locally on port 8080
 langgraph/agent.sh start

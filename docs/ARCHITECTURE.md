@@ -380,7 +380,7 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph BasicAgent["Basic Agent (simple-agent.py)"]
+    subgraph BasicAgent["Basic Agent (local_cli.py)"]
         LLM[Claude Sonnet 4<br/>via Bedrock Converse]
         REACT[ReAct Loop<br/>Thought → Action → Observation]
         TOOLS[MCP Tools<br/>get-schema, read-cypher]
@@ -421,7 +421,7 @@ cd basic-agent
 uv sync                   # Install dependencies
 ./agent.sh start          # Run locally (port 8080)
 ./agent.sh test           # Test local agent
-python simple-agent.py "What is the database schema?"
+python local_cli.py "What is the database schema?"
 ```
 
 ### Orchestrator Agent (Multi-Agent)

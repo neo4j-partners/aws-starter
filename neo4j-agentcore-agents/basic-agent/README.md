@@ -9,7 +9,7 @@ the framework split: one shared core wired to both LangGraph and Strands.
 
 ```
 User input (POST /invocations)
-  -> BedrockAgentCoreApp (langgraph/agent.py or strands/agent.py)
+  -> BedrockAgentCoreApp (langgraph/runtime_app.py or strands/runtime_app.py)
      -> ReAct loop: Claude on Bedrock + MCP tools
         -> AgentCore Gateway (OAuth2 JWT) -> Neo4j MCP Server -> Neo4j
 ```
@@ -35,8 +35,8 @@ when it is missing or close to expiring.
 | Path | Use |
 |------|-----|
 | `common/` | Credentials, token refresh, schema cache, model config, prompt |
-| `langgraph/agent.py`, `strands/agent.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
-| `langgraph/simple-agent.py`, `strands/simple-agent.py` | Simplified local experimentation |
+| `langgraph/runtime_app.py`, `strands/runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `langgraph/local_cli.py`, `strands/local_cli.py` | Simplified local experimentation |
 | `langgraph/agent.sh`, `strands/agent.sh` | CLI wrapper for all operations |
 | `invoke_agent.py` | Invoke the deployed agent with boto3, supports load testing |
 | `queries.txt` | 20 sample queries across discovery, fleet, maintenance, delays |

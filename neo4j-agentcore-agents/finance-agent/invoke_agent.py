@@ -14,7 +14,7 @@ sessions. The ``memory-demo`` therefore proves both cross-session recall and
 per-user isolation; ``verify_neo4j_persistence`` is the ground-truth check.
 
 Memory is wired into the **Strands** variant only
-(``strands/agent.py`` -> ``neo4j_agent_memory``). The ``memory-demo`` mode is
+(``strands/runtime_app.py`` -> ``neo4j_agent_memory``). The ``memory-demo`` mode is
 only meaningful against a deployed Strands agent; the LangGraph variant has no
 memory tools and will just answer each turn independently.
 

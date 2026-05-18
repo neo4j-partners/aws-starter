@@ -36,4 +36,4 @@ EXPOSE 8080
 
 # opentelemetry-instrument (from aws-opentelemetry-distro) wraps the process
 # so AgentCore emits traces/metrics to CloudWatch GenAI Observability.
-CMD ["uv", "run", "opentelemetry-instrument", "python", "strands/agent.py"]
+CMD ["uv", "run", "opentelemetry-instrument", "python", "strands/runtime_app.py"]

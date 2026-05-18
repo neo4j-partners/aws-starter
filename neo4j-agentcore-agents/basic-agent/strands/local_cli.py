@@ -6,8 +6,8 @@ Gateway. Uses the synchronous Strands agent call — the idiomatic form for a
 one-shot CLI. The cached schema is injected into the system prompt.
 
 Usage:
-    uv run python strands/simple-agent.py                  # demo queries
-    uv run python strands/simple-agent.py "your question"  # ask
+    uv run python strands/local_cli.py                  # demo queries
+    uv run python strands/local_cli.py "your question"  # ask
 """
 
 import asyncio

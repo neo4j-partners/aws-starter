@@ -39,8 +39,8 @@ long-running deployment keeps working without re-syncing credentials.
 | Path | Use |
 |------|-----|
 | `common/` | Shared credentials, token refresh, model config, prompt |
-| `langgraph/agent.py`, `strands/agent.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
-| `langgraph/simple-agent.py`, `strands/simple-agent.py` | Local CLI, run queries directly in the terminal |
+| `langgraph/runtime_app.py`, `strands/runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `langgraph/local_cli.py`, `strands/local_cli.py` | Local CLI, run queries directly in the terminal |
 | `langgraph/agent.sh`, `strands/agent.sh` | CLI wrapper for start, test, deploy, invoke |
 | `invoke_agent.py` | Call the deployed agent programmatically with boto3 |
 
@@ -59,7 +59,7 @@ cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 uv sync
 
 # CLI mode, no server
-uv run python langgraph/simple-agent.py "Who are the largest owners of NVIDIA?"
+uv run python langgraph/local_cli.py "Who are the largest owners of NVIDIA?"
 
 # Or run the AgentCore server locally on port 8080
 langgraph/agent.sh start

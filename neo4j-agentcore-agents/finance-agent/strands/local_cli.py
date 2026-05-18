@@ -6,8 +6,8 @@ Gateway. Uses the synchronous Strands agent call — the idiomatic form for a
 one-shot CLI.
 
 Usage:
-    uv run python strands/simple-agent.py                            # demo
-    uv run python strands/simple-agent.py "Tell me about Apple Inc"  # ask
+    uv run python strands/local_cli.py                            # demo
+    uv run python strands/local_cli.py "Tell me about Apple Inc"  # ask
 """
 
 import logging

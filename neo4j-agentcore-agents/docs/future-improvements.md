@@ -1,7 +1,7 @@
 # Finance Agent Memory: Future Improvements
 
 Tracks known limitations and follow-up work for the user-scoped Context Graph
-memory added to the Strands variant (`common/memory.py`, `strands/agent.py`,
+memory added to the Strands variant (`common/memory.py`, `strands/runtime_app.py`,
 `invoke_agent.py`).
 
 ## Resolved: memory never persisted (`user` vs `username` wheel bug)
@@ -64,7 +64,7 @@ ground-truth query found the `:Message` scoped to `user_id="demo-user"` with
   primes the cache. Module docstring updated to document the workaround.
 - **Changed `future-improvements.md`**: this section, plus the two items
   below that the fix made stale.
-- No new files. No change to `strands/agent.py`, `strands/agent.sh`, or
+- No new files. No change to `strands/runtime_app.py`, `strands/agent.sh`, or
   `invoke_agent.py`; the agent wiring and per-user Cypher were already
   correct.
 

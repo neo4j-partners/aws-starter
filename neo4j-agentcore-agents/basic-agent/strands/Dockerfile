@@ -38,4 +38,4 @@ COPY .mcp-credentials.jso[n] ./
 
 EXPOSE 8080
 
-CMD ["uv", "run", "python", "strands/agent.py"]
+CMD ["uv", "run", "python", "strands/runtime_app.py"]

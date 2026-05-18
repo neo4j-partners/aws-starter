@@ -5,7 +5,7 @@
 # server via AgentCore Gateway.
 #
 # Usage:
-#   ./agent.sh start              Start agent locally (port 8080)
+#   ./agent.sh start              Start agent locally (port 7020)
 #   ./agent.sh stop               Stop local agent
 #   ./agent.sh test               Test local agent with curl
 #   ./agent.sh configure          Configure for AWS deployment
@@ -62,7 +62,7 @@ print_usage() {
     echo "Finance Agent - AgentCore Runtime"
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh start              Start agent locally (port 8080)"
+    echo "  ./agent.sh start              Start agent locally (port 7020)"
     echo "  ./agent.sh stop               Stop local agent"
     echo "  ./agent.sh test               Test local agent with curl"
     echo "  ./agent.sh configure          Configure for AWS deployment"
@@ -92,10 +92,12 @@ case "${1:-help}" in
             echo "  cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json ."
             exit 1
         fi
-        echo -e "${GREEN}Starting agent locally on port 8080...${NC}"
-        echo "Test with: curl -X POST http://localhost:8080/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
+        echo -e "${GREEN}Starting agent locally on port 7020...${NC}"
+        echo "Test with: curl -X POST http://localhost:7020/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
-        uv run python "$ENTRYPOINT"
+        # AgentCore Runtime hard-requires the deployed container on 8080;
+        # locally we override the entrypoint's default via PORT.
+        PORT=7020 uv run python "$ENTRYPOINT"
         ;;
 
     stop)
@@ -107,7 +109,7 @@ case "${1:-help}" in
     test)
         echo -e "${GREEN}Testing local agent...${NC}"
         echo ""
-        curl -s -X POST http://localhost:8080/invocations \
+        curl -s -X POST http://localhost:7020/invocations \
             -H "Content-Type: application/json" \
             -d '{"prompt": "Which accounts have the highest risk scores, and who do they transfer money to?"}' | python -m json.tool
         ;;

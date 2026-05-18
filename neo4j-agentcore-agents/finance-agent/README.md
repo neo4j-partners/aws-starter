@@ -92,7 +92,7 @@ against the deployed runtime ARN.
 | Path | Use |
 |------|-----|
 | `core/` | Shared credentials, token refresh, model config, prompt, MCP transport + model/client factories |
-| `server/runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `server/runtime_app.py` | AgentCore Runtime entrypoint (8080 deployed, 7020 local via `PORT`) |
 | `client/demo.py` | Showcase client, runs the demo questions local or `--remote` |
 | `client/local.py` | Local CLI, run a single query directly in the terminal |
 | `client/remote.py` | Call the deployed agent programmatically with boto3 |
@@ -125,7 +125,7 @@ uv run python client/demo.py --list
 # One-off question, no server
 uv run python client/local.py "Which accounts have the highest risk scores, and who do they transfer money to?"
 
-# Or run the AgentCore server locally on port 8080
+# Or run the AgentCore server locally on port 7020
 ./agent.sh start          # in one terminal, leave running
 ./agent.sh test           # in another, sends the default demo query
 ```
@@ -134,11 +134,11 @@ uv run python client/local.py "Which accounts have the highest risk scores, and 
 [Demo](#demo) table, locally and in process. It is the fastest way to see
 the agent work end to end after `uv sync`.
 
-`./agent.sh start` binds port 8080 and blocks. Run `./agent.sh test` from a
+`./agent.sh start` binds port 7020 and blocks. Run `./agent.sh test` from a
 second terminal, or send your own query:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/invocations \
+curl -s -X POST http://127.0.0.1:7020/invocations \
   -H 'Content-Type: application/json' \
   -d '{"prompt": "Find circular transfer chains where money returns to its origin account"}'
 ```
@@ -238,7 +238,7 @@ the agent recalls it from the Context Graph in a fresh session.
 
 | Command | Description |
 |---------|-------------|
-| `start` | Run locally on port 8080 |
+| `start` | Run locally on port 7020 |
 | `stop` | Stop the local agent |
 | `test` | Send a sample query with curl |
 | `configure` | Generate AWS deployment config |

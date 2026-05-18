@@ -49,6 +49,14 @@ AGENT_DIRS = {
 CONTAINER_NAME_PREFIX = "neo4j-agent"
 DEFAULT_PORT = 8080
 
+# The port each agent's container listens on. fleet-agent serves 7070;
+# orchestrator-agent still serves the AgentCore default 8080. The host port
+# (DEFAULT_PORT) is unchanged, so test requests still go to localhost:8080.
+CONTAINER_PORTS = {
+    "fleet-agent": 7070,
+    "orchestrator-agent": 8080,
+}
+
 
 class AgentType(str, Enum):
     fleet_agent = "fleet-agent"
@@ -201,7 +209,7 @@ def run(
 
     cmd.extend([
         "--name", container_name,
-        "-p", f"{port}:8080",
+        "-p", f"{port}:{CONTAINER_PORTS.get(agent_name, 8080)}",
         # Mount AWS credentials (read-write for SSO cache)
         "-v", f"{Path.home()}/.aws:/root/.aws",
         # Pass AWS environment variables

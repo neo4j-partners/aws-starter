@@ -29,7 +29,7 @@ Context Graph semantic memory:
 
 Local testing:
     ./agent.sh start
-    curl -X POST http://localhost:8080/invocations \
+    curl -X POST http://localhost:7020/invocations \
         -H "Content-Type: application/json" \
         -d '{"prompt": "Which accounts have the highest risk scores, and who do they transfer money to?"}'
 
@@ -40,6 +40,7 @@ Cloud deployment:
 """
 
 import logging
+import os
 import re
 from collections.abc import AsyncIterator
 
@@ -202,4 +203,7 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
 
 
 if __name__ == "__main__":
-    app.run(port=8080)
+    # AgentCore Runtime always invokes the deployed container on 8080
+    # (the platform's fixed /invocations contract), so 8080 is the
+    # default. Local runs override it via PORT (agent.sh start sets 7020).
+    app.run(port=int(os.environ.get("PORT", "8080")))

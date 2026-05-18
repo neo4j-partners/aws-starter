@@ -30,7 +30,7 @@ ol > li {
 
 # The Aircraft Data Model
 
-Digital twins, knowledge graphs, turning flat data into a connected fleet, and the dual analytics-plus-graph architecture that serves it
+Turning a flat aircraft fleet into a connected digital twin, then serving it with a dual analytics-plus-graph architecture
 
 ---
 
@@ -89,20 +89,6 @@ Behind the counts, the dataset captures a realistic fleet:
 - Each aircraft broken into systems (engines, avionics, hydraulics) and components (turbines, compressors, pumps)
 - Sensors emitting time-series telemetry: EGT, vibration, fuel flow
 - Operational history: flights, delays, and maintenance events with severity and corrective actions
-
----
-
-## From Tabular Data to Graph
-
-**In flat CSV/tables:** Information is isolated across separate files.
-
-**In a knowledge graph:** It becomes connected and traversable:
-
-```
-(Aircraft AC1001)-[:HAS_SYSTEM]->(Engine CFM56-7B #1)
-(Engine CFM56-7B #1)-[:HAS_COMPONENT]->(High-pressure Turbine)
-(High-pressure Turbine)-[:HAS_EVENT]->(Bearing wear, CRITICAL)
-```
 
 ---
 
@@ -176,39 +162,32 @@ This structure enables questions that traditional tabular search cannot answer.
 
 ## From Digital Twin to Dual Store
 
-A flat dataset hides the connections that operations and maintenance questions depend on. Modeled as a property graph, the fleet becomes a faithful **digital twin**: **traversable**, so relationship-heavy questions become single graph queries, and **extensible**, so new entities and connections layer in without reshaping tables.
-
-But the graph is not the whole story. The same fleet emits hundreds of thousands of sensor readings that are better crunched as columns than traversed as nodes.
-
-The rest of this deck covers the **dual data architecture**: pairing the knowledge graph with a columnar analytics store, and routing each question to the store that answers it best.
+- **Flat data hides connections**: operations and maintenance questions depend on relationships a flat dataset cannot express
+- **The graph is the twin**: modeled as a property graph, the fleet becomes a faithful digital twin
+- **Traversable**: relationship-heavy questions become single graph queries
+- **Extensible**: new entities and connections layer in without reshaping tables
+- **Not the whole story**: the same fleet emits hundreds of thousands of sensor readings, better crunched as columns than traversed as nodes
+- **The dual data architecture**: pair the knowledge graph with a columnar analytics store, and route each question to the store that answers it best
 
 ---
 
 ## Why Combine an Analytics Store and Neo4j?
 
-A columnar analytics store and Neo4j solve **different problems well**.
-
-**The analytics layer** (e.g. a lakehouse or data warehouse) excels at working with large volumes of structured data: aggregations, time-series analysis, and machine learning over tables.
-
-**Neo4j** excels at understanding **how things connect**: following chains of relationships, finding patterns, and answering questions about structure.
-
-Most real-world problems have both: numbers that need crunching **and** relationships that need navigating. Using both stores together gives you the best of each.
+- **Different problems, different tools**: a columnar analytics store and Neo4j each solve a distinct class of problem well
+- **The analytics layer**: a lakehouse or data warehouse excels at large volumes of structured data, aggregations, time-series analysis, and ML over tables
+- **Neo4j**: excels at understanding how things connect, following chains of relationships, finding patterns, answering questions about structure
+- **Most problems have both**: numbers that need crunching and relationships that need navigating
+- **Use both together**: each store does what it is best at
 
 ---
 
 ## Dual Database Architecture
 
-The data is split across two stores, each chosen for the workload it handles best:
+Each store handles the workload it is best at:
 
-**The columnar analytics store** for time-series telemetry
-- Hundreds of thousands of hourly sensor readings across many days
-- Columnar storage and SQL for aggregations, trend analysis, statistical comparisons
-
-**Neo4j Aura** for richly connected relational data
-- Aircraft topology, component hierarchies, maintenance events, flights, delays, airport routes
-- Native multi-hop traversals without expensive JOINs
-
-A multi-agent supervisor on AWS Bedrock AgentCore routes questions to the right store automatically.
+- **Columnar analytics store**: hundreds of thousands of hourly sensor readings; SQL aggregations, trend analysis, statistical comparisons
+- **Neo4j Aura**: aircraft topology, component hierarchies, maintenance, flights, delays, routes; native multi-hop traversals without expensive JOINs
+- **Supervisor (Bedrock AgentCore)**: routes each question to the right store automatically
 
 ---
 
@@ -262,7 +241,7 @@ The next slides break down what each side does and when to reach for which.
 
 ## Tables Become Graphs
 
-Data in the analytics store lives in **rows and columns**. Data in Neo4j lives as **nodes and relationships**.
+Earlier we saw flat tables become a connected graph conceptually. In the dual architecture, that same mapping runs as a repeatable pipeline: data in the analytics store lives in **rows and columns**, data in Neo4j lives as **nodes and relationships**.
 
 The Neo4j Connector for Apache Spark, run as an AWS Glue job, handles the translation:
 
@@ -444,8 +423,9 @@ No Cypher or SQL knowledge is required from the end user.
 
 ## Summary
 
-The dual data architecture is a natural pairing:
+From flat fleet data to a queryable digital twin, served by two stores:
 
+- **The fleet becomes a property-graph digital twin**: topology, operations, and maintenance modeled as nodes and relationships
 - AWS Glue with the Neo4j Spark connector moves data between the analytics store and the knowledge graph
 - **Tabular data becomes a graph**, making implicit relationships explicit and queryable
 - **Neo4j as an MCP server** gives AI agents direct access to the knowledge graph

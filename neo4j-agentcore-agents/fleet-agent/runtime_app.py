@@ -14,7 +14,7 @@ streams the answer with ``stream_async``.
 
 Local testing:
     ./agent.sh start
-    curl -X POST http://localhost:8080/invocations \
+    curl -X POST http://localhost:7070/invocations \
         -H "Content-Type: application/json" \
         -d '{"prompt": "How many aircraft are in the database?"}'
 
@@ -205,4 +205,4 @@ async def invoke(payload: dict | None = None):
 
 if __name__ == "__main__":
     logger.info(f"Starting Neo4j Fleet Agent with model: {MODEL_ID}")
-    app.run()
+    app.run(port=7070)

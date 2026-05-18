@@ -5,7 +5,7 @@ three SSE event shapes: ``{"type": "chunk", "data": ...}``,
 ``{"type": "error", "error": ...}``, ``{"type": "complete"}``. Both transports
 below produce that same byte stream, so a single parser handles them:
 
-- :func:`invoke_local`    — HTTP POST to a locally running runtime (port 8080).
+- :func:`invoke_local`    — HTTP POST to a locally running runtime (port 7070).
 - :func:`invoke_deployed` — boto3 ``bedrock-agentcore`` data plane (deployed).
 
 :func:`invoke` dispatches on ``target`` and returns the shape callers expect:
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # fleet-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
 # default local URL both anchor here regardless of the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
-LOCAL_URL = "http://localhost:8080/invocations"
+LOCAL_URL = "http://localhost:7070/invocations"
 
 Target = Literal["local", "deployed"]
 
@@ -145,7 +145,7 @@ def invoke_local(
     url: str = LOCAL_URL,
     timeout: int = 180,
 ) -> dict:
-    """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 8080)."""
+    """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 7070)."""
     logger.info("Local URL: %s | payload: %s", url, payload)
     try:
         with httpx.Client(timeout=timeout) as c:

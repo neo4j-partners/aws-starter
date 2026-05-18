@@ -6,7 +6,7 @@
 # the neo4j-graphrag vector and Text2Cypher retrievers.
 #
 # Usage:
-#   ./agent.sh start              Start locally (port 8080, ADOT tracing)
+#   ./agent.sh start              Start locally (port 7070, ADOT tracing)
 #   ./agent.sh stop               Stop local agent
 #   ./agent.sh test               Test local agent with curl
 #   ./agent.sh cli "prompt"       Ask the local agent (thin client)
@@ -40,7 +40,7 @@ print_usage() {
     echo "Neo4j Fleet Agent - AgentCore Runtime"
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh start              Start locally (port 8080)"
+    echo "  ./agent.sh start              Start locally (port 7070)"
     echo "  ./agent.sh stop               Stop local agent"
     echo "  ./agent.sh test               Test local agent with curl"
     echo "  ./agent.sh cli \"prompt\"        Ask the local agent (thin client)"
@@ -107,8 +107,8 @@ case "${1:-help}" in
     start)
         ensure_deps
         load_env
-        echo -e "${GREEN}Starting agent locally on port 8080 with OTEL instrumentation...${NC}"
-        echo "Test with: curl -X POST http://localhost:8080/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
+        echo -e "${GREEN}Starting agent locally on port 7070 with OTEL instrumentation...${NC}"
+        echo "Test with: curl -X POST http://localhost:7070/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
         uv run opentelemetry-instrument python "$ENTRYPOINT"
         ;;
@@ -122,7 +122,7 @@ case "${1:-help}" in
     test)
         echo -e "${GREEN}Testing local agent...${NC}"
         echo ""
-        curl -s -X POST http://localhost:8080/invocations \
+        curl -s -X POST http://localhost:7070/invocations \
             -H "Content-Type: application/json" \
             -d '{"prompt": "What is the database schema?"}' | python -m json.tool
         ;;

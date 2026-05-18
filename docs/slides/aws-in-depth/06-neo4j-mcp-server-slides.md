@@ -34,15 +34,6 @@ What it provides, and how this project deploys it on Amazon Bedrock AgentCore
 
 ---
 
-## What Is the Model Context Protocol?
-
-- **MCP** is an open standard that lets AI agents use external tools through a consistent interface
-- An agent does not need a hand-written integration per data source
-- The agent asks the server "what tools do you have?", then calls them
-- Tools are described in natural language, so the LLM can choose them on its own
-
----
-
 ## The Neo4j MCP Server
 
 - Open-source server from Neo4j: [github.com/neo4j/mcp](https://github.com/neo4j/mcp)
@@ -135,14 +126,6 @@ Deployment takes roughly 5 to 10 minutes. The Neo4j database must be running and
 
 ---
 
-## Custom Resources Solve Ordering
-
-- **OAuth Provider** custom resource creates the OAuth2 credential provider used for Gateway to Runtime auth
-- **Runtime Health Check** custom resource waits until the Runtime is ready before the Gateway Target is created
-- Without the health gate, the Target can attach to a Runtime that is not yet serving requests
-
----
-
 ## Gateway Tool Name Prefixing
 
 When tools are accessed through the Gateway, names are prefixed with the target name. This is intentional AWS behavior.
@@ -178,6 +161,37 @@ Discover names at runtime. The same pattern works for Gateway (prefixed) and dir
 
 ---
 
+## Summary
+
+- The Neo4j MCP server exposes a graph to agents through two read-only tools: `get-schema` and `read-cypher`
+- MCP removes the need for custom Neo4j integration code per agent
+- This project deploys it to AgentCore Runtime behind a Gateway with M2M OAuth2
+- A single `./deploy.sh` builds the ARM64 image and deploys the stack, with custom resources handling OAuth provider and Runtime-readiness ordering
+- Gateway tool prefixing is handled with runtime tool discovery, and Claude Sonnet keeps the standard hyphenated tool names
+
+---
+
+# Appendix
+
+---
+
+## What Is the Model Context Protocol?
+
+- **MCP** is an open standard that lets AI agents use external tools through a consistent interface
+- An agent does not need a hand-written integration per data source
+- The agent asks the server "what tools do you have?", then calls them
+- Tools are described in natural language, so the LLM can choose them on its own
+
+---
+
+## Custom Resources Solve Ordering
+
+- **OAuth Provider** custom resource creates the OAuth2 credential provider used for Gateway to Runtime auth
+- **Runtime Health Check** custom resource waits until the Runtime is ready before the Gateway Target is created
+- Without the health gate, the Target can attach to a Runtime that is not yet serving requests
+
+---
+
 ## Why Claude Sonnet
 
 - Tool names use hyphens: `get-schema`, `read-cypher`
@@ -210,13 +224,3 @@ Direct-Runtime testing isolates whether a failure is in the Gateway or the Runti
 | `CognitoScope` | OAuth2 scope (`...-mcp/invoke`) |
 | `MCPServerRuntimeArn` | ARN of the AgentCore Runtime |
 | `CognitoUserPoolId` | Used to retrieve the client secret |
-
----
-
-## Summary
-
-- The Neo4j MCP server exposes a graph to agents through two read-only tools: `get-schema` and `read-cypher`
-- MCP removes the need for custom Neo4j integration code per agent
-- This project deploys it to AgentCore Runtime behind a Gateway with M2M OAuth2
-- A single `./deploy.sh` builds the ARM64 image and deploys the stack, with custom resources handling OAuth provider and Runtime-readiness ordering
-- Gateway tool prefixing is handled with runtime tool discovery, and Claude Sonnet keeps the standard hyphenated tool names

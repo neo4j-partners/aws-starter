@@ -215,3 +215,6 @@ id_ecdsa
 *.openssh
 
 amazon-bedrock-ide-app-export-*
+
+# MCP credentials (contains secrets - never commit)
+.mcp.json

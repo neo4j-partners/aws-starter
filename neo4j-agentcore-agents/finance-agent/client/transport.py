@@ -1,16 +1,20 @@
 """One wire, two transports — the only place clients touch the network.
 
-``runtime_app.py`` serves four surfaces off ``/invocations`` and emits exactly
-three SSE event shapes: ``{"type": "chunk", "data": ...}``,
+``server/runtime_app.py`` serves ``/invocations`` and emits exactly three SSE
+event shapes: ``{"type": "chunk", "data": ...}``,
 ``{"type": "error", "error": ...}``, ``{"type": "complete"}``. Both transports
 below produce that same byte stream, so a single parser handles them:
 
-- :func:`invoke_local`    — HTTP POST to a locally running runtime (port 7070).
+- :func:`invoke_local`    — HTTP POST to a locally running runtime (port 7020).
 - :func:`invoke_deployed` — boto3 ``bedrock-agentcore`` data plane (deployed).
 
 :func:`invoke` dispatches on ``target`` and returns the shape callers expect:
 ``{"status": "success", "response": "..."}`` or
 ``{"status": "error", "errors": [...]}``.
+
+``payload`` is passed through verbatim, so ``{"prompt": "..."}`` runs the full
+agent and ``{"prompt": "...", "user_id": "...", "session_id": "..."}`` reaches
+the runtime's per-request memory scope unchanged.
 """
 
 from __future__ import annotations
@@ -19,8 +23,9 @@ import json
 import logging
 import sys
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Literal
 
 import boto3
 import httpx
@@ -28,10 +33,10 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# fleet-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
+# finance-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
 # default local URL both anchor here regardless of the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
-LOCAL_URL = "http://localhost:7070/invocations"
+LOCAL_URL = "http://localhost:7020/invocations"
 
 Target = Literal["local", "deployed"]
 
@@ -44,29 +49,28 @@ def get_agent_config() -> tuple[str, str]:
     """
     config_file = AGENT_ROOT / ".bedrock_agentcore.yaml"
     try:
-        with config_file.open(encoding="utf-8") as f:
+        with open(config_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
-
-        default_agent = config.get("default_agent")
-        if not default_agent:
-            raise ValueError(f"default_agent not found in {config_file}")
-
-        agent_config = config.get("agents", {}).get(default_agent, {})
-        arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
-        region = agent_config.get("aws", {}).get("region", "us-west-2")
-
-        if not arn:
-            raise ValueError(
-                f"agent_arn not found for agent '{default_agent}' in "
-                f"{config_file}"
-            )
-        return arn, region
     except FileNotFoundError:
         logger.error("%s not found", config_file)
         print(f"ERROR: {config_file} not found")
         print("")
         print("Run './agent.sh configure' and './agent.sh deploy' first")
         sys.exit(1)
+
+    default_agent = config.get("default_agent")
+    if not default_agent:
+        raise ValueError(f"default_agent not found in {config_file}")
+
+    agent_config = config.get("agents", {}).get(default_agent, {})
+    arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
+    region = agent_config.get("aws", {}).get("region", "us-west-2")
+
+    if not arn:
+        raise ValueError(
+            f"agent_arn not found for agent '{default_agent}' in {config_file}"
+        )
+    return arn, region
 
 
 def _handle_sse_event(
@@ -124,7 +128,12 @@ def _result(content_parts: list[str], errors: list[str]) -> dict:
 
 
 def invoke_deployed(payload: dict, stream: bool = True) -> dict:
-    """Invoke the deployed runtime via the boto3 ``bedrock-agentcore`` data plane."""
+    """Invoke the deployed runtime via the boto3 ``bedrock-agentcore`` data plane.
+
+    ``payload`` is sent as-is. The boto3 ``runtimeSessionId`` is a separate
+    transport-level id (fresh per call); the runtime's memory scope keys off
+    the ``user_id``/``session_id`` *inside* the payload, not this id.
+    """
     agent_arn, region = get_agent_config()
     logger.info("Agent ARN: %s | region: %s | payload: %s", agent_arn, region, payload)
 
@@ -145,7 +154,7 @@ def invoke_local(
     url: str = LOCAL_URL,
     timeout: int = 180,
 ) -> dict:
-    """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 7070)."""
+    """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 7020)."""
     logger.info("Local URL: %s | payload: %s", url, payload)
     try:
         with httpx.Client(timeout=timeout) as c:
@@ -174,12 +183,7 @@ def invoke(
     target: Target = "local",
     stream: bool = True,
 ) -> dict:
-    """Invoke the runtime, choosing the transport by ``target``.
-
-    ``payload`` is passed through verbatim, so ``{"prompt": "..."}`` runs the
-    full agent and ``{"mode": "schema" | "graph_query" | "vector_search", ...}``
-    hits the direct surfaces of the same runtime.
-    """
+    """Invoke the runtime, choosing the transport by ``target``."""
     if target == "deployed":
         return invoke_deployed(payload, stream=stream)
     return invoke_local(payload, stream=stream)

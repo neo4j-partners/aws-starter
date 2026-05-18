@@ -1,57 +1,43 @@
 #!/usr/bin/env python3
-"""Invoke the deployed Finance Agent and exercise its Context Graph memory.
+"""Deployed-agent harness — one-shot, load test, and memory demo.
 
-This calls the AgentCore Runtime agent recorded in ``.bedrock_agentcore.yaml``
-via boto3. Unlike ``agentcore invoke`` (which sends ``{"prompt": ...}`` only),
-this client also puts ``user_id``/``session_id`` in the payload so the
-agent's per-request memory directives bind to them.
+A thin client. It does not build an agent: it sends payloads to the agent
+deployed on AgentCore Runtime over the boto3 ``bedrock-agentcore`` data plane
+(via :mod:`client.transport`) and streams the answer back token by token.
 
-The stock ``neo4j_agent_memory`` 0.2.1 Strands tools accept ``user_id`` but
-ignore it (message search is a global vector query). The agent
-works around this with ``core.memory.user_scoped_context_graph_tools``, so
-this agent *does* isolate by ``user_id`` and recalls across that user's
-sessions. The ``memory-demo`` therefore proves both cross-session recall and
-per-user isolation; ``verify_neo4j_persistence`` is the ground-truth check.
-
-Memory is wired into ``server/runtime_app.py`` (-> ``neo4j_agent_memory``). The
-``memory-demo`` mode is only meaningful against a deployed agent that had
-``NEO4J_URI``/``NEO4J_PASSWORD`` injected at deploy time.
-
-The response is streamed: SSE events ("data: {...}\\n\\n") are parsed as they
-arrive off the wire and the answer is printed to the terminal token by token,
-not buffered and printed at the end. The parser understands exactly the three
-event shapes the Strands runtime emits (``chunk``/``error``/``complete``); the
-deprecated direct-response shapes are not supported.
+``memory-demo`` proves the deployed runtime's Context Graph memory across
+sessions and per user; ``--verify-neo4j`` is the ground-truth check that
+queries Neo4j directly for the persisted ``:Message`` node. Memory lives only
+in the deployed runtime, so these modes always target ``deployed``.
 
 Usage:
-    uv run python client/remote.py                       # default prompt
-    uv run python client/remote.py "Tell me about Apple" # one-shot
-    uv run python client/remote.py --user-id alice "..." # one-shot, scoped
-    uv run python client/remote.py memory-demo           # cross-session recall
-    uv run python client/remote.py memory-demo --user-id alice
-    uv run python client/remote.py load-test             # random queries / 5s
-    uv run python client/remote.py load-test --interval 10
+    uv run python -m client.invoke                       # default prompt
+    uv run python -m client.invoke "Tell me about risk"  # one-shot
+    uv run python -m client.invoke --user-id alice "..." # one-shot, scoped
+    uv run python -m client.invoke memory-demo           # cross-session recall
+    uv run python -m client.invoke memory-demo --user-id alice --verify-neo4j
+    uv run python -m client.invoke load-test             # random queries / 5s
+    uv run python -m client.invoke load-test --interval 10
 
 Prerequisites:
     - Agent deployed (./agent.sh deploy)
     - NEO4J_URI / NEO4J_PASSWORD injected at deploy time (memory-demo needs it)
     - AWS credentials configured
-    - .bedrock_agentcore.yaml present (created by agentcore configure)
+    - .bedrock_agentcore.yaml present (created by ./agent.sh configure)
 """
 
+from __future__ import annotations
+
 import argparse
-import json
 import logging
 import os
 import random
 import re
 import sys
 import time
-import uuid
 from pathlib import Path
 
-import boto3
-import yaml
+from client.transport import AGENT_ROOT, invoke_deployed
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -59,14 +45,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# This module lives in client/; the uv project, .bedrock_agentcore.yaml and
-# queries.txt are at the agent root one level up. Anchor to that, not to the
-# current working directory, so paths resolve regardless of where it's run.
-AGENT_ROOT = Path(__file__).resolve().parent.parent
-
-CONFIG_FILE = AGENT_ROOT / ".bedrock_agentcore.yaml"
 QUERIES_FILE = AGENT_ROOT / "queries.txt"
-DEFAULT_PROMPT = "Which accounts have the highest risk scores, and who do they transfer money to?"
+DEFAULT_PROMPT = (
+    "Which accounts have the highest risk scores, and who do they transfer "
+    "money to?"
+)
 DEFAULT_USER_ID = "demo-user"
 
 # Distinctive tokens from the memory-demo "teach" turn. The agent summarizes
@@ -84,118 +67,20 @@ ENV_FILES = (
 )
 
 
-def get_agent_config() -> tuple[str, str]:
-    """Read the agent ARN and region from .bedrock_agentcore.yaml.
-
-    That file is created by ``agentcore configure``.
-    """
-    try:
-        with open(CONFIG_FILE, encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-    except FileNotFoundError:
-        print(f"ERROR: {CONFIG_FILE.name} not found")
-        print("")
-        print("Run './agent.sh configure' and './agent.sh deploy' first")
-        sys.exit(1)
-
-    default_agent = config.get("default_agent")
-    if not default_agent:
-        raise ValueError(f"default_agent not found in {CONFIG_FILE.name}")
-
-    agent_config = config.get("agents", {}).get(default_agent, {})
-    arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
-    region = agent_config.get("aws", {}).get("region", "us-west-2")
-
-    if not arn:
-        raise ValueError(
-            f"agent_arn not found for agent '{default_agent}' in {CONFIG_FILE.name}"
-        )
-
-    return arn, region
-
-
-def _handle_sse_event(
-    event: str, content_parts: list[str], errors: list[str]
-) -> None:
-    """Dispatch one SSE event from the Strands runtime, printing text live.
-
-    The Strands ``server/runtime_app`` emits exactly three JSON event shapes:
-    ``{"type": "chunk", "data": ...}``, ``{"type": "error", "error": ...}``,
-    and ``{"type": "complete"}``. ``chunk`` text is printed as it arrives and
-    also collected so callers still get the assembled response. ``json.loads``
-    already yields real newlines, so no ``\\n`` unescaping is needed; anything
-    that is not one of these shapes is ignored.
-    """
-    event = event.strip()
-    if not event:
-        return
-    if event.startswith("data: "):
-        event = event[6:]
-    try:
-        data = json.loads(event)
-    except json.JSONDecodeError:
-        return
-    if data.get("type") == "chunk":
-        text = data.get("data", "")
-        print(text, end="", flush=True)
-        content_parts.append(text)
-    elif data.get("type") == "error":
-        errors.append(data.get("error", "Unknown error"))
-
-
 def invoke_agent(
     prompt: str,
     user_id: str = DEFAULT_USER_ID,
     session_id: str | None = None,
 ) -> dict:
-    """Invoke the deployed agent with one prompt, scoped to ``user_id``.
+    """Send one prompt to the deployed agent, scoped to ``user_id``.
 
-    ``user_id``/``session_id`` go in the JSON payload because the agent's
-    ``_resolve_user_id`` reads them from there to scope its memory
-    tools. The boto3 ``runtimeSessionId`` is a separate transport-level id
-    (fresh per call) and is not what the memory scope keys off.
+    ``user_id``/``session_id`` go in the JSON payload because the runtime's
+    ``_resolve_user_id`` reads them from there to scope its memory tools.
     """
-    agent_arn, region = get_agent_config()
-
-    logger.info("Agent ARN: %s", agent_arn)
-    logger.info("Region: %s", region)
-    logger.info("Prompt: %s", prompt)
-    logger.info("Memory scope: user_id=%s session_id=%s", user_id, session_id)
-
-    client = boto3.client("bedrock-agentcore", region_name=region)
-
     request: dict[str, str] = {"prompt": prompt, "user_id": user_id}
     if session_id:
         request["session_id"] = session_id
-    payload = json.dumps(request).encode()
-
-    response = client.invoke_agent_runtime(
-        agentRuntimeArn=agent_arn,
-        runtimeSessionId=str(uuid.uuid4()),
-        payload=payload,
-        qualifier="DEFAULT",
-    )
-
-    content_parts: list[str] = []
-    errors: list[str] = []
-    buffer = ""
-
-    # Parse and print SSE events ("data: {...}\n\n") as they arrive off the
-    # wire rather than buffering the whole response, so the answer streams to
-    # the terminal live.
-    for raw in response.get("response", []):
-        buffer += raw.decode("utf-8")
-        while "\n\n" in buffer:
-            event, buffer = buffer.split("\n\n", 1)
-            _handle_sse_event(event, content_parts, errors)
-    if buffer.strip():
-        _handle_sse_event(buffer, content_parts, errors)
-
-    print()  # terminate the streamed line
-
-    if errors:
-        return {"status": "error", "errors": errors}
-    return {"status": "success", "response": "".join(content_parts)}
+    return invoke_deployed(request, stream=True)
 
 
 def _print_result(result: dict) -> None:
@@ -206,7 +91,7 @@ def _print_result(result: dict) -> None:
 
 def run_one_shot(prompt: str, user_id: str) -> None:
     print("=" * 70)
-    print("Finance Agent - Programmatic Invocation")
+    print("Finance Agent - Programmatic Invocation (deployed)")
     print("=" * 70)
     print("")
     print(f"User ID: {user_id}")
@@ -216,8 +101,7 @@ def run_one_shot(prompt: str, user_id: str) -> None:
     print("=" * 70)
     print("Response:")
     print("=" * 70)
-    result = invoke_agent(prompt, user_id=user_id)
-    _print_result(result)
+    _print_result(invoke_agent(prompt, user_id=user_id))
     print("")
 
 
@@ -226,8 +110,8 @@ def run_memory_demo(user_id: str) -> None:
 
     Same ``user_id``, different ``session_id`` per turn: if the second turn
     answers using the preference stated in the first, cross-session
-    persistence and semantic recall are working. Because the agent
-    uses ``core.memory``'s user-scoped tools, recall is also isolated per
+    persistence and semantic recall are working. Because the runtime uses
+    ``core.memory``'s user-scoped tools, recall is also isolated per
     ``user_id`` (a different user would not see this memory).
     ``verify_neo4j_persistence`` is the ground-truth check.
     """
@@ -254,7 +138,9 @@ def run_memory_demo(user_id: str) -> None:
     print("-" * 70)
     print(f"Prompt: {teach}")
     print("")
-    _print_result(invoke_agent(teach, user_id=user_id, session_id="demo-session-teach"))
+    _print_result(
+        invoke_agent(teach, user_id=user_id, session_id="demo-session-teach")
+    )
     print("")
 
     print("Pausing 5s to let memory persist...")
@@ -291,7 +177,11 @@ def _read_env_var(path: Path, key: str) -> str | None:
             stripped = line.strip()
             if stripped.startswith(prefix):
                 value = stripped[len(prefix) :].rstrip("\r")
-                if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                if (
+                    len(value) >= 2
+                    and value[0] == value[-1]
+                    and value[0] in "\"'"
+                ):
                     value = value[1:-1]
                 return value or None
     return None
@@ -416,8 +306,9 @@ def verify_neo4j_persistence(user_id: str, within_minutes: int = 30) -> None:
 
 
 def load_queries() -> list[str]:
-    """Load numbered queries from queries.txt."""
+    """Load the numbered sample queries from the agent-root ``queries.txt``."""
     if not QUERIES_FILE.exists():
+        logger.error("queries.txt not found at %s", QUERIES_FILE)
         return []
     queries: list[str] = []
     with open(QUERIES_FILE, encoding="utf-8") as f:
@@ -520,7 +411,7 @@ def main() -> None:
         else:
             prompt = " ".join(command) if command else DEFAULT_PROMPT
             run_one_shot(prompt, args.user_id)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - top-level CLI guard
         print(f"ERROR: {e}")
         sys.exit(1)
 

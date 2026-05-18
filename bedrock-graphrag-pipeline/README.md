@@ -18,6 +18,42 @@ The output is exactly the graph the
 instance backs the pipeline, the MCP server, and the agent with no code
 changes on their side.
 
+## Quick start
+
+```bash
+cd bedrock-graphrag-pipeline
+
+cp .env.sample .env
+# Edit .env: set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD for your Aura
+# instance. LLM_PROVIDER=bedrock by default, so enrichment uses Amazon Bedrock
+# with your standard AWS credentials from env or ~/.aws. No API key needed.
+# Leave LOAD_FULL_DATASET=false for a small, fast run.
+
+./setup.sh
+```
+
+`./setup.sh` installs dependencies, then runs all five stages: generate,
+load, enrich (chunk, Titan embeddings, Claude extraction over `manuals/`),
+index + fuse, and strict verify.
+
+### Commands
+
+| Command | Stages run |
+|---------|-----------|
+| `./setup.sh` | Full pipeline: sync, generate, clean, load + enrich + fuse, verify |
+| `./setup.sh generate` | Stage 1 only: (re)generate CSVs into `generated/` |
+| `./setup.sh load` | Clean, then stages 2–5 (needs Bedrock/LLM access) |
+| `./setup.sh load-operational` | Clean, then stage 2 + relink only. **No LLM, no API key.** |
+| `./setup.sh verify` | Stage 5 only, read-only (`--strict`) |
+| `./setup.sh clean` | Delete all nodes and relationships |
+| `./setup.sh samples` | Run showcase queries against the loaded graph |
+
+The underlying CLI (`uv run populate-aircraft-db ...`) exposes finer steps:
+`enrich` (stages 3–4 against an already-loaded graph), `clean-enrichment`
+(drop only the knowledge graph, preserve operational data), `debug-extract`
+(run the extractor on selected chunks without writing to Neo4j), and
+`agent-samples` (simulate an agent issuing Cypher and vector searches).
+
 ## What this example demonstrates
 
 Production GraphRAG on Bedrock needs three capabilities beyond embedding
@@ -30,9 +66,9 @@ chunks and storing vectors. This example implements all three end to end:
    schema-conformant JSON directly. See
    [Structured output on Bedrock](#structured-output-on-bedrock).
 2. **Document context preserved through chunking.** `ContextPrependingSplitter`
-   prepends a document-level header (aircraft type and title) to every chunk,
-   so the extractor labels each entity with the correct airframe model even
-   deep in engine-specific sections. See
+   prepends a document-level header to every chunk, so the extractor labels
+   each entity with the correct airframe model even deep in engine-specific
+   sections. See
    [Keeping document context in every chunk](#keeping-document-context-in-every-chunk).
 3. **Extracted knowledge fused with structured data.** A fusion step writes
    typed relationships between the LLM-extracted graph and the operational
@@ -43,46 +79,35 @@ chunks and storing vectors. This example implements all three end to end:
 ## Pipeline architecture
 
 ```
-                ┌─────────────────────────────────────────────┐
-   data spec    │  1. GENERATE                                 │
-   (knobs) ───▶ │  synthetic operational dataset → CSVs        │
-                │  src/generator/  →  generated/*.csv          │
-                └───────────────────────┬─────────────────────┘
-                                         │
-                ┌────────────────────────▼─────────────────────┐
-                │  2. LOAD (structured graph)                   │
-                │  constraints + indexes + fulltext, then       │
-                │  bulk-load nodes & relationships from CSV     │
-                │  src/populate_aircraft_db/loader.py           │
-                └────────────────────────┬─────────────────────┘
-                                         │
-   manuals/     ┌────────────────────────▼─────────────────────┐
-   *.md      ─▶ │  3. ENRICH (GraphRAG over documents)          │
-                │  SimpleKGPipeline:                            │
-                │   • ContextPrependingSplitter (fixed-size)    │
-                │   • Bedrock Titan v2 embeddings (1024-dim)    │
-                │   • StructuredBedrockLLM entity extraction    │
-                │     (Converse tool use, schema-shaped JSON)   │
-                │   • entity resolution                         │
-                │  src/populate_aircraft_db/pipeline.py         │
-                └────────────────────────┬─────────────────────┘
-                                         │
-                ┌────────────────────────▼─────────────────────┐
-                │  4. INDEX + FUSE                              │
-                │  vector + fulltext index on :Chunk, then      │
-                │  link extracted entities to the operational   │
-                │  graph (Document→Aircraft, Sensor→Limit, …)   │
-                │  pipeline.link_to_existing_graph()            │
-                └────────────────────────┬─────────────────────┘
-                                         │
-                ┌────────────────────────▼─────────────────────┐
-                │  5. VERIFY                                    │
-                │  strict checks: counts, embedding dimensions, │
-                │  cross-link presence (CI-friendly exit code)  │
-                └───────────────────────────────────────────────┘
+               ┌─ 1. GENERATE ───────────────────────┐
+ data spec ─▶  │ synthetic dataset → CSV files        │
+               │ src/generator/                       │
+               └──────────────────┬───────────────────┘
+                                  ▼
+               ┌─ 2. LOAD ────────────────────────────┐
+               │ CSV → operational graph              │
+               │ loader.py · schema.py                │
+               └──────────────────┬───────────────────┘
+                                  ▼
+               ┌─ 3. ENRICH ──────────────────────────┐      ╔════════════════╗
+ manuals/ ─▶   │ chunk → embed → extract entities     │ ───▶ ║ AMAZON BEDROCK ║
+               │ pipeline.py (SimpleKGPipeline)       │ ◀─── ║ Titan v2 embed ║
+               └──────────────────┬───────────────────┘      ║ Claude extract ║
+                                  ▼                           ╚════════════════╝
+               ┌─ 4. INDEX + FUSE ────────────────────┐
+               │ vector index + cross-link graphs     │
+               │ link_to_existing_graph()             │
+               └──────────────────┬───────────────────┘
+                                  ▼
+               ┌─ 5. VERIFY ──────────────────────────┐
+               │ strict checks · CI exit code         │
+               └──────────────────────────────────────┘
 ```
 
 `./setup.sh` runs all five stages in order against your Neo4j Aura instance.
+Stage 3 is the only stage that calls a model: Amazon Bedrock for Titan v2
+embeddings and Claude entity extraction (`global.anthropic.claude-sonnet-4-6`
+by default). Every other stage is pure Neo4j and local compute.
 
 ### Stage detail
 
@@ -123,69 +148,35 @@ model and keeps each model's limits distinct.
 
 ## Structured output on Bedrock
 
-`src/populate_aircraft_db/bedrock_structured.py` is the most reusable piece
-of this example outside the aircraft domain.
+`src/populate_aircraft_db/bedrock_structured.py` is the most reusable piece of
+this example outside the aircraft domain.
 
-`neo4j-graphrag`'s entity extractor asks its LLM for `response_format`
-(schema-shaped JSON). `StructuredBedrockLLM` is a thin subclass that satisfies
-that request through Bedrock **Converse tool use**: it declares the target
-schema as a tool, sets a forced `toolChoice`, and returns the tool input as
-the structured result. Claude returns schema-conformant JSON directly, the
-AWS-recommended path for structured output. This keeps extraction fast and
-reliable. It reuses the stock `BedrockLLM` Converse helpers; only the
-`toolChoice` forcing is added.
-
-If you are building any Bedrock + `neo4j-graphrag` pipeline, this subclass is
-the part to copy.
+- `neo4j-graphrag`'s entity extractor asks its LLM for schema-shaped JSON via
+  `response_format`.
+- `StructuredBedrockLLM` is a thin `BedrockLLM` subclass that serves that
+  request through Bedrock **Converse tool use**.
+- It declares the target schema as a tool and sets a forced `toolChoice`,
+  then returns the tool input as the structured result.
+- Claude returns schema-conformant JSON directly, the AWS-recommended path,
+  so extraction stays fast and reliable.
+- It reuses the stock `BedrockLLM` Converse helpers; only the `toolChoice`
+  forcing is added.
+- Copy this subclass for any Bedrock + `neo4j-graphrag` pipeline.
 
 ## Keeping document context in every chunk
 
-`ContextPrependingSplitter` in `pipeline.py` wraps `FixedSizeSplitter` and
-prepends a `[DOCUMENT CONTEXT]` header (aircraft type and title) to every
-chunk before extraction. `SimpleKGPipeline` passes document metadata only to
-the lexical graph builder, so this header is how the extractor keeps the
-document-level airframe model in view even in ~800-character chunks that sit
-deep in engine-specific sections where only the engine designation appears.
-The custom `EXTRACTION_PROMPT` tells the model to read that header and keep
-the airframe model distinct from the engine model, which keeps the
-`OperatingLimit.aircraftType == Aircraft.model` cross-links in stage 4
-accurate.
-
-## Quick start
-
-```bash
-cd bedrock-graphrag-pipeline
-
-cp .env.sample .env
-# Edit .env: set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD for your Aura
-# instance. LLM_PROVIDER=bedrock by default, so enrichment uses Amazon Bedrock
-# with your standard AWS credentials from env or ~/.aws. No API key needed.
-# Leave LOAD_FULL_DATASET=false for a small, fast run.
-
-./setup.sh
-```
-
-`./setup.sh` installs dependencies, then runs all five stages: generate,
-load, enrich (chunk, Titan embeddings, Claude extraction over `manuals/`),
-index + fuse, and strict verify.
-
-### Commands
-
-| Command | Stages run |
-|---------|-----------|
-| `./setup.sh` | Full pipeline: sync, generate, clean, load + enrich + fuse, verify |
-| `./setup.sh generate` | Stage 1 only: (re)generate CSVs into `generated/` |
-| `./setup.sh load` | Clean, then stages 2–5 (needs Bedrock/LLM access) |
-| `./setup.sh load-operational` | Clean, then stage 2 + relink only. **No LLM, no API key.** |
-| `./setup.sh verify` | Stage 5 only, read-only (`--strict`) |
-| `./setup.sh clean` | Delete all nodes and relationships |
-| `./setup.sh samples` | Run showcase queries against the loaded graph |
-
-The underlying CLI (`uv run populate-aircraft-db ...`) exposes finer steps:
-`enrich` (stages 3–4 against an already-loaded graph), `clean-enrichment`
-(drop only the knowledge graph, preserve operational data), `debug-extract`
-(run the extractor on selected chunks without writing to Neo4j), and
-`agent-samples` (simulate an agent issuing Cypher and vector searches).
+- `ContextPrependingSplitter` in `pipeline.py` wraps `FixedSizeSplitter`.
+- It prepends a `[DOCUMENT CONTEXT]` header carrying the aircraft type and
+  title to every chunk before extraction.
+- `SimpleKGPipeline` passes document metadata only to the lexical graph
+  builder, so this header is the only place the extractor sees the
+  document-level airframe model.
+- It matters most in ~800-character chunks deep in engine-specific sections
+  where only the engine designation appears.
+- The custom `EXTRACTION_PROMPT` tells the model to read the header and keep
+  the airframe model distinct from the engine model.
+- Result: the `OperatingLimit.aircraftType == Aircraft.model` cross-links in
+  stage 4 stay accurate.
 
 ## Configuration
 

@@ -7,7 +7,7 @@ dependencies = [
     # Shared core
     "httpx>=0.28.1",
     "boto3>=1.43.9",
-    # client/remote.py reads .bedrock_agentcore.yaml; declare pyyaml
+    # client/transport.py reads .bedrock_agentcore.yaml; declare pyyaml
     # explicitly rather than rely on it arriving transitively via the toolkit.
     "pyyaml>=6.0",
     "mcp>=1.27.1",
@@ -37,11 +37,22 @@ constraint-dependencies = [
 [tool.uv.sources]
 neo4j-agent-memory = { path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" }
 
+# Console entry points. The server runs in the foreground of its own
+# terminal (Ctrl+C to stop) — it is never backgrounded by a script. The
+# clients are thin wire callers. `finance-server` defaults to port 7020 for
+# local dev; the cloud container uses runtime_app's __main__ (fixed 8080).
+[project.scripts]
+finance-server = "server.runtime_app:main"
+finance-cli = "client.cli:main"
+finance-demo = "client.demo:main"
+finance-invoke = "client.invoke:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Install the shared `core` package into the venv so the entrypoint and the
-# client tooling can `from core import ...` without any sys.path manipulation.
+# Package the shared `core` plus `client`/`server` into the venv so the
+# console scripts resolve `client.*`/`server.*` and `from core import ...`
+# works without any sys.path manipulation.
 [tool.hatch.build.targets.wheel]
-packages = ["core"]
+packages = ["core", "client", "server"]

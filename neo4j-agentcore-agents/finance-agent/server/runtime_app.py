@@ -4,12 +4,15 @@
 A Strands-native financial-analysis agent over the Neo4j MCP server via
 AgentCore Gateway, written the Strands way:
 
-- The Bedrock model and the MCP client are built once at module load.
-- The MCP transport factory resolves a *fresh* OAuth2 token on every context
-  entry (via ``core.transport``), so a long-running runtime
+- The Bedrock model is built once at module load (stateless per call, safe
+  to share across concurrent requests).
+- Each request builds its *own* MCP client and opens its own
+  ``with mcp_client:`` scope, so concurrent requests never contend on a
+  shared session. The MCP transport factory resolves a *fresh* OAuth2 token
+  on every context entry (via ``core.transport``), so a long-running runtime
   never serves requests with an expired Bearer token.
-- Each request opens its own ``with mcp_client:`` scope, lists tools, builds
-  an ``Agent``, and streams the answer with ``stream_async``.
+- Each request lists tools, builds an ``Agent``, and streams the answer with
+  ``stream_async``.
 
 Context Graph semantic memory:
 
@@ -67,10 +70,11 @@ logging.getLogger("neo4j_agent_memory").setLevel(logging.DEBUG)
 
 app = BedrockAgentCoreApp()
 
-# Built once; reused across requests. The MCP transport factory resolves a
-# fresh OAuth2 token on every ``with mcp_client:`` entry (see core.transport).
+# Built once; reused across requests. The Bedrock model is stateless per
+# call, so sharing it across concurrent requests is safe. The MCP client is
+# deliberately NOT shared — it holds a single session and is built per
+# request in ``invoke`` so concurrent requests do not collide.
 model = build_model()
-mcp_client = build_mcp_client()
 
 
 def _build_memory_tools():
@@ -175,8 +179,12 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
     logger.info("Memory scope: user_id=%s session_id=%s", user_id, session_id)
 
     try:
-        # Per-request MCP scope: the transport factory runs on context entry,
-        # so this request uses a freshly validated token.
+        # Per-request MCP client: an MCPClient holds a single session, so a
+        # shared one would raise "the client session is currently running"
+        # under concurrent invokes. Constructing one is cheap (just wraps the
+        # transport factory); the session and a freshly resolved OAuth2 token
+        # are established on context entry below.
+        mcp_client = build_mcp_client()
         with mcp_client:
             tools = mcp_client.list_tools_sync() + memory_tools
             logger.info("Loaded %d tools", len(tools))
@@ -202,8 +210,19 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
         yield {"type": "error", "error": f"Error processing request: {e}"}
 
 
+def main() -> None:
+    """Local dev entry point: ``uv run finance-server``.
+
+    Runs the server in the foreground; stop with Ctrl+C. Defaults to port
+    7020 for local use so it never collides with the cloud contract; an
+    explicit ``PORT`` still wins. The cloud container never calls this. it
+    uses the ``__main__`` block below.
+    """
+    app.run(port=int(os.environ.get("PORT", "7020")))
+
+
 if __name__ == "__main__":
     # AgentCore Runtime always invokes the deployed container on 8080
-    # (the platform's fixed /invocations contract), so 8080 is the
-    # default. Local runs override it via PORT (agent.sh start sets 7020).
+    # (the platform's fixed /invocations contract), so 8080 is the default
+    # for the container path. Local dev uses ``main`` (finance-server, 7020).
     app.run(port=int(os.environ.get("PORT", "8080")))

@@ -27,18 +27,20 @@ Cloud deployment:
 import asyncio
 import logging
 import os
+from collections.abc import AsyncGenerator
+from enum import Enum
 
 import neo4j
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from strands import Agent
 from strands.models import BedrockModel
 
 from agent import (
-    AWS_REGION,
-    MODEL_ID,
     SYSTEM_PROMPT_TEMPLATE,
     get_graph_schema,
     graph_query,
+    settings,
     vector_search,
 )
 from agent.tools import graph_query_tool, vector_search_tool
@@ -55,34 +57,65 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 app = BedrockAgentCoreApp()
 
 model = BedrockModel(
-    model_id=MODEL_ID,
-    region_name=AWS_REGION,
+    model_id=settings.model_id,
+    region_name=settings.aws_region,
     temperature=0.0,
     streaming=True,
 )
 
 
-def extract_prompt_from_payload(
-    payload: dict,
-) -> tuple[str | None, str, str]:
-    """Extract prompt + context from payload, supporting multiple fields.
+class Mode(str, Enum):
+    """The direct (non-agent) surfaces selectable via the ``mode`` field."""
 
-    Returns ``(prompt, session_id, user_id)``.
+    SCHEMA = "schema"
+    GRAPH_QUERY = "graph_query"
+    VECTOR_SEARCH = "vector_search"
+
+
+class RequestPayload(BaseModel):
+    """Validated view of the untrusted ``/invocations`` request body.
+
+    AgentCore hands the entrypoint a raw dict. This model is the single trust
+    boundary: it validates ``mode``, coerces ``top_k`` to int, and centralizes
+    the prompt-field aliases. The agent path and the direct data path resolve
+    their text differently, so the raw fields are kept separate and exposed
+    through :attr:`agent_prompt` / :attr:`data_query`.
     """
-    prompt = (
-        payload.get("prompt")
-        or payload.get("message")
-        or payload.get("query")
-        or payload.get("inputText")
-        or payload.get("input")
-    )
-    session_id = payload.get("session_id", "default_session")
-    user_id = payload.get("user_id", "default_user")
-    return prompt, session_id, user_id
+
+    model_config = ConfigDict(extra="ignore")
+
+    mode: Mode | None = None
+    top_k: int = 5
+    session_id: str = "default_session"
+    user_id: str = "default_user"
+
+    prompt: str | None = None
+    message: str | None = None
+    query: str | None = None
+    input_text: str | None = Field(default=None, validation_alias="inputText")
+    input_: str | None = Field(default=None, validation_alias="input")
+
+    @property
+    def agent_prompt(self) -> str | None:
+        """Prompt for the full ReAct agent (prompt > message > query > input)."""
+        return (
+            self.prompt
+            or self.message
+            or self.query
+            or self.input_text
+            or self.input_
+        )
+
+    @property
+    def data_query(self) -> str | None:
+        """Query text for the direct data surfaces (query > prompt > message)."""
+        return self.query or self.prompt or self.message
 
 
 @app.entrypoint
-async def invoke(payload: dict | None = None):
+async def invoke(
+    payload: dict | None = None,
+) -> AsyncGenerator[dict, None]:
     """AgentCore Runtime handler — direct Neo4j GraphRAG, streamed.
 
     The runtime serves four surfaces off the single ``/invocations``
@@ -97,17 +130,27 @@ async def invoke(payload: dict | None = None):
     The three data modes emit one ``chunk`` then ``complete``, so the SSE
     parser in ``client.transport`` handles them with no special casing.
     """
-    if payload is None:
-        payload = {}
+    raw = payload or {}
 
-    mode = payload.get("mode")
+    try:
+        req = RequestPayload.model_validate(raw)
+    except ValidationError as e:
+        logger.warning("Invalid request payload: %s", e)
+        yield {
+            "type": "error",
+            "error": f"Invalid request payload: {e}",
+        }
+        return
+
+    mode = req.mode
     logger.info(
-        f"Received request mode={mode!r} payload keys: "
-        f"{list(payload.keys())}"
+        "Received request mode=%r payload keys: %s",
+        mode,
+        list(raw.keys()),
     )
 
     try:
-        if mode == "schema":
+        if mode is Mode.SCHEMA:
             # Blocking (connects + fetches schema, cached after); off-loop.
             schema = await asyncio.to_thread(get_graph_schema)
             yield {"type": "chunk", "data": schema}
@@ -115,36 +158,31 @@ async def invoke(payload: dict | None = None):
             logger.info("Schema request completed successfully")
             return
 
-        if mode in ("graph_query", "vector_search"):
-            query = (
-                payload.get("query")
-                or payload.get("prompt")
-                or payload.get("message")
-            )
+        if mode in (Mode.GRAPH_QUERY, Mode.VECTOR_SEARCH):
+            query = req.data_query
             if not query:
-                logger.warning("No query provided for mode=%s", mode)
+                logger.warning("No query provided for mode=%s", mode.value)
                 yield {
                     "type": "error",
                     "error": (
-                        f"No query provided for mode '{mode}'. Include "
+                        f"No query provided for mode '{mode.value}'. Include "
                         f"'query' in your request."
                     ),
                 }
                 return
-            logger.info(f"{mode} direct call: {query[:100]}...")
-            if mode == "graph_query":
+            logger.info("%s direct call: %s...", mode.value, query[:100])
+            if mode is Mode.GRAPH_QUERY:
                 result = await asyncio.to_thread(graph_query, query)
             else:
-                top_k = int(payload.get("top_k", 5))
                 result = await asyncio.to_thread(
-                    vector_search, query, top_k
+                    vector_search, query, req.top_k
                 )
             yield {"type": "chunk", "data": result}
             yield {"type": "complete"}
-            logger.info(f"{mode} request completed successfully")
+            logger.info("%s request completed successfully", mode.value)
             return
 
-        prompt, session_id, user_id = extract_prompt_from_payload(payload)
+        prompt = req.agent_prompt
 
         if not prompt:
             logger.warning("No prompt provided in request")
@@ -158,10 +196,12 @@ async def invoke(payload: dict | None = None):
             return
 
         logger.info(
-            f"Processing query for user {user_id}, session {session_id}: "
-            f"{prompt[:100]}..."
+            "Processing query for user %s, session %s: %s...",
+            req.user_id,
+            req.session_id,
+            prompt[:100],
         )
-        logger.info(f"Model: {MODEL_ID}")
+        logger.info("Model: %s", settings.model_id)
 
         # First call connects to Neo4j + fetches the schema (cached after);
         # both are blocking, so keep them off the event loop.
@@ -182,10 +222,10 @@ async def invoke(payload: dict | None = None):
         logger.info("Request completed successfully")
 
     except RuntimeError as e:
-        logger.error(f"Configuration error: {e}")
+        logger.error("Configuration error: %s", e)
         yield {"type": "error", "error": str(e)}
     except (neo4j.exceptions.Neo4jError, neo4j.exceptions.DriverError) as e:
-        logger.error(f"Neo4j error: {e}", exc_info=True)
+        logger.error("Neo4j error: %s", e, exc_info=True)
         yield {
             "type": "error",
             "error": (
@@ -194,7 +234,7 @@ async def invoke(payload: dict | None = None):
             ),
         }
     except Exception as e:
-        logger.error(f"Error processing request: {e}", exc_info=True)
+        logger.error("Error processing request: %s", e, exc_info=True)
         yield {
             "type": "error",
             "error": (
@@ -210,6 +250,8 @@ if __name__ == "__main__":
     # start sets 7070) to avoid colliding with a local service on 8080.
     port = int(os.environ.get("AGENT_PORT", "8080"))
     logger.info(
-        f"Starting Neo4j Fleet Agent with model: {MODEL_ID} on port {port}"
+        "Starting Neo4j Fleet Agent with model: %s on port %s",
+        settings.model_id,
+        port,
     )
     app.run(port=port)

@@ -6,8 +6,8 @@
 # the neo4j-graphrag vector and Text2Cypher retrievers.
 #
 # Usage:
-#   ./agent.sh start              Start locally (port 7070, ADOT tracing)
-#   ./agent.sh stop               Stop local agent
+#   ./agent.sh start              Start locally (port 7070, ADOT tracing);
+#                                 runs in the foreground — Ctrl+C to stop
 #   ./agent.sh test               Test local agent with curl
 #   ./agent.sh cli "prompt"       Ask the local agent (thin client)
 #   ./agent.sh demo               Run the functionality showcase (local)
@@ -40,8 +40,7 @@ print_usage() {
     echo "Neo4j Fleet Agent - AgentCore Runtime"
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh start              Start locally (port 7070)"
-    echo "  ./agent.sh stop               Stop local agent"
+    echo "  ./agent.sh start              Start locally (port 7070, foreground; Ctrl+C to stop)"
     echo "  ./agent.sh test               Test local agent with curl"
     echo "  ./agent.sh cli \"prompt\"        Ask the local agent (thin client)"
     echo "  ./agent.sh demo               Run the functionality showcase (local)"
@@ -112,15 +111,12 @@ case "${1:-help}" in
         # with a service already bound to 8080.
         export AGENT_PORT=7070
         echo -e "${GREEN}Starting agent locally on port 7070 with OTEL instrumentation...${NC}"
-        echo "Test with: curl -X POST http://localhost:7070/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
+        echo "Runs in the foreground — press Ctrl+C to stop."
+        echo "Test from another shell: curl -X POST http://localhost:7070/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
-        uv run opentelemetry-instrument python "$ENTRYPOINT"
-        ;;
-
-    stop)
-        echo -e "${YELLOW}Stopping local agent...${NC}"
-        pkill -f "python $ENTRYPOINT" 2>/dev/null || echo "No agent process found"
-        echo -e "${GREEN}Stopped.${NC}"
+        # Foreground by design: Ctrl+C (SIGINT) is the shutdown contract.
+        # There is no background mode and no `stop` — nothing to track.
+        exec uv run opentelemetry-instrument python "$ENTRYPOINT"
         ;;
 
     test)

@@ -32,13 +32,7 @@ from neo4j_graphrag.retrievers import Text2CypherRetriever, VectorRetriever
 from neo4j_graphrag.schema import get_schema
 from neo4j_graphrag.types import RetrieverResultItem
 
-from agent.config import (
-    AWS_REGION,
-    EMBED_DIMENSIONS,
-    EMBED_MODEL_ID,
-    MODEL_ID,
-    VECTOR_INDEX_NAME,
-)
+from agent.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +72,9 @@ def _neo4j_database() -> str:
 def _embedder() -> BedrockEmbeddings:
     """Bedrock embedder — must match what bedrock-graphrag-pipeline used to populate."""
     return BedrockEmbeddings(
-        model_id=EMBED_MODEL_ID,
-        dimensions=EMBED_DIMENSIONS,
-        region_name=AWS_REGION,
+        model_id=settings.embed_model_id,
+        dimensions=settings.embed_dimensions,
+        region_name=settings.aws_region,
     )
 
 
@@ -97,7 +91,7 @@ def _chunk_formatter(record: neo4j.Record) -> RetrieverResultItem:
 def _vector_retriever() -> VectorRetriever:
     return VectorRetriever(
         get_driver(),
-        index_name=VECTOR_INDEX_NAME,
+        index_name=settings.vector_index_name,
         embedder=_embedder(),
         return_properties=["text"],
         result_formatter=_chunk_formatter,
@@ -118,7 +112,9 @@ def get_graph_schema() -> str:
 def _text2cypher_retriever() -> Text2CypherRetriever:
     return Text2CypherRetriever(
         get_driver(),
-        llm=BedrockLLM(model_name=MODEL_ID, region_name=AWS_REGION),
+        llm=BedrockLLM(
+            model_name=settings.model_id, region_name=settings.aws_region
+        ),
         neo4j_schema=get_graph_schema(),
         neo4j_database=_neo4j_database(),
     )

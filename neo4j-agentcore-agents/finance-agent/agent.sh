@@ -1,18 +1,26 @@
 #!/bin/bash
-# Finance Agent - AgentCore Runtime
+# Finance Agent - AgentCore deployment helper
 #
-# A ReAct agent for financial data analysis that connects to the Neo4j MCP
-# server via AgentCore Gateway.
+# This script does ONE thing: deploy/manage the agent on AgentCore Runtime.
+# It is a thin wrapper over the `agentcore` CLI; the only reason it exists
+# (rather than documenting raw `agentcore` commands) is that `deploy` sources
+# NEO4J_URI/NEO4J_PASSWORD from .env and injects them into the runtime env
+# for Context Graph memory.
+#
+# It does NOT run the agent locally and it does NOT run the clients. The
+# server runs in the foreground of its own terminal; the clients are uv
+# console scripts. See the README "Quick Start: Local". In short:
+#
+#   Terminal 1:  uv run finance-server          # Ctrl+C to stop
+#   Terminal 2:  uv run finance-cli "question"
+#                uv run finance-demo
+#                uv run finance-invoke memory-demo
 #
 # Usage:
-#   ./agent.sh start              Start agent locally (port 7020)
-#   ./agent.sh stop               Stop local agent
-#   ./agent.sh test               Test local agent with curl
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
 #   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent
-#   ./agent.sh memory-demo        Cross-session Context Graph memory demo
 #   ./agent.sh destroy            Remove from AgentCore
 #
 # Prerequisites:
@@ -23,7 +31,7 @@ set -e
 
 # This script and the uv project (pyproject.toml, uv.lock, .venv,
 # .mcp-credentials.json) live at the agent root; the runtime entrypoint
-# lives in server/ and the local client tooling in client/.
+# lives in server/ and the client tooling in client/.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
 AGENT_NAME="finance_agent"
@@ -59,17 +67,19 @@ load_neo4j_env() {
 }
 
 print_usage() {
-    echo "Finance Agent - AgentCore Runtime"
+    echo "Finance Agent - AgentCore deployment helper"
     echo ""
-    echo "Usage:"
-    echo "  ./agent.sh start              Start agent locally (port 7020)"
-    echo "  ./agent.sh stop               Stop local agent"
-    echo "  ./agent.sh test               Test local agent with curl"
+    echo "Run the agent locally without this script:"
+    echo "  Terminal 1:  uv run finance-server          # Ctrl+C to stop"
+    echo "  Terminal 2:  uv run finance-cli \"question\""
+    echo "               uv run finance-demo"
+    echo "               uv run finance-invoke memory-demo"
+    echo ""
+    echo "Deployment (this script):"
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
     echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed agent"
-    echo "  ./agent.sh memory-demo        Cross-session Context Graph memory demo"
     echo "  ./agent.sh destroy            Remove from AgentCore"
     echo "  ./agent.sh help               Show this help message"
 }
@@ -83,37 +93,6 @@ ensure_deps() {
 }
 
 case "${1:-help}" in
-    start)
-        ensure_deps
-        if [ ! -f ".mcp-credentials.json" ]; then
-            echo -e "${RED}ERROR: .mcp-credentials.json not found${NC}"
-            echo ""
-            echo "Copy credentials from your Neo4j MCP server deployment:"
-            echo "  cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json ."
-            exit 1
-        fi
-        echo -e "${GREEN}Starting agent locally on port 7020...${NC}"
-        echo "Test with: curl -X POST http://localhost:7020/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
-        echo ""
-        # AgentCore Runtime hard-requires the deployed container on 8080;
-        # locally we override the entrypoint's default via PORT.
-        PORT=7020 uv run python "$ENTRYPOINT"
-        ;;
-
-    stop)
-        echo -e "${YELLOW}Stopping local agent...${NC}"
-        pkill -f "python $ENTRYPOINT" 2>/dev/null || echo "No agent process found"
-        echo -e "${GREEN}Stopped.${NC}"
-        ;;
-
-    test)
-        echo -e "${GREEN}Testing local agent...${NC}"
-        echo ""
-        curl -s -X POST http://localhost:7020/invocations \
-            -H "Content-Type: application/json" \
-            -d '{"prompt": "Which accounts have the highest risk scores, and who do they transfer money to?"}' | python -m json.tool
-        ;;
-
     configure)
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
@@ -163,15 +142,6 @@ case "${1:-help}" in
         echo "Prompt: $PROMPT"
         echo ""
         uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
-        ;;
-
-    memory-demo)
-        ensure_deps
-        echo -e "${GREEN}Running cross-session Context Graph memory demo...${NC}"
-        echo ""
-        DEMO_ARGS=(memory-demo)
-        [ -n "$2" ] && DEMO_ARGS+=(--user-id "$2")
-        uv run python client/remote.py "${DEMO_ARGS[@]}"
         ;;
 
     destroy)

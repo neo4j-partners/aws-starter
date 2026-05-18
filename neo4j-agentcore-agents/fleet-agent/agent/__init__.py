@@ -26,12 +26,9 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from agent.config import (  # noqa: E402  (must follow load_dotenv)
-    AWS_REGION,
-    EMBED_DIMENSIONS,
-    EMBED_MODEL_ID,
-    MODEL_ID,
     SYSTEM_PROMPT_TEMPLATE,
-    VECTOR_INDEX_NAME,
+    Settings,
+    settings,
 )
 from agent.retrieval import (  # noqa: E402  (must follow load_dotenv)
     close,
@@ -42,12 +39,9 @@ from agent.retrieval import (  # noqa: E402  (must follow load_dotenv)
 )
 
 __all__ = [
-    "AWS_REGION",
-    "EMBED_DIMENSIONS",
-    "EMBED_MODEL_ID",
-    "MODEL_ID",
     "SYSTEM_PROMPT_TEMPLATE",
-    "VECTOR_INDEX_NAME",
+    "Settings",
+    "settings",
     "close",
     "get_driver",
     "get_graph_schema",

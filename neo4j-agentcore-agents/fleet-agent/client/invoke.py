@@ -41,7 +41,7 @@ def load_queries() -> list[str]:
         return []
 
     queries: list[str] = []
-    with open(queries_file) as f:
+    with queries_file.open(encoding="utf-8") as f:
         for line in f:
             match = re.match(r"^\d+\.\s+(.+)$", line.strip())
             if match:

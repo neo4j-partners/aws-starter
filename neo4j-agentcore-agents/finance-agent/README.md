@@ -22,9 +22,10 @@ required.
 * **Graph-native financial-crime analysis:** Claude on Bedrock reasons in a
   ReAct loop over a GDS-enriched money-movement graph with communities,
   betweenness centrality, and similarity edges.
-* **Same path local and cloud:** the local CLI and the deployed agent take
-  the identical Gateway route, so the demo runs the same in process and
-  against the deployed runtime.
+* **One server, thin clients:** `server/runtime_app.py` is the only thing
+  that builds the agent. Everything in `client/` is a thin wire client that
+  sends a prompt to that running server and streams the answer, so the demo
+  is identical against the local server and the deployed runtime.
 
 ## Prerequisites
 
@@ -36,6 +37,11 @@ required.
 
 ## Quick Start: Local
 
+The agent only runs as a server. `client/` holds thin clients that talk to
+it; nothing in `client/` builds an agent. So the server must be running
+first. It runs in the foreground of its own terminal and stops with Ctrl+C —
+nothing backgrounds it, so there is no PID or port to manage.
+
 Set up once:
 
 ```bash
@@ -43,47 +49,37 @@ cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 uv sync
 ```
 
-Then pick one of the following. They are alternatives, not a sequence.
-
-**Run the showcase in process** (no server, no deploy). This is the fastest
-way to see the agent work end to end:
+Start the server. `uv run finance-server` binds port 7020 and blocks, so
+leave it in its own terminal; Ctrl+C stops it:
 
 ```bash
-uv run python client/demo.py            # every question in the Demo table
-uv run python client/demo.py -n 4       # just question 4
-uv run python client/demo.py --list     # list the questions, run nothing
+# terminal 1: leave this running, Ctrl+C to stop
+uv run finance-server
 ```
 
-**Ask a one-off question** (no server):
+In a second terminal, drive it with the thin clients:
 
 ```bash
-uv run python client/local.py "Which accounts have the highest risk scores, and who do they transfer money to?"
+# terminal 2
+uv run finance-cli "Which accounts have the highest risk scores?"
+uv run finance-demo                      # all demo questions, local server
+uv run finance-demo -n 4                 # just question 4
+uv run finance-demo --list               # list the questions, run nothing
 ```
 
-**Run the AgentCore server locally** on port 7020. `./agent.sh start` binds
-the port and blocks, so use two terminals:
+`finance-cli` and `finance-demo` post to the running server and parse its
+`data:` server-sent event stream (one JSON chunk per line,
+`{"type": "chunk", "data": "..."}`, ending with `{"type": "complete"}`). A
+raw `curl` works too:
 
 ```bash
-# terminal 1: leave this running
-./agent.sh start
-```
-
-```bash
-# terminal 2: send the default demo query
-./agent.sh test
-
-# or send your own query
 curl -s -X POST http://127.0.0.1:7020/invocations \
   -H 'Content-Type: application/json' \
   -d '{"prompt": "Find circular transfer chains where money returns to its origin account"}'
 ```
 
-The server response streams back as `data:` server-sent events, one JSON
-chunk per line (`{"type": "chunk", "data": "..."}`), ending with
-`{"type": "complete"}`.
-
-Running against the deployed agent (`client/demo.py --remote`) is covered in
-[Quick Start: Cloud](#quick-start-cloud) and [Demo](#demo).
+The same clients hit the deployed agent with `--remote` instead of the local
+server. See [Quick Start: Cloud](#quick-start-cloud) and [Demo](#demo).
 
 ## Quick Start: Cloud
 
@@ -105,17 +101,68 @@ export AWS_PROFILE=<your-sso-profile>
 `agentcore deploy` uses `direct_code_deploy`. It packages the source, uploads
 it to S3, and creates or updates the AgentCore Runtime agent. No container
 build runs. Run the full demo against the deployed agent with
-`uv run python client/demo.py --remote` (see [Demo](#demo)).
+`uv run finance-demo --remote` (see [Demo](#demo)).
 
 Notes:
 
-- `agent.sh deploy` reads `default_agent` from `.bedrock_agentcore.yaml`. It
+- `./agent.sh deploy` reads `default_agent` from `.bedrock_agentcore.yaml`. It
   must point at `finance_agent` with `entrypoint: .../server/runtime_app.py`. If
   `./agent.sh configure` cannot run interactively in your environment, set
   those two fields directly; everything else in that file is reused as is.
 - If the venv was created under a different path, console scripts such as
   `agentcore` carry a stale interpreter. Recreate it with
   `rm -rf .venv && uv sync`.
+
+## Demo
+
+These questions exercise the parts of the graph that a flat database cannot
+answer well. `finance-demo` runs all of them in order against the local
+server by default, or against the deployed agent with `--remote`. They also
+work one at a time via `uv run finance-cli "..."` (local) or
+`./agent.sh invoke-cloud "..."` (deployed).
+
+```bash
+uv run finance-demo            # all questions, local server
+uv run finance-demo --remote   # all questions, deployed agent
+uv run finance-demo --memory   # Context Graph memory showcase
+```
+
+| Question | What it shows |
+|----------|---------------|
+| `Which accounts have the highest risk scores, and who do they transfer money to?` | Risk ranking joined to one hop of transfer behavior. This is the default query. |
+| `Find communities of accounts that transfer money among themselves but rarely transact with merchants.` | Uses pre-computed `community_id` to surface insular clusters. |
+| `Show the accounts with the highest betweenness centrality and explain why they are money-flow intermediaries.` | Centrality as a structural signal, not just a property lookup. |
+| `Detect circular transfer chains where money leaves an account and returns to it, A to B to C to A.` | Multi-hop path pattern, a classic layering signal. |
+| `Pick a high-risk account, find behaviorally similar accounts via SIMILAR_TO, and check whether they share transfer counterparties.` | Combines similarity edges with shared-neighbor traversal. |
+| `Which merchant categories see the most transaction volume by region?` | Aggregation across `TRANSACTED_WITH` for a baseline, non-graph answer. |
+
+Cross-session memory demo (requires `NEO4J_URI` and `NEO4J_PASSWORD`, see
+[Environment Variables](#environment-variables)):
+
+```bash
+uv run finance-invoke memory-demo                    # default user
+uv run finance-invoke memory-demo --user-id analyst-1  # specific user_id
+
+uv run finance-demo --memory   # 4-section showcase
+```
+
+`finance-invoke memory-demo` runs two sessions: the first states a durable
+fact, the second confirms the agent recalls it from the Context Graph in a
+fresh session. Add `--verify-neo4j` via
+`uv run finance-invoke memory-demo --verify-neo4j` for the ground-truth
+check that queries Neo4j directly for the persisted message.
+
+`finance-demo --memory` runs a fuller four-section showcase against the
+deployed agent (it ignores `--remote` / `-n`, since Context Graph memory
+lives only in the deployed runtime):
+
+1. **Cold start** — a brand-new user; the agent should admit it knows nothing.
+2. **Teaching** — the user states a durable preference; the agent persists it
+   via `add_memory`.
+3. **Cross-session recall** — a fresh session, same user, the preference never
+   restated; recall here proves memory survives across sessions.
+4. **Per-user isolation** — a different user asks the same question; the first
+   user's memory must not leak across the tenant boundary.
 
 ## Architecture
 
@@ -152,20 +199,22 @@ runs an OAuth2 client-credentials flow to mint a bearer token, then refreshes
 that token in memory before it expires. The MCP client connects to the Gateway
 over `streamable_http` with an `Authorization: Bearer` header and loads the
 Neo4j tools at runtime. Because tokens refresh themselves, a long-running
-deployment keeps working without re-syncing credentials. The local CLI and the
-deployed agent take the exact same Gateway path.
+deployment keeps working without re-syncing credentials. The MCP/Gateway path
+lives entirely in `server/runtime_app.py`; the thin clients in `client/` only
+send prompts to that server (locally over HTTP, deployed over boto3) and never
+touch the Gateway themselves.
 
-**How the remote deploy works.** `agent.sh configure` runs
+**How the remote deploy works.** `./agent.sh configure` runs
 `agentcore configure`, which writes `.bedrock_agentcore.yaml` with the agent
-name, IAM role, and region. `agent.sh deploy` runs `agentcore deploy`, which
+name, IAM role, and region. `./agent.sh deploy` runs `agentcore deploy`, which
 uses `direct_code_deploy`: it zips the Python source, uploads it to S3,
 triggers CodeBuild to install dependencies, and creates or updates the
 AgentCore Runtime agent. No Docker image is built.
 
 **Deploys to AgentCore.** The deployed target is an Amazon Bedrock
-AgentCore Runtime agent. Invoke it with `agent.sh invoke-cloud` or with boto3
-via `client/remote.py`, which calls `bedrock-agentcore` `invoke_agent_runtime`
-against the deployed runtime ARN.
+AgentCore Runtime agent. Invoke it with `./agent.sh invoke-cloud`, or with any
+thin client plus `--remote`: `client/transport.py`'s `invoke_deployed` calls
+`bedrock-agentcore` `invoke_agent_runtime` against the deployed runtime ARN.
 
 ## The Graph
 
@@ -188,26 +237,35 @@ centrality, and similarity edges. Questions that traverse the graph
 | Path | Use |
 |------|-----|
 | `core/` | Shared credentials, token refresh, model config, prompt, MCP transport + model/client factories |
-| `server/runtime_app.py` | AgentCore Runtime entrypoint (8080 deployed, 7020 local via `PORT`) |
-| `client/demo.py` | Showcase client, runs the demo questions local or `--remote` |
-| `client/local.py` | Local CLI, run a single query directly in the terminal |
-| `client/remote.py` | Call the deployed agent programmatically with boto3 |
-| `agent.sh` | CLI wrapper for start, test, deploy, invoke |
+| `server/runtime_app.py` | The agent. AgentCore Runtime entrypoint and the only agent builder. `main()` is `finance-server` (7020 local); the cloud container uses `__main__` (fixed 8080) |
+| `client/transport.py` | The one wire layer: `invoke_local` (HTTP+SSE) / `invoke_deployed` (boto3) |
+| `client/cli.py` | `finance-cli`: thin terminal client, one prompt, `--remote` toggles target |
+| `client/demo.py` | `finance-demo`: thin showcase client, all demo questions + `--memory`, local or `--remote` |
+| `client/invoke.py` | `finance-invoke`: deployed harness: one-shot, `load-test`, `memory-demo`, `--verify-neo4j` |
+| `agent.sh` | Deployment helper only: `configure`, `deploy`, `status`, `invoke-cloud`, `destroy` |
 
 ## Commands
 
-`./agent.sh` accepts:
+The server and clients run as `uv` console scripts (no wrapper script).
+Run the server in its own terminal; Ctrl+C stops it:
 
 | Command | Description |
 |---------|-------------|
-| `start` | Run locally on port 7020 |
-| `stop` | Stop the local agent |
-| `test` | Send a sample query with curl |
+| `uv run finance-server` | Run the agent server locally on port 7020 (Ctrl+C to stop) |
+| `uv run finance-cli "prompt"` | Ask the running local server (`--remote` for the deployed agent) |
+| `uv run finance-demo` | Run the demo questions against the local server (`--remote`, `-n N`, `--list`, `--memory`) |
+| `uv run finance-invoke memory-demo` | Cross-session Context Graph memory demo (`--user-id`, `--verify-neo4j`) |
+| `uv run finance-invoke load-test` | Load test the deployed agent (`--interval N`) |
+
+`./agent.sh` is the deployment helper (it injects `NEO4J_URI`/`NEO4J_PASSWORD`
+into the runtime env on `deploy`):
+
+| Command | Description |
+|---------|-------------|
 | `configure` | Generate AWS deployment config |
 | `deploy` | Deploy to AgentCore Runtime |
 | `status` | Check deployment status |
 | `invoke-cloud "prompt"` | Invoke the deployed agent |
-| `memory-demo [user_id]` | Cross-session Context Graph memory demo |
 | `destroy` | Remove from AgentCore |
 
 ## Environment Variables
@@ -217,12 +275,13 @@ centrality, and similarity edges. Questions that traverse the graph
 | `MODEL_ID` | No | `global.anthropic.claude-haiku-4-5-20251001-v1:0` |
 | `AWS_REGION` | No | `us-west-2` |
 | `NEO4J_URI`, `NEO4J_PASSWORD` | No | Unset. Enables Strands semantic memory when set |
-| `PORT` | No | `8080`. HTTP port the runtime binds; `./agent.sh start` sets `7020` for local |
+| `PORT` | No | Local: `7020` (`finance-server` default). Cloud container: fixed `8080` |
 
-The deployed AgentCore container always listens on **8080** — that is the
+The deployed AgentCore container always listens on **8080**: that is the
 platform's fixed `/invocations` contract and is not configurable. For local
-runs, `./agent.sh start` exports `PORT=7020` so it does not collide with
-anything already on 8080; the same `server/runtime_app.py` serves both.
+runs, `finance-server` defaults to `PORT=7020` so it does not collide with
+anything already on 8080; an explicit `PORT` still wins. The same
+`server/runtime_app.py` serves both.
 
 ## Refreshing Credentials
 

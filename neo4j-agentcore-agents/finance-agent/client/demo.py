@@ -238,6 +238,97 @@ def run_memory_demo() -> None:
     print("=" * 72)
 
 
+# --- Multi-client memory demo ----------------------------------------------
+
+# Two clients with deliberately contradictory portfolios so that each client's
+# recall is easy to read against what it was taught.
+_A_TEACH = (
+    "Please remember this about me: I only invest in low-risk energy stocks "
+    "and I hold a large position in NVIDIA. Just acknowledge for now."
+)
+_B_TEACH = (
+    "Please remember this about me: I trade aggressive crypto only and I "
+    "refuse to hold any technology stocks. Just acknowledge for now."
+)
+_MULTI_RECALL = (
+    "Based on what you already know about me and my portfolio, what should I "
+    "consider adding and what should I avoid? If you have no information "
+    "about me yet, say so plainly."
+)
+
+
+def _multi_turn(
+    step: int,
+    total: int,
+    client: str,
+    action: str,
+    prompt: str,
+    *,
+    user_id: str,
+) -> str:
+    """Run one buffered, labelled turn and return the response text.
+
+    Buffered (``stream=False``) so two interleaved clients print as clean
+    blocks instead of garbling each other's tokens. Returns the response so
+    the caller can scan it for cross-client leakage.
+    """
+    print()
+    print("=" * 72)
+    print(f"  [{step}/{total}] Client {client} — {action}")
+    print(f"  user_id={user_id}")
+    print("=" * 72)
+    print(f"Prompt: {prompt}")
+    print("-" * 72)
+    result = invoke_agent(prompt, user_id=user_id, stream=False)
+    if result.get("status") != "success":
+        print(f"ERROR: {result.get('errors', ['Unknown error'])}")
+        return ""
+    response = result.get("response", "")
+    print(response)
+    return response
+
+
+def run_multi_client_memory_demo() -> None:
+    """Interleaved two-client memory demo against the deployed agent.
+
+    Order is A-teach, B-teach, A-recall, B-recall. Interleaving is the point:
+    teaching both clients before either recalls means correct recall can only
+    come from ``user_id``-scoped storage, not call order. Memory lives only in
+    the deployed runtime, so this always targets the deployed agent.
+    """
+    import time
+    import uuid
+
+    run_tag = uuid.uuid4().hex[:8]
+    user_a = f"mem-multi-a-{run_tag}"
+    user_b = f"mem-multi-b-{run_tag}"
+    total = 4
+
+    print("Mode:  deployed AgentCore Runtime agent, Context Graph memory")
+    print("Demo:  two clients, interleaved (A teach, B teach, A recall, "
+          "B recall)")
+    print(f"Run:   Client A user_id={user_a!r}")
+    print(f"       Client B user_id={user_b!r}")
+    print("Client A: low-risk energy + NVIDIA   |   Client B: aggressive "
+          "crypto, no tech")
+
+    _multi_turn(1, total, "A", "teach", _A_TEACH, user_id=user_a)
+    _multi_turn(2, total, "B", "teach", _B_TEACH, user_id=user_b)
+
+    print()
+    print("Pausing 5s to let both writes settle in Neo4j...")
+    time.sleep(5)
+
+    _multi_turn(3, total, "A", "recall", _MULTI_RECALL, user_id=user_a)
+    _multi_turn(4, total, "B", "recall", _MULTI_RECALL, user_id=user_b)
+
+    print()
+    print("=" * 72)
+    print("  Each client's recall above should reflect only what it was "
+          "taught.")
+    print("=" * 72)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Showcase finance-agent demo questions, local or remote.",
@@ -263,6 +354,14 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--memory-multi",
+        action="store_true",
+        help=(
+            "Run the interleaved two-client Context Graph memory demo "
+            "against the deployed agent (ignores --remote / -n)"
+        ),
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         help="Print the demo questions and exit without running them",
@@ -272,6 +371,17 @@ def main() -> None:
     if args.list:
         for i, question in enumerate(DEMO_QUESTIONS, 1):
             print(f"{i}. {question}")
+        return
+
+    if args.memory_multi:
+        try:
+            run_multi_client_memory_demo()
+        except KeyboardInterrupt:
+            print("\nInterrupted.")
+            sys.exit(130)
+        except Exception as e:  # noqa: BLE001 - top-level CLI guard
+            print(f"ERROR: {e}")
+            sys.exit(1)
         return
 
     if args.memory:

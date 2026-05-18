@@ -26,12 +26,12 @@ Context Graph semantic memory:
   tools accept ``user_id`` but ignore it — see core/memory.py.) The
   ``user_id`` is resolved from the invoke payload and injected into the
   per-request system prompt so the model passes the right scope.
-- Memory tooling is best-effort: if the direct Neo4j env vars
-  (``NEO4J_URI``, ``NEO4J_PASSWORD``) are absent the agent still runs with
-  the MCP tools alone.
+- Memory is a core capability, not an enhancement. The direct Neo4j env
+  vars (``NEO4J_URI``, ``NEO4J_PASSWORD``) are required: if they are absent
+  the agent aborts at startup rather than degrading to MCP-only.
 
 Local testing:
-    ./agent.sh start
+    uv run finance-server
     curl -X POST http://localhost:7020/invocations \
         -H "Content-Type: application/json" \
         -d '{"prompt": "Which accounts have the highest risk scores, and who do they transfer money to?"}'
@@ -46,13 +46,24 @@ import logging
 import os
 import re
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from dotenv import load_dotenv
 from strands import Agent
 
-from core import AWS_REGION, MODEL_ID, SYSTEM_PROMPT
-from core.factory import build_mcp_client, build_model
-from core.memory import user_scoped_context_graph_tools
+# Local dev: load finance-agent/.env BEFORE the first-party imports below.
+# ``core.config`` reads MODEL_ID/AWS_REGION from os.environ at import time,
+# and ``core.memory`` reads NEO4J_URI/NEO4J_PASSWORD when ``memory_tools`` is
+# built at module load. Loading .env here means a local .env can override all
+# of them. ``override=False`` keeps any real environment variable winning,
+# matching how the cloud path injects these via ``agentcore deploy --env``
+# (no .env ships in the container, so this is a no-op there).
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+
+from core import AWS_REGION, MODEL_ID, SYSTEM_PROMPT  # noqa: E402
+from core.factory import build_mcp_client, build_model  # noqa: E402
+from core.memory import user_scoped_context_graph_tools  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,25 +88,31 @@ app = BedrockAgentCoreApp()
 model = build_model()
 
 
-def _build_memory_tools():
-    """Build user-scoped Context Graph memory tools, or none if env is unset.
+def _build_memory_tools() -> list:
+    """Build the user-scoped Context Graph memory tools.
 
-    ``user_scoped_context_graph_tools`` reads ``NEO4J_URI``/``NEO4J_PASSWORD``
-    from the environment (the same direct-connection vars the MCP server
-    uses) and raises ``ValueError`` when they are missing. Memory is an
-    enhancement, not a hard dependency, so a missing config degrades to
-    MCP-only rather than failing the whole agent.
+    Memory is a core capability of this agent, not an enhancement: the agent
+    must not run without it. ``user_scoped_context_graph_tools`` reads
+    ``NEO4J_URI``/``NEO4J_PASSWORD`` from the environment (the same
+    direct-connection vars the MCP server uses) and raises ``ValueError``
+    when they are missing. That is fatal here — the error is logged and
+    re-raised so it propagates out of module import and aborts startup,
+    rather than degrading to MCP-only.
     """
     try:
         tools = user_scoped_context_graph_tools(
             embedding_provider="bedrock",
             aws_region=AWS_REGION,
         )
-        logger.info("User-scoped Context Graph memory enabled (%d tools)", len(tools))
-        return tools
-    except ValueError as e:
-        logger.warning("Context Graph memory disabled: %s", e)
-        return []
+    except ValueError:
+        logger.error(
+            "Context Graph memory is required but could not be initialized. "
+            "Set NEO4J_URI and NEO4J_PASSWORD (locally in finance-agent/.env, "
+            "in the cloud via './agent.sh deploy', which injects them).",
+        )
+        raise
+    logger.info("User-scoped Context Graph memory enabled (%d tools)", len(tools))
+    return tools
 
 
 # Built once; reused across requests.
@@ -136,10 +153,9 @@ def _memory_system_prompt(user_id: str, session_id: str | None) -> str:
     The memory tools take ``user_id``/``session_id`` as arguments the model
     fills in, so the resolved scope is stated here rather than relying on the
     model to invent it. Built per request; the shared ``SYSTEM_PROMPT`` is
-    left untouched.
+    left untouched. ``memory_tools`` is always non-empty (startup aborts
+    otherwise), so the prompt always carries the memory directives.
     """
-    if not memory_tools:
-        return SYSTEM_PROMPT
     session_clause = f' and session_id="{session_id}"' if session_id else ""
     return (
         f"{SYSTEM_PROMPT}\n\n"
@@ -195,9 +211,21 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
                 system_prompt=_memory_system_prompt(user_id, session_id),
             )
 
+            # Strands repeats ``current_tool_use`` on every input delta while
+            # a tool call is being assembled; dedupe by toolUseId so each tool
+            # call surfaces exactly once. Emitting these as ``tool`` events is
+            # what keeps the streamed narration from running together: the
+            # client prints a labelled boundary where a tool call happened.
+            last_tool_id: str | None = None
             async for event in agent.stream_async(prompt):
                 if "data" in event:
                     yield {"type": "chunk", "data": event["data"]}
+                elif tool_use := event.get("current_tool_use"):
+                    tool_id = tool_use.get("toolUseId")
+                    name = tool_use.get("name")
+                    if name and tool_id != last_tool_id:
+                        last_tool_id = tool_id
+                        yield {"type": "tool", "name": name}
 
         yield {"type": "complete"}
         logger.info("Request completed successfully")

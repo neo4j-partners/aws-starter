@@ -48,24 +48,23 @@ For an aircraft fleet this means capturing:
 
 ## Why Knowledge Graphs for Digital Twins?
 
-Digital twins are fundamentally about **relationships**: components belong to systems, faults affect components, removals follow maintenance events.
+Modeling a connected domain as a property graph is a **standard data modeling pattern**: the structure mirrors the real world.
 
-- **Entities → nodes**: each with its own properties
-- **Connections → relationships**: typed, directed, and propertied
-- **Multi-hop traversal**: native, with no expensive JOINs
-- **The graph is the twin**: query it, reason over it, extend it
-- **Single traversal vs. many JOINs**: "Which components caused flight delays?" is one hop in a graph, a JOIN chain in tables
+- **Entities → nodes**: aircraft, systems, components, sensors
+- **Connections → relationships**: typed, directed, propertied
+- **The model is the domain**: no foreign keys or join tables to translate
+- **Extends in place**: new entity types layer in without reshaping a schema
+- **Same pattern everywhere**: supply chains, networks, org structures
 
----
-
-## What the Dataset Models
-
-Behind the counts, the dataset captures a realistic fleet:
-
-- Multiple operators flying Boeing 737, Airbus A320/A321, and Embraer E190
-- Each aircraft broken into systems (engines, avionics, hydraulics) and components (turbines, compressors, pumps)
-- Sensors emitting time-series telemetry: EGT, vibration, fuel flow
-- Operational history: flights, delays, and maintenance events with severity and corrective actions
+<!--
+A digital twin is a connected domain, and connected domains have a
+standard data modeling pattern: the property graph. Instead of
+flattening relationships into foreign keys and join tables, you model
+entities as nodes and their connections as typed relationships. The
+model looks like the thing it represents, so it extends in place as
+the domain grows. This is not aircraft-specific: the same pattern
+fits supply chains, networks, and org structures.
+-->
 
 ---
 
@@ -96,20 +95,13 @@ Every node and relationship can carry properties (names, dates, measurements), s
 | "What sensors monitor Engine #1?" | Traverse HAS_SENSOR relationships |
 | "How many critical maintenance events?" | Count MaintenanceEvent nodes by severity |
 
----
-
-## From Digital Twin to Dual Store
-
-- **Flat data hides connections**: operations and maintenance questions depend on relationships a flat dataset cannot express
-- **The graph is the twin**: modeled as a property graph, the fleet becomes a faithful digital twin
-- **Traversable**: relationship-heavy questions become single graph queries
-- **Extensible**: new entities and connections layer in without reshaping tables
-- **Not the whole story**: the same fleet emits hundreds of thousands of sensor readings, better crunched as columns than traversed as nodes
-- **The dual data architecture**: pair the knowledge graph with a columnar analytics store, and route each question to the store that answers it best
+- **Single traversal, not a JOIN chain**: relationship questions become one graph query
 
 ---
 
 ## Dual Database Architecture
+
+The graph answers connection questions, but the same fleet emits hundreds of thousands of sensor readings, better crunched as columns than traversed as nodes. Pair the graph with a columnar analytics store and route each question to the store that answers it best.
 
 Each store handles the workload it is best at, and a supervisor on AWS Bedrock AgentCore routes each question to the right one.
 

@@ -21,6 +21,7 @@ dependencies = [
     # from a wheel vendored under vendor/ so it ships inside the
     # direct_code_deploy bundle. Rebuild with scripts/vendor-memory.sh.
     "neo4j-agent-memory[strands]",
+    "python-dotenv>=1.2.2",
 ]
 
 # Supply-chain caution: hold these transitive deps below releases published

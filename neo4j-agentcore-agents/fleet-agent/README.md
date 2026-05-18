@@ -1,14 +1,21 @@
 # Fleet Agent
 
-A Strands ReAct agent that answers natural language questions about an
-aviation fleet graph. It connects **directly to Neo4j** (no MCP server, no
-AgentCore Gateway) and reasons with Claude on Bedrock using two
-`neo4j-graphrag` retrievers, with a packaged `agent/` core that holds the
-Neo4j driver, retrievers, and prompt.
+An aviation fleet carries two kinds of knowledge that rarely sit together.
+One is structured: which aircraft exist, what parts they carry, which flights
+they flew, where delays piled up. The other is unstructured: maintenance
+manuals written in prose. Real fleet questions cross both. "How many aircraft
+are overdue for inspection?" is a graph traversal; "what does the manual say
+about hydraulic leak detection?" is a search over text.
+
+This agent handles both. It is a Strands ReAct agent that reasons with an LLM
+on Bedrock and reaches Neo4j through two `neo4j-graphrag` retrievers: a
+Text2Cypher retriever for exact and aggregate questions, and a vector
+retriever over maintenance-manual chunks for topical ones. A packaged
+`agent/` core holds the Neo4j driver, both retrievers, and the prompt.
 
 - **Direct Neo4j driver:** the agent opens a single Neo4j driver per process
-  straight to Aura, with no MCP server or AgentCore Gateway between the agent
-  and the graph.
+  straight to Aura. There is no MCP server and no AgentCore Gateway between
+  the agent and the graph; the agent owns the driver itself.
 - **Neo4j GraphRAG Text2Cypher:** `graph_query` uses `neo4j-graphrag`'s
   Text2Cypher retriever so Claude writes read-only Cypher from the live schema
   for exact and aggregate questions.
@@ -20,16 +27,18 @@ Neo4j driver, retrievers, and prompt.
 - **Bedrock Titan embeddings:** query embeddings for `vector_search` come from
   Amazon Titan on Bedrock, matched to the embedder `bedrock-graphrag-pipeline`
   used to populate the graph.
-- **AgentCore Runtime deployment:** the agent serves on a managed AgentCore
-  Runtime, with the Neo4j connection injected as Runtime environment variables.
+- **Deploys to AgentCore Runtime:** the agent serves on a managed Amazon
+  Bedrock AgentCore Runtime, with the Neo4j connection injected as Runtime
+  environment variables. How the code is packaged and uploaded is an
+  implementation detail; from the caller's side it is one command.
 
 ## Architecture
 
 ```
   +-------------------------------------------+
   |  Client                                   |
-  |  agent.sh invoke-cloud / client.invoke /  |
-  |  client.demo --remote  (boto3)            |
+  |  agent.sh invoke-cloud / fleet-invoke /    |
+  |  fleet-demo --remote  (boto3)             |
   +-------------------------------------------+
                       |
                       |  POST /invocations  (SSE stream)
@@ -37,14 +46,14 @@ Neo4j driver, retrievers, and prompt.
   +-------------------------------------------+        +---------------------------+
   |  AgentCore Runtime                        |        |  Amazon Bedrock           |
   |  Fleet Agent (runtime_app.py)             | -----> |  Claude (LLM, Text2Cypher)|
-  |  Strands ReAct: graph_query,              |        |  Titan (embeddings)       |
-  |  vector_search                            | <----- |                           |
+  |  Strands ReAct                            | <----- |  Titan (embeddings)       |
   +-------------------------------------------+        +---------------------------+
-                      |
-                      |  Neo4j driver  (neo4j+s://)
-                      v
+            |                          |
+            |  graph_query             |  vector_search
+            |  Text2Cypher -> Cypher   |  query embedding -> ANN
+            v                          v
   +-------------------------------------------+
-  |  Neo4j Aura                               |
+  |  Neo4j Aura  (one neo4j+s:// driver)      |
   |  Aircraft Digital Twin graph              |
   |  + maintenanceChunkEmbeddings index       |
   +-------------------------------------------+
@@ -71,9 +80,9 @@ cp .env.sample .env        # set Aura creds + embedding provider
 
 - Point the agent's `.env` at the same `NEO4J_URI`; the schema is read live, so
   the agent picks up the data automatically.
-- The retriever embedder must match the one `bedrock-graphrag-pipeline` used
-  (default: Bedrock Titan v2, 1024 dims; override with `EMBED_MODEL_ID` /
-  `EMBED_DIMENSIONS`).
+- The retriever embedder must match the one `bedrock-graphrag-pipeline` used.
+  The default is Bedrock Titan v2 at 1024 dims; override with `EMBED_MODEL_ID`
+  and `EMBED_DIMENSIONS`.
 
 ## Prerequisites
 
@@ -94,23 +103,28 @@ uv sync
 ### Server
 
 ```bash
-./agent.sh start                                    # serves http://localhost:7070
+# terminal 1: leave this running, Ctrl+C to stop
+uv run fleet-server                                 # serves http://localhost:7070
+uv run opentelemetry-instrument fleet-server        # same, with OTEL tracing
 ```
 
-- Auto-loads the agent-root `.env` and runs `runtime_app.py` on port 7070
-  (deployed serves 8080; local overrides to avoid a clash).
-- Keep this running in one terminal. The clients below are thin clients that
-  talk to it over HTTP and hold no Neo4j credentials of their own.
+- Auto-loads the agent-root `.env`, which the `agent` package loads on import,
+  and runs `runtime_app.py` on port 7070. The deployed runtime serves 8080;
+  local defaults to 7070 to avoid a clash, and `AGENT_PORT` still overrides.
+- Runs in the foreground of its own terminal; Ctrl+C stops it. Nothing
+  backgrounds it, so there is no PID or port to manage.
+- The clients below are thin clients that talk to it over HTTP in a second
+  terminal and hold no Neo4j credentials of their own.
 
 ```bash
-./agent.sh test                                     # sample query via the thin client
-./agent.sh cli "How many aircraft are in the fleet?"
+# terminal 2
+uv run fleet-cli "How many aircraft are in the fleet?"
 ```
 
 ### Demo
 
 ```bash
-./agent.sh demo                                     # or: uv run python -m client.demo
+uv run fleet-demo
 ```
 
 Walks the agent's full surface against the running server, one `====` section
@@ -122,8 +136,9 @@ at a time:
 4. the full Strands ReAct agent choosing tools by itself.
 
 Each section is served through a `mode` field on `/invocations`, so
-`./agent.sh start` must be up first. Section 4 calls Claude for several turns
-(a few minutes, Bedrock usage); sections 1 to 3 return quickly.
+`uv run fleet-server` must be up first. Section 4 calls Claude for several
+turns and takes a few minutes of Bedrock usage; sections 1 to 3 return
+quickly.
 
 ## Quick Start: Cloud
 
@@ -149,54 +164,59 @@ aws sso login --sso-session <your-sso-session>     # if using AWS SSO
   managed python3.13 arm64, IAM + CloudWatch. No Docker build, no ECR image.
 - `./agent.sh deploy` injects the Neo4j connection as Runtime env vars; the
   container has no `.env`. Output includes the Agent ARN and dashboard URL.
-- `configure` is required first (even if `.bedrock_agentcore.yaml` exists): it
-  pins the entrypoint and records account, region, and execution role.
+- `configure` is required first even if `.bedrock_agentcore.yaml` already
+  exists: it pins the entrypoint and records account, region, and execution
+  role.
 
 ### Drive the deployed runtime
 
 ```bash
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
-uv run python -m client.demo --remote                  # full showcase, deployed
-uv run python -m client.invoke "What does the manual say about hydraulic leak detection?"
-./agent.sh load-test 5                                 # replay queries.txt every 5s
+uv run fleet-demo --remote                              # full showcase, deployed
+uv run fleet-invoke "What does the manual say about hydraulic leak detection?"
+uv run fleet-invoke load-test 5                          # replay queries.txt every 5s
 ```
 
-Same four `/invocations` surfaces as local (a `mode` field selects them; no
-`mode` runs the full agent), only the transport differs:
+Same four `/invocations` surfaces as local, where a `mode` field selects them
+and no `mode` runs the full agent. Only the transport differs:
 
-- `./agent.sh invoke-cloud "..."` — one prompt via boto3.
-- `uv run python -m client.demo --remote` — all four sections, deployed.
-- `uv run python -m client.invoke "..."` — one prompt; add `load-test
-  [seconds]` (or `./agent.sh load-test [seconds]`) to replay `queries.txt` on
-  an interval. Streams the answer token by token.
-- `./agent.sh destroy` — remove the runtime when finished.
+- `./agent.sh invoke-cloud "..."`: one prompt via boto3.
+- `uv run fleet-demo --remote`: all four sections, deployed.
+- `uv run fleet-invoke "..."`: one prompt; add `load-test [seconds]` to
+  replay `queries.txt` on an interval. Streams the answer token by token.
+- `./agent.sh destroy`: remove the runtime when finished.
 
 ## Layout
 
 | Path | Use |
 |------|-----|
 | `agent/` | Packaged core (installed into the venv): `config.py` (model id, region, embedder/index, system prompt), `retrieval.py` (direct-to-Neo4j driver + GraphRAG `graph_query` / `vector_search` / `get_graph_schema`), `tools.py` (Strands tool wrappers) |
-| `client/` | Dev-only thin clients, run via `python -m client.<mod>`: `transport.py` (the only network layer — local HTTP port 7070 + boto3 deployed), `cli.py` (terminal client), `demo.py` (functionality showcase), `invoke.py` (deployed single call + load test) |
-| `runtime_app.py` | AgentCore Runtime entrypoint; `mode`-dispatched surfaces, port 8080 deployed / 7070 local |
-| `agent.sh` | CLI wrapper for the local run, the clients, and the deploy lifecycle |
+| `client/` | Thin clients (`fleet-cli`/`fleet-demo`/`fleet-invoke` console scripts): `transport.py` (the only network layer: local HTTP port 7070 + boto3 deployed), `cli.py` (terminal client), `demo.py` (functionality showcase), `invoke.py` (deployed single call + load test) |
+| `runtime_app.py` | AgentCore Runtime entrypoint; `main()` is `fleet-server` (7070 local), the cloud container uses `__main__` (fixed 8080); `mode`-dispatched surfaces |
+| `agent.sh` | Deployment helper only: `configure`, `deploy`, `status`, `invoke-cloud`, `destroy` |
 | `queries.txt` | Sample queries across discovery, fleet, maintenance, delays |
 
 ## Commands
 
-`agent.sh` wraps the local run, the thin clients, and the deploy lifecycle.
-The same clients can also be run directly with `uv run python -m client.<mod>`.
+The server and clients run as `uv` console scripts (no wrapper script).
+Run the server in its own terminal; Ctrl+C stops it:
 
 | Command | Description |
 |---------|-------------|
-| `start` | Run the local agent on port 7070 (foreground; Ctrl+C to stop) |
-| `test` | Send a sample query through the thin client (`client.cli`) |
-| `cli "prompt"` | Ask the running agent one question (thin client) |
-| `demo` | Run the functionality showcase against the local server |
+| `uv run fleet-server` | Run the agent server locally on port 7070 (Ctrl+C to stop; prefix `opentelemetry-instrument` for tracing) |
+| `uv run fleet-cli "prompt"` | Ask the running local server (`--remote` for the deployed agent) |
+| `uv run fleet-demo` | Run the functionality showcase against the local server (`--remote` for deployed) |
+| `uv run fleet-invoke "prompt"` | One prompt against the deployed agent; `load-test [N]` replays `queries.txt` every N seconds |
+
+`./agent.sh` is the deployment helper (it injects the Neo4j connection into
+the runtime env on `deploy`):
+
+| Command | Description |
+|---------|-------------|
 | `configure` | Generate AWS deployment config |
 | `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
 | `status` | Check deployment status |
 | `invoke-cloud "prompt"` | Invoke the deployed agent via boto3 |
-| `load-test [N]` | Replay `queries.txt` against the deployed agent every N seconds |
 
 ## Environment Variables
 
@@ -214,8 +234,9 @@ The same clients can also be run directly with `uv run python -m client.<mod>`.
 
 ## Observability
 
-The agent uses AWS Distro for OpenTelemetry. `agent.sh start` wraps the
-process with `opentelemetry-instrument`, which traces the Neo4j driver, boto3
+The agent uses AWS Distro for OpenTelemetry. Run the server as
+`uv run opentelemetry-instrument fleet-server` to wrap the process with
+`opentelemetry-instrument`, which traces the Neo4j driver, boto3
 calls to Bedrock, and incoming requests. After deploying, enable Tracing on
 the runtime in the CloudWatch console under Bedrock AgentCore. Traces then
 appear in the Bedrock AgentCore Observability dashboard. Without that step no

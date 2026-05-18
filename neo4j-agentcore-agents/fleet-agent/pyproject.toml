@@ -19,13 +19,28 @@ dependencies = [
     "strands-agents",
 ]
 
+# Console entry points. The server runs in the foreground of its own
+# terminal (Ctrl+C to stop) — it is never backgrounded by a script. The
+# clients are thin wire callers. `fleet-server` defaults to port 7070 for
+# local dev (AGENT_PORT still overrides); the cloud container uses
+# runtime_app's __main__ (fixed 8080).
+[project.scripts]
+fleet-server = "runtime_app:main"
+fleet-cli = "client.cli:main"
+fleet-demo = "client.demo:main"
+fleet-invoke = "client.invoke:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Install the `agent` core package into the venv so runtime_app.py can
-# `from agent import ...` without any sys.path manipulation. `client/` is
-# dev-only and runs via `python -m client.<mod>` from the project root, so
-# it is intentionally not packaged (keeps the runtime image minimal).
+# Package the `agent` core plus `client` and the top-level `runtime_app`
+# module into the venv so the console scripts resolve `runtime_app:main`
+# and `client.*:main`, and runtime_app can `from agent import ...` without
+# any sys.path manipulation. Deployment uses direct_code_deploy (it zips
+# the source tree), so packaging client here only affects the local venv.
 [tool.hatch.build.targets.wheel]
-packages = ["agent"]
+packages = ["agent", "client"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"runtime_app.py" = "runtime_app.py"

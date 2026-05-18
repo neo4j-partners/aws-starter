@@ -642,6 +642,7 @@ dependencies = [
     { name = "httpx" },
     { name = "mcp" },
     { name = "neo4j-agent-memory", extra = ["strands"] },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "strands-agents" },
 ]
@@ -655,6 +656,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mcp", specifier = ">=1.27.1" },
     { name = "neo4j-agent-memory", extras = ["strands"], path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "strands-agents", specifier = ">=1.40.0" },
 ]

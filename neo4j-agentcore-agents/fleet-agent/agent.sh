@@ -1,26 +1,35 @@
 #!/bin/bash
-# Neo4j Fleet Agent - AgentCore Runtime
+# Neo4j Fleet Agent - AgentCore deployment helper
 #
 # A Strands ReAct agent that connects directly to Neo4j (no MCP server, no
 # Gateway) and answers natural language questions using AWS Bedrock Claude +
 # the neo4j-graphrag vector and Text2Cypher retrievers.
 #
+# This script does ONE thing: deploy/manage the agent on AgentCore Runtime.
+# It is a thin wrapper over the `agentcore` CLI; the only reason it exists
+# (rather than documenting raw `agentcore` commands) is that `deploy` loads
+# the Neo4j connection from .env and injects it into the runtime env.
+#
+# It does NOT run the agent locally and it does NOT run the clients. The
+# server runs in the foreground of its own terminal; the clients are uv
+# console scripts. See the README "Quick Start: Local". In short:
+#
+#   Terminal 1:  uv run fleet-server           # Ctrl+C to stop
+#                uv run opentelemetry-instrument fleet-server   # + tracing
+#   Terminal 2:  uv run fleet-cli "question"
+#                uv run fleet-demo
+#                uv run fleet-invoke load-test
+#
 # Usage:
-#   ./agent.sh start              Start locally (port 7070, ADOT tracing);
-#                                 runs in the foreground — Ctrl+C to stop
-#   ./agent.sh test               Test local agent with curl
-#   ./agent.sh cli "prompt"       Ask the local agent (thin client)
-#   ./agent.sh demo               Run the functionality showcase (local)
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
 #   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent
-#   ./agent.sh load-test [N]      Run load test (Ns interval, default 5)
 #   ./agent.sh destroy            Remove from AgentCore
 #
 # Prerequisites:
 #   - Neo4j connection env vars: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
-#     (a .env at the agent root is auto-loaded for local runs)
+#     (a .env at the agent root is auto-loaded for deploy)
 #   - AWS credentials configured (for Bedrock access)
 
 set -e
@@ -37,18 +46,20 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_usage() {
-    echo "Neo4j Fleet Agent - AgentCore Runtime"
+    echo "Neo4j Fleet Agent - AgentCore deployment helper"
     echo ""
-    echo "Usage:"
-    echo "  ./agent.sh start              Start locally (port 7070, foreground; Ctrl+C to stop)"
-    echo "  ./agent.sh test               Test local agent with curl"
-    echo "  ./agent.sh cli \"prompt\"        Ask the local agent (thin client)"
-    echo "  ./agent.sh demo               Run the functionality showcase (local)"
+    echo "Run the agent locally without this script:"
+    echo "  Terminal 1:  uv run fleet-server           # Ctrl+C to stop"
+    echo "               uv run opentelemetry-instrument fleet-server  # + tracing"
+    echo "  Terminal 2:  uv run fleet-cli \"question\""
+    echo "               uv run fleet-demo"
+    echo "               uv run fleet-invoke load-test"
+    echo ""
+    echo "Deployment (this script):"
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
     echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed agent"
-    echo "  ./agent.sh load-test [N]      Run load test (Ns interval)"
     echo "  ./agent.sh destroy            Remove from AgentCore"
     echo "  ./agent.sh help               Show this help message"
 }
@@ -103,43 +114,6 @@ deploy_env_args() {
 }
 
 case "${1:-help}" in
-    start)
-        ensure_deps
-        load_env
-        # AgentCore requires the deployed container on 8080 (runtime_app.py
-        # defaults there). Locally we override to 7070 to avoid colliding
-        # with a service already bound to 8080.
-        export AGENT_PORT=7070
-        echo -e "${GREEN}Starting agent locally on port 7070 with OTEL instrumentation...${NC}"
-        echo "Runs in the foreground — press Ctrl+C to stop."
-        echo "Test from another shell: curl -X POST http://localhost:7070/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
-        echo ""
-        # Foreground by design: Ctrl+C (SIGINT) is the shutdown contract.
-        # There is no background mode and no `stop` — nothing to track.
-        exec uv run opentelemetry-instrument python "$ENTRYPOINT"
-        ;;
-
-    test)
-        # Route through the SSE-aware thin client: the runtime streams
-        # `data: {...}` events, which `python -m json.tool` cannot parse.
-        ensure_deps
-        echo -e "${GREEN}Testing local agent...${NC}"
-        echo ""
-        uv run python -m client.cli "What is the database schema?"
-        ;;
-
-    cli)
-        # Thin client — talks to the running agent over the wire; needs no
-        # Neo4j credentials of its own (the server holds those).
-        ensure_deps
-        uv run python -m client.cli "${@:2}"
-        ;;
-
-    demo)
-        ensure_deps
-        uv run python -m client.demo "${@:2}"
-        ;;
-
     configure)
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
@@ -184,15 +158,6 @@ case "${1:-help}" in
         echo "Prompt: $PROMPT"
         echo ""
         uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
-        ;;
-
-    load-test)
-        ensure_deps
-        INTERVAL="${2:-5}"
-        echo -e "${GREEN}Starting load test (${INTERVAL}s interval)...${NC}"
-        echo "Press Ctrl+C to stop"
-        echo ""
-        uv run python -m client.invoke load-test "$INTERVAL"
         ;;
 
     destroy)

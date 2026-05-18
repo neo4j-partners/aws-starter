@@ -147,7 +147,13 @@ def section_agent() -> None:
     ]
     for label, q in questions:
         print(f"User ({label}): {q}")
-        show("Agent answer", call({"prompt": q}))
+        print("--- Agent answer ---")
+        # Streamed (unlike the buffered sections above) so the ``→ tool``
+        # boundaries print live as the agent calls graph_query/vector_search.
+        result = invoke({"prompt": q}, target=TARGET, stream=True)
+        if result.get("status") != "success":
+            print(f"[error] {result.get('errors', ['Unknown error'])}")
+        print()
 
 
 def main() -> None:

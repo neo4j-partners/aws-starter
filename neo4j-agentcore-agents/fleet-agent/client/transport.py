@@ -1,9 +1,10 @@
 """One wire, two transports — the only place clients touch the network.
 
-``runtime_app.py`` serves four surfaces off ``/invocations`` and emits exactly
-three SSE event shapes: ``{"type": "chunk", "data": ...}``,
-``{"type": "error", "error": ...}``, ``{"type": "complete"}``. Both transports
-below produce that same byte stream, so a single parser handles them:
+``runtime_app.py`` serves four surfaces off ``/invocations`` and emits four
+SSE event shapes: ``{"type": "chunk", "data": ...}``,
+``{"type": "tool", "name": ...}``, ``{"type": "error", "error": ...}``,
+``{"type": "complete"}``. Both transports below produce that same byte
+stream, so a single parser handles them:
 
 - :func:`invoke_local`    — HTTP POST to a locally running runtime (port 7070).
 - :func:`invoke_deployed` — boto3 ``bedrock-agentcore`` data plane (deployed).
@@ -78,7 +79,7 @@ def _handle_sse_event(
     """Dispatch one SSE event, printing ``chunk`` text live when streaming.
 
     ``json.loads`` already yields real newlines, so no unescaping is needed;
-    anything that is not one of the three known shapes is ignored.
+    anything that is not one of the four known shapes is ignored.
     """
     event = event.strip()
     if not event:
@@ -94,6 +95,13 @@ def _handle_sse_event(
         if stream:
             print(text, end="", flush=True)
         content_parts.append(text)
+    elif data.get("type") == "tool":
+        # A labelled boundary where the agent called a retriever tool.
+        # Display-only: kept out of content_parts so the returned response
+        # string stays the agent's prose, not the trace.
+        if stream:
+            name = data.get("name", "")
+            print(f"\n\n  → {name}\n", end="\n", flush=True)
     elif data.get("type") == "error":
         errors.append(data.get("error", "Unknown error"))
 

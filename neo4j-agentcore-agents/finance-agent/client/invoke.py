@@ -5,10 +5,12 @@ A thin client. It does not build an agent: it sends payloads to the agent
 deployed on AgentCore Runtime over the boto3 ``bedrock-agentcore`` data plane
 (via :mod:`client.transport`) and streams the answer back token by token.
 
-``memory-demo`` proves the deployed runtime's Context Graph memory across
-sessions and per user; ``--verify-neo4j`` is the ground-truth check that
-queries Neo4j directly for the persisted ``:Message`` node. Memory lives only
-in the deployed runtime, so these modes always target ``deployed``.
+``memory-demo`` proves Context Graph memory across sessions and per user;
+``--verify-neo4j`` is the ground-truth check that queries Neo4j directly for
+the persisted ``:Message`` node. The target defaults to the deployed runtime;
+``--local`` runs the same flows against a ``finance-server`` on localhost:7020
+(whose memory must be enabled — see finance-agent/.env). ``--verify-neo4j``
+queries Neo4j directly and is transport-independent, so it works either way.
 
 Usage:
     uv run python -m client.invoke                       # default prompt
@@ -16,14 +18,20 @@ Usage:
     uv run python -m client.invoke --user-id alice "..." # one-shot, scoped
     uv run python -m client.invoke memory-demo           # cross-session recall
     uv run python -m client.invoke memory-demo --user-id alice --verify-neo4j
+    uv run python -m client.invoke memory-demo --local   # against finance-server
     uv run python -m client.invoke load-test             # random queries / 5s
     uv run python -m client.invoke load-test --interval 10
 
-Prerequisites:
+Prerequisites (deployed, the default):
     - Agent deployed (./agent.sh deploy)
     - NEO4J_URI / NEO4J_PASSWORD injected at deploy time (memory-demo needs it)
     - AWS credentials configured
     - .bedrock_agentcore.yaml present (created by ./agent.sh configure)
+
+Prerequisites (--local):
+    - finance-agent/.env with NEO4J_URI / NEO4J_PASSWORD — Context Graph
+      memory is core, so finance-server will not start without them
+    - finance-server running in another terminal (uv run finance-server)
 """
 
 from __future__ import annotations
@@ -37,7 +45,7 @@ import sys
 import time
 from pathlib import Path
 
-from client.transport import AGENT_ROOT, invoke_deployed
+from client.transport import AGENT_ROOT, Target, invoke
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -71,16 +79,22 @@ def invoke_agent(
     prompt: str,
     user_id: str = DEFAULT_USER_ID,
     session_id: str | None = None,
+    target: Target = "deployed",
+    stream: bool = True,
 ) -> dict:
-    """Send one prompt to the deployed agent, scoped to ``user_id``.
+    """Send one prompt to the agent, scoped to ``user_id``.
 
     ``user_id``/``session_id`` go in the JSON payload because the runtime's
     ``_resolve_user_id`` reads them from there to scope its memory tools.
+    ``target`` selects the transport: ``"deployed"`` (default) hits the
+    AgentCore Runtime; ``"local"`` posts to a ``finance-server`` on
+    localhost:7020. ``stream=False`` buffers the answer instead of printing
+    it live, so callers interleaving multiple clients can label each block.
     """
     request: dict[str, str] = {"prompt": prompt, "user_id": user_id}
     if session_id:
         request["session_id"] = session_id
-    return invoke_deployed(request, stream=True)
+    return invoke(request, target=target, stream=stream)
 
 
 def _print_result(result: dict) -> None:
@@ -89,9 +103,9 @@ def _print_result(result: dict) -> None:
         print(f"ERROR: {result.get('errors', ['Unknown error'])}")
 
 
-def run_one_shot(prompt: str, user_id: str) -> None:
+def run_one_shot(prompt: str, user_id: str, target: Target) -> None:
     print("=" * 70)
-    print("Finance Agent - Programmatic Invocation (deployed)")
+    print(f"Finance Agent - Programmatic Invocation ({target})")
     print("=" * 70)
     print("")
     print(f"User ID: {user_id}")
@@ -101,11 +115,11 @@ def run_one_shot(prompt: str, user_id: str) -> None:
     print("=" * 70)
     print("Response:")
     print("=" * 70)
-    _print_result(invoke_agent(prompt, user_id=user_id))
+    _print_result(invoke_agent(prompt, user_id=user_id, target=target))
     print("")
 
 
-def run_memory_demo(user_id: str) -> None:
+def run_memory_demo(user_id: str, target: Target) -> None:
     """Two turns in separate sessions; turn 2 must recall turn 1's fact.
 
     Same ``user_id``, different ``session_id`` per turn: if the second turn
@@ -113,7 +127,8 @@ def run_memory_demo(user_id: str) -> None:
     persistence and semantic recall are working. Because the runtime uses
     ``core.memory``'s user-scoped tools, recall is also isolated per
     ``user_id`` (a different user would not see this memory).
-    ``verify_neo4j_persistence`` is the ground-truth check.
+    ``verify_neo4j_persistence`` is the ground-truth check. ``target`` picks
+    the runtime under test (deployed by default, or ``local``).
     """
     teach = (
         "Please remember this about me: I prefer low-risk energy stocks, and "
@@ -125,7 +140,7 @@ def run_memory_demo(user_id: str) -> None:
     )
 
     print("=" * 70)
-    print("Finance Agent - Cross-Session Memory Demo")
+    print(f"Finance Agent - Cross-Session Memory Demo ({target})")
     print("=" * 70)
     print(f"User ID: {user_id}")
     print("Turn 1 and Turn 2 use different sessions for the same user.")
@@ -139,7 +154,12 @@ def run_memory_demo(user_id: str) -> None:
     print(f"Prompt: {teach}")
     print("")
     _print_result(
-        invoke_agent(teach, user_id=user_id, session_id="demo-session-teach")
+        invoke_agent(
+            teach,
+            user_id=user_id,
+            session_id="demo-session-teach",
+            target=target,
+        )
     )
     print("")
 
@@ -153,7 +173,12 @@ def run_memory_demo(user_id: str) -> None:
     print(f"Prompt: {recall}")
     print("")
     _print_result(
-        invoke_agent(recall, user_id=user_id, session_id="demo-session-recall")
+        invoke_agent(
+            recall,
+            user_id=user_id,
+            session_id="demo-session-recall",
+            target=target,
+        )
     )
     print("")
     print("=" * 70)
@@ -319,7 +344,7 @@ def load_queries() -> list[str]:
     return queries
 
 
-def run_load_test(interval: int, user_id: str) -> None:
+def run_load_test(interval: int, user_id: str, target: Target) -> None:
     queries = load_queries()
     if not queries:
         print(f"ERROR: no numbered queries found in {QUERIES_FILE.name}")
@@ -350,7 +375,7 @@ def run_load_test(interval: int, user_id: str) -> None:
             print("-" * 70)
             print("")
 
-            _print_result(invoke_agent(query, user_id=user_id))
+            _print_result(invoke_agent(query, user_id=user_id, target=target))
 
             print("")
             print("-" * 70)
@@ -390,6 +415,14 @@ def main() -> None:
         help="Seconds between queries in load-test mode (default: 5)",
     )
     parser.add_argument(
+        "--local",
+        action="store_true",
+        help=(
+            "Target a finance-server on localhost:7020 instead of the "
+            "deployed runtime (start it with 'uv run finance-server')"
+        ),
+    )
+    parser.add_argument(
         "--verify-neo4j",
         action="store_true",
         help=(
@@ -399,18 +432,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    target: Target = "local" if args.local else "deployed"
     command = args.command
     try:
         if command and command[0] == "memory-demo":
-            run_memory_demo(args.user_id)
+            run_memory_demo(args.user_id, target)
             if args.verify_neo4j:
                 print("")
                 verify_neo4j_persistence(args.user_id)
         elif command and command[0] == "load-test":
-            run_load_test(args.interval, args.user_id)
+            run_load_test(args.interval, args.user_id, target)
         else:
             prompt = " ".join(command) if command else DEFAULT_PROMPT
-            run_one_shot(prompt, args.user_id)
+            run_one_shot(prompt, args.user_id, target)
     except Exception as e:  # noqa: BLE001 - top-level CLI guard
         print(f"ERROR: {e}")
         sys.exit(1)

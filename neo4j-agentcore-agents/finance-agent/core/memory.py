@@ -234,8 +234,9 @@ def user_scoped_context_graph_tools(
 
     Args mirror ``context_graph_tools``. ``neo4j_uri`` / ``neo4j_password``
     default to ``NEO4J_URI`` / ``NEO4J_PASSWORD`` and a ``ValueError`` is
-    raised if neither is resolvable (the caller treats that as "memory
-    disabled, run MCP-only").
+    raised if either is unresolvable. Memory is a core capability of the
+    Finance Agent, so the runtime treats that ``ValueError`` as fatal and
+    aborts startup rather than running without memory.
 
     Returns:
         ``[search_context, add_memory, get_user_preferences,

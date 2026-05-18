@@ -109,14 +109,18 @@ case "${1:-help}" in
         echo "This may take several minutes..."
         echo ""
         load_neo4j_env
-        DEPLOY_ARGS=()
-        if [ -n "$NEO4J_URI" ] && [ -n "$NEO4J_PASSWORD" ]; then
-            DEPLOY_ARGS+=(--env "NEO4J_URI=$NEO4J_URI")
-            DEPLOY_ARGS+=(--env "NEO4J_PASSWORD=$NEO4J_PASSWORD")
-            echo -e "${GREEN}Context Graph memory: injecting NEO4J_URI/NEO4J_PASSWORD into runtime env${NC}"
-        else
-            echo -e "${YELLOW}NEO4J_URI/NEO4J_PASSWORD not found — Context Graph memory will be disabled in the cloud (agent still runs MCP-only)${NC}"
+        # Context Graph memory is a core capability: the runtime aborts at
+        # startup without NEO4J_URI/NEO4J_PASSWORD. Refuse to deploy a
+        # runtime that would crash-loop rather than deploy it memory-less.
+        if [ -z "$NEO4J_URI" ] || [ -z "$NEO4J_PASSWORD" ]; then
+            echo -e "${RED}ERROR: NEO4J_URI/NEO4J_PASSWORD not found.${NC}"
+            echo "Context Graph memory is required. Provide them in"
+            echo "finance-agent/.env (or the Neo4j MCP server's .env) and"
+            echo "re-run './agent.sh deploy'."
+            exit 1
         fi
+        DEPLOY_ARGS=(--env "NEO4J_URI=$NEO4J_URI" --env "NEO4J_PASSWORD=$NEO4J_PASSWORD")
+        echo -e "${GREEN}Context Graph memory: injecting NEO4J_URI/NEO4J_PASSWORD into runtime env${NC}"
         echo ""
         uv run agentcore deploy "${DEPLOY_ARGS[@]}"
         echo ""

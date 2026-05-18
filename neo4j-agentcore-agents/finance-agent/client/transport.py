@@ -1,7 +1,7 @@
 """One wire, two transports — the only place clients touch the network.
 
-``server/runtime_app.py`` serves ``/invocations`` and emits exactly three SSE
-event shapes: ``{"type": "chunk", "data": ...}``,
+``server/runtime_app.py`` serves ``/invocations`` and emits four SSE event
+shapes: ``{"type": "chunk", "data": ...}``, ``{"type": "tool", "name": ...}``,
 ``{"type": "error", "error": ...}``, ``{"type": "complete"}``. Both transports
 below produce that same byte stream, so a single parser handles them:
 
@@ -98,6 +98,13 @@ def _handle_sse_event(
         if stream:
             print(text, end="", flush=True)
         content_parts.append(text)
+    elif data.get("type") == "tool":
+        # A labelled boundary where the agent called a Neo4j/memory tool.
+        # Display-only: kept out of content_parts so the returned response
+        # string stays the agent's prose, not the trace.
+        if stream:
+            name = data.get("name", "")
+            print(f"\n\n  → {name}\n", end="\n", flush=True)
     elif data.get("type") == "error":
         errors.append(data.get("error", "Unknown error"))
 

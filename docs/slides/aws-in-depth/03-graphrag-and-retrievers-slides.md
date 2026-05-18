@@ -223,6 +223,98 @@ with: MATCH (c:Chunk) RETURN c.text, size(c.embedding) LIMIT 1.
 
 ---
 
+## The Complete Knowledge Graph
+
+| Component | Purpose |
+|-----------|---------|
+| **Documents** | Source provenance |
+| **Chunks** | Searchable text units |
+| **Embeddings** | Semantic search |
+| **Entities** | Structured domain knowledge |
+| **Relationships** | Connections between entities |
+
+<!--
+With all five in place, the graph has everything GraphRAG needs: searchable
+text, the structure around it, and the provenance behind it.
+-->
+
+---
+
+## GraphRAG: Graph-Enriched Retrieval
+
+- **Graph holds** structured connections and domain knowledge
+- **Search finds** starting chunks closest in meaning
+- **Traversal enriches** by following entities and relationships
+- **Agents receive** richer context than text search alone
+
+<!--
+Vector or fulltext search finds relevant chunks, standard RAG. What GraphRAG
+adds is graph traversal from those chunks through the entities and
+relationships surrounding them. The agent ends up with far richer context
+than text search could provide.
+-->
+
+---
+
+![bg contain](images/graphrag-retrieval-flow.png)
+
+---
+
+## Powered by the Neo4j Python GraphRAG Library
+
+- **Retrievers:** ready-made Vector, Vector Cypher, Text2Cypher
+- **Embeddings:** pluggable embedders (Amazon Bedrock Titan, others)
+- **Pipeline:** one call to retrieve context and generate an answer
+
+<!--
+Everything from here is built on the Neo4j Python GraphRAG library. It ships
+the three retriever patterns, pluggable embedders, and a pipeline that
+combines retrieval with generation in one call.
+-->
+
+---
+
+## The GraphRAG Class
+
+```
+User Question
+    ↓
+Retriever finds relevant context
+    ↓
+Context passed to LLM
+    ↓
+LLM generates grounded answer
+```
+
+Retriever finds context. LLM writes the answer.
+
+<!--
+The GraphRAG class combines retrieval with generation. The retriever's only
+job is finding the right context. The LLM's only job is turning that context
+into a coherent answer.
+-->
+
+---
+
+## Overview of Retrievers
+
+| Pattern | What It Does |
+|---------|--------------|
+| **Vector** | Semantically similar content (standard RAG) |
+| **Vector Cypher** | Similar content, then traverse to entities |
+| **Text2Cypher** | Query the graph directly for precise facts |
+
+The rest of this deck builds on these three.
+
+<!--
+This is the single most important slide. Everything that follows is one of
+these three retrievers. Vector for content, Vector Cypher for content plus
+relationships, Text2Cypher for precise facts. The combination is more powerful
+than any one alone.
+-->
+
+---
+
 ## Searching a Vector Index
 
 Embed the query in application code, pass the vector as a parameter.
@@ -269,98 +361,6 @@ This is what traditional RAG cannot do. After vector search finds the starting
 chunks, we traverse the graph from them, here to the source document. The same
 pattern extends to components, events, and sensors.
 -->
-
----
-
-## The Complete Knowledge Graph
-
-| Component | Purpose |
-|-----------|---------|
-| **Documents** | Source provenance |
-| **Chunks** | Searchable text units |
-| **Embeddings** | Semantic search |
-| **Entities** | Structured domain knowledge |
-| **Relationships** | Connections between entities |
-
-<!--
-With all five in place, the graph has everything GraphRAG needs: searchable
-text, the structure around it, and the provenance behind it.
--->
-
----
-
-## Three Retrieval Patterns
-
-| Pattern | What It Does |
-|---------|--------------|
-| **Vector** | Semantically similar content (standard RAG) |
-| **Vector Cypher** | Similar content, then traverse to entities |
-| **Text2Cypher** | Query the graph directly for precise facts |
-
-The rest of this deck builds on these three.
-
-<!--
-This is the single most important slide. Everything that follows is one of
-these three retrievers. Vector for content, Vector Cypher for content plus
-relationships, Text2Cypher for precise facts. The combination is more powerful
-than any one alone.
--->
-
----
-
-## Powered by the Neo4j Python GraphRAG Library
-
-- **Retrievers:** ready-made Vector, Vector Cypher, Text2Cypher
-- **Embeddings:** pluggable embedders (Amazon Bedrock Titan, others)
-- **Pipeline:** one call to retrieve context and generate an answer
-
-<!--
-Everything from here is built on the Neo4j Python GraphRAG library. It ships
-the three retriever patterns, pluggable embedders, and a pipeline that
-combines retrieval with generation in one call.
--->
-
----
-
-## The GraphRAG Class
-
-```
-User Question
-    ↓
-Retriever finds relevant context
-    ↓
-Context passed to LLM
-    ↓
-LLM generates grounded answer
-```
-
-Retriever finds context. LLM writes the answer.
-
-<!--
-The GraphRAG class combines retrieval with generation. The retriever's only
-job is finding the right context. The LLM's only job is turning that context
-into a coherent answer.
--->
-
----
-
-## GraphRAG: Graph-Enriched Retrieval
-
-- **Graph holds** structured connections and domain knowledge
-- **Search finds** starting chunks closest in meaning
-- **Traversal enriches** by following entities and relationships
-- **Agents receive** richer context than text search alone
-
-<!--
-Vector or fulltext search finds relevant chunks, standard RAG. What GraphRAG
-adds is graph traversal from those chunks through the entities and
-relationships surrounding them. The agent ends up with far richer context
-than text search could provide.
--->
-
----
-
-![bg contain](images/graphrag-retrieval-flow.png)
 
 ---
 

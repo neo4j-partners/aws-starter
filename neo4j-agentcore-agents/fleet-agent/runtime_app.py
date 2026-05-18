@@ -13,7 +13,7 @@ and injected into the system prompt at ``Agent`` construction. Each request
 streams the answer with ``stream_async``.
 
 Local testing:
-    ./agent.sh start
+    uv run fleet-server
     curl -X POST http://localhost:7070/invocations \
         -H "Content-Type: application/json" \
         -d '{"prompt": "How many aircraft are in the database?"}'
@@ -214,9 +214,20 @@ async def invoke(
             system_prompt=system_prompt,
         )
 
+        # Strands repeats ``current_tool_use`` on every input delta while a
+        # tool call is being assembled; dedupe by toolUseId so each call
+        # surfaces exactly once. Emitting these as ``tool`` events lets the
+        # client print a labelled boundary where graph_query/vector_search ran.
+        last_tool_id: str | None = None
         async for event in agent.stream_async(prompt):
             if "data" in event:
                 yield {"type": "chunk", "data": event["data"]}
+            elif tool_use := event.get("current_tool_use"):
+                tool_id = tool_use.get("toolUseId")
+                name = tool_use.get("name")
+                if name and tool_id != last_tool_id:
+                    last_tool_id = tool_id
+                    yield {"type": "tool", "name": name}
 
         yield {"type": "complete"}
         logger.info("Request completed successfully")
@@ -244,10 +255,28 @@ async def invoke(
         }
 
 
+def main() -> None:
+    """Local dev entry point: ``uv run fleet-server``.
+
+    Runs the server in the foreground; stop with Ctrl+C. Defaults to port
+    7070 for local use so it never collides with a local service on 8080;
+    an explicit ``AGENT_PORT`` still wins. The cloud container never calls
+    this. it uses the ``__main__`` block below. For local OTEL tracing,
+    prefix with ``opentelemetry-instrument``.
+    """
+    port = int(os.environ.get("AGENT_PORT", "7070"))
+    logger.info(
+        "Starting Neo4j Fleet Agent with model: %s on port %s",
+        settings.model_id,
+        port,
+    )
+    app.run(port=port)
+
+
 if __name__ == "__main__":
     # AgentCore Runtime requires the deployed container to serve 8080, so
-    # that is the default. Local runs override via AGENT_PORT (./agent.sh
-    # start sets 7070) to avoid colliding with a local service on 8080.
+    # that is the default for the container path. Local dev uses ``main``
+    # (fleet-server, 7070).
     port = int(os.environ.get("AGENT_PORT", "8080"))
     logger.info(
         "Starting Neo4j Fleet Agent with model: %s on port %s",

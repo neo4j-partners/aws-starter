@@ -118,11 +118,11 @@ Agents connect to the Neo4j MCP server through the Gateway:
 
 | Agent | Pattern |
 |-------|---------|
-| **Fleet Agent** | LangGraph and Strands variants over a shared core |
+| **Fleet Agent** | Strands agent over a shared core |
 | **Finance Agent** | Same LangGraph / Strands split over its own core |
 | **Orchestrator Agent** | Multi-agent supervisor with routing |
 
-Fleet Agent uses one shared `agent.sh` with a variant argument (`./agent.sh langgraph start`); each variant has its own `runtime_app.py` and Dockerfile over a shared `common/` core and uv project.
+Fleet Agent uses one `agent.sh` (`./agent.sh start`) with `runtime_app.py` and a Dockerfile over a shared `common/` core and uv project.
 
 ---
 

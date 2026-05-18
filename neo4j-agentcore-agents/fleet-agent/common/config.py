@@ -1,4 +1,4 @@
-"""Static configuration shared by both framework variants."""
+"""Static configuration shared by the agent entrypoints."""
 
 import os
 

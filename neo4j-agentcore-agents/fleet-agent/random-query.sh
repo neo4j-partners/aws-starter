@@ -4,12 +4,11 @@
 # Continuously invokes the deployed agent with random queries from queries.txt
 # Runs every 10 seconds until interrupted with Ctrl+C
 #
-# Usage: ./random-query.sh [langgraph|strands]   (default: langgraph)
+# Usage: ./random-query.sh
 #
 
 set -e
 
-VARIANT="${1:-langgraph}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 QUERIES_FILE="$SCRIPT_DIR/queries.txt"
 
@@ -63,7 +62,7 @@ while true; do
 
     # Invoke the agent
     cd "$SCRIPT_DIR"
-    ./agent.sh "$VARIANT" invoke-cloud "$query"
+    ./agent.sh invoke-cloud "$query"
 
     echo
     echo "------------------------------------------------------------"

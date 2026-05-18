@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Finance Agent (Strands) — AgentCore Runtime deployment.
+"""Finance Agent — AgentCore Runtime deployment.
 
 A Strands-native financial-analysis agent over the Neo4j MCP server via
-AgentCore Gateway. This is written the Strands way, not a port of the
-LangGraph variant:
+AgentCore Gateway, written the Strands way:
 
 - The Bedrock model and the MCP client are built once at module load.
 - The MCP transport factory resolves a *fresh* OAuth2 token on every context
@@ -32,12 +31,12 @@ Local testing:
     ./agent.sh start
     curl -X POST http://localhost:8080/invocations \
         -H "Content-Type: application/json" \
-        -d '{"prompt": "What companies are in the database?"}'
+        -d '{"prompt": "Which accounts have the highest risk scores, and who do they transfer money to?"}'
 
 Cloud deployment:
     ./agent.sh configure
     ./agent.sh deploy
-    ./agent.sh invoke-cloud "What companies are in the database?"
+    ./agent.sh invoke-cloud "Which accounts have the highest risk scores, and who do they transfer money to?"
 """
 
 import logging
@@ -154,8 +153,8 @@ def _memory_system_prompt(user_id: str, session_id: str | None) -> str:
 
     The memory tools take ``user_id``/``session_id`` as arguments the model
     fills in, so the resolved scope is stated here rather than relying on the
-    model to invent it. Built per request; the shared ``SYSTEM_PROMPT`` (used
-    by the LangGraph variant too) is left untouched.
+    model to invent it. Built per request; the shared ``SYSTEM_PROMPT`` is
+    left untouched.
     """
     if not memory_tools:
         return SYSTEM_PROMPT

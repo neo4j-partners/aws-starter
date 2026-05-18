@@ -13,8 +13,8 @@ The embedder here MUST match the one ``sample-data`` used to populate the
 graph, or vector search returns noise. ``sample-data`` defaults to Amazon
 Bedrock Titan v2 (1024 dims); both are env-overridable.
 
-Nothing in this module imports LangChain or Strands — each variant wraps the
-two callables below as its own framework-native tools.
+Nothing in this module imports Strands. ``tools.py`` wraps the two callables
+below as Strands-native tools.
 """
 
 from __future__ import annotations

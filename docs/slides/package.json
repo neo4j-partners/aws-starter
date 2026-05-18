@@ -1,0 +1,18 @@
+{
+  "name": "aws-in-depth-slides",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Marp slide decks for the AWS + Neo4j in-depth presentation",
+  "scripts": {
+    "preview": "marp --input-dir aws-in-depth --server --allow-local-files",
+    "build": "npm run build:all",
+    "build:all": "node scripts/build-theme-gallery.mjs all",
+    "build:pdf": "marp --input-dir aws-in-depth --output dist --pdf --allow-local-files",
+    "build:html": "marp --input-dir aws-in-depth --output dist --html --allow-local-files",
+    "build:pptx": "marp --input-dir aws-in-depth --output dist --pptx --allow-local-files",
+    "serve": "npm run build:all && python3 -m http.server 8080 --directory build"
+  },
+  "devDependencies": {
+    "@marp-team/marp-cli": "^4.2.3"
+  }
+}

@@ -58,23 +58,21 @@ uv run python simple-agent.py "query"  # Simple agent (static token)
 ```bash
 cd neo4j-agentcore-agents
 
-# Fleet Agent — LangGraph and Strands variants over a shared common/ core.
-# uv project (pyproject.toml, uv.lock, .venv) is at the agent root, with a
-# shared agent.sh; each variant has its own runtime_app.py + Dockerfile.
+# Fleet Agent — Strands agent over a shared common/ core. uv project
+# (pyproject.toml, uv.lock, .venv), agent.sh, runtime_app.py, and Dockerfile
+# all live at the agent root.
 cd fleet-agent
 uv sync                          # Install deps (also installs the common package)
-./agent.sh langgraph start       # Run LangGraph variant locally (port 8080)
-./agent.sh langgraph test        # Test local agent
-./agent.sh langgraph deploy      # Deploy LangGraph variant to AgentCore Runtime
-./agent.sh langgraph invoke-cloud "query"
-./agent.sh strands start         # Run Strands variant locally (port 8080)
-./agent.sh strands deploy        # Deploy Strands variant (distinct agent name)
+./agent.sh start                 # Run locally (port 8080)
+./agent.sh test                  # Test local agent
+./agent.sh deploy                # Deploy to AgentCore Runtime
+./agent.sh invoke-cloud "query"
 
-# Finance Agent — same LangGraph/Strands split over its own common/ core
+# Finance Agent: Strands agent over its own common/ core. Same root layout
+# as fleet-agent (agent.sh, runtime_app.py, Dockerfile at the agent root).
 cd ../finance-agent
 uv sync
-langgraph/agent.sh start     # LangGraph variant
-strands/agent.sh start       # Strands variant
+./agent.sh start
 # (start/test/configure/deploy/status/invoke-cloud/destroy)
 
 # Orchestrator Agent (multi-agent with routing)
@@ -94,8 +92,7 @@ uv sync
 
 uv run local-test sync-credentials   # Copy creds from MCP server
 uv run local-test all fleet-agent    # Build, run, test all-in-one
-uv run local-test build fleet-agent  # Build Docker image (default: langgraph variant)
-uv run local-test build fleet-agent --variant strands  # Build Strands variant
+uv run local-test build fleet-agent  # Build Docker image
 uv run local-test run fleet-agent    # Start container
 uv run local-test test fleet-agent   # Send test request
 uv run local-test logs fleet-agent   # View container logs

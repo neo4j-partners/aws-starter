@@ -6,8 +6,8 @@ server, no Gateway). Uses the synchronous Strands agent call — the idiomatic
 form for a one-shot CLI. The schema is injected into the system prompt.
 
 Usage:
-    uv run python strands/local_cli.py                  # demo queries
-    uv run python strands/local_cli.py "your question"  # ask
+    uv run python local_cli.py                  # demo queries
+    uv run python local_cli.py "your question"  # ask
 """
 
 import logging

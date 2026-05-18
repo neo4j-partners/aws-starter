@@ -1,12 +1,12 @@
 """Shared, framework-agnostic building blocks for the Finance Agent.
 
-Both framework variants (``langgraph/`` and ``strands/``) import from here:
+The agent entrypoint imports from here:
 
 - :mod:`common.config`      — model id, region, system prompt
 - :mod:`common.credentials` — credential loading + OAuth2 token refresh
 
-Nothing in this package depends on LangGraph or Strands. Framework-specific
-wiring (LLM construction, MCP client) lives in each variant.
+Nothing in this package depends on Strands. Framework-specific wiring (model
+construction, MCP client) lives in ``runtime_app.py``.
 """
 
 from common.config import AWS_REGION, MODEL_ID, SYSTEM_PROMPT

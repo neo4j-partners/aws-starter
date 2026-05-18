@@ -1,8 +1,8 @@
 """Strands-native tool wrappers over the framework-agnostic common callables.
 
-Imported by both ``strands/runtime_app.py`` and ``strands/local_cli.py``: the
-variant directory is ``sys.path[0]`` for the script entrypoints, so this is a
-plain top-level module, not a package import.
+Imported by both ``runtime_app.py`` and ``local_cli.py``: the agent root is
+``sys.path[0]`` for the script entrypoints, so this is a plain top-level
+module, not a package import.
 """
 
 from strands import tool

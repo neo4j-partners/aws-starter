@@ -13,15 +13,15 @@ and injected into the system prompt at ``Agent`` construction. Each request
 streams the answer with ``stream_async``.
 
 Local testing:
-    ./agent.sh strands start
+    ./agent.sh start
     curl -X POST http://localhost:8080/invocations \
         -H "Content-Type: application/json" \
         -d '{"prompt": "How many aircraft are in the database?"}'
 
 Cloud deployment:
-    ./agent.sh strands configure
-    ./agent.sh strands deploy
-    ./agent.sh strands invoke-cloud "How many aircraft are in the database?"
+    ./agent.sh configure
+    ./agent.sh deploy
+    ./agent.sh invoke-cloud "How many aircraft are in the database?"
 """
 
 import asyncio

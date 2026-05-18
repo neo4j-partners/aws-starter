@@ -1,7 +1,7 @@
 [project]
 name = "neo4j-fleet-agent"
 version = "0.1.0"
-description = "Neo4j fleet agent — LangGraph and Strands variants, direct-to-Neo4j GraphRAG over a shared common/ core"
+description = "Neo4j fleet agent — Strands, direct-to-Neo4j GraphRAG over a shared common/ core"
 requires-python = ">=3.10"
 dependencies = [
     # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)
@@ -14,12 +14,7 @@ dependencies = [
     "pyyaml>=6.0",
     # Observability - ADOT for automatic tracing to CloudWatch
     "aws-opentelemetry-distro>=0.10.0",
-    # LangGraph variant
-    "langchain>=1.2.0",
-    "langgraph>=1.0.6",
-    "langchain-aws>=1.2.0",
-    "langchain-core>=0.3.0",
-    # Strands variant
+    # Strands agent framework
     "strands-agents",
 ]
 
@@ -27,9 +22,7 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Install the shared `common` package into the venv so both variants can
-# `from common import ...` without any sys.path manipulation. The agent root
-# is never placed on sys.path, so the `langgraph/` and `strands/`
-# subdirectories cannot shadow the installed langchain/strands packages.
+# Install the shared `common` package into the venv so the entrypoints can
+# `from common import ...` without any sys.path manipulation.
 [tool.hatch.build.targets.wheel]
 packages = ["common"]

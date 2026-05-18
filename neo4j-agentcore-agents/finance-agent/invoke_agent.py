@@ -3,20 +3,19 @@
 
 This calls the AgentCore Runtime agent recorded in ``.bedrock_agentcore.yaml``
 via boto3. Unlike ``agentcore invoke`` (which sends ``{"prompt": ...}`` only),
-this client also puts ``user_id``/``session_id`` in the payload so the Strands
-variant's per-request memory directives bind to them.
+this client also puts ``user_id``/``session_id`` in the payload so the
+agent's per-request memory directives bind to them.
 
 The stock ``neo4j_agent_memory`` 0.2.1 Strands tools accept ``user_id`` but
-ignore it (message search is a global vector query). The Strands variant
+ignore it (message search is a global vector query). The agent
 works around this with ``common.memory.user_scoped_context_graph_tools``, so
 this agent *does* isolate by ``user_id`` and recalls across that user's
 sessions. The ``memory-demo`` therefore proves both cross-session recall and
 per-user isolation; ``verify_neo4j_persistence`` is the ground-truth check.
 
-Memory is wired into the **Strands** variant only
-(``strands/runtime_app.py`` -> ``neo4j_agent_memory``). The ``memory-demo`` mode is
-only meaningful against a deployed Strands agent; the LangGraph variant has no
-memory tools and will just answer each turn independently.
+Memory is wired into ``runtime_app.py`` (-> ``neo4j_agent_memory``). The
+``memory-demo`` mode is only meaningful against a deployed agent that had
+``NEO4J_URI``/``NEO4J_PASSWORD`` injected at deploy time.
 
 The response is streamed: SSE events ("data: {...}\\n\\n") are parsed as they
 arrive off the wire and the answer is printed to the terminal token by token,
@@ -34,7 +33,7 @@ Usage:
     uv run python invoke_agent.py load-test --interval 10
 
 Prerequisites:
-    - Strands variant deployed (strands/agent.sh deploy)
+    - Agent deployed (./agent.sh deploy)
     - NEO4J_URI / NEO4J_PASSWORD injected at deploy time (memory-demo needs it)
     - AWS credentials configured
     - .bedrock_agentcore.yaml present (created by agentcore configure)
@@ -62,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 CONFIG_FILE = Path(__file__).parent / ".bedrock_agentcore.yaml"
 QUERIES_FILE = Path(__file__).parent / "queries.txt"
-DEFAULT_PROMPT = "What companies are in the database?"
+DEFAULT_PROMPT = "Which accounts have the highest risk scores, and who do they transfer money to?"
 DEFAULT_USER_ID = "demo-user"
 
 # Distinctive tokens from the memory-demo "teach" turn. The agent summarizes
@@ -72,7 +71,7 @@ DEFAULT_USER_ID = "demo-user"
 TEACH_NEEDLES = ("energy", "nvidia")
 
 # .env files searched (in order) for direct Neo4j credentials, mirroring
-# strands/agent.sh: project-local first, then the Neo4j MCP server's .env
+# agent.sh: project-local first, then the Neo4j MCP server's .env
 # (same database as the finance graph).
 ENV_FILES = (
     Path(__file__).parent / ".env",
@@ -91,7 +90,7 @@ def get_agent_config() -> tuple[str, str]:
     except FileNotFoundError:
         print(f"ERROR: {CONFIG_FILE.name} not found")
         print("")
-        print("Run 'strands/agent.sh configure' and 'strands/agent.sh deploy' first")
+        print("Run './agent.sh configure' and './agent.sh deploy' first")
         sys.exit(1)
 
     default_agent = config.get("default_agent")
@@ -146,8 +145,8 @@ def invoke_agent(
 ) -> dict:
     """Invoke the deployed agent with one prompt, scoped to ``user_id``.
 
-    ``user_id``/``session_id`` go in the JSON payload because the Strands
-    variant's ``_resolve_user_id`` reads them from there to scope its memory
+    ``user_id``/``session_id`` go in the JSON payload because the agent's
+    ``_resolve_user_id`` reads them from there to scope its memory
     tools. The boto3 ``runtimeSessionId`` is a separate transport-level id
     (fresh per call) and is not what the memory scope keys off.
     """
@@ -222,7 +221,7 @@ def run_memory_demo(user_id: str) -> None:
 
     Same ``user_id``, different ``session_id`` per turn: if the second turn
     answers using the preference stated in the first, cross-session
-    persistence and semantic recall are working. Because the Strands variant
+    persistence and semantic recall are working. Because the agent
     uses ``common.memory``'s user-scoped tools, recall is also isolated per
     ``user_id`` (a different user would not see this memory).
     ``verify_neo4j_persistence`` is the ground-truth check.
@@ -275,7 +274,7 @@ def run_memory_demo(user_id: str) -> None:
 def _read_env_var(path: Path, key: str) -> str | None:
     """First ``KEY=value`` match in ``path``, with one quote layer stripped.
 
-    Mirrors ``strands/agent.sh``'s ``read_env_var``: split on the first '='
+    Mirrors ``agent.sh``'s ``read_env_var``: split on the first '='
     so passwords containing '=' survive, strip CR, then peel one layer of
     surrounding single/double quotes (common .env style).
     """

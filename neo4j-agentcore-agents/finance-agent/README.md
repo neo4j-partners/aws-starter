@@ -1,10 +1,27 @@
 # Finance Agent
 
-A ReAct agent for financial data analysis over SEC filings, companies, risk
-factors, and institutional ownership. It connects to a Neo4j MCP server
-through an AgentCore Gateway and reasons with Claude on Bedrock. This is the
-simplest agent to deploy: `agentcore deploy` zips the Python source and
-uploads it, with no Docker image required.
+A ReAct agent for financial-crime analysis over a Neo4j transaction graph:
+accounts, merchants, money transfers, behavioral similarity, and pre-computed
+graph metrics. It connects to a Neo4j MCP server through an AgentCore Gateway
+and reasons with Claude on Bedrock. This is the simplest agent to deploy:
+`agentcore deploy` zips the Python source and uploads it, with no Docker image
+required.
+
+## The Graph
+
+The agent is tuned for the money-movement graph behind the MCP server:
+
+| Element | Properties |
+|---------|------------|
+| `Account` node (25K) | `balance`, `account_type`, `region`, `risk_score` (unbounded, higher is riskier), `community_id`, `betweenness_centrality` |
+| `Merchant` node (7.5K) | `merchant_name`, `category` (gaming, restaurant, grocery, ...), `region` |
+| `TRANSACTED_WITH` (Account to Merchant, 249K) | `amount`, `txn_hour`, `txn_timestamp` |
+| `TRANSFERRED_TO` (Account to Account, 223K) | `amount`, `transfer_timestamp` |
+| `SIMILAR_TO` (Account to Account, 243K) | `similarity_score` |
+
+The data is pre-enriched with Neo4j GDS: community IDs, betweenness
+centrality, and similarity edges. Questions that traverse the graph
+(transfer chains, shared counterparties, communities) get the most out of it.
 
 ## Architecture
 
@@ -49,8 +66,7 @@ deployed agent take the exact same Gateway path.
 name, IAM role, and region. `agent.sh deploy` runs `agentcore deploy`, which
 uses `direct_code_deploy`: it zips the Python source, uploads it to S3,
 triggers CodeBuild to install dependencies, and creates or updates the
-AgentCore Runtime agent. No Docker image is built. The LangGraph and Strands
-variants deploy under distinct agent names.
+AgentCore Runtime agent. No Docker image is built.
 
 **Yes, it deploys to AgentCore.** The deployed target is an Amazon Bedrock
 AgentCore Runtime agent. Invoke it with `agent.sh invoke-cloud` or with boto3
@@ -59,12 +75,11 @@ against the deployed runtime ARN.
 
 ## Unique Features
 
-- **Two framework variants, one core.** `common/` holds the
-  framework-agnostic credentials, token refresh, model config, and system
-  prompt. `langgraph/` and `strands/` are thin wrappers that produce the same
-  answers through the same Gateway. Compare frameworks side by side.
-- **Neo4j-backed semantic memory (Strands variant).** When `NEO4J_URI` and
-  `NEO4J_PASSWORD` are set, the Strands variant adds Context Graph memory
+- **Shared core, thin entrypoint.** `common/` holds the framework-agnostic
+  credentials, token refresh, model config, and system prompt. The Strands
+  `runtime_app.py` is a thin wrapper over it.
+- **Neo4j-backed semantic memory.** When `NEO4J_URI` and
+  `NEO4J_PASSWORD` are set, the agent adds Context Graph memory
   tools: `search_context`, `get_entity_graph`, `add_memory`, and
   `get_user_preferences`. Memory is scoped per request by `user_id`. It is
   best-effort and disables cleanly when those env vars are absent.
@@ -76,9 +91,10 @@ against the deployed runtime ARN.
 | Path | Use |
 |------|-----|
 | `common/` | Shared credentials, token refresh, model config, prompt |
-| `langgraph/runtime_app.py`, `strands/runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
-| `langgraph/local_cli.py`, `strands/local_cli.py` | Local CLI, run queries directly in the terminal |
-| `langgraph/agent.sh`, `strands/agent.sh` | CLI wrapper for start, test, deploy, invoke |
+| `runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `demo_client.py` | Showcase client, runs the demo questions local or `--remote` |
+| `local_cli.py` | Local CLI, run a single query directly in the terminal |
+| `agent.sh` | CLI wrapper for start, test, deploy, invoke |
 | `invoke_agent.py` | Call the deployed agent programmatically with boto3 |
 
 ## Prerequisites
@@ -95,15 +111,39 @@ against the deployed runtime ARN.
 cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 uv sync
 
-# CLI mode, no server
-uv run python langgraph/local_cli.py "Who are the largest owners of NVIDIA?"
+# Showcase: runs ALL demo questions in-process, no server, no deploy
+uv run python demo_client.py
+
+# Same six questions against the deployed AgentCore agent instead
+uv run python demo_client.py --remote
+
+# Pick one question, or just list them
+uv run python demo_client.py -n 4
+uv run python demo_client.py --list
+
+# One-off question, no server
+uv run python local_cli.py "Which accounts have the highest risk scores, and who do they transfer money to?"
 
 # Or run the AgentCore server locally on port 8080
-langgraph/agent.sh start
-langgraph/agent.sh test
+./agent.sh start          # in one terminal, leave running
+./agent.sh test           # in another, sends the default demo query
 ```
 
-Swap `langgraph` for `strands` to run the Strands variant.
+`demo_client.py` with no arguments runs every question in the
+[Demo](#demo) table, locally and in process. It is the fastest way to see
+the agent work end to end after `uv sync`.
+
+`./agent.sh start` binds port 8080 and blocks. Run `./agent.sh test` from a
+second terminal, or send your own query:
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/invocations \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt": "Find circular transfer chains where money returns to its origin account"}'
+```
+
+The response streams back as `data:` server-sent events, one JSON chunk per
+line (`{"type": "chunk", "data": "..."}`), ending with `{"type": "complete"}`.
 
 ## Quick Start: Cloud
 
@@ -111,18 +151,50 @@ Swap `langgraph` for `strands` to run the Strands variant.
 cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 uv sync
 
-langgraph/agent.sh configure        # generates .bedrock_agentcore.yaml
-langgraph/agent.sh deploy           # zips source, uploads, creates the runtime
-langgraph/agent.sh invoke-cloud "What companies are in the database?"
+./agent.sh configure        # generates .bedrock_agentcore.yaml
+./agent.sh deploy           # zips source, uploads, creates the runtime
+./agent.sh invoke-cloud "Which accounts have the highest risk scores, and who do they transfer money to?"
 ```
 
 `agentcore deploy` uses `direct_code_deploy`. It packages the source, uploads
 it to S3, and creates or updates the AgentCore Runtime agent. No container
-build runs. The two variants deploy under distinct agent names.
+build runs.
+
+## Demo
+
+These questions exercise the parts of the graph that a flat database cannot
+answer well. `demo_client.py` runs all of them in order: locally by default,
+or against the deployed agent with `--remote`. They also work one at a time
+via `local_cli.py`, `curl`, or `./agent.sh invoke-cloud "..."`.
+
+```bash
+uv run python demo_client.py            # all questions, local
+uv run python demo_client.py --remote   # all questions, deployed agent
+```
+
+| Question | What it shows |
+|----------|---------------|
+| `Which accounts have the highest risk scores, and who do they transfer money to?` | Risk ranking joined to one hop of transfer behavior. This is the default query. |
+| `Find communities of accounts that transfer money among themselves but rarely transact with merchants.` | Uses pre-computed `community_id` to surface insular clusters. |
+| `Show the accounts with the highest betweenness centrality and explain why they are money-flow intermediaries.` | Centrality as a structural signal, not just a property lookup. |
+| `Detect circular transfer chains where money leaves an account and returns to it, A to B to C to A.` | Multi-hop path pattern, a classic layering signal. |
+| `Pick a high-risk account, find behaviorally similar accounts via SIMILAR_TO, and check whether they share transfer counterparties.` | Combines similarity edges with shared-neighbor traversal. |
+| `Which merchant categories see the most transaction volume by region?` | Aggregation across `TRANSACTED_WITH` for a baseline, non-graph answer. |
+
+Cross-session memory demo (requires `NEO4J_URI` and `NEO4J_PASSWORD`, see
+[Environment Variables](#environment-variables)):
+
+```bash
+./agent.sh memory-demo            # default user
+./agent.sh memory-demo analyst-1  # scoped to a specific user_id
+```
+
+This runs two sessions: the first states a durable fact, the second confirms
+the agent recalls it from the Context Graph in a fresh session.
 
 ## Commands
 
-`langgraph/agent.sh` and `strands/agent.sh` accept:
+`./agent.sh` accepts:
 
 | Command | Description |
 |---------|-------------|
@@ -133,6 +205,7 @@ build runs. The two variants deploy under distinct agent names.
 | `deploy` | Deploy to AgentCore Runtime |
 | `status` | Check deployment status |
 | `invoke-cloud "prompt"` | Invoke the deployed agent |
+| `memory-demo [user_id]` | Cross-session Context Graph memory demo |
 | `destroy` | Remove from AgentCore |
 
 ## Environment Variables

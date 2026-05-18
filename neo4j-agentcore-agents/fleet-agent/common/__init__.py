@@ -1,13 +1,14 @@
-"""Shared, framework-agnostic building blocks for the Neo4j fleet agent.
+"""Shared building blocks for the Neo4j fleet agent.
 
-Both framework variants (``langgraph/`` and ``strands/``) import from here:
+The Strands entrypoints (``runtime_app.py``, ``local_cli.py``) and the tool
+wrappers (``tools.py``) import from here:
 
 - :mod:`common.config`       — model id, region, embedder/index, prompt
 - :mod:`common.neo4j_tools`  — direct-to-Neo4j GraphRAG retrieval callables
 
 The agent connects straight to Neo4j (no MCP server, no AgentCore Gateway).
-Framework-specific wiring (LLM construction, tool binding) lives in each
-variant; the retrieval callables here are plain functions both variants wrap.
+Strands-specific wiring (LLM construction, tool binding) lives in the
+entrypoints; the retrieval callables here are plain functions they wrap.
 
 Importing this package loads the agent-root ``.env``, the fleet-agent
 directory one level up from ``common/``, so local runs pick up the Neo4j

@@ -74,7 +74,7 @@ A multi-agent supervisor on AWS Bedrock AgentCore routes questions to the right 
 | **AI capability** | SQL analytics, foundation models | Vector indexes, GraphRAG, MCP |
 | **Strength** | Scale, aggregation, ML | Relationships, traversal, pattern matching |
 
-A data connector moves data between the stores. **MCP** lets agents query the graph directly. Together, the stores stay connected at every layer.
+**AWS Glue with the Neo4j Spark connector** moves data between the stores. Together, the stores stay connected at every layer.
 
 ---
 
@@ -113,7 +113,7 @@ The next slides break down what each side does and when to reach for which.
 
 Data in the analytics store lives in **rows and columns**. Data in Neo4j lives as **nodes and relationships**.
 
-A data connector handles the translation:
+The Neo4j Connector for Apache Spark, run as an AWS Glue job, handles the translation:
 
 | Columnar analytics store | Knowledge Graph (Neo4j) |
 |------------------------|------------------------|
@@ -295,7 +295,7 @@ No Cypher or SQL knowledge is required from the end user.
 
 The dual data architecture is a natural pairing:
 
-- A data connector moves data between the analytics store and the knowledge graph
+- AWS Glue with the Neo4j Spark connector moves data between the analytics store and the knowledge graph
 - **Tabular data becomes a graph**, making implicit relationships explicit and queryable
 - **Neo4j as an MCP server** gives AI agents direct access to the knowledge graph
 - **A multi-agent supervisor on AWS Bedrock AgentCore** routes questions to the right store automatically

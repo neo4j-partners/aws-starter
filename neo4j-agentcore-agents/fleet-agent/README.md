@@ -1,16 +1,16 @@
 # Fleet Agent
 
-A single ReAct agent that answers natural language questions about an
+A Strands ReAct agent that answers natural language questions about an
 aviation fleet graph. It connects **directly to Neo4j** (no MCP server, no
 AgentCore Gateway) and reasons with Claude on Bedrock using two
-`neo4j-graphrag` retrievers. This agent is the reference for the framework
-split: one shared core wired to both LangGraph and Strands.
+`neo4j-graphrag` retrievers, with a shared `common/` core that holds the
+Neo4j driver, retrievers, and prompt.
 
 ## Architecture
 
 ```
 User input (POST /invocations)
-  -> BedrockAgentCoreApp (langgraph/runtime_app.py or strands/runtime_app.py)
+  -> BedrockAgentCoreApp (runtime_app.py)
      -> ReAct loop: Claude on Bedrock + two tools
         -> graph_query   (Text2Cypher, neo4j-graphrag)    -> Neo4j
         -> vector_search (VectorRetriever, neo4j-graphrag) -> Neo4j
@@ -49,19 +49,20 @@ Bedrock Titan v2, 1024 dims — overridable via `EMBED_MODEL_ID` /
 - **Live-schema caching.** `common/neo4j_tools.py` fetches the Neo4j schema
   once per process and injects it into the system prompt, so Claude routes
   tools without a schema round trip per request.
-- **Two framework variants, one core.** `common/` is framework-agnostic and
-  exposes plain `graph_query` / `vector_search` callables. `langgraph/` wraps
-  them as LangChain tools; `strands/` wraps them as Strands tools. Same
-  answers, different framework.
+- **Shared core, thin Strands wrappers.** `common/` exposes plain
+  `graph_query` / `vector_search` callables; `tools.py` wraps them as Strands
+  tools that `runtime_app.py` and `local_cli.py` bind to the agent.
 
 ## Layout
 
 | Path | Use |
 |------|-----|
 | `common/` | Neo4j driver + GraphRAG retrievers, model config, prompt |
-| `langgraph/runtime_app.py`, `strands/runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
-| `langgraph/local_cli.py`, `strands/local_cli.py` | Simplified local experimentation |
-| `agent.sh` | Shared CLI wrapper for all operations; first arg picks the variant |
+| `tools.py` | Strands tool wrappers over the `common` callables |
+| `runtime_app.py` | AgentCore Runtime entrypoint, port 8080 or cloud |
+| `local_cli.py` | Simplified local experimentation |
+| `demo.py` | Console showcase of the full agent surface, section by section |
+| `agent.sh` | CLI wrapper for all operations |
 | `invoke_agent.py` | Invoke the deployed agent with boto3, supports load testing |
 | `queries.txt` | 20 sample queries across discovery, fleet, maintenance, delays |
 
@@ -82,21 +83,50 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your-password
 EOF
 
-./agent.sh langgraph start        # serves http://localhost:8080
-./agent.sh langgraph test         # sends a sample query
+./agent.sh start        # serves http://localhost:8080
+./agent.sh test         # sends a sample query
 ```
 
-Swap `langgraph` for `strands` to run the Strands variant. `agent.sh start`
-auto-loads the agent-root `.env`.
+`agent.sh start` auto-loads the agent-root `.env`.
+
+## Quick Start: Demo (no server)
+
+`demo.py` walks the full agent surface in the console, one `====` section at
+a time, each with a plain-English description of what it shows:
+
+1. the live Neo4j schema the agent reasons over,
+2. the `graph_query` retriever alone (Text2Cypher),
+3. the `vector_search` retriever alone (semantic search over manual chunks),
+4. the full Strands ReAct agent choosing tools by itself.
+
+No server is required. `demo.py` builds its own in-process Strands agent and
+connects straight to Neo4j, so you do not run `./agent.sh start` first. It
+needs only the three things in [Prerequisites](#prerequisites): `uv sync`, a
+`.env` with the Neo4j connection, and AWS credentials for Bedrock.
+
+```bash
+uv sync
+cat > .env <<'EOF'
+NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-password
+EOF
+
+uv run python demo.py
+```
+
+Section 4 invokes Claude on Bedrock for several turns, so a full run takes a
+few minutes and incurs Bedrock usage. The data-only sections 1 to 3 return
+immediately.
 
 ## Quick Start: Cloud
 
 ```bash
 uv sync
 
-./agent.sh langgraph configure        # generates .bedrock_agentcore.yaml
-./agent.sh langgraph deploy           # packages, builds image, provisions runtime
-./agent.sh langgraph invoke-cloud "How many aircraft are in the database?"
+./agent.sh configure        # generates .bedrock_agentcore.yaml
+./agent.sh deploy           # packages, builds image, provisions runtime
+./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
 
 `agentcore deploy` packages the code, builds an ARM64 container image, pushes
@@ -111,17 +141,15 @@ From the parent `neo4j-agentcore-agents/` directory:
 
 ```bash
 uv run local-test all fleet-agent                  # build, run, test
-uv run local-test build fleet-agent --variant strands
+uv run local-test build fleet-agent
 ```
 
-The harness keys the image and container by agent name and ignores the
-variant. The langgraph and strands variants cannot run as separate containers
-at the same time. Run one variant at a time, and pass the Neo4j env vars
-through to the container.
+The harness builds from the agent-root `Dockerfile` and keys the image and
+container by agent name. Pass the Neo4j env vars through to the container.
 
 ## Commands
 
-`./agent.sh <langgraph|strands> <command>` accepts:
+`./agent.sh <command>` accepts:
 
 | Command | Description |
 |---------|-------------|

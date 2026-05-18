@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Finance Agent (Strands) — local CLI.
+"""Finance Agent — local CLI.
 
 A Strands-native terminal client for the Neo4j MCP server via AgentCore
 Gateway. Uses the synchronous Strands agent call — the idiomatic form for a
 one-shot CLI.
 
 Usage:
-    uv run python strands/local_cli.py                            # demo
-    uv run python strands/local_cli.py "Tell me about Apple Inc"  # ask
+    uv run python local_cli.py                            # demo
+    uv run python local_cli.py "Tell me about Apple Inc"  # ask
 """
 
 import logging

@@ -1,8 +1,8 @@
 """Credential loading and in-memory OAuth2 token refresh.
 
 Credentials come from ``.mcp-credentials.json`` at the agent root (one level
-above this package, so resolution is stable no matter which variant's
-entrypoint is running). The access token is refreshed in memory only — no
+above this package, so resolution is stable regardless of the working
+directory). The access token is refreshed in memory only — no
 file writes — so this works unchanged on AgentCore Runtime where the
 filesystem is ephemeral.
 """
@@ -17,7 +17,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Anchor to the agent root (parent of the `common` package), not to the
-# entrypoint's directory — entrypoints live in `langgraph/` and `strands/`.
+# current working directory, so credential resolution is stable.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
 CREDENTIALS_FILE = AGENT_ROOT / ".mcp-credentials.json"
 

@@ -1,11 +1,10 @@
-# Finance Agent (Strands) — Dockerfile for AgentCore Runtime
+# Finance Agent — Dockerfile for AgentCore Runtime
 #
-# Build context is the agent root (one level up), so the shared `common/`
-# package and the root pyproject.toml/uv.lock are available:
+# Build context is the agent root, so the shared `common/` package and the
+# root pyproject.toml/uv.lock are available:
 #
-#   docker build --platform linux/arm64 \
-#       -f strands/Dockerfile -t finance-strands .
-#   docker run -p 8080:8080 finance-strands
+#   docker build --platform linux/arm64 -t finance-agent .
+#   docker run -p 8080:8080 finance-agent
 #
 # AgentCore Requirements: ARM64 (aarch64), port 8080, HTTP server on 8080.
 
@@ -27,7 +26,7 @@ COPY common ./common
 COPY vendor ./vendor
 RUN uv sync --frozen --no-dev
 
-COPY strands ./strands
+COPY runtime_app.py ./
 
 # Copy MCP credentials if present (wildcard avoids failure when absent).
 COPY .mcp-credentials.jso[n] ./
@@ -36,4 +35,4 @@ EXPOSE 8080
 
 # opentelemetry-instrument (from aws-opentelemetry-distro) wraps the process
 # so AgentCore emits traces/metrics to CloudWatch GenAI Observability.
-CMD ["uv", "run", "opentelemetry-instrument", "python", "strands/runtime_app.py"]
+CMD ["uv", "run", "opentelemetry-instrument", "python", "runtime_app.py"]

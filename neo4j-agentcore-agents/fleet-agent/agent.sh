@@ -1,24 +1,20 @@
 #!/bin/bash
 # Neo4j Fleet Agent - AgentCore Runtime
 #
-# A ReAct agent that connects directly to Neo4j (no MCP server, no Gateway)
-# and answers natural language questions using AWS Bedrock Claude + the
-# neo4j-graphrag vector and Text2Cypher retrievers.
-#
-# Two framework variants share this script; pass the variant as the first
-# argument. The variant selects the entrypoint (<variant>/runtime_app.py)
-# and the deployed agent name (fleet_<variant>).
+# A Strands ReAct agent that connects directly to Neo4j (no MCP server, no
+# Gateway) and answers natural language questions using AWS Bedrock Claude +
+# the neo4j-graphrag vector and Text2Cypher retrievers.
 #
 # Usage:
-#   ./agent.sh <langgraph|strands> start              Start locally (port 8080, ADOT tracing)
-#   ./agent.sh <langgraph|strands> stop               Stop local agent
-#   ./agent.sh <langgraph|strands> test               Test local agent with curl
-#   ./agent.sh <langgraph|strands> configure          Configure for AWS deployment
-#   ./agent.sh <langgraph|strands> deploy             Deploy to AgentCore Runtime
-#   ./agent.sh <langgraph|strands> status             Check deployment status
-#   ./agent.sh <langgraph|strands> invoke-cloud "prompt"  Invoke deployed agent
-#   ./agent.sh <langgraph|strands> load-test [N]      Run load test (Ns interval, default 5)
-#   ./agent.sh <langgraph|strands> destroy            Remove from AgentCore
+#   ./agent.sh start              Start locally (port 8080, ADOT tracing)
+#   ./agent.sh stop               Stop local agent
+#   ./agent.sh test               Test local agent with curl
+#   ./agent.sh configure          Configure for AWS deployment
+#   ./agent.sh deploy             Deploy to AgentCore Runtime
+#   ./agent.sh status             Check deployment status
+#   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent
+#   ./agent.sh load-test [N]      Run load test (Ns interval, default 5)
+#   ./agent.sh destroy            Remove from AgentCore
 #
 # Prerequisites:
 #   - Neo4j connection env vars: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
@@ -27,8 +23,8 @@
 
 set -e
 
-# The uv project (pyproject.toml, uv.lock, .venv, .env, invoke_agent.py) and
-# this script all live at the agent root; entrypoints live in variant dirs.
+# The uv project (pyproject.toml, uv.lock, .venv, .env, invoke_agent.py),
+# the entrypoint (runtime_app.py), and this script all live at the agent root.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
@@ -41,38 +37,20 @@ print_usage() {
     echo "Neo4j Fleet Agent - AgentCore Runtime"
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh <langgraph|strands> start              Start locally (port 8080)"
-    echo "  ./agent.sh <langgraph|strands> stop               Stop local agent"
-    echo "  ./agent.sh <langgraph|strands> test               Test local agent with curl"
-    echo "  ./agent.sh <langgraph|strands> configure          Configure for AWS deployment"
-    echo "  ./agent.sh <langgraph|strands> deploy             Deploy to AgentCore Runtime"
-    echo "  ./agent.sh <langgraph|strands> status             Check deployment status"
-    echo "  ./agent.sh <langgraph|strands> invoke-cloud \"prompt\"  Invoke deployed agent"
-    echo "  ./agent.sh <langgraph|strands> load-test [N]      Run load test (Ns interval)"
-    echo "  ./agent.sh <langgraph|strands> destroy            Remove from AgentCore"
-    echo "  ./agent.sh help                                   Show this help message"
+    echo "  ./agent.sh start              Start locally (port 8080)"
+    echo "  ./agent.sh stop               Stop local agent"
+    echo "  ./agent.sh test               Test local agent with curl"
+    echo "  ./agent.sh configure          Configure for AWS deployment"
+    echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
+    echo "  ./agent.sh status             Check deployment status"
+    echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed agent"
+    echo "  ./agent.sh load-test [N]      Run load test (Ns interval)"
+    echo "  ./agent.sh destroy            Remove from AgentCore"
+    echo "  ./agent.sh help               Show this help message"
 }
 
-# First argument selects the framework variant.
-VARIANT="${1:-help}"
-case "$VARIANT" in
-    langgraph|strands)
-        shift
-        ;;
-    help|--help|-h)
-        print_usage
-        exit 0
-        ;;
-    *)
-        echo -e "${RED}Unknown variant: $VARIANT (expected 'langgraph' or 'strands')${NC}"
-        echo ""
-        print_usage
-        exit 1
-        ;;
-esac
-
-ENTRYPOINT="$VARIANT/runtime_app.py"
-AGENT_NAME="fleet_${VARIANT}"
+ENTRYPOINT="runtime_app.py"
+AGENT_NAME="fleet_agent"
 
 ensure_deps() {
     if [ ! -d ".venv" ]; then
@@ -124,7 +102,7 @@ case "${1:-help}" in
     start)
         ensure_deps
         load_env
-        echo -e "${GREEN}Starting ${VARIANT} agent locally on port 8080 with OTEL instrumentation...${NC}"
+        echo -e "${GREEN}Starting agent locally on port 8080 with OTEL instrumentation...${NC}"
         echo "Test with: curl -X POST http://localhost:8080/invocations -H 'Content-Type: application/json' -d '{\"prompt\": \"Hello\"}'"
         echo ""
         uv run opentelemetry-instrument python "$ENTRYPOINT"
@@ -146,27 +124,27 @@ case "${1:-help}" in
 
     configure)
         ensure_deps
-        echo -e "${GREEN}Configuring ${VARIANT} agent for AWS deployment...${NC}"
+        echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
         echo ""
         uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME"
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
-        echo "Run './agent.sh $VARIANT deploy' to deploy to AgentCore Runtime"
+        echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"
         ;;
 
     deploy)
         ensure_deps
         load_env
         deploy_env_args
-        echo -e "${GREEN}Deploying ${VARIANT} agent to AgentCore Runtime...${NC}"
+        echo -e "${GREEN}Deploying agent to AgentCore Runtime...${NC}"
         echo "Passing Neo4j connection as Runtime environment variables."
         echo "This may take several minutes..."
         echo ""
         uv run agentcore deploy "${DEPLOY_ENV_ARGS[@]}"
         echo ""
         echo -e "${GREEN}Deployment complete!${NC}"
-        echo "Run './agent.sh $VARIANT status' to check status"
-        echo "Run './agent.sh $VARIANT invoke-cloud \"your question\"' to test"
+        echo "Run './agent.sh status' to check status"
+        echo "Run './agent.sh invoke-cloud \"your question\"' to test"
         ;;
 
     status)

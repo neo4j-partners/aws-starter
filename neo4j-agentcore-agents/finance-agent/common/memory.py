@@ -51,8 +51,8 @@ is large and the entity graph is intentionally not user-scoped, so forking
 it would add risk for no gain.
 
 This is the only ``common`` module that depends on ``neo4j_agent_memory``;
-``common/__init__`` does not import it, so the LangGraph variant (which has no
-memory tools) never pulls the dependency.
+``common/__init__`` does not import it, so importers that do not need memory
+tools never pull the dependency.
 """
 
 import asyncio

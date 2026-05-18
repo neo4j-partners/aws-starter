@@ -6,14 +6,48 @@ AgentCore Gateway) and reasons with Claude on Bedrock using two
 `neo4j-graphrag` retrievers, with a shared `common/` core that holds the
 Neo4j driver, retrievers, and prompt.
 
+- **Direct Neo4j driver:** the agent opens a single Neo4j driver per process
+  straight to Aura, with no MCP server or AgentCore Gateway between the agent
+  and the graph.
+- **Neo4j GraphRAG Text2Cypher:** `graph_query` uses `neo4j-graphrag`'s
+  Text2Cypher retriever so Claude writes read-only Cypher from the live schema
+  for exact and aggregate questions.
+- **Neo4j GraphRAG vector search:** `vector_search` uses a `neo4j-graphrag`
+  `VectorRetriever` over the `maintenanceChunkEmbeddings` index for fuzzy,
+  topical questions on maintenance document chunks.
+- **Claude on Bedrock:** the ReAct loop and Text2Cypher both call Claude
+  through Amazon Bedrock using credentials from the standard AWS chain.
+- **Bedrock Titan embeddings:** query embeddings for `vector_search` come from
+  Amazon Titan on Bedrock, matched to the embedder `bedrock-graphrag-pipeline`
+  used to populate the graph.
+- **AgentCore Runtime deployment:** the agent serves on a managed AgentCore
+  Runtime, with the Neo4j connection injected as Runtime environment variables.
+
 ## Architecture
 
 ```
-User input (POST /invocations)
-  -> BedrockAgentCoreApp (runtime_app.py)
-     -> ReAct loop: Claude on Bedrock + two tools
-        -> graph_query   (Text2Cypher, neo4j-graphrag)    -> Neo4j
-        -> vector_search (VectorRetriever, neo4j-graphrag) -> Neo4j
+  +-------------------------------------------+
+  |  Client                                   |
+  |  agent.sh invoke-cloud / client.invoke /  |
+  |  client.demo --remote  (boto3)            |
+  +-------------------------------------------+
+                      |
+                      |  POST /invocations  (SSE stream)
+                      v
+  +-------------------------------------------+        +---------------------------+
+  |  AgentCore Runtime                        |        |  Amazon Bedrock           |
+  |  Fleet Agent (runtime_app.py)             | -----> |  Claude (LLM, Text2Cypher)|
+  |  Strands ReAct: graph_query,              |        |  Titan (embeddings)       |
+  |  vector_search                            | <----- |                           |
+  +-------------------------------------------+        +---------------------------+
+                      |
+                      |  Neo4j driver  (neo4j+s://)
+                      v
+  +-------------------------------------------+
+  |  Neo4j Aura                               |
+  |  Aircraft Digital Twin graph              |
+  |  + maintenanceChunkEmbeddings index       |
+  +-------------------------------------------+
 ```
 
 The agent reads `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` from the
@@ -26,52 +60,28 @@ the Titan embedder).
 This agent expects the **Aircraft Digital Twin** graph (the entities listed in
 `queries.txt`), including the chunk embeddings + `maintenanceChunkEmbeddings`
 vector index that power `vector_search`. If the Neo4j instance is empty,
-generate and load that dataset with [`sample-data/`](../../sample-data/):
+generate and load that dataset with
+[`bedrock-graphrag-pipeline/`](../../bedrock-graphrag-pipeline/):
 
 ```bash
-cd ../../sample-data
+cd ../../bedrock-graphrag-pipeline
 cp .env.sample .env        # set Aura creds + embedding provider
 ./setup.sh
 ```
 
 Point the agent's `.env` at the same `NEO4J_URI`. The schema is read from the
 live database at runtime, so the agent picks up the data automatically. The
-retriever embedder must match the one `sample-data` used to populate (default:
+retriever embedder must match the one `bedrock-graphrag-pipeline` used to
+populate (default:
 Bedrock Titan v2, 1024 dims — overridable via `EMBED_MODEL_ID` /
 `EMBED_DIMENSIONS`).
-
-## Unique Features
-
-- **Direct GraphRAG, two tools.** `graph_query` is `neo4j-graphrag`'s
-  Text2Cypher (the LLM writes read-only Cypher from the live schema) for exact
-  and aggregate questions. `vector_search` is a `VectorRetriever` over
-  maintenance document chunks for fuzzy, topical questions.
-- **Live-schema caching.** `common/neo4j_tools.py` fetches the Neo4j schema
-  once per process and injects it into the system prompt, so Claude routes
-  tools without a schema round trip per request.
-- **Shared core, thin Strands wrappers.** `common/` exposes plain
-  `graph_query` / `vector_search` callables; `tools.py` wraps them as Strands
-  tools that `runtime_app.py` and `local_cli.py` bind to the agent.
-
-## Layout
-
-| Path | Use |
-|------|-----|
-| `common/` | Neo4j driver + GraphRAG retrievers, model config, prompt |
-| `tools.py` | Strands tool wrappers over the `common` callables |
-| `runtime_app.py` | AgentCore Runtime entrypoint; `mode`-dispatched surfaces, port 8080 or cloud |
-| `local_cli.py` | Simplified local experimentation |
-| `demo.py` | Console showcase, section by section; `--remote` drives the deployed runtime |
-| `agent.sh` | CLI wrapper for the local run and deploy lifecycle |
-| `invoke_agent.py` | Invoke the deployed runtime with boto3, supports load testing |
-| `queries.txt` | 20 sample queries across discovery, fleet, maintenance, delays |
 
 ## Prerequisites
 
 1. Python 3.10+ and the `uv` package manager.
 2. AWS CLI configured, with Bedrock model access enabled (LLM + Titan
    embeddings).
-3. A reachable Neo4j instance populated by [`sample-data/`](../../sample-data/).
+3. A reachable Neo4j instance populated by [`bedrock-graphrag-pipeline/`](../../bedrock-graphrag-pipeline/).
 
 ## Quick Start: Local
 
@@ -83,65 +93,33 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your-password
 EOF
 
-./agent.sh start        # serves http://localhost:8080
-./agent.sh test         # sends a sample query
+./agent.sh start        # serves http://localhost:7070
+./agent.sh test         # sample query through the thin client
+./agent.sh cli "How many aircraft are in the fleet?"
+./agent.sh demo         # full functionality showcase, local server
 ```
 
-`agent.sh start` auto-loads the agent-root `.env`.
+`agent.sh start` auto-loads the agent-root `.env` and runs `runtime_app.py` on
+port 7070. The deployed container serves 8080; the local run overrides to 7070
+to avoid colliding with a service already on 8080. Keep `./agent.sh start`
+running in one terminal: `test`, `cli`, and `demo` are thin clients that talk
+to it over HTTP and hold no Neo4j credentials of their own.
 
-## Quick Start: Demo (no server)
-
-`demo.py` walks the full agent surface in the console, one `====` section at
-a time, each with a plain-English description of what it shows:
+`./agent.sh demo` (equivalently `uv run python -m client.demo`) walks the
+agent's full surface against the running local server, one `====` section at a
+time, each with a plain-English description:
 
 1. the live Neo4j schema the agent reasons over,
 2. the `graph_query` retriever alone (Text2Cypher),
 3. the `vector_search` retriever alone (semantic search over manual chunks),
 4. the full Strands ReAct agent choosing tools by itself.
 
-`demo.py` runs in either of two modes, same four sections in both:
-
-```bash
-uv sync
-uv run python demo.py            # local: in-process, straight to Neo4j
-uv run python demo.py --remote   # remote: drives the deployed runtime
-```
-
-Default (local) builds its own in-process Strands agent and connects straight
-to Neo4j, so you do not run `./agent.sh start` first. It needs only the three
-things in [Prerequisites](#prerequisites): `uv sync`, a `.env` with the Neo4j
-connection, and AWS credentials for Bedrock.
-
-`--remote` serves every section from the deployed AgentCore runtime over
-boto3: `{"mode": "schema" | "graph_query" | "vector_search"}` for sections 1
-to 3 and `{"prompt": ...}` for section 4. It opens no local Neo4j connection
-and needs only AWS credentials and an agent already deployed
-([Remote Quick Start](#remote-quick-start)).
-
-Section 4 invokes Claude on Bedrock for several turns, so a full run takes a
-few minutes and incurs Bedrock usage. The data-only sections 1 to 3 return
-quickly.
+Every section is served by the running `runtime_app.py` through a `mode` field
+in the payload, so `./agent.sh start` must be up first. Section 4 invokes
+Claude on Bedrock for several turns, so a full run takes a few minutes and
+incurs Bedrock usage; the data-only sections 1 to 3 return quickly.
 
 ## Quick Start: Cloud
-
-```bash
-uv sync
-
-./agent.sh configure        # generates .bedrock_agentcore.yaml
-./agent.sh deploy           # packages the code, provisions the runtime
-
-uv run python demo.py --remote                    # full showcase, deployed
-uv run python invoke_agent.py "How many aircraft are in the database?"
-```
-
-`agentcore deploy` runs in `direct_code_deploy` mode: it uploads the code
-package to S3, provisions the AgentCore Runtime on a managed python3.13 arm64
-environment, and sets up IAM and CloudWatch. There is no Docker build and no
-ECR image for this agent. `./agent.sh deploy` passes the Neo4j connection from
-`.env` as Runtime environment variables; the container itself has no `.env`.
-The deploy output includes the Agent ARN and an observability dashboard URL.
-
-## Remote Quick Start
 
 A self-contained path from nothing to a deployed agent answering questions over
 boto3. These are the exact steps used to validate the live runtime.
@@ -149,7 +127,7 @@ boto3. These are the exact steps used to validate the live runtime.
 ```bash
 uv sync
 
-# 1. Point .env at a Neo4j instance populated by sample-data
+# 1. Point .env at a Neo4j instance populated by bedrock-graphrag-pipeline
 cp .env.sample .env          # set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD
 
 # 2. Authenticate to AWS. With SSO, log in to your session first:
@@ -160,56 +138,65 @@ aws sso login --sso-session <your-sso-session>
 ./agent.sh deploy            # provisions the runtime, injects the Neo4j env vars
 ./agent.sh status            # wait for Endpoint: DEFAULT READY
 
-# 4. Run a demo client against the remote runtime
-uv run python demo.py --remote
-uv run python invoke_agent.py "What does the manual say about hydraulic leak detection?"
+# 4. Drive the deployed runtime
+./agent.sh invoke-cloud "How many aircraft are in the database?"
+uv run python -m client.demo --remote                  # full showcase, deployed
+uv run python -m client.invoke "What does the manual say about hydraulic leak detection?"
+./agent.sh load-test 5       # replay queries.txt every 5s
 ```
 
-Two clients drive the deployed runtime, no `agent.sh` needed:
-
-- `demo.py --remote` walks all four sections against the deployed agent: the
-  schema, each retriever on its own, and the full agent.
-- `invoke_agent.py` sends one prompt (or `load-test [seconds]` to replay
-  `queries.txt` on an interval). It reads the Agent ARN from
-  `.bedrock_agentcore.yaml`, calls `bedrock-agentcore` with boto3, and streams
-  the answer token by token.
-
-Both reach the four surfaces of the single `/invocations` endpoint through a
-`mode` field in the payload; no `mode` runs the full agent.
-
-`./agent.sh deploy` passes the Neo4j connection from `.env` as Runtime
-environment variables. The container itself has no `.env`. Run
-`./agent.sh destroy` to remove the runtime when you are finished.
+`agentcore deploy` runs in `direct_code_deploy` mode: it uploads the code
+package to S3, provisions the AgentCore Runtime on a managed python3.13 arm64
+environment, and sets up IAM and CloudWatch. There is no Docker build and no
+ECR image for this agent. `./agent.sh deploy` passes the Neo4j connection from
+`.env` as Runtime environment variables; the container itself has no `.env`.
+The deploy output includes the Agent ARN and an observability dashboard URL.
 
 A first `configure` is required even if `.bedrock_agentcore.yaml` is already
 present, because it pins the entrypoint to `runtime_app.py` and records the
 account, region, and execution role for this environment.
 
-## Local Docker Testing
+The deployed runtime exposes the same four surfaces of the single
+`/invocations` endpoint through a `mode` field in the payload (no `mode` runs
+the full agent); only the transport differs from local:
 
-From the parent `neo4j-agentcore-agents/` directory:
+- `./agent.sh invoke-cloud "..."` sends one prompt via boto3.
+- `uv run python -m client.demo --remote` walks all four sections against the
+  deployed agent: the schema, each retriever on its own, and the full agent.
+- `uv run python -m client.invoke "..."` sends one prompt;
+  `uv run python -m client.invoke load-test [seconds]` (or
+  `./agent.sh load-test [seconds]`) replays `queries.txt` on an interval. It
+  reads the Agent ARN from `.bedrock_agentcore.yaml`, calls `bedrock-agentcore`
+  with boto3, and streams the answer token by token.
 
-```bash
-uv run local-test all fleet-agent                  # build, run, test
-uv run local-test build fleet-agent
-```
+Run `./agent.sh destroy` to remove the runtime when you are finished.
 
-The harness builds from the agent-root `Dockerfile` and keys the image and
-container by agent name. Pass the Neo4j env vars through to the container.
+## Layout
+
+| Path | Use |
+|------|-----|
+| `agent/` | Packaged core (installed into the venv): `config.py` (model id, region, embedder/index, system prompt), `retrieval.py` (direct-to-Neo4j driver + GraphRAG `graph_query` / `vector_search` / `get_graph_schema`), `tools.py` (Strands tool wrappers) |
+| `client/` | Dev-only thin clients, run via `python -m client.<mod>`: `transport.py` (the only network layer — local HTTP port 7070 + boto3 deployed), `cli.py` (terminal client), `demo.py` (functionality showcase), `invoke.py` (deployed single call + load test) |
+| `runtime_app.py` | AgentCore Runtime entrypoint; `mode`-dispatched surfaces, port 8080 deployed / 7070 local |
+| `agent.sh` | CLI wrapper for the local run, the clients, and the deploy lifecycle |
+| `queries.txt` | Sample queries across discovery, fleet, maintenance, delays |
 
 ## Commands
 
-`agent.sh` covers the local run and the deploy lifecycle. Invoking the
-deployed runtime is done with the Python clients above
-(`demo.py --remote`, `invoke_agent.py`), not `agent.sh`.
+`agent.sh` wraps the local run, the thin clients, and the deploy lifecycle.
+The same clients can also be run directly with `uv run python -m client.<mod>`.
 
 | Command | Description |
 |---------|-------------|
-| `start` / `stop` | Run or stop the local agent on port 8080 |
-| `test` | Send a sample query with curl |
+| `start` / `stop` | Run or stop the local agent on port 7070 |
+| `test` | Send a sample query through the thin client (`client.cli`) |
+| `cli "prompt"` | Ask the running agent one question (thin client) |
+| `demo` | Run the functionality showcase against the local server |
 | `configure` | Generate AWS deployment config |
 | `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
 | `status` | Check deployment status |
+| `invoke-cloud "prompt"` | Invoke the deployed agent via boto3 |
+| `load-test [N]` | Replay `queries.txt` against the deployed agent every N seconds |
 
 ## Environment Variables
 
@@ -239,8 +226,8 @@ traces are recorded.
 | Symptom | Cause and fix |
 |---------|---------------|
 | `NEO4J_URI is not set` | Set `NEO4J_URI` / `NEO4J_PASSWORD` in the agent-root `.env` (local) or as Runtime env vars (deployed). |
-| `vector_search` returns noise or nothing | The retriever embedder must match what `sample-data` used. Align `EMBED_MODEL_ID` / `EMBED_DIMENSIONS`, and confirm the `maintenanceChunkEmbeddings` index exists. |
+| `vector_search` returns noise or nothing | The retriever embedder must match what `bedrock-graphrag-pipeline` used. Align `EMBED_MODEL_ID` / `EMBED_DIMENSIONS`, and confirm the `maintenanceChunkEmbeddings` index exists. |
 | `ServiceUnavailable` / auth error from Neo4j | Wrong `NEO4J_URI` scheme or credentials, or the instance is unreachable. |
 | `NoCredentialsError` | AWS credentials are not configured. Run `aws configure` or set env credentials. |
 | `AccessDeniedException` on the model | Enable Bedrock model access for the configured LLM and Titan embedding model in the AWS console. |
-| 404 JSON with `timestamp` on port 8080 | Another service holds port 8080. `lsof -ti :8080 \| xargs kill`, then restart. |
+| 404 JSON with `timestamp` on port 7070 | Another service holds port 7070. `lsof -ti :7070 \| xargs kill`, then restart. |

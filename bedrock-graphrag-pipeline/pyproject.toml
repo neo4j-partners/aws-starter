@@ -1,7 +1,7 @@
 [project]
-name = "aws-starter-sample-data"
+name = "bedrock-graphrag-pipeline"
 version = "0.1.0"
-description = "Generate the Aircraft Digital Twin dataset locally and load it into a Neo4j Aura instance for the fleet-agent / Neo4j MCP server"
+description = "A GraphRAG ingestion pipeline on Amazon Bedrock: generate an operational graph, enrich it from unstructured documents with Titan embeddings and Claude entity extraction, and fuse the two into a single Neo4j knowledge graph"
 requires-python = ">=3.11"
 dependencies = [
     # generator

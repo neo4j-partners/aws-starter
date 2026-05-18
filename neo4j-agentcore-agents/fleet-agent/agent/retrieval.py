@@ -5,12 +5,13 @@ connects straight to Neo4j with the driver and answers questions with two
 ``neo4j-graphrag`` retrievers:
 
 - ``vector_search``  — semantic search over maintenance-document chunks, using
-  the ``maintenanceChunkEmbeddings`` index that ``sample-data`` populates.
+  the ``maintenanceChunkEmbeddings`` index that ``bedrock-graphrag-pipeline``
+  populates.
 - ``graph_query``    — Text2Cypher: the LLM writes a read-only Cypher query
   from the live schema and the question, for exact/aggregate answers.
 
-The embedder here MUST match the one ``sample-data`` used to populate the
-graph, or vector search returns noise. ``sample-data`` defaults to Amazon
+The embedder here MUST match the one ``bedrock-graphrag-pipeline`` used to
+populate the graph, or vector search returns noise. It defaults to Amazon
 Bedrock Titan v2 (1024 dims); both are env-overridable.
 
 Nothing in this module imports Strands. ``agent.tools`` wraps the two
@@ -75,7 +76,7 @@ def _neo4j_database() -> str:
 
 @lru_cache(maxsize=1)
 def _embedder() -> BedrockEmbeddings:
-    """Bedrock embedder — must match what sample-data used to populate."""
+    """Bedrock embedder — must match what bedrock-graphrag-pipeline used to populate."""
     return BedrockEmbeddings(
         model_id=EMBED_MODEL_ID,
         dimensions=EMBED_DIMENSIONS,

@@ -7,8 +7,8 @@ MODEL_ID = os.getenv(
 )
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
-# Vector index + embedder. These MUST match what `sample-data` used to
-# populate the graph. sample-data defaults to Amazon Bedrock Titan v2
+# Vector index + embedder. These MUST match what `bedrock-graphrag-pipeline`
+# used to populate the graph. It defaults to Amazon Bedrock Titan v2
 # (1024 dims) on the `maintenanceChunkEmbeddings` index over :Chunk(text).
 VECTOR_INDEX_NAME = os.getenv("VECTOR_INDEX_NAME", "maintenanceChunkEmbeddings")
 EMBED_MODEL_ID = os.getenv("EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")

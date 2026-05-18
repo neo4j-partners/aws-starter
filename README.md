@@ -275,14 +275,14 @@ Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-back
 
 ---
 
-### 🗄️ **Sample Data** (`sample-data/`)
+### 🗄️ **Bedrock GraphRAG Pipeline** (`bedrock-graphrag-pipeline/`)
 
-*   **[`sample-data`](./sample-data/)**
+*   **[`bedrock-graphrag-pipeline`](./bedrock-graphrag-pipeline/)**
     *   **Status:** ✅ Ready to Run
-    *   **Description:** One-command pipeline that generates a synthetic **Aircraft Digital Twin** dataset locally, loads it into a Neo4j Aura instance, and enriches it with GraphRAG over maintenance manuals (Bedrock Titan embeddings + Bedrock Claude entity extraction). Produces exactly the graph the fleet-agent and Neo4j MCP server expect — point all three at the same Aura instance and they work with no code changes.
-    *   **Key Features:** `./setup.sh` one-command pipeline, synthetic generator + Aura loader, Amazon Bedrock enrichment by default (us-east-1), strict graph verification, sampled or full dataset sizing.
-    *   **Use Case:** Standing up a populated, queryable graph for the fleet-agent / MCP server demos without needing a pre-existing dataset.
-    *   **Docs:** See **[`sample-data/README.md`](./sample-data/README.md)** for the quick start, commands, dataset sizing, and Bedrock notes.
+    *   **Description:** A worked example of building a **GraphRAG ingestion pipeline on Amazon Bedrock**. It builds an operational graph from synthetic data, enriches it from unstructured maintenance manuals (Bedrock Titan embeddings + Bedrock Claude entity extraction via Converse tool-use), and fuses the structured and extracted graphs into one Neo4j knowledge graph. The **Aircraft Digital Twin** fleet is the example dataset; the pipeline is the reusable artifact. Produces exactly the graph the fleet-agent and Neo4j MCP server expect — point all three at the same Aura instance and they work with no code changes.
+    *   **Key Features:** `./setup.sh` one-command pipeline, five-stage GraphRAG ingest, structured-output extraction via `StructuredBedrockLLM` (forced `toolChoice`), structured + unstructured graph fusion, Amazon Bedrock by default (us-east-1), strict verification, sampled or full dataset sizing.
+    *   **Use Case:** A reference for building GraphRAG ingest on Bedrock, and a fast way to stand up a populated graph for the fleet-agent / MCP server demos.
+    *   **Docs:** See **[`bedrock-graphrag-pipeline/README.md`](./bedrock-graphrag-pipeline/README.md)** for the pipeline architecture, the Bedrock structured-output technique, commands, and dataset sizing.
 
 ---
 
@@ -345,4 +345,4 @@ Claude Code will automatically connect to the Neo4j Aura Agent MCP server along 
 ## Documentation
 
 *   [CLAUDE.md](CLAUDE.md) - detailed commands for Claude Code / Developers.
-*   [sample-data/README.md](sample-data/README.md) - generate and load the Aircraft Digital Twin dataset into Neo4j Aura.
+*   [bedrock-graphrag-pipeline/README.md](bedrock-graphrag-pipeline/README.md) - build a GraphRAG ingest pipeline on Bedrock and load the Aircraft Digital Twin graph into Neo4j Aura.

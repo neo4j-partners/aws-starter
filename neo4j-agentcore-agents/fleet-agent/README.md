@@ -119,15 +119,53 @@ immediately.
 uv sync
 
 ./agent.sh configure        # generates .bedrock_agentcore.yaml
-./agent.sh deploy           # packages, builds image, provisions runtime
+./agent.sh deploy           # packages the code, provisions the runtime
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
 
-`agentcore deploy` packages the code, builds an ARM64 container image, pushes
-it to ECR, provisions the AgentCore Runtime, and sets up IAM and CloudWatch.
-Set `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` as Runtime environment
-variables (the container has no `.env`). The deploy output includes the Agent
-ARN and an observability dashboard URL.
+`agentcore deploy` runs in `direct_code_deploy` mode: it uploads the code
+package to S3, provisions the AgentCore Runtime on a managed python3.13 arm64
+environment, and sets up IAM and CloudWatch. There is no Docker build and no
+ECR image for this agent. `./agent.sh deploy` passes the Neo4j connection from
+`.env` as Runtime environment variables; the container itself has no `.env`.
+The deploy output includes the Agent ARN and an observability dashboard URL.
+
+## Remote Quick Start
+
+A self-contained path from nothing to a deployed agent answering questions over
+boto3. These are the exact steps used to validate the live runtime.
+
+```bash
+uv sync
+
+# 1. Point .env at a Neo4j instance populated by sample-data
+cp .env.sample .env          # set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD
+
+# 2. Authenticate to AWS. With SSO, log in to your session first:
+aws sso login --sso-session <your-sso-session>
+
+# 3. Configure and deploy the runtime
+./agent.sh configure         # writes .bedrock_agentcore.yaml, entrypoint runtime_app.py
+./agent.sh deploy            # provisions the runtime, injects the Neo4j env vars
+./agent.sh status            # wait for Endpoint: DEFAULT READY
+
+# 4. Run the demo client against the remote runtime
+./agent.sh invoke-cloud "How many aircraft are in the database?"
+uv run python invoke_agent.py "What does the manual say about hydraulic leak detection?"
+```
+
+`invoke_agent.py` is the remote demo client. It reads the Agent ARN from
+`.bedrock_agentcore.yaml`, calls `bedrock-agentcore` with boto3, and streams the
+answer to the terminal token by token. `uv run python invoke_agent.py load-test
+[seconds]` replays `queries.txt` on an interval against the deployed runtime.
+
+`./agent.sh deploy` passes the Neo4j connection from `.env` as Runtime
+environment variables. The container itself has no `.env`. Run
+`./agent.sh destroy` to remove the runtime when you are finished.
+
+A first `configure` is required even if `.bedrock_agentcore.yaml` is already
+present, because it pins the entrypoint to `runtime_app.py` and records the
+account, region, and execution role for this environment.
 
 ## Local Docker Testing
 

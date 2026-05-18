@@ -9,6 +9,22 @@ exact graph (Aircraft, Systems, Components, Sensors, Readings, Flights,
 Airports, Delays, Maintenance, Removals). It just needs data. This folder
 generates that data locally and loads it into Aura in one command.
 
+## Overview
+
+In one command, `./setup.sh`:
+
+1. **Generates** a synthetic Aircraft Digital Twin dataset locally as CSVs
+   (aircraft, sensors, readings, flights, delays, maintenance events).
+2. **Loads** those CSVs into your Neo4j Aura instance as a graph.
+3. **Enriches** the graph with GraphRAG over the maintenance manuals in
+   `manuals/` — chunking, Bedrock Titan embeddings, and Bedrock Claude entity
+   extraction — then builds the vector index and verifies the result.
+
+The output is exactly the graph the
+[fleet-agent](../neo4j-agentcore-agents/fleet-agent/) and
+[Neo4j MCP server](../neo4j-agentcore-mcp-server/) expect — no code changes on
+their side, only pointing them at the same Aura instance.
+
 ## What's here
 
 | Path | Purpose |

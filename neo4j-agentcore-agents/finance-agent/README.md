@@ -160,6 +160,45 @@ uv sync
 it to S3, and creates or updates the AgentCore Runtime agent. No container
 build runs.
 
+## Remote Quick Start: Deploy and Run the Demo
+
+End-to-end path from a clean checkout to the full demo running against the
+deployed AgentCore Runtime agent.
+
+```bash
+cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
+uv sync
+
+# AWS auth: boto3 and the agentcore CLI need resolvable credentials.
+# With AWS SSO, refresh the token and export the profile so boto3 picks
+# it up (the AWS CLI may work while boto3 still fails without this):
+aws sso login
+export AWS_PROFILE=<your-sso-profile>
+
+./agent.sh deploy            # zips source, uploads, creates/updates the runtime
+
+# Run the full six-question demo against the deployed agent
+uv run python demo_client.py --remote
+
+# Or a single question against the deployed agent
+uv run python demo_client.py --remote -n 1
+```
+
+`demo_client.py --remote` reuses `invoke_agent.py`, which reads the deployed
+runtime ARN from `.bedrock_agentcore.yaml` and streams the agent's answer back
+to the terminal. The same questions run identically in local mode by dropping
+`--remote`, so the demo is the same locally and in the cloud.
+
+Notes:
+
+- `agent.sh deploy` reads `default_agent` from `.bedrock_agentcore.yaml`. It
+  must point at `finance_agent` with `entrypoint: .../runtime_app.py`. If
+  `./agent.sh configure` cannot run interactively in your environment, set
+  those two fields directly; everything else in that file is reused as is.
+- If the venv was created under a different path, console scripts such as
+  `agentcore` carry a stale interpreter. Recreate it with
+  `rm -rf .venv && uv sync`.
+
 ## Demo
 
 These questions exercise the parts of the graph that a flat database cannot

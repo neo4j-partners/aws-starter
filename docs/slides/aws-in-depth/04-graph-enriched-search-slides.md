@@ -33,6 +33,16 @@ Retrievers, decision frameworks, and going beyond plain vector search
 
 ---
 
+## Powered by the Neo4j Python GraphRAG Library
+
+Everything in this deck is built on the **Neo4j Python GraphRAG Library**.
+
+- **Retrievers**: ready-made Vector, Vector Cypher, and Text2Cypher search patterns
+- **Embeddings**: pluggable embedders (Amazon Bedrock Titan, OpenAI, and more)
+- **GraphRAG pipeline**: one call to retrieve context and generate a grounded answer
+
+---
+
 ## From Knowledge Graph to Answers
 
 You have a knowledge graph with:

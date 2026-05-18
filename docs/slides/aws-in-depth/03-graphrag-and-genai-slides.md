@@ -357,9 +357,9 @@ When you search, your question becomes an embedding, and the system finds chunks
 
 When a knowledge graph pipeline processes documents:
 
-1. Each chunk gets an embedding from the embedding model
+1. Each chunk gets an embedding from Amazon Bedrock Titan v2 (1024 dimensions)
 2. The embedding is stored as a property on the Chunk node
-3. A vector index enables fast similarity search across all chunks
+3. A vector index (`maintenanceChunkEmbeddings`) enables fast similarity search across all chunks
 
 ```cypher
 // Chunks have embedding properties
@@ -372,16 +372,21 @@ LIMIT 1
 
 ## Searching a Vector Index
 
-```cypher
-// Create an embedding for the query
-WITH genai.vector.encode(
-    "What maintenance issues affect the turbine?",
-    "OpenAI",
-    { token: $apiKey }
-) AS queryEmbedding
+Embed the query in application code with Amazon Bedrock Titan, then pass the vector into Neo4j as a parameter:
 
-// Search the vector index for similar chunks
-CALL db.index.vector.queryNodes('maintenanceChunkEmbeddings', 5, queryEmbedding)
+```python
+# Application code: Amazon Bedrock Titan v2 (1024 dims)
+from neo4j_graphrag.embeddings import BedrockEmbeddings
+
+embedder = BedrockEmbeddings(model_id="amazon.titan-embed-text-v2:0")
+query_embedding = embedder.embed_query(
+    "What maintenance issues affect the turbine?"
+)
+```
+
+```cypher
+// $queryEmbedding is the Titan vector created above
+CALL db.index.vector.queryNodes('maintenanceChunkEmbeddings', 5, $queryEmbedding)
 YIELD node, score
 
 RETURN node.text AS content, score
@@ -396,14 +401,16 @@ This finds the 5 chunks most semantically similar to the query.
 
 **The real power of GraphRAG:** Start with semantic search, then traverse the graph.
 
-```cypher
-WITH genai.vector.encode(
-    "What maintenance issues affect the turbine?",
-    "OpenAI",
-    { token: $apiKey }
-) AS queryEmbedding
+```python
+# Application code: embed the query with Amazon Bedrock Titan
+query_embedding = embedder.embed_query(
+    "What maintenance issues affect the turbine?"
+)
+```
 
-CALL db.index.vector.queryNodes('maintenanceChunkEmbeddings', 5, queryEmbedding)
+```cypher
+// $queryEmbedding is the Titan vector created above
+CALL db.index.vector.queryNodes('maintenanceChunkEmbeddings', 5, $queryEmbedding)
 YIELD node, score
 
 // Traverse from chunk to its parent document

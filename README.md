@@ -275,6 +275,17 @@ Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-back
 
 ---
 
+### 🗄️ **Sample Data** (`sample-data/`)
+
+*   **[`sample-data`](./sample-data/)**
+    *   **Status:** ✅ Ready to Run
+    *   **Description:** One-command pipeline that generates a synthetic **Aircraft Digital Twin** dataset locally, loads it into a Neo4j Aura instance, and enriches it with GraphRAG over maintenance manuals (Bedrock Titan embeddings + Bedrock Claude entity extraction). Produces exactly the graph the fleet-agent and Neo4j MCP server expect — point all three at the same Aura instance and they work with no code changes.
+    *   **Key Features:** `./setup.sh` one-command pipeline, synthetic generator + Aura loader, Amazon Bedrock enrichment by default (us-east-1), strict graph verification, sampled or full dataset sizing.
+    *   **Use Case:** Standing up a populated, queryable graph for the fleet-agent / MCP server demos without needing a pre-existing dataset.
+    *   **Docs:** See **[`sample-data/README.md`](./sample-data/README.md)** for the quick start, commands, dataset sizing, and Bedrock notes.
+
+---
+
 ### 📊 **Databricks Integration** (`databrick_samples/`)
 
 *   **[`databrick_samples`](./databrick_samples/)**
@@ -334,3 +345,4 @@ Claude Code will automatically connect to the Neo4j Aura Agent MCP server along 
 ## Documentation
 
 *   [CLAUDE.md](CLAUDE.md) - detailed commands for Claude Code / Developers.
+*   [sample-data/README.md](sample-data/README.md) - generate and load the Aircraft Digital Twin dataset into Neo4j Aura.

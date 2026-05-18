@@ -95,7 +95,7 @@ Retrievers and graph access become **tools**. Three reference agents show the pa
 
 ## The Fleet Agent
 
-`neo4j-agentcore-agents/fleet-agent`: a Strands ReAct agent answering natural-language questions over the aviation fleet graph.
+`fleet-agent-demo/agent`: a Strands ReAct agent answering natural-language questions over the aviation fleet graph.
 
 - **Two tools**: `graph_query` (Text2Cypher) and `vector_search` (VectorRetriever), both `neo4j-graphrag`
 - **Direct to Neo4j**: opens one driver, no MCP server or Gateway

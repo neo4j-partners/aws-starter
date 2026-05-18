@@ -8,7 +8,6 @@ dependencies = [
     "bedrock-agentcore-starter-toolkit",
     # LangGraph for multi-agent orchestration
     "langgraph>=0.2.0",
-    "langgraph-supervisor>=0.0.1",
     "langchain>=0.3.0",
     "langchain-aws>=0.2.0",
     "langchain-mcp-adapters>=0.2.0",
@@ -19,3 +18,20 @@ dependencies = [
     # Observability - ADOT for automatic tracing to CloudWatch
     "aws-opentelemetry-distro>=0.10.0",
 ]
+
+# Console entry points. The server runs in the foreground of its own
+# terminal (Ctrl+C to stop); `orchestrator-invoke` is the cloud
+# invocation / load-test client.
+[project.scripts]
+orchestrator-server = "server.runtime_app:main"
+orchestrator-invoke = "client.invoke:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Package the shared `core` plus `client`/`server` into the venv so the
+# console scripts resolve `client.*`/`server.*` and `from core import ...`
+# works without any sys.path manipulation.
+[tool.hatch.build.targets.wheel]
+packages = ["core", "client", "server"]

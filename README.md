@@ -64,10 +64,10 @@ Verify the MCP server connection by running the simple agent from your local mac
 ```bash
 cd langgraph-neo4j-mcp-agent
 uv sync
-uv run python simple-agent.py "What is the database schema?"
+uv run python -m neo4j_mcp_agent.simple_agent "What is the database schema?"
 ```
 
-This uses [`simple-agent.py`](./langgraph-neo4j-mcp-agent/simple-agent.py) which reads credentials from `.mcp-credentials.json` and queries the Neo4j MCP server via the AgentCore Gateway.
+This uses [`simple_agent.py`](./langgraph-neo4j-mcp-agent/neo4j_mcp_agent/simple_agent.py) which reads credentials from `.mcp-credentials.json` and queries the Neo4j MCP server via the AgentCore Gateway.
 
 ---
 
@@ -124,12 +124,12 @@ SageMaker Unified Studio has a permissions boundary that blocks direct Bedrock m
 cd langgraph-neo4j-mcp-agent
 
 # See available options
-./setup-inference-profile.sh --help
+./inference-profiles/setup-inference-profile.sh --help
 
 # Create a profile (choose one)
-./setup-inference-profile.sh haiku      # Fast & cheap - great for testing
-./setup-inference-profile.sh sonnet     # Balanced - recommended
-./setup-inference-profile.sh --test haiku  # Create and test in one step
+./inference-profiles/setup-inference-profile.sh haiku      # Fast & cheap - great for testing
+./inference-profiles/setup-inference-profile.sh sonnet     # Balanced - recommended
+./inference-profiles/setup-inference-profile.sh --test haiku  # Create and test in one step
 ```
 
 Copy the output ARN - you'll paste it into notebooks in the following steps.
@@ -265,24 +265,23 @@ Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-back
 
 *   **[`neo4j-agentcore-agents`](./neo4j-agentcore-agents/)**
     *   **Status:** ✅ Ready to Run
-    *   **Description:** Three ReAct agents that deploy to AgentCore Runtime using the `BedrockAgentCoreApp` pattern with the `@app.entrypoint` decorator and the AgentCore CLI (`agentcore configure`, `agentcore deploy`). The `fleet-agent` is a single Strands agent: `runtime_app.py` is the only agent builder, an `agent/` package holds the direct-to-Neo4j GraphRAG core, and a `client/` package provides thin terminal and load-test clients that reach it over the wire. This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration.
-    *   **Key Features:** AgentCore Runtime deployment, a single agent builder with thin clients selected only by target (local server vs deployed runtime), programmatic invocation via boto3, CloudWatch observability, managed infrastructure.
+    *   **Description:** Two ReAct agents that deploy to AgentCore Runtime using the `BedrockAgentCoreApp` pattern with the `@app.entrypoint` decorator and the AgentCore CLI (`agentcore configure`, `agentcore deploy`). Each reaches Neo4j through the MCP server over an AgentCore Gateway with OAuth2 auth. This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration.
+    *   **Key Features:** AgentCore Runtime deployment, MCP Gateway access with OAuth2 token refresh, programmatic invocation via boto3, CloudWatch observability, managed infrastructure.
     *   **Use Case:** Production deployments requiring managed scaling, observability dashboards, enterprise security, and supervisor/worker orchestration.
     *   **Includes:**
         *   **[`finance-agent/`](./neo4j-agentcore-agents/finance-agent/)** — SEC filings and corporate finance agent. Simplest to deploy, no Docker. Strands variant adds Neo4j-backed semantic memory.
-        *   **[`fleet-agent/`](./neo4j-agentcore-agents/fleet-agent/)** — Aviation fleet agent. Single Strands agent connecting directly to Neo4j (no MCP, no Gateway) with live-schema caching, an `agent/` core, and thin `client/` entrypoints. The runtime defaults to port 8080 (AgentCore requirement); `./agent.sh start` overrides it to 7070 locally via `AGENT_PORT`, so deploy is unaffected.
         *   **[`orchestrator-agent/`](./neo4j-agentcore-agents/orchestrator-agent/)** — Multi-agent supervisor. Classifies intent and routes to Maintenance or Operations specialists, then synthesizes cross-domain answers.
 
 ---
 
-### 🗄️ **Bedrock GraphRAG Pipeline** (`bedrock-graphrag-pipeline/`)
+### 🛩️ **Fleet Agent Demo** (`fleet-agent-demo/`)
 
-*   **[`bedrock-graphrag-pipeline`](./bedrock-graphrag-pipeline/)**
+*   **[`fleet-agent-demo`](./fleet-agent-demo/)**
     *   **Status:** ✅ Ready to Run
-    *   **Description:** A worked example of building a **GraphRAG ingestion pipeline on Amazon Bedrock**. It builds an operational graph from synthetic data, enriches it from unstructured maintenance manuals (Bedrock Titan embeddings + Bedrock Claude entity extraction via Converse tool-use), and fuses the structured and extracted graphs into one Neo4j knowledge graph. The **Aircraft Digital Twin** fleet is the example dataset; the pipeline is the reusable artifact. Produces exactly the graph the fleet-agent and Neo4j MCP server expect — point all three at the same Aura instance and they work with no code changes.
-    *   **Key Features:** `./setup.sh` one-command pipeline, five-stage GraphRAG ingest, structured-output extraction via `StructuredBedrockLLM` (forced `toolChoice`), structured + unstructured graph fusion, Amazon Bedrock by default (us-east-1), strict verification, sampled or full dataset sizing.
-    *   **Use Case:** A reference for building GraphRAG ingest on Bedrock, and a fast way to stand up a populated graph for the fleet-agent / MCP server demos.
-    *   **Docs:** See **[`bedrock-graphrag-pipeline/README.md`](./bedrock-graphrag-pipeline/README.md)** for the pipeline architecture, the Bedrock structured-output technique, commands, and dataset sizing.
+    *   **Description:** A self-contained, end-to-end GraphRAG demo pairing two projects that belong together. **`pipeline/`** is a worked example of a **GraphRAG ingestion pipeline on Amazon Bedrock**: it builds an operational graph from synthetic data, enriches it from unstructured maintenance manuals (Bedrock Titan embeddings plus Bedrock Claude entity extraction via Converse tool-use), and fuses the structured and extracted graphs into one Neo4j knowledge graph. **`agent/`** is a Strands ReAct agent that answers natural language questions over that graph, connecting directly to Neo4j (no MCP server, no Gateway) and combining Text2Cypher with vector search over the maintenance chunks. The **Aircraft Digital Twin** fleet is the example dataset. Point both at the same Neo4j instance with a matching embedder and they work with no code changes.
+    *   **Key Features:** `pipeline/setup.sh` one-command five-stage ingest, structured-output extraction via `StructuredBedrockLLM` (forced `toolChoice`), structured plus unstructured graph fusion, a direct-to-Neo4j Strands agent with live-schema caching, local server plus thin CLI/demo/load-test clients, AgentCore Runtime deployment via `agent/agent.sh`.
+    *   **Use Case:** A reference for building GraphRAG ingest on Bedrock and running an agent over the result, runnable top to bottom from one walkthrough.
+    *   **Docs:** Start with the **[`fleet-agent-demo/README.md`](./fleet-agent-demo/README.md)** quickstart, then see **[`fleet-agent-demo/pipeline/README.md`](./fleet-agent-demo/pipeline/README.md)** and **[`fleet-agent-demo/agent/README.md`](./fleet-agent-demo/agent/README.md)** for details.
 
 ---
 
@@ -345,4 +344,4 @@ Claude Code will automatically connect to the Neo4j Aura Agent MCP server along 
 ## Documentation
 
 *   [CLAUDE.md](CLAUDE.md) - detailed commands for Claude Code / Developers.
-*   [bedrock-graphrag-pipeline/README.md](bedrock-graphrag-pipeline/README.md) - build a GraphRAG ingest pipeline on Bedrock and load the Aircraft Digital Twin graph into Neo4j Aura.
+*   [fleet-agent-demo/README.md](fleet-agent-demo/README.md) - end-to-end walkthrough: build a GraphRAG ingest pipeline on Bedrock, load the Aircraft Digital Twin graph into Neo4j, and run an agent over it.

@@ -46,14 +46,21 @@ agents. This agent is the reference for multi-agent routing and observability.
 
 ## Layout
 
-| File | Purpose |
+The agent follows the shared `core/` + `server/` + `client/` convention.
+`core/` holds everything reusable, `server/` is the only thing that ships in
+the Docker image, and `client/` is local-only tooling.
+
+| Path | Purpose |
 |------|---------|
-| `orchestrator_agent.py` | Supervisor entrypoint that classifies and routes |
-| `maintenance_agent.py` | Worker for faults, components, sensors, reliability |
-| `operations_agent.py` | Worker for flights, delays, routes, airports |
-| `invoke_agent.py` | Cloud invocation and load testing |
-| `queries.txt` | 20 test queries, 10 maintenance and 10 operations |
-| `agent.sh` | CLI wrapper for all operations |
+| `core/config.py` | Model id and region (env-overridable) |
+| `core/prompts.py` | Router and the two specialist system prompts |
+| `core/credentials.py` | Credential loading + in-memory OAuth2 token refresh |
+| `core/factory.py` | Bedrock LLM and MCP tool factories |
+| `core/graph.py` | LangGraph router + specialist nodes + graph builder |
+| `server/runtime_app.py` | AgentCore entrypoint (`orchestrator-server`) |
+| `client/invoke.py` | Cloud invocation and load testing (`orchestrator-invoke`) |
+| `client/queries.txt` | 20 test queries, 10 maintenance and 10 operations |
+| `agent.sh` | CLI wrapper for local run and deployment |
 
 ## Prerequisites
 
@@ -68,6 +75,7 @@ uv sync
 ../sync-credentials.sh             # or: cp ../fleet-agent/.mcp-credentials.json .
 
 ./agent.sh start                   # serves http://localhost:8080
+                                   # (equivalent: uv run orchestrator-server)
 ./agent.sh test-maintenance        # query that routes to Maintenance
 ./agent.sh test-operations         # query that routes to Operations
 ```
@@ -119,7 +127,7 @@ uv run local-test all orchestrator-agent
 
 **Cross-domain:** "How do maintenance issues affect flight delays?"
 
-See `queries.txt` for the full set of 20.
+See `client/queries.txt` for the full set of 20.
 
 ## See Also
 

@@ -417,7 +417,7 @@ flowchart TB
 **Usage:**
 
 ```bash
-cd fleet-agent
+cd fleet-agent-demo/agent
 uv sync                   # Install dependencies
 ./agent.sh start          # Run locally (port 8080)
 ./agent.sh test           # Test local agent

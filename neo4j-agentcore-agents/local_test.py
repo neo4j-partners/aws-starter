@@ -12,10 +12,10 @@ Commands:
 
 Usage:
     uv run local-test sync-credentials
-    uv run local-test build fleet-agent
-    uv run local-test run fleet-agent
-    uv run local-test test fleet-agent
-    uv run local-test all fleet-agent
+    uv run local-test build orchestrator-agent
+    uv run local-test run orchestrator-agent
+    uv run local-test test orchestrator-agent
+    uv run local-test all orchestrator-agent
 """
 
 import json
@@ -42,7 +42,6 @@ MCP_SERVER_DIR = SCRIPT_DIR.parent / "neo4j-agentcore-mcp-server"
 CREDENTIALS_SOURCE = MCP_SERVER_DIR / ".mcp-credentials.json"
 
 AGENT_DIRS = {
-    "fleet-agent": SCRIPT_DIR / "fleet-agent",
     "orchestrator-agent": SCRIPT_DIR / "orchestrator-agent",
 }
 
@@ -51,7 +50,6 @@ DEFAULT_PORT = 8080
 
 
 class AgentType(str, Enum):
-    fleet_agent = "fleet-agent"
     orchestrator_agent = "orchestrator-agent"
 
 
@@ -110,7 +108,7 @@ def sync_credentials():
 
 @app.command()
 def build(
-    agent: AgentType = typer.Argument(..., help="Agent to build (fleet-agent or orchestrator-agent)"),
+    agent: AgentType = typer.Argument(..., help="Agent to build"),
     variant: str = typer.Option("langgraph", help="Framework variant (langgraph or strands) for agents split into variant subdirs"),
     platform: str = typer.Option("linux/arm64", help="Docker platform (linux/arm64 for AgentCore)"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without Docker cache"),
@@ -165,7 +163,7 @@ def build(
 
 @app.command()
 def run(
-    agent: AgentType = typer.Argument(..., help="Agent to run (fleet-agent or orchestrator-agent)"),
+    agent: AgentType = typer.Argument(..., help="Agent to run"),
     port: int = typer.Option(DEFAULT_PORT, help="Port to expose"),
     detach: bool = typer.Option(True, "-d", "--detach", help="Run in background"),
     model: Optional[str] = typer.Option(None, "--model", help="Override MODEL_ID environment variable"),
@@ -249,7 +247,7 @@ def run(
 
 @app.command()
 def stop(
-    agent: AgentType = typer.Argument(..., help="Agent to stop (fleet-agent or orchestrator-agent)"),
+    agent: AgentType = typer.Argument(..., help="Agent to stop"),
 ):
     """Stop running agent container."""
     agent_name = agent.value
@@ -267,7 +265,7 @@ def stop(
 
 @app.command()
 def test(
-    agent: AgentType = typer.Argument(..., help="Agent to test (fleet-agent or orchestrator-agent)"),
+    agent: AgentType = typer.Argument(..., help="Agent to test"),
     prompt: str = typer.Option("What is the database schema?", "-p", "--prompt", help="Test prompt to send"),
     port: int = typer.Option(DEFAULT_PORT, help="Port the agent is running on"),
     timeout: int = typer.Option(120, help="Request timeout in seconds"),

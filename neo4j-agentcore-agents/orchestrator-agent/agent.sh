@@ -17,8 +17,13 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# This script and the uv project (pyproject.toml, uv.lock, .venv,
+# .mcp-credentials.json) live at the agent root; the runtime entrypoint
+# lives in server/ and the client tooling in client/.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENTRYPOINT="server/runtime_app.py"
+AGENT_NAME="orchestrator_agent"
+cd "$ROOT_DIR"
 
 # Colors for output
 RED='\033[0;31m'
@@ -84,12 +89,12 @@ case "${1:-help}" in
         echo "  ./agent.sh test-maintenance   # Routes to Maintenance Agent"
         echo "  ./agent.sh test-operations    # Routes to Operations Agent"
         echo ""
-        uv run opentelemetry-instrument python orchestrator_agent.py
+        uv run orchestrator-server
         ;;
 
     stop)
         echo -e "${YELLOW}Stopping local orchestrator...${NC}"
-        pkill -f "python orchestrator_agent.py" 2>/dev/null || echo "No orchestrator process found"
+        pkill -f "$ENTRYPOINT" 2>/dev/null || echo "No orchestrator process found"
         echo -e "${GREEN}Stopped.${NC}"
         ;;
 
@@ -123,7 +128,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${GREEN}Configuring orchestrator for AWS deployment...${NC}"
         echo ""
-        uv run agentcore configure -e orchestrator_agent.py
+        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME"
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"
@@ -168,9 +173,9 @@ case "${1:-help}" in
         echo -e "${BLUE}Tests routing to Maintenance and Operations agents${NC}"
         echo ""
         if [ -n "$2" ]; then
-            uv run python invoke_agent.py load-test --interval "$2"
+            uv run orchestrator-invoke load-test --interval "$2"
         else
-            uv run python invoke_agent.py load-test
+            uv run orchestrator-invoke load-test
         fi
         ;;
 

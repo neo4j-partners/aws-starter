@@ -65,4 +65,4 @@ fi
 
 # Run the agent
 cd "$SCRIPT_DIR"
-uv run python agent.py "$@"
+uv run python -m neo4j_mcp_agent.agent "$@"

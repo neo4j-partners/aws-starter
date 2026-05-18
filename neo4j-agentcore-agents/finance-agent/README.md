@@ -71,10 +71,7 @@ uv sync
 
 # Cross-session memory is a core part of the agent and runs on the same
 # Neo4j instance as the finance graph, so set these for local runs too.
-cat > .env <<'EOF'
-NEO4J_URI=neo4j+s://xxxxxxxx.databases.neo4j.io
-NEO4J_PASSWORD=your-password
-EOF
+cp .env.example .env       # then edit NEO4J_URI / NEO4J_PASSWORD
 ```
 
 Start the server. `uv run finance-server` binds port 7020 and blocks, so

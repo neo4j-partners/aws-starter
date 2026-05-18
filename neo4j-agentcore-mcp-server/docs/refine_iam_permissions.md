@@ -848,8 +848,8 @@ For the sandbox tester, create a separate cross-account role with the [Sandbox T
 6. **Verify sandbox tester** by invoking the agent:
    ```bash
    # As sandbox tester role (SigV4 path)
-   cd neo4j-agentcore-agents/fleet-agent
-   uv run python invoke_agent.py "What is the database schema?"
+   cd fleet-agent-demo/agent
+   uv run fleet-invoke "What is the database schema?"
 
    # Or via Gateway JWT (no IAM required, just credentials)
    cd neo4j-agentcore-mcp-server

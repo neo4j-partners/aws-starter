@@ -2,9 +2,8 @@
 # Deploy Neo4j MCP Agent to AgentCore via CloudFormation
 #
 # Usage:
-#   ./deploy.sh fleet-agent              # Deploy fleet-agent
 #   ./deploy.sh orchestrator-agent       # Deploy orchestrator-agent
-#   ./deploy.sh fleet-agent my-stack     # Custom stack name
+#   ./deploy.sh orchestrator-agent my-stack   # Custom stack name
 #
 # Prerequisites:
 #   - AWS CLI configured with credentials
@@ -24,15 +23,15 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-AGENT_TYPE="${1:-fleet-agent}"
+AGENT_TYPE="${1:-orchestrator-agent}"
 STACK_NAME="${2:-neo4j-${AGENT_TYPE}}"
 AWS_REGION="${AWS_REGION:-us-west-2}"
 NETWORK_MODE="${NETWORK_MODE:-PUBLIC}"
 
 # Validate agent type
-if [[ "$AGENT_TYPE" != "fleet-agent" && "$AGENT_TYPE" != "orchestrator-agent" ]]; then
+if [[ "$AGENT_TYPE" != "orchestrator-agent" ]]; then
     echo -e "${RED}ERROR: Invalid agent type: $AGENT_TYPE${NC}"
-    echo "Usage: $0 [fleet-agent|orchestrator-agent] [stack-name]"
+    echo "Usage: $0 [orchestrator-agent] [stack-name]"
     exit 1
 fi
 

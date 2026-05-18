@@ -1,5 +1,10 @@
 # Strandsify: dual-framework agents over a shared core
 
+> Note: since this proposal was written, `fleet-agent` has moved to
+> `fleet-agent-demo/agent/` (alongside the GraphRAG pipeline that populates
+> its graph). Path references to `neo4j-agentcore-agents/fleet-agent` below
+> reflect the original layout and are kept as a historical record.
+
 ## Proposal
 
 ### ELI5

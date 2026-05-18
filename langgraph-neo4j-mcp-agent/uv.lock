@@ -989,7 +989,6 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "boto3" },
-    { name = "fastmcp" },
     { name = "httpx" },
     { name = "langchain" },
     { name = "langchain-aws" },
@@ -1003,11 +1002,14 @@ minimal = [
     { name = "langchain-aws" },
     { name = "langgraph" },
 ]
+test = [
+    { name = "fastmcp" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.42.0" },
-    { name = "fastmcp", specifier = ">=2.14.3" },
+    { name = "fastmcp", marker = "extra == 'test'", specifier = ">=2.14.3" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "langchain", specifier = ">=1.2.0" },
     { name = "langchain-aws", specifier = ">=1.2.1" },
@@ -1017,7 +1019,7 @@ requires-dist = [
     { name = "langgraph", marker = "extra == 'minimal'", specifier = ">=1.0.6" },
     { name = "mcp", specifier = ">=1.25.0" },
 ]
-provides-extras = ["minimal"]
+provides-extras = ["minimal", "test"]
 
 [[package]]
 name = "numpy"

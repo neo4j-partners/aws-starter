@@ -253,7 +253,7 @@ The SQL version requires manually coding each hop as a separate CTE with explici
 
 ## Routing Questions to the Right Store
 
-A **multi-agent supervisor on AWS Bedrock AgentCore** sits above the two stores and routes each question to the right place.
+A **multi-agent supervisor on AWS Bedrock AgentCore** sits above the two stores and routes each question.
 
 ```
                     User Question
@@ -266,10 +266,10 @@ A **multi-agent supervisor on AWS Bedrock AgentCore** sits above the two stores 
      (columnar / SQL)             (graph / Cypher)
 ```
 
-It decides based on the nature of the question:
+It decides based on the question:
 - **Numbers and trends** to the analytics agent
 - **Relationships and structure** to the Neo4j MCP agent
-- **Both needed** calls each agent in sequence, then combines the answers
+- **Both needed** calls each agent in sequence, then combines results
 
 ---
 

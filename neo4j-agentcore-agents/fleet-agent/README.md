@@ -106,12 +106,6 @@ needs only the three things in [Prerequisites](#prerequisites): `uv sync`, a
 
 ```bash
 uv sync
-cat > .env <<'EOF'
-NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your-password
-EOF
-
 uv run python demo.py
 ```
 

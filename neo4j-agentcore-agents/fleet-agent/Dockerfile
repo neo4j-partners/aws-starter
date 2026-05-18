@@ -1,11 +1,10 @@
-# Neo4j MCP Agent (LangGraph) — Dockerfile for AgentCore Runtime
+# Neo4j Fleet Agent (Strands) — Dockerfile for AgentCore Runtime
 #
-# Build context is the agent root (one level up), so the shared `common/`
-# package and the root pyproject.toml/uv.lock are available:
+# Build context is the agent root, so the shared `common/` package and the
+# root pyproject.toml/uv.lock are available:
 #
-#   docker build --platform linux/arm64 \
-#       -f langgraph/Dockerfile -t neo4j-langgraph .
-#   docker run -p 8080:8080 neo4j-langgraph
+#   docker build --platform linux/arm64 -t neo4j-fleet-agent .
+#   docker run -p 8080:8080 neo4j-fleet-agent
 #
 # AgentCore Requirements: ARM64 (aarch64), port 8080, HTTP server on 8080.
 
@@ -31,11 +30,11 @@ COPY pyproject.toml uv.lock ./
 COPY common ./common
 RUN uv sync --frozen --no-dev
 
-COPY langgraph ./langgraph
+COPY runtime_app.py tools.py ./
 
-# Copy MCP credentials if present (wildcard avoids failure when absent).
-COPY .mcp-credentials.jso[n] ./
+# Neo4j connection (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD) and AWS
+# credentials are supplied as Runtime environment variables, not baked in.
 
 EXPOSE 8080
 
-CMD ["uv", "run", "python", "langgraph/runtime_app.py"]
+CMD ["uv", "run", "python", "runtime_app.py"]

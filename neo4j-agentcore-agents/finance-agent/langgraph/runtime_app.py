@@ -18,10 +18,12 @@ Cloud deployment:
 """
 
 import logging
+from collections.abc import AsyncIterator
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
+from langchain_core.language_models import BaseChatModel
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from common import (
@@ -42,7 +44,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 app = BedrockAgentCoreApp()
 
 
-def get_llm(region: str = AWS_REGION):
+def get_llm(region: str = AWS_REGION) -> BaseChatModel:
     """Get the Bedrock Claude LLM via the Converse API."""
     return init_chat_model(
         MODEL_ID,
@@ -66,7 +68,7 @@ def build_mcp_client(gateway_url: str, access_token: str) -> MultiServerMCPClien
 
 
 @app.entrypoint
-async def invoke(payload: dict | None = None):
+async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
     """AgentCore Runtime handler — processes financial queries via Neo4j MCP."""
     if payload is None:
         payload = {}
@@ -85,7 +87,7 @@ async def invoke(payload: dict | None = None):
         }
         return
 
-    logger.info(f"Query: {prompt[:100]}...")
+    logger.info("Query: %s...", prompt[:100])
 
     try:
         credentials = get_active_credentials()
@@ -93,14 +95,14 @@ async def invoke(payload: dict | None = None):
         access_token = credentials["access_token"]
         region = credentials.get("region", AWS_REGION)
 
-        logger.info(f"Gateway: {gateway_url}")
-        logger.info(f"Model: {MODEL_ID}")
+        logger.info("Gateway: %s", gateway_url)
+        logger.info("Model: %s", MODEL_ID)
 
         llm = get_llm(region)
         mcp_client = build_mcp_client(gateway_url, access_token)
 
         tools = await mcp_client.get_tools()
-        logger.info(f"Loaded {len(tools)} tools: {[t.name for t in tools]}")
+        logger.info("Loaded %d tools: %s", len(tools), [t.name for t in tools])
 
         agent = create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
         result = await agent.ainvoke({"messages": [("human", prompt)]})
@@ -117,11 +119,11 @@ async def invoke(payload: dict | None = None):
         logger.info("Request completed successfully")
 
     except FileNotFoundError as e:
-        logger.error(f"Credentials error: {e}")
+        logger.error("Credentials error: %s", e)
         yield {"type": "error", "error": str(e)}
     except Exception as e:
-        logger.error(f"Error: {e}", exc_info=True)
-        yield {"type": "error", "error": f"Error processing request: {str(e)}"}
+        logger.error("Error: %s", e, exc_info=True)
+        yield {"type": "error", "error": f"Error processing request: {e}"}
 
 
 if __name__ == "__main__":

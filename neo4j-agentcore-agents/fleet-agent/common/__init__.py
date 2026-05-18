@@ -1,32 +1,55 @@
-"""Shared, framework-agnostic building blocks for the Neo4j MCP fleet agent.
+"""Shared, framework-agnostic building blocks for the Neo4j fleet agent.
 
 Both framework variants (``langgraph/`` and ``strands/``) import from here:
 
-- :mod:`common.config`      — model id, region, system-prompt template
-- :mod:`common.credentials` — credential loading + OAuth2 token refresh
-- :mod:`common.schema`      — raw-MCP schema fetch + process-level cache
+- :mod:`common.config`       — model id, region, embedder/index, prompt
+- :mod:`common.neo4j_tools`  — direct-to-Neo4j GraphRAG retrieval callables
 
-Nothing in this package depends on LangGraph or Strands. Framework-specific
-wiring (LLM construction, MCP tool client) lives in each variant.
+The agent connects straight to Neo4j (no MCP server, no AgentCore Gateway).
+Framework-specific wiring (LLM construction, tool binding) lives in each
+variant; the retrieval callables here are plain functions both variants wrap.
+
+Importing this package loads the agent-root ``.env``, the fleet-agent
+directory one level up from ``common/``, so local runs pick up the Neo4j
+connection vars regardless of the working directory. Existing environment
+variables are never overridden, so shell-exported vars and AgentCore Runtime
+env vars still take precedence; in the deployed Runtime there is no ``.env``
+and the load is a harmless no-op.
 """
 
-from common.config import AWS_REGION, MODEL_ID, SYSTEM_PROMPT_TEMPLATE
-from common.credentials import (
-    check_token_expiry,
-    get_active_credentials,
-    load_credentials,
-    refresh_token,
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# fleet-agent/ is the parent of common/; its .env is the local config source.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from common.config import (  # noqa: E402  (must follow load_dotenv)
+    AWS_REGION,
+    EMBED_DIMENSIONS,
+    EMBED_MODEL_ID,
+    MODEL_ID,
+    SYSTEM_PROMPT_TEMPLATE,
+    VECTOR_INDEX_NAME,
 )
-from common.schema import fetch_schema, get_cached_schema
+from common.neo4j_tools import (  # noqa: E402  (must follow load_dotenv)
+    close,
+    get_driver,
+    get_graph_schema,
+    graph_query,
+    vector_search,
+)
 
 __all__ = [
     "AWS_REGION",
+    "EMBED_DIMENSIONS",
+    "EMBED_MODEL_ID",
     "MODEL_ID",
     "SYSTEM_PROMPT_TEMPLATE",
-    "check_token_expiry",
-    "get_active_credentials",
-    "load_credentials",
-    "refresh_token",
-    "fetch_schema",
-    "get_cached_schema",
+    "VECTOR_INDEX_NAME",
+    "close",
+    "get_driver",
+    "get_graph_schema",
+    "graph_query",
+    "vector_search",
 ]

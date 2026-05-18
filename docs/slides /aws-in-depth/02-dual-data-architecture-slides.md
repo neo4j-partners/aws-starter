@@ -1,0 +1,304 @@
+---
+marp: true
+theme: default
+paginate: true
+---
+
+<style>
+section {
+  --marp-auto-scaling-code: false;
+}
+
+li {
+  opacity: 1 !important;
+  animation: none !important;
+  visibility: visible !important;
+}
+
+/* Disable all fragment animations */
+.marp-fragment {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+ul > li,
+ol > li {
+  opacity: 1 !important;
+}
+</style>
+
+# The Dual Data Architecture
+
+Why split data across a columnar analytics store and a graph database, and how to route each question to the right one
+
+---
+
+## Why Combine an Analytics Store and Neo4j?
+
+A columnar analytics store and Neo4j solve **different problems well**.
+
+**The analytics layer** (e.g. a lakehouse or data warehouse) excels at working with large volumes of structured data: aggregations, time-series analysis, and machine learning over tables.
+
+**Neo4j** excels at understanding **how things connect**: following chains of relationships, finding patterns, and answering questions about structure.
+
+Most real-world problems have both: numbers that need crunching **and** relationships that need navigating. Using both stores together gives you the best of each.
+
+---
+
+## Dual Database Architecture
+
+The data is split across two stores, each chosen for the workload it handles best:
+
+**The columnar analytics store** for time-series telemetry
+- Hundreds of thousands of hourly sensor readings across many days
+- Columnar storage and SQL for aggregations, trend analysis, statistical comparisons
+
+**Neo4j Aura** for richly connected relational data
+- Aircraft topology, component hierarchies, maintenance events, flights, delays, airport routes
+- Native multi-hop traversals without expensive JOINs
+
+A multi-agent supervisor on AWS Bedrock AgentCore routes questions to the right store automatically.
+
+---
+
+![bg contain](images/dual-database-architecture.png)
+
+---
+
+## What Each Store Brings
+
+| | Columnar analytics store | Neo4j |
+|---|-----------|-------|
+| **Stores** | Tables and files | Nodes and relationships |
+| **Answers** | "How much?" and "How often?" | "How is this connected?" and "What is affected?" |
+| **AI capability** | SQL analytics, foundation models | Vector indexes, GraphRAG, MCP |
+| **Strength** | Scale, aggregation, ML | Relationships, traversal, pattern matching |
+
+A data connector moves data between the stores. **MCP** lets agents query the graph directly. Together, the stores stay connected at every layer.
+
+---
+
+## Two Data Models, Two Query Languages
+
+How rows and columns work together with nodes and relationships.
+
+- **The analytics store (Data Intelligence):** structured, semi-structured, and unstructured data at scale
+- **Neo4j (Graph Intelligence):** connections between entities, explicit and traversable
+
+The next slides break down what each side does and when to reach for which.
+
+---
+
+## The Analytics Store
+
+- **Aggregates** transactions, sensor streams, clickstreams
+- **Governs** documents, images, unstructured files
+- **SQL** at petabyte scale, real-time streaming, data science
+- Schema enforcement, ACID transactions, and time travel provide the foundation
+- ML pipelines from feature engineering through model serving
+
+---
+
+## Neo4j: The Graph Intelligence Platform
+
+- **Traverses** supply chains, fault networks, knowledge graphs
+- **Cypher** pattern matching on nodes and relationships
+- **Multi-hop traversal** and path finding in milliseconds
+- Pattern matching across connection topologies reveals structures invisible in flat tables
+- Graph Data Science (graph algorithms), AuraDB (managed database), GraphRAG (graph-enhanced retrieval)
+
+---
+
+## Tables Become Graphs
+
+Data in the analytics store lives in **rows and columns**. Data in Neo4j lives as **nodes and relationships**.
+
+A data connector handles the translation:
+
+| Columnar analytics store | Knowledge Graph (Neo4j) |
+|------------------------|------------------------|
+| A row in an Aircraft table | An Aircraft node |
+| A row in a Systems table | A System node |
+| A foreign key linking them | A `HAS_SYSTEM` relationship |
+
+What was implicit in table joins becomes **explicit and traversable** in the graph.
+
+---
+
+## From the Analytics Store to the Graph
+
+- **Most data stays put:** aggregates, metrics, logs, documents
+- **Rows become nodes:** entity columns become node properties
+- **Foreign keys become relationships:** `record.system_id` to `(:Aircraft)-[:HAS_SYSTEM]->(:System)`
+- **Mapping tables become relationships:** junction rows become edges with properties
+- **Shared attributes become shared nodes:** two flights through the same airport connect through one `(:Airport)` node
+- **Self-referential columns become chains:** component replacement becomes `(:Component)-[:REPLACED_BY]->(:Component)`
+
+Only the subset with connection patterns worth traversing projects into Neo4j. The analytics store remains the system of record; the graph is a projection of the connections that matter.
+
+---
+
+## Data Intelligence, Graph Intelligence, or Both?
+
+- **SQL:** average EGT by aircraft, a single GROUP BY aggregation
+- **Cypher:** components within three hops of a flagged maintenance event, a single traversal query
+
+Most investigations need **both**.
+
+| Question | Store |
+|---|---|
+| Average EGT by aircraft | Analytics store (SQL aggregation) |
+| Components within three hops of a flagged maintenance event | Neo4j (graph traversal) |
+| Find aircraft sharing a faulty component type, then compute their total delay minutes | Both |
+
+---
+
+## When to Stay in SQL vs. Move to the Graph
+
+**Stay in SQL / the analytics store when:**
+
+- The question is about aggregation: totals, averages, counts, distributions
+- The data fits naturally in rows and columns with no recursive joins
+- You need full-table scans over billions of records
+- The answer lives in a single table or a small number of predictable joins
+
+**Move to Cypher / Neo4j when:**
+
+- The question involves connections between entities, "who is connected to whom?"
+- You need variable-length traversal, following chains where the depth is not known in advance
+- The join count would be three or more self-joins against the same table
+- You need real-time path finding or pattern matching against a connection topology
+- The query shape changes based on what you find (exploratory traversal)
+
+**The rule of thumb:** if you are counting things, stay in SQL. If you are following connections, move to the graph.
+
+---
+
+## Decision Table: SQL vs. Cypher
+
+| Signal | Stay in SQL | Move to Cypher |
+|--------|-------------|----------------|
+| Number of hops | 1 to 2 fixed joins | 3+ or variable depth |
+| Query shape | Known at design time | Depends on the data encountered |
+| Result type | Aggregated numbers | Paths, subgraphs, connected components |
+| Latency requirement | Batch is fine | Sub-second for interactive investigation |
+| Data volume per query | Millions of rows scanned | Thousands of entities traversed |
+
+---
+
+## The Same Question, Two Languages
+
+**Question:** Find all components within three hops of a flagged component (comp-1234) through shared systems or shared maintenance events.
+
+**SQL (analytics store):**
+
+```sql
+WITH hop1 AS (
+    SELECT DISTINCT sc2.component_id
+    FROM system_components sc1
+    JOIN system_components sc2
+      ON sc1.system_id = sc2.system_id AND sc1.component_id != sc2.component_id
+    WHERE sc1.component_id = 'comp-1234'
+    UNION
+    SELECT DISTINCT ec2.component_id
+    FROM event_components ec1
+    JOIN event_components ec2
+      ON ec1.event_id = ec2.event_id AND ec1.component_id != ec2.component_id
+    WHERE ec1.component_id = 'comp-1234'
+),
+hop2 AS (
+    SELECT DISTINCT sc2.component_id
+    FROM hop1 h JOIN system_components sc1 ON h.component_id = sc1.component_id
+    JOIN system_components sc2
+      ON sc1.system_id = sc2.system_id AND sc1.component_id != sc2.component_id
+    UNION
+    SELECT DISTINCT ec2.component_id
+    FROM hop1 h JOIN event_components ec1 ON h.component_id = ec1.component_id
+    JOIN event_components ec2
+      ON ec1.event_id = ec2.event_id AND ec1.component_id != ec2.component_id
+),
+hop3 AS (
+    SELECT DISTINCT sc2.component_id
+    FROM hop2 h JOIN system_components sc1 ON h.component_id = sc1.component_id
+    JOIN system_components sc2
+      ON sc1.system_id = sc2.system_id AND sc1.component_id != sc2.component_id
+    UNION
+    SELECT DISTINCT ec2.component_id
+    FROM hop2 h JOIN event_components ec1 ON h.component_id = ec1.component_id
+    JOIN event_components ec2
+      ON ec1.event_id = ec2.event_id AND ec1.component_id != ec2.component_id
+)
+SELECT component_id FROM hop1 UNION
+SELECT component_id FROM hop2 UNION
+SELECT component_id FROM hop3;
+```
+
+---
+
+## The Same Question in Cypher
+
+**Cypher (Neo4j):**
+
+```cypher
+MATCH (flagged:Component {id: 'comp-1234'})
+      -[:HAS_COMPONENT|HAS_EVENT*1..3]-
+      (connected:Component)
+WHERE connected <> flagged
+RETURN DISTINCT connected.id
+```
+
+The SQL version requires manually coding each hop as a separate CTE with explicit joins across two link tables. Adding a fourth hop means another CTE block. The Cypher version expresses the same traversal in three lines, and changing `*1..3` to `*1..5` extends the search with no structural change.
+
+---
+
+## Routing Questions to the Right Store
+
+A **multi-agent supervisor on AWS Bedrock AgentCore** sits above the two stores and routes each question to the right place.
+
+```
+                    User Question
+                         |
+                         v
+            ┌─── Supervisor (AgentCore) ───┐
+            |                              |
+            v                              v
+     Analytics agent              Neo4j MCP agent
+     (columnar / SQL)             (graph / Cypher)
+```
+
+It decides based on the nature of the question:
+- **Numbers and trends** to the analytics agent
+- **Relationships and structure** to the Neo4j MCP agent
+- **Both needed** calls each agent in sequence, then combines the answers
+
+---
+
+## Multi-Agent Routing in Action
+
+**"What is the average EGT for engine AC5?"**
+The supervisor sends this to the **analytics agent**, a numeric aggregation over sensor data.
+
+**"Which components were serviced on aircraft N95040A?"**
+The supervisor sends this to the **Neo4j agent**, a relationship traversal through the graph.
+
+**"Find aircraft with high vibration readings and show their maintenance history"**
+The supervisor calls **both agents in sequence**:
+  1. The analytics agent identifies which aircraft have high vibration
+  2. The Neo4j agent retrieves maintenance history for those aircraft
+  3. The supervisor synthesizes a combined answer
+
+No Cypher or SQL knowledge is required from the end user.
+
+---
+
+## Summary
+
+The dual data architecture is a natural pairing:
+
+- A data connector moves data between the analytics store and the knowledge graph
+- **Tabular data becomes a graph**, making implicit relationships explicit and queryable
+- **Neo4j as an MCP server** gives AI agents direct access to the knowledge graph
+- **A multi-agent supervisor on AWS Bedrock AgentCore** routes questions to the right store automatically
+- If you are counting things, stay in SQL. If you are following connections, move to the graph
+
+Together, you get the analytical power of the columnar store **and** the relationship intelligence of the graph, connected, not siloed.

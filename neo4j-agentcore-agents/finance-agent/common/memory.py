@@ -58,6 +58,7 @@ memory tools) never pulls the dependency.
 import asyncio
 import concurrent.futures
 import logging
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -260,8 +261,6 @@ def user_scoped_context_graph_tools(
             "scripts/vendor-memory.sh and re-check this module."
         ) from e
 
-    import os
-
     uri = neo4j_uri or os.environ.get("NEO4J_URI")
     password = neo4j_password or os.environ.get("NEO4J_PASSWORD")
     if not uri:
@@ -357,7 +356,7 @@ def user_scoped_context_graph_tools(
                         for r in rows
                     )
                 except Exception as e:  # noqa: BLE001 - best-effort recall
-                    logger.debug(f"Scoped message search failed: {e}")
+                    logger.debug("Scoped message search failed: %s", e)
 
                 try:
                     prefs = await client._client.execute_read(
@@ -374,7 +373,7 @@ def user_scoped_context_graph_tools(
                         for p in prefs
                     )
                 except Exception as e:  # noqa: BLE001 - best-effort recall
-                    logger.debug(f"Scoped preference search failed: {e}")
+                    logger.debug("Scoped preference search failed: %s", e)
 
                 return results
 
@@ -456,7 +455,7 @@ def user_scoped_context_graph_tools(
                         {"user_id": uid, "category": category, "limit": 50},
                     )
                 except Exception as e:  # noqa: BLE001 - best-effort recall
-                    logger.debug(f"Scoped preference fetch failed: {e}")
+                    logger.debug("Scoped preference fetch failed: %s", e)
                     return []
                 return [
                     {

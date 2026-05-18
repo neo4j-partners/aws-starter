@@ -36,7 +36,7 @@ def load_credentials() -> dict:
                 "Copy from the MCP server deployment:\n"
                 "  cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json ."
             )
-        with open(CREDENTIALS_FILE) as f:
+        with open(CREDENTIALS_FILE, encoding="utf-8") as f:
             _CREDENTIALS = json.load(f)
         logger.info("Credentials loaded into memory")
 
@@ -90,7 +90,7 @@ def refresh_token(credentials: dict) -> dict:
     credentials["access_token"] = token_data["access_token"]
     credentials["token_expires_at"] = expires_at.isoformat()
 
-    logger.info(f"Token refreshed (in-memory). Expires: {expires_at.isoformat()}")
+    logger.info("Token refreshed (in-memory). Expires: %s", expires_at.isoformat())
     return credentials
 
 

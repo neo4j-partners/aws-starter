@@ -37,7 +37,12 @@ if [[ "$LOAD_FULL_DATASET" == "true" ]]; then
   DEFAULT_DAYS=90
 else
   DEFAULT_AIRCRAFT=20
-  DEFAULT_DAYS=7
+  # 90 days: degradation is time-driven, so a shorter window produces zero
+  # MaintenanceEvents (events only fire once sensor series cross model
+  # thresholds, which takes ~45+ days). 20 aircraft x 90 days yields ~111
+  # events and keeps readings ~23M — small-tier friendly, and makes the
+  # fleet-agent maintenance queries actually return data.
+  DEFAULT_DAYS=90
 fi
 AIRCRAFT="${GEN_AIRCRAFT:-$DEFAULT_AIRCRAFT}"
 DAYS="${GEN_DAYS:-$DEFAULT_DAYS}"
@@ -51,14 +56,14 @@ export DATA_DIR="$SCRIPT_DIR/generated"
 export DOCUMENT_DIR="$SCRIPT_DIR/manuals"
 mkdir -p "$DATA_DIR"
 
-UV_SYNC_EXTRA=()
+UV_SYNC_EXTRA=""
 if [[ "${LLM_PROVIDER:-openai}" == "anthropic" ]]; then
-  UV_SYNC_EXTRA=(--extra anthropic)
+  UV_SYNC_EXTRA="--extra anthropic"
 fi
 
 sync_deps() {
-  echo "==> uv sync ${UV_SYNC_EXTRA[*]:-}"
-  uv sync "${UV_SYNC_EXTRA[@]}"
+  echo "==> uv sync ${UV_SYNC_EXTRA}"
+  uv sync ${UV_SYNC_EXTRA}
 }
 
 do_generate() {

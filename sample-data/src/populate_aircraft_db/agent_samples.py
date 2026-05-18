@@ -238,13 +238,47 @@ def _create_llm_client(
     *,
     openai_key: str | None = None,
     anthropic_key: str | None = None,
+    region: str | None = None,
     llm_model: str,
     embedding_model: str,
     embedding_dimensions: int,
 ):
     """Return an LLM callable and an embed callable based on the provider."""
 
-    if provider == "openai":
+    if provider == "bedrock":
+        import json
+
+        import boto3
+
+        client = boto3.client(
+            "bedrock-runtime", **({"region_name": region} if region else {})
+        )
+
+        def chat(system: str, user: str) -> str:
+            resp = client.converse(
+                modelId=llm_model,
+                system=[{"text": system}],
+                messages=[{"role": "user", "content": [{"text": user}]}],
+                inferenceConfig={"maxTokens": 1000},
+            )
+            return resp["output"]["message"]["content"][0]["text"]
+
+        def embed(text: str) -> list[float]:
+            resp = client.invoke_model(
+                modelId=embedding_model,
+                accept="application/json",
+                contentType="application/json",
+                body=json.dumps(
+                    {
+                        "inputText": text,
+                        "dimensions": embedding_dimensions,
+                        "normalize": True,
+                    }
+                ),
+            )
+            return list(json.loads(resp["body"].read())["embedding"])
+
+    elif provider == "openai":
         from openai import OpenAI
 
         client = OpenAI(api_key=openai_key)
@@ -423,6 +457,7 @@ def run_agent_samples(
     provider: str,
     openai_key: str | None = None,
     anthropic_key: str | None = None,
+    region: str | None = None,
     llm_model: str,
     embedding_model: str,
     embedding_dimensions: int,
@@ -433,6 +468,7 @@ def run_agent_samples(
         provider,
         openai_key=openai_key,
         anthropic_key=anthropic_key,
+        region=region,
         llm_model=llm_model,
         embedding_model=embedding_model,
         embedding_dimensions=embedding_dimensions,

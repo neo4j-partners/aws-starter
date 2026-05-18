@@ -16,6 +16,7 @@ import sys
 
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
+from langchain_core.language_models import BaseChatModel
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from common import (
@@ -37,7 +38,7 @@ DEMO_QUESTIONS = [
 ]
 
 
-def get_llm(region: str = AWS_REGION):
+def get_llm(region: str = AWS_REGION) -> BaseChatModel:
     """Get the Bedrock Claude LLM via the Converse API."""
     return init_chat_model(
         MODEL_ID,

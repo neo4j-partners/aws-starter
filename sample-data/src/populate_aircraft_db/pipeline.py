@@ -226,9 +226,12 @@ def _create_extraction_llm(
 ):
     """Create the LLM used for maintenance-manual entity extraction."""
     if provider == "bedrock":
-        from neo4j_graphrag.llm.bedrock_llm import BedrockLLM
+        # StructuredBedrockLLM (a thin local subclass) routes the extractor's
+        # response_format request through Bedrock Converse tool use, so entity
+        # extraction gets schema-shaped JSON instead of prompt-and-repair.
+        from .bedrock_structured import StructuredBedrockLLM
 
-        return BedrockLLM(
+        return StructuredBedrockLLM(
             model_name=llm_model,
             model_params={"maxTokens": llm_max_tokens},
             region_name=region,
@@ -362,6 +365,7 @@ def debug_extract_chunks(
         provider=provider,
         openai_api_key=openai_api_key,
         anthropic_api_key=anthropic_api_key,
+        region=region,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
     )
@@ -426,6 +430,7 @@ def process_all_documents(
     provider: str,
     openai_api_key: str | None,
     anthropic_api_key: str | None,
+    region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
     embedding_model: str,
@@ -445,6 +450,7 @@ def process_all_documents(
         provider=provider,
         openai_api_key=openai_api_key,
         anthropic_api_key=anthropic_api_key,
+        region=region,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
         embedding_model=embedding_model,

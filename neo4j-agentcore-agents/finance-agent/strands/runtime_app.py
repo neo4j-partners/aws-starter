@@ -42,6 +42,7 @@ Cloud deployment:
 
 import logging
 import re
+from collections.abc import AsyncIterator
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from mcp.client.streamable_http import streamablehttp_client
@@ -109,10 +110,10 @@ def _build_memory_tools():
             embedding_provider="bedrock",
             aws_region=AWS_REGION,
         )
-        logger.info(f"User-scoped Context Graph memory enabled ({len(tools)} tools)")
+        logger.info("User-scoped Context Graph memory enabled (%d tools)", len(tools))
         return tools
     except ValueError as e:
-        logger.warning(f"Context Graph memory disabled: {e}")
+        logger.warning("Context Graph memory disabled: %s", e)
         return []
 
 
@@ -170,7 +171,7 @@ def _memory_system_prompt(user_id: str, session_id: str | None) -> str:
 
 
 @app.entrypoint
-async def invoke(payload: dict | None = None):
+async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
     """AgentCore Runtime handler — processes financial queries via Neo4j MCP."""
     if payload is None:
         payload = {}
@@ -192,16 +193,16 @@ async def invoke(payload: dict | None = None):
     user_id = _resolve_user_id(payload)
     session_id = _safe_scope_id(payload.get("session_id"))
 
-    logger.info(f"Query: {prompt[:100]}...")
-    logger.info(f"Model: {MODEL_ID}")
-    logger.info(f"Memory scope: user_id={user_id} session_id={session_id}")
+    logger.info("Query: %s...", prompt[:100])
+    logger.info("Model: %s", MODEL_ID)
+    logger.info("Memory scope: user_id=%s session_id=%s", user_id, session_id)
 
     try:
         # Per-request MCP scope: the transport factory runs on context entry,
         # so this request uses a freshly validated token.
         with mcp_client:
             tools = mcp_client.list_tools_sync() + memory_tools
-            logger.info(f"Loaded {len(tools)} tools")
+            logger.info("Loaded %d tools", len(tools))
 
             agent = Agent(
                 model=model,
@@ -217,11 +218,11 @@ async def invoke(payload: dict | None = None):
         logger.info("Request completed successfully")
 
     except FileNotFoundError as e:
-        logger.error(f"Credentials error: {e}")
+        logger.error("Credentials error: %s", e)
         yield {"type": "error", "error": str(e)}
     except Exception as e:
-        logger.error(f"Error: {e}", exc_info=True)
-        yield {"type": "error", "error": f"Error processing request: {str(e)}"}
+        logger.error("Error: %s", e, exc_info=True)
+        yield {"type": "error", "error": f"Error processing request: {e}"}
 
 
 if __name__ == "__main__":

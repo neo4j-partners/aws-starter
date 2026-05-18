@@ -20,8 +20,9 @@ generates that data locally and loads it into Aura in one command.
 | `setup.sh` | One-command pipeline. |
 
 CSVs are generated locally rather than committed (the full readings file is
-~114 MB). The vendored code is a clean copy from
-`databricks-neo4j-lab/lab_setup` and is not modified.
+~114 MB). The vendored code originates from `databricks-neo4j-lab/lab_setup`
+and has been modified here to support **Amazon Bedrock** (Titan embeddings +
+Claude extraction) as the default enrichment backend.
 
 ## Quick start
 
@@ -30,14 +31,17 @@ cd sample-data
 
 cp .env.sample .env
 # Edit .env: set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD for your Aura
-# instance, and OPENAI_API_KEY (enrichment). Leave LOAD_FULL_DATASET=false.
+# instance. LLM_PROVIDER=bedrock by default, so enrichment uses Amazon Bedrock
+# with your standard AWS credentials (env / ~/.aws) — no API key needed.
+# Leave LOAD_FULL_DATASET=false.
 
 ./setup.sh
 ```
 
 `./setup.sh` (full pipeline) installs deps, generates the dataset, clears the
-database, loads CSV data, runs GraphRAG enrichment (chunking, OpenAI
-embeddings, LLM entity extraction over `manuals/`), and verifies the result.
+database, loads CSV data, runs GraphRAG enrichment (chunking, Bedrock Titan
+embeddings, Bedrock Claude entity extraction over `manuals/`), and verifies
+the result.
 
 ### Commands
 
@@ -45,7 +49,7 @@ embeddings, LLM entity extraction over `manuals/`), and verifies the result.
 |---------|--------|
 | `./setup.sh` | Full: sync, generate, clean, setup (load + enrich), verify |
 | `./setup.sh generate` | Only (re)generate CSVs into `generated/` |
-| `./setup.sh load` | Clean + load + GraphRAG enrich (needs an LLM key) |
+| `./setup.sh load` | Clean + load + GraphRAG enrich (needs Bedrock/LLM access) |
 | `./setup.sh load-operational` | Clean + CSV load only — **no LLM, no API key** |
 | `./setup.sh verify` | Read-only graph verification (`--strict`) |
 | `./setup.sh clean` | Delete all nodes and relationships |
@@ -55,14 +59,36 @@ embeddings, LLM entity extraction over `manuals/`), and verifies the result.
 
 Controlled by `LOAD_FULL_DATASET` in `.env`:
 
-- **`false` (default)** — ~20 aircraft × 7 days. Readings stay a few MB, loads
-  in minutes, fits free/small Aura tiers. Answers every query in
-  `fleet-agent/queries.txt`.
+- **`false` (default)** — ~20 aircraft × 90 days (~23 MB of readings, ~111
+  maintenance events). Loads in minutes, fits free/small Aura tiers. The 90-day
+  window is deliberate: maintenance events only fire after sensor degradation
+  crosses model thresholds (~45+ days), so a shorter window yields none and the
+  `fleet-agent/queries.txt` maintenance queries return empty.
 - **`true`** — ~100 aircraft × 90 days (~114 MB of readings). Realistic but slow
   to load; needs a larger Aura tier.
 
 Set `false`/`true` so the heavy readings file is never even generated in
 sampled mode. Override per-knob with `GEN_AIRCRAFT` / `GEN_DAYS` if needed.
+
+## Bedrock notes
+
+- **Models** (override in `.env`): extraction `global.anthropic.claude-sonnet-4-6`,
+  embeddings `amazon.titan-embed-text-v2:0`
+  (Titan V2, 1024-dim). The vector index is created at that dimension on each
+  `clean`+`setup`, so changing the model just needs a matching
+  `BEDROCK_EMBEDDING_DIMENSIONS` and a re-run.
+- **Region** is pinned to `us-east-1` (this repo's AgentCore region); override
+  only via the explicit `BEDROCK_REGION` env var. Ensure the chosen models are
+  enabled there.
+- **Structured output:** `neo4j-graphrag` 1.16.0's stock `BedrockLLM` rejects
+  `response_format`, so the library would fall back to prompt-based JSON +
+  repair. This repo adds a thin `StructuredBedrockLLM` subclass
+  (`src/populate_aircraft_db/bedrock_structured.py`) that routes the
+  extractor's `response_format` through Bedrock Converse **tool use** with a
+  forced `toolChoice`, so Claude returns schema-shaped JSON directly — the
+  AWS-recommended path for structured output. It reuses the stock
+  `BedrockLLM`'s Converse helpers; only `toolChoice` forcing is added. Switch
+  `LLM_PROVIDER=openai` only if you specifically want the OpenAI extractor.
 
 ## Wiring it to the MCP server and agent
 
@@ -83,9 +109,17 @@ The MCP server and fleet-agent need **no code changes** — only config:
    with no changes. Try the queries in
    `../neo4j-agentcore-agents/fleet-agent/queries.txt`.
 
-## Re-syncing the vendored code
+## Relationship to the upstream lab_setup
 
-The generator and loader are a copy from
-`databricks-neo4j-lab/lab_setup/{generator,populate_aircraft_db}`. To pull
-upstream changes, re-copy those `src/` packages and the `manuals/*.md` files;
-do not hand-edit the vendored code so the copy stays clean.
+The generator and loader originated from
+`databricks-neo4j-lab/lab_setup/{generator,populate_aircraft_db}`. This copy
+has been modified to add **Amazon Bedrock** as a provider (Titan embeddings via
+`BedrockEmbeddings`, Claude extraction via `BedrockLLM`) and to make it the
+default. Edit it freely. If you pull changes from upstream, re-apply the
+Bedrock support, which lives in:
+
+- `src/populate_aircraft_db/config.py` — `bedrock` provider + settings
+- `src/populate_aircraft_db/main.py` — credential resolution + dimension wiring
+- `src/populate_aircraft_db/pipeline.py` — `StructuredBedrockLLM` / `BedrockEmbeddings`
+- `src/populate_aircraft_db/bedrock_structured.py` — tool-use structured-output subclass
+- `src/populate_aircraft_db/agent_samples.py` — Bedrock chat/embed for `samples`

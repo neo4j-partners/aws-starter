@@ -8,17 +8,54 @@ uploads it, with no Docker image required.
 
 ## Architecture
 
+The agent runs as a `BedrockAgentCoreApp` on AgentCore Runtime. It reasons
+with Claude on Bedrock in a ReAct loop, and every Neo4j query goes out through
+an AgentCore Gateway to a separate Neo4j MCP server. The agent never talks to
+Neo4j directly.
+
 ```
-AgentCore Runtime
-  agent.py (BedrockAgentCoreApp)
-    -> Claude on Bedrock (ReAct loop)
-    -> MCP client -> AgentCore Gateway (OAuth2 JWT) -> Neo4j MCP Server -> Neo4j
+  AWS Bedrock AgentCore
+  +-------------------------------------------------------------------+
+  |                                                                   |
+  |  +--------------------------+         +----------------------+     |
+  |  |  Finance Agent           |  tools  |  AgentCore Gateway   |     |
+  |  |  (AgentCore Runtime)     | ------>  |  (OAuth2 JWT auth)   |     |
+  |  |                          |         +----------+-----------+     |
+  |  |  BedrockAgentCoreApp     |                    |                 |
+  |  |  ReAct loop              |                    v                 |
+  |  |   - Claude (Bedrock)     |         +----------------------+     |
+  |  |   - MCP client           |         |  Neo4j MCP Server    |     |
+  |  |     (streamable_http)    |         |  (AgentCore Runtime) |     |
+  |  +--------------------------+         +----------+-----------+     |
+  |                                                  |                 |
+  +--------------------------------------------------|-----------------+
+                                                     v
+                                          +--------------------+
+                                          |   Neo4j database   |
+                                          +--------------------+
 ```
 
-The local CLI and the deployed agent take the same Gateway path.
-`.mcp-credentials.json` supplies the Gateway URL and OAuth2 client
-credentials. The access token is minted and refreshed in memory, so a
-long-running deployment keeps working without re-syncing credentials.
+**How it uses the MCP server.** `common/credentials.py` reads
+`.mcp-credentials.json` for the Gateway URL and OAuth2 client credentials. It
+runs an OAuth2 client-credentials flow to mint a bearer token, then refreshes
+that token in memory before it expires. The MCP client connects to the Gateway
+over `streamable_http` with an `Authorization: Bearer` header and loads the
+Neo4j tools at runtime. Because tokens refresh themselves, a long-running
+deployment keeps working without re-syncing credentials. The local CLI and the
+deployed agent take the exact same Gateway path.
+
+**How the remote deploy works.** `agent.sh configure` runs
+`agentcore configure`, which writes `.bedrock_agentcore.yaml` with the agent
+name, IAM role, and region. `agent.sh deploy` runs `agentcore deploy`, which
+uses `direct_code_deploy`: it zips the Python source, uploads it to S3,
+triggers CodeBuild to install dependencies, and creates or updates the
+AgentCore Runtime agent. No Docker image is built. The LangGraph and Strands
+variants deploy under distinct agent names.
+
+**Yes, it deploys to AgentCore.** The deployed target is an Amazon Bedrock
+AgentCore Runtime agent. Invoke it with `agent.sh invoke-cloud` or with boto3
+via `invoke_agent.py`, which calls `bedrock-agentcore` `invoke_agent_runtime`
+against the deployed runtime ARN.
 
 ## Unique Features
 

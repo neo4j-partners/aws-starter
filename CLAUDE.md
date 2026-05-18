@@ -59,16 +59,16 @@ uv run python simple-agent.py "query"  # Simple agent (static token)
 cd neo4j-agentcore-agents
 
 # Fleet Agent — LangGraph and Strands variants over a shared common/ core.
-# uv project (pyproject.toml, uv.lock, .venv, .mcp-credentials.json) is at
-# the agent root; each variant has its own agent.sh + Dockerfile.
+# uv project (pyproject.toml, uv.lock, .venv) is at the agent root, with a
+# shared agent.sh; each variant has its own runtime_app.py + Dockerfile.
 cd fleet-agent
-uv sync                      # Install deps (also installs the common package)
-langgraph/agent.sh start     # Run LangGraph variant locally (port 8080)
-langgraph/agent.sh test      # Test local agent
-langgraph/agent.sh deploy    # Deploy LangGraph variant to AgentCore Runtime
-langgraph/agent.sh invoke-cloud "query"
-strands/agent.sh start       # Run Strands variant locally (port 8080)
-strands/agent.sh deploy      # Deploy Strands variant (distinct agent name)
+uv sync                          # Install deps (also installs the common package)
+./agent.sh langgraph start       # Run LangGraph variant locally (port 8080)
+./agent.sh langgraph test        # Test local agent
+./agent.sh langgraph deploy      # Deploy LangGraph variant to AgentCore Runtime
+./agent.sh langgraph invoke-cloud "query"
+./agent.sh strands start         # Run Strands variant locally (port 8080)
+./agent.sh strands deploy        # Deploy Strands variant (distinct agent name)
 
 # Finance Agent — same LangGraph/Strands split over its own common/ core
 cd ../finance-agent

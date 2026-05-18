@@ -2,11 +2,17 @@
 """
 Invoke Agent Programmatically
 
-Demonstrates how to invoke the deployed Neo4j MCP Agent using boto3.
+Demonstrates how to invoke the deployed Neo4j Fleet Agent using boto3.
+
+The response is streamed: SSE events ("data: {...}\\n\\n") are parsed as they
+arrive off the wire and the answer is printed to the terminal token by token,
+not buffered and printed at the end. The parser understands exactly the three
+event shapes the Strands runtime emits (chunk/error/complete); the deprecated
+direct-response shapes are not supported.
 
 Usage:
     uv run python invoke_agent.py                          # Uses default prompt
-    uv run python invoke_agent.py "What is the schema?"    # Custom prompt
+    uv run python invoke_agent.py "How many aircraft?"     # Custom prompt
     uv run python invoke_agent.py load-test                # Load test mode (random queries every 5s)
     uv run python invoke_agent.py load-test 10             # Load test with custom interval (10s)
 
@@ -75,6 +81,41 @@ def get_agent_config() -> tuple[str, str]:
         sys.exit(1)
 
 
+def _handle_sse_event(
+    event: str, content_parts: list[str], errors: list[str]
+) -> None:
+    """Dispatch one SSE event from the Strands runtime, printing text live.
+
+    The Strands ``runtime_app`` emits exactly three JSON event shapes:
+    ``{"type": "chunk", "data": ...}``, ``{"type": "error", "error": ...}``,
+    and ``{"type": "complete"}``. ``chunk`` text is printed as it arrives and
+    also collected so callers still get the assembled response. ``json.loads``
+    already yields real newlines, so no ``\\n`` unescaping is needed; anything
+    that is not one of these shapes is ignored.
+    """
+    event = event.strip()
+    if not event:
+        return
+    if event.startswith("data: "):
+        event = event[6:]
+    try:
+        data = json.loads(event)
+    except json.JSONDecodeError:
+        return
+    if data.get("type") == "chunk":
+        text = data.get("data", "")
+        print(text, end="", flush=True)
+        content_parts.append(text)
+    elif data.get("type") == "error":
+        errors.append(data.get("error", "Unknown error"))
+
+
+def _print_result(result: dict) -> None:
+    """The success text already streamed live; only surface errors here."""
+    if result.get("status") != "success":
+        print(f"ERROR: {result.get('errors', ['Unknown error'])}")
+
+
 def invoke_agent(prompt: str) -> dict:
     """
     Invoke the deployed agent with a prompt.
@@ -109,56 +150,29 @@ def invoke_agent(prompt: str) -> dict:
         qualifier="DEFAULT",
     )
 
-    # Read and parse the streaming response
-    content_parts = []
-    errors = []
-    raw_buffer = ""
+    # Parse and print SSE events ("data: {...}\n\n") as they arrive off the
+    # wire rather than buffering the whole response, so the answer streams to
+    # the terminal live.
+    content_parts: list[str] = []
+    errors: list[str] = []
+    buffer = ""
 
-    for chunk in response.get("response", []):
-        raw_buffer += chunk.decode("utf-8")
+    for raw in response.get("response", []):
+        buffer += raw.decode("utf-8")
+        while "\n\n" in buffer:
+            event, buffer = buffer.split("\n\n", 1)
+            _handle_sse_event(event, content_parts, errors)
+    if buffer.strip():
+        _handle_sse_event(buffer, content_parts, errors)
 
-    # Parse SSE format - each message is "data: {...}\n\n"
-    for message in raw_buffer.split("\n\n"):
-        message = message.strip()
-        if not message:
-            continue
-
-        # Strip "data: " prefix if present
-        if message.startswith("data: "):
-            message = message[6:]
-
-        # Try to parse as JSON
-        try:
-            chunk_data = json.loads(message)
-
-            # Handle different response types
-            if chunk_data.get("type") == "chunk":
-                content_parts.append(chunk_data.get("data", ""))
-            elif chunk_data.get("type") == "error":
-                errors.append(chunk_data.get("error", "Unknown error"))
-            elif chunk_data.get("type") == "complete":
-                pass  # End of response
-            else:
-                # Handle legacy format (direct response)
-                if "response" in chunk_data:
-                    content_parts.append(chunk_data["response"])
-                elif "data" in chunk_data:
-                    content_parts.append(chunk_data["data"])
-        except json.JSONDecodeError:
-            # Not JSON, could be raw text
-            if message:
-                content_parts.append(message)
-
-    # Join content and clean up escaped newlines
-    full_response = "".join(content_parts)
-    full_response = full_response.replace("\\n", "\n")
+    print()  # terminate the streamed line
 
     if errors:
         return {"status": "error", "errors": errors}
 
     return {
         "status": "success",
-        "response": full_response,
+        "response": "".join(content_parts),
     }
 
 
@@ -190,7 +204,7 @@ def run_load_test(interval: int = 5):
         sys.exit(1)
 
     print("=" * 70)
-    print("Neo4j MCP Agent - Load Test Mode")
+    print("Neo4j Fleet Agent - Load Test Mode")
     print("=" * 70)
     print(f"Loaded {len(queries)} queries from queries.txt")
     print(f"Running a random query every {interval} seconds...")
@@ -213,12 +227,7 @@ def run_load_test(interval: int = 5):
             print("-" * 70)
             print("")
 
-            result = invoke_agent(query)
-
-            if result.get("status") == "success":
-                print(result.get("response", "No response"))
-            else:
-                print(f"ERROR: {result.get('errors', ['Unknown error'])}")
+            _print_result(invoke_agent(query))
 
             print("")
             print("-" * 70)
@@ -256,24 +265,18 @@ def main():
         prompt = "How many aircraft are in the database?"
 
     print("=" * 70)
-    print("Neo4j MCP Agent - Programmatic Invocation")
+    print("Neo4j Fleet Agent - Programmatic Invocation")
     print("=" * 70)
     print("")
     print(f"Prompt: {prompt}")
     print("")
 
-    result = invoke_agent(prompt)
-
     print("")
     print("=" * 70)
     print("Response:")
     print("=" * 70)
-
-    if result.get("status") == "success":
-        print(result.get("response", "No response"))
-    else:
-        print(f"ERROR: {result.get('errors', ['Unknown error'])}")
-
+    result = invoke_agent(prompt)
+    _print_result(result)
     print("")
 
 

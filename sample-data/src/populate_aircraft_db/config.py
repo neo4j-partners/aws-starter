@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
+        # The .env is shared with setup.sh, which owns bash-only knobs
+        # (LOAD_FULL_DATASET, GEN_*, DATA_DIR/DOCUMENT_DIR). Ignore env keys
+        # this model doesn't declare instead of rejecting them.
+        extra="ignore",
     )
 
     neo4j_uri: str
@@ -51,8 +55,11 @@ class Settings(BaseSettings):
 
     # Amazon Bedrock — used when llm_provider is "bedrock". Credentials come
     # from the standard AWS chain (env vars / ~/.aws), not from this file.
+    # AgentCore region for this repo. Pinned to us-east-1; override only via
+    # the explicit BEDROCK_REGION env var.
     bedrock_region: str = "us-east-1"
-    bedrock_llm_model: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+    # Claude Sonnet 4.6 via the cross-region "global" inference profile.
+    bedrock_llm_model: str = "global.anthropic.claude-sonnet-4-6"
     bedrock_llm_max_tokens: int = 8000
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     bedrock_embedding_dimensions: int = 1024

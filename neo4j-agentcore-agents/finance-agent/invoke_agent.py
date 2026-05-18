@@ -18,6 +18,12 @@ Memory is wired into the **Strands** variant only
 only meaningful against a deployed Strands agent; the LangGraph variant has no
 memory tools and will just answer each turn independently.
 
+The response is streamed: SSE events ("data: {...}\\n\\n") are parsed as they
+arrive off the wire and the answer is printed to the terminal token by token,
+not buffered and printed at the end. The parser understands exactly the three
+event shapes the Strands runtime emits (``chunk``/``error``/``complete``); the
+deprecated direct-response shapes are not supported.
+
 Usage:
     uv run python invoke_agent.py                       # default prompt
     uv run python invoke_agent.py "Tell me about Apple" # one-shot
@@ -80,7 +86,7 @@ def get_agent_config() -> tuple[str, str]:
     That file is created by ``agentcore configure``.
     """
     try:
-        with open(CONFIG_FILE) as f:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
         print(f"ERROR: {CONFIG_FILE.name} not found")
@@ -104,6 +110,35 @@ def get_agent_config() -> tuple[str, str]:
     return arn, region
 
 
+def _handle_sse_event(
+    event: str, content_parts: list[str], errors: list[str]
+) -> None:
+    """Dispatch one SSE event from the Strands runtime, printing text live.
+
+    The Strands ``runtime_app`` emits exactly three JSON event shapes:
+    ``{"type": "chunk", "data": ...}``, ``{"type": "error", "error": ...}``,
+    and ``{"type": "complete"}``. ``chunk`` text is printed as it arrives and
+    also collected so callers still get the assembled response. ``json.loads``
+    already yields real newlines, so no ``\\n`` unescaping is needed; anything
+    that is not one of these shapes is ignored.
+    """
+    event = event.strip()
+    if not event:
+        return
+    if event.startswith("data: "):
+        event = event[6:]
+    try:
+        data = json.loads(event)
+    except json.JSONDecodeError:
+        return
+    if data.get("type") == "chunk":
+        text = data.get("data", "")
+        print(text, end="", flush=True)
+        content_parts.append(text)
+    elif data.get("type") == "error":
+        errors.append(data.get("error", "Unknown error"))
+
+
 def invoke_agent(
     prompt: str,
     user_id: str = DEFAULT_USER_ID,
@@ -118,10 +153,10 @@ def invoke_agent(
     """
     agent_arn, region = get_agent_config()
 
-    logger.info(f"Agent ARN: {agent_arn}")
-    logger.info(f"Region: {region}")
-    logger.info(f"Prompt: {prompt}")
-    logger.info(f"Memory scope: user_id={user_id} session_id={session_id}")
+    logger.info("Agent ARN: %s", agent_arn)
+    logger.info("Region: %s", region)
+    logger.info("Prompt: %s", prompt)
+    logger.info("Memory scope: user_id=%s session_id=%s", user_id, session_id)
 
     client = boto3.client("bedrock-agentcore", region_name=region)
 
@@ -139,48 +174,29 @@ def invoke_agent(
 
     content_parts: list[str] = []
     errors: list[str] = []
-    raw_buffer = ""
+    buffer = ""
 
-    for chunk in response.get("response", []):
-        raw_buffer += chunk.decode("utf-8")
+    # Parse and print SSE events ("data: {...}\n\n") as they arrive off the
+    # wire rather than buffering the whole response, so the answer streams to
+    # the terminal live.
+    for raw in response.get("response", []):
+        buffer += raw.decode("utf-8")
+        while "\n\n" in buffer:
+            event, buffer = buffer.split("\n\n", 1)
+            _handle_sse_event(event, content_parts, errors)
+    if buffer.strip():
+        _handle_sse_event(buffer, content_parts, errors)
 
-    # SSE format: each message is "data: {...}\n\n"
-    for message in raw_buffer.split("\n\n"):
-        message = message.strip()
-        if not message:
-            continue
-        if message.startswith("data: "):
-            message = message[6:]
-
-        try:
-            chunk_data = json.loads(message)
-            if chunk_data.get("type") == "chunk":
-                content_parts.append(chunk_data.get("data", ""))
-            elif chunk_data.get("type") == "error":
-                errors.append(chunk_data.get("error", "Unknown error"))
-            elif chunk_data.get("type") == "complete":
-                pass
-            else:
-                # Legacy / direct-response shapes
-                if "response" in chunk_data:
-                    content_parts.append(chunk_data["response"])
-                elif "data" in chunk_data:
-                    content_parts.append(chunk_data["data"])
-        except json.JSONDecodeError:
-            if message:
-                content_parts.append(message)
-
-    full_response = "".join(content_parts).replace("\\n", "\n")
+    print()  # terminate the streamed line
 
     if errors:
         return {"status": "error", "errors": errors}
-    return {"status": "success", "response": full_response}
+    return {"status": "success", "response": "".join(content_parts)}
 
 
 def _print_result(result: dict) -> None:
-    if result.get("status") == "success":
-        print(result.get("response", "No response"))
-    else:
+    """The success text already streamed live; only surface errors here."""
+    if result.get("status") != "success":
         print(f"ERROR: {result.get('errors', ['Unknown error'])}")
 
 
@@ -193,11 +209,10 @@ def run_one_shot(prompt: str, user_id: str) -> None:
     print(f"Prompt:  {prompt}")
     print("")
 
-    result = invoke_agent(prompt, user_id=user_id)
-
     print("=" * 70)
     print("Response:")
     print("=" * 70)
+    result = invoke_agent(prompt, user_id=user_id)
     _print_result(result)
     print("")
 
@@ -267,7 +282,7 @@ def _read_env_var(path: Path, key: str) -> str | None:
     if not path.is_file():
         return None
     prefix = f"{key}="
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
             if stripped.startswith(prefix):
@@ -401,7 +416,7 @@ def load_queries() -> list[str]:
     if not QUERIES_FILE.exists():
         return []
     queries: list[str] = []
-    with open(QUERIES_FILE) as f:
+    with open(QUERIES_FILE, encoding="utf-8") as f:
         for line in f:
             match = re.match(r"^\d+\.\s+(.+)$", line.strip())
             if match:

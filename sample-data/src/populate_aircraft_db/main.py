@@ -68,13 +68,21 @@ def _connect(settings: Settings) -> Generator[Driver, None, None]:
 
 @dataclass
 class _LLMCredentials:
-    provider: Literal["openai", "anthropic"]
+    provider: Literal["bedrock", "openai", "anthropic"]
     openai_key: str | None
     anthropic_key: str | None
     llm_model: str
     llm_max_tokens: int
     embedding_model: str
     embedding_dims: int
+    region: str | None = None
+
+
+def _expected_embedding_dims(settings: Settings) -> int:
+    """Embedding dimensionality for the active provider (read-only, no keys)."""
+    if settings.llm_provider == "bedrock":
+        return settings.bedrock_embedding_dimensions
+    return settings.openai_embedding_dimensions
 
 
 def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
@@ -82,6 +90,25 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
     provider = settings.llm_provider
     openai_key = None
     anthropic_key = None
+    region = None
+
+    if provider == "bedrock":
+        # AWS credentials come from the standard boto3 chain, not this file.
+        region = settings.bedrock_region
+        llm_model = settings.bedrock_llm_model
+        llm_max_tokens = settings.bedrock_llm_max_tokens
+        embedding_model = settings.bedrock_embedding_model
+        embedding_dims = settings.bedrock_embedding_dimensions
+        return _LLMCredentials(
+            provider=provider,
+            openai_key=None,
+            anthropic_key=None,
+            llm_model=llm_model,
+            llm_max_tokens=llm_max_tokens,
+            embedding_model=embedding_model,
+            embedding_dims=embedding_dims,
+            region=region,
+        )
 
     if provider == "openai":
         if settings.openai_api_key is None:
@@ -167,6 +194,7 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
         provider=creds.provider,
         openai_api_key=creds.openai_key,
         anthropic_api_key=creds.anthropic_key,
+        region=creds.region,
         llm_model=creds.llm_model,
         llm_max_tokens=creds.llm_max_tokens,
         embedding_model=creds.embedding_model,
@@ -228,7 +256,7 @@ def setup_cmd() -> None:
 
         verify(
             driver,
-            expected_embedding_dimensions=settings.openai_embedding_dimensions,
+            expected_embedding_dimensions=creds.embedding_dims,
         )
 
     elapsed = time.monotonic() - start
@@ -250,7 +278,7 @@ def verify_cmd(
     with _connect(settings) as driver:
         passed = verify(
             driver,
-            expected_embedding_dimensions=settings.openai_embedding_dimensions,
+            expected_embedding_dimensions=_expected_embedding_dims(settings),
             strict=strict,
         )
 
@@ -363,6 +391,7 @@ def debug_extract_cmd(
             provider=creds.provider,
             openai_api_key=creds.openai_key,
             anthropic_api_key=creds.anthropic_key,
+            region=creds.region,
             llm_model=creds.llm_model,
             llm_max_tokens=creds.llm_max_tokens,
             chunk_size=settings.chunk_size,
@@ -405,6 +434,7 @@ def agent_samples_cmd() -> None:
             provider=creds.provider,
             openai_key=creds.openai_key,
             anthropic_key=creds.anthropic_key,
+            region=creds.region,
             llm_model=creds.llm_model,
             embedding_model=creds.embedding_model,
             embedding_dimensions=creds.embedding_dims,

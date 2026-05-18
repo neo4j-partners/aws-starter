@@ -40,13 +40,22 @@ class Settings(BaseSettings):
     openai_extraction_model: str = "gpt-5-mini"
     openai_extraction_max_completion_tokens: int = 8000
 
-    # LLM provider selection — "openai" or "anthropic".
-    llm_provider: Literal["openai", "anthropic"] = "openai"
+    # LLM provider selection — "bedrock" (default), "openai", or "anthropic".
+    # Controls BOTH entity extraction and chunk embeddings.
+    llm_provider: Literal["bedrock", "openai", "anthropic"] = "bedrock"
 
     # Anthropic — only required when llm_provider is "anthropic".
     anthropic_api_key: SecretStr | None = None
     anthropic_extraction_model: str = "claude-sonnet-4-6"
     anthropic_extraction_max_tokens: int = 8000
+
+    # Amazon Bedrock — used when llm_provider is "bedrock". Credentials come
+    # from the standard AWS chain (env vars / ~/.aws), not from this file.
+    bedrock_region: str = "us-east-1"
+    bedrock_llm_model: str = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+    bedrock_llm_max_tokens: int = 8000
+    bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
+    bedrock_embedding_dimensions: int = 1024
 
     # Chunking settings for the `setup` command.
     chunk_size: int = 800

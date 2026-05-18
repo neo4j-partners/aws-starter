@@ -220,10 +220,19 @@ def _create_extraction_llm(
     provider: str,
     openai_api_key: str | None,
     anthropic_api_key: str | None,
+    region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
 ):
     """Create the LLM used for maintenance-manual entity extraction."""
+    if provider == "bedrock":
+        from neo4j_graphrag.llm.bedrock_llm import BedrockLLM
+
+        return BedrockLLM(
+            model_name=llm_model,
+            model_params={"maxTokens": llm_max_tokens},
+            region_name=region,
+        )
     if provider == "openai":
         from neo4j_graphrag.llm.openai_llm import OpenAILLM
 
@@ -252,6 +261,7 @@ def _create_pipeline(
     provider: str,
     openai_api_key: str | None,
     anthropic_api_key: str | None,
+    region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
     embedding_model: str,
@@ -272,16 +282,26 @@ def _create_pipeline(
         provider=provider,
         openai_api_key=openai_api_key,
         anthropic_api_key=anthropic_api_key,
+        region=region,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
     )
 
     # --- Embedder ---
-    embedder = DimensionAwareOpenAIEmbeddings(
-        dimensions=embedding_dimensions,
-        model=embedding_model,
-        api_key=openai_api_key,
-    )
+    if provider == "bedrock":
+        from neo4j_graphrag.embeddings.bedrock import BedrockEmbeddings
+
+        embedder = BedrockEmbeddings(
+            model_id=embedding_model,
+            dimensions=embedding_dimensions,
+            region_name=region,
+        )
+    else:
+        embedder = DimensionAwareOpenAIEmbeddings(
+            dimensions=embedding_dimensions,
+            model=embedding_model,
+            api_key=openai_api_key,
+        )
 
     # --- Text splitter (with per-chunk context injection) ---
     inner_splitter = FixedSizeSplitter(
@@ -316,6 +336,7 @@ def debug_extract_chunks(
     provider: str,
     openai_api_key: str | None,
     anthropic_api_key: str | None,
+    region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
     chunk_size: int,

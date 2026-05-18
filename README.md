@@ -285,23 +285,23 @@ Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-back
 
 ---
 
-### 📦 **Foundation Samples** (`foundation_samples/`)
+### 📦 **Infra Samples** (`infra_samples/`)
 
 > These samples are adapted from the official [Amazon Bedrock AgentCore Samples](https://github.com/awslabs/amazon-bedrock-agentcore-samples) repository. They have been simplified and restructured with shell script wrappers to make them easy to run and understand without navigating the full samples repo.
 
-*   **[`foundation_samples/simple-agentcore-agent`](./foundation_samples/simple-agentcore-agent/)**
+*   **[`infra_samples/simple-agentcore-agent`](./infra_samples/simple-agentcore-agent/)**
     *   **Status:** ✅ Works
     *   **Description:** A "Hello World" baseline sample that deploys a simple AI agent to AgentCore Runtime using the Strands Agents framework. This is the best starting point for verifying your AWS setup, CDK bootstrapping, and understanding the basic AgentCore deployment lifecycle.
     *   **Key Features:** Minimal dependencies, `@app.entrypoint` decorator pattern, local development with hot reload, one-command cloud deployment.
     *   **Use Case:** First-time AgentCore users, testing AWS permissions, learning the deployment workflow.
 
-*   **[`foundation_samples/sample-agentcore-mcp-server`](./foundation_samples/sample-agentcore-mcp-server/)**
+*   **[`infra_samples/sample-agentcore-mcp-server`](./infra_samples/sample-agentcore-mcp-server/)**
     *   **Status:** ✅ Works
     *   **Description:** A generic MCP server example with Calculator and Greeter tools using the `FastMCP` framework. Demonstrates the foundational pattern for hosting custom Python MCP servers on AgentCore without the complexity of external databases or authentication.
     *   **Key Features:** FastMCP stateless HTTP transport, CloudFormation-based deployment, local development server, comprehensive test scripts.
     *   **Use Case:** Learning MCP server development, creating custom tool servers, prototyping before adding database integrations.
 
-*   **[`foundation_samples/simple-oauth-gateway`](./foundation_samples/simple-oauth-gateway/)**
+*   **[`infra_samples/simple-oauth-gateway`](./infra_samples/simple-oauth-gateway/)**
     *   **Status:** ✅ Works
     *   **Description:** A comprehensive demo of setting up an OAuth2 Gateway with Role-Based Access Control (RBAC) and Lambda Interceptors. Shows how to secure MCP server access with Cognito-based authentication and implement custom authorization logic.
     *   **Key Features:** Cognito User Pool integration, machine-to-machine (M2M) OAuth flows, Lambda interceptors for request/response modification, RBAC patterns.

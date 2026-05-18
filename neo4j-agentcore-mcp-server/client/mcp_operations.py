@@ -31,7 +31,7 @@ This module implements dynamic tool discovery following AWS best practices:
 - Resolve base names to actual names when calling tools
 
 This pattern is used in all official AWS AgentCore samples:
-- foundation_samples/simple-oauth-gateway/client/demo.py (lines 174-176)
+- infra_samples/simple-oauth-gateway/client/demo.py (lines 174-176)
 - shopping-concierge-agent/gateway_client.py (line 142)
 - AWS-operations-agent/mcp-tool-handler.py (lines 8-10)
 
@@ -98,7 +98,7 @@ async def get_tool_map(session: ClientSession) -> dict[str, str]:
     invocation, so we must use whatever names are returned by tools/list.
 
     AWS Sample References:
-        - foundation_samples/simple-oauth-gateway/client/demo.py:174-176
+        - infra_samples/simple-oauth-gateway/client/demo.py:174-176
         - shopping-concierge-agent/gateway_client.py:142
         - AWS-operations-agent/mcp-tool-handler.py:8-10
 

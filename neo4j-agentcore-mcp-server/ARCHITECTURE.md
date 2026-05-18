@@ -306,7 +306,7 @@ The same pattern appears in official AWS samples:
 
 | Sample | File | Location |
 |--------|------|----------|
-| foundation_samples/simple-oauth-gateway | `client/demo.py` | Lines 174-176 |
+| infra_samples/simple-oauth-gateway | `client/demo.py` | Lines 174-176 |
 | shopping-concierge-agent | `gateway_client.py` | Line 142 |
 | AWS-operations-agent | `mcp-tool-handler.py` | Lines 8-10 |
 

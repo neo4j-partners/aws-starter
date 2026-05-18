@@ -103,17 +103,17 @@ uv run local-test stop fleet-agent   # Stop container
 uv run local-test status             # Check all containers
 ```
 
-### Foundation Samples
+### Infra Samples
 
 ```bash
 # Simple agent (Hello World)
-cd foundation_samples/simple-agentcore-agent
+cd infra_samples/simple-agentcore-agent
 uv sync && uv run cdk bootstrap && uv run cdk deploy
 uv run python test_agent.py
 uv run cdk destroy
 
 # Sample MCP server (Calculator/Greeter tools)
-cd foundation_samples/sample-agentcore-mcp-server
+cd infra_samples/sample-agentcore-mcp-server
 uv sync && uv run cdk deploy
 uv run python test_mcp_server.py
 uv run cdk destroy
@@ -151,7 +151,7 @@ uv run cdk deploy                    # Run CDK commands
 | **LangGraph Agent** | `langgraph-neo4j-mcp-agent/` | Standalone ReAct agent, notebooks for SageMaker |
 | **AgentCore Agents** | `neo4j-agentcore-agents/` | Cloud-deployed agents (basic + orchestrator) |
 | **Databricks Samples** | `databrick_samples/` | Unity Catalog HTTP connection integration |
-| **Foundation Samples** | `foundation_samples/` | Educational baseline examples |
+| **Infra Samples** | `infra_samples/` | Educational baseline examples |
 
 ### Request Flow
 

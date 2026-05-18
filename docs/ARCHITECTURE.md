@@ -11,7 +11,7 @@ This document provides a comprehensive architecture overview of the Neo4j MCP ec
    - [CDK Stack Components](#cdk-stack-components)
    - [Authentication Architecture](#authentication-architecture)
 3. [AI Agents Architecture](#ai-agents-architecture)
-   - [Basic Agent](#basic-agent)
+   - [Fleet Agent](#fleet-agent)
    - [Orchestrator Agent (Multi-Agent)](#orchestrator-agent-multi-agent)
 4. [End-to-End Request Flow](#end-to-end-request-flow)
 
@@ -45,7 +45,7 @@ flowchart TB
         end
 
         subgraph Agents["AI Agents"]
-            BASIC[Basic Agent<br/>Single ReAct Loop]
+            FLEET[Fleet Agent<br/>Single ReAct Loop]
             ORCH[Orchestrator<br/>Multi-Agent Router]
         end
 
@@ -57,9 +57,9 @@ flowchart TB
     RUNTIME --> MCP
     MCP --> NEO4J
     GATEWAY --> RUNTIME
-    BASIC --> GATEWAY
+    FLEET --> GATEWAY
     ORCH --> GATEWAY
-    BASIC --> COGNITO
+    FLEET --> COGNITO
     ORCH --> COGNITO
 ```
 
@@ -370,7 +370,7 @@ sequenceDiagram
 
 Two agent implementations are provided in `neo4j-agentcore-agents/`:
 
-### Basic Agent
+### Fleet Agent
 
 A single ReAct (Reasoning + Acting) agent that handles all queries using LangChain and LangGraph.
 
@@ -380,7 +380,7 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph BasicAgent["Basic Agent (local_cli.py)"]
+    subgraph FleetAgent["Fleet Agent (local_cli.py)"]
         LLM[Claude Sonnet 4<br/>via Bedrock Converse]
         REACT[ReAct Loop<br/>Thought → Action → Observation]
         TOOLS[MCP Tools<br/>get-schema, read-cypher]
@@ -417,7 +417,7 @@ flowchart TB
 **Usage:**
 
 ```bash
-cd basic-agent
+cd fleet-agent
 uv sync                   # Install dependencies
 ./agent.sh start          # Run locally (port 8080)
 ./agent.sh test           # Test local agent

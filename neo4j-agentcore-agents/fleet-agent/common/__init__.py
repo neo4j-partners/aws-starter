@@ -1,4 +1,4 @@
-"""Shared, framework-agnostic building blocks for the Neo4j MCP basic agent.
+"""Shared, framework-agnostic building blocks for the Neo4j MCP fleet agent.
 
 Both framework variants (``langgraph/`` and ``strands/``) import from here:
 

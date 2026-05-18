@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple Neo4j MCP Agent (LangGraph)
+"""Neo4j MCP Agent (LangGraph) — local CLI.
 
 A simplified ReAct agent that connects to the Neo4j MCP server via AgentCore
 Gateway. Uses .mcp-credentials.json for authentication (no automatic token

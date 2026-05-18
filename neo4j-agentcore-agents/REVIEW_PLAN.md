@@ -1,6 +1,6 @@
 # neo4j-agentcore-agents — Review & Fix Plan
 
-Review date: 2026-05-17. Scope: `neo4j-agentcore-agents/` (basic-agent,
+Review date: 2026-05-17. Scope: `neo4j-agentcore-agents/` (fleet-agent,
 finance-agent-gateway, finance-agent, orchestrator-agent, cfn/, Dockerfiles,
 pyproject, credentials handling) checked against AWS Bedrock AgentCore
 documentation.
@@ -40,7 +40,7 @@ security posture, and corrects the docs.
   `CMD` runs the agent directly, not through the ADOT auto-instrumentation
   entrypoint, so the README's OpenTelemetry claim does not hold for the
   Docker/CFN path (hypothesis — see Decisions).
-- Inconsistent model IDs: basic-agent and orchestrator use
+- Inconsistent model IDs: fleet-agent and orchestrator use
   `global.anthropic.claude-sonnet-4-5-20250929-v1:0`; finance-agent-gateway
   uses the older `us.anthropic.claude-sonnet-4-20250514-v1:0`.
 - README does not mention the one-time CloudWatch Transaction Search account
@@ -49,7 +49,7 @@ security posture, and corrects the docs.
 ### Added
 
 - Token-refresh logic in `finance-agent-gateway/agent.py` (mirroring the
-  working pattern in `basic-agent/aircraft-agent.py`).
+  working pattern in `fleet-agent/aircraft-agent.py`).
 - Confused-deputy condition keys on the CFN trust policy.
 - A documented decision on credential delivery to the container.
 
@@ -98,7 +98,7 @@ security posture, and corrects the docs.
 ### Where to look
 
 - Token refresh: `finance-agent-gateway/agent.py`, compare to
-  `basic-agent/aircraft-agent.py` `refresh_token` / `check_token_expiry`.
+  `fleet-agent/aircraft-agent.py` `refresh_token` / `check_token_expiry`.
 - IAM + trust + network mode: `cfn/agent-runtime.yaml`.
 - Observability: `*/Dockerfile` `CMD`, `pyproject.toml` ADOT dependency,
   `README.md` observability claim.

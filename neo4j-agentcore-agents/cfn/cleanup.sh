@@ -2,10 +2,10 @@
 # Cleanup Neo4j MCP Agent from AgentCore
 #
 # Usage:
-#   ./cleanup.sh basic-agent              # Cleanup basic-agent
+#   ./cleanup.sh fleet-agent              # Cleanup fleet-agent
 #   ./cleanup.sh orchestrator-agent       # Cleanup orchestrator-agent
-#   ./cleanup.sh basic-agent my-stack     # Custom stack name
-#   ./cleanup.sh basic-agent my-stack --delete-ecr  # Also delete ECR repo
+#   ./cleanup.sh fleet-agent my-stack     # Custom stack name
+#   ./cleanup.sh fleet-agent my-stack --delete-ecr  # Also delete ECR repo
 #
 # Options:
 #   --delete-ecr    Also delete the ECR repository and images
@@ -22,7 +22,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-AGENT_TYPE="${1:-basic-agent}"
+AGENT_TYPE="${1:-fleet-agent}"
 STACK_NAME="${2:-neo4j-${AGENT_TYPE}}"
 DELETE_ECR=false
 AWS_REGION="${AWS_REGION:-us-west-2}"
@@ -37,9 +37,9 @@ for arg in "$@"; do
 done
 
 # Validate agent type
-if [[ "$AGENT_TYPE" != "basic-agent" && "$AGENT_TYPE" != "orchestrator-agent" ]]; then
+if [[ "$AGENT_TYPE" != "fleet-agent" && "$AGENT_TYPE" != "orchestrator-agent" ]]; then
     echo -e "${RED}ERROR: Invalid agent type: $AGENT_TYPE${NC}"
-    echo "Usage: $0 [basic-agent|orchestrator-agent] [stack-name] [--delete-ecr]"
+    echo "Usage: $0 [fleet-agent|orchestrator-agent] [stack-name] [--delete-ecr]"
     exit 1
 fi
 

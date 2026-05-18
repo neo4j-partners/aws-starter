@@ -263,12 +263,12 @@ Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-back
 
 *   **[`neo4j-agentcore-agents`](./neo4j-agentcore-agents/)**
     *   **Status:** ✅ Ready to Run
-    *   **Description:** Three ReAct agents that deploy to AgentCore Runtime using the `BedrockAgentCoreApp` pattern with the `@app.entrypoint` decorator and the AgentCore CLI (`agentcore configure`, `agentcore deploy`). The `basic-agent` and `finance-agent` each ship two framework variants over a shared `common/` core: a `langgraph/` variant using LangChain `create_react_agent` and a `strands/` variant using the Strands `Agent`. This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration.
+    *   **Description:** Three ReAct agents that deploy to AgentCore Runtime using the `BedrockAgentCoreApp` pattern with the `@app.entrypoint` decorator and the AgentCore CLI (`agentcore configure`, `agentcore deploy`). The `fleet-agent` and `finance-agent` each ship two framework variants over a shared `common/` core: a `langgraph/` variant using LangChain `create_react_agent` and a `strands/` variant using the Strands `Agent`. This is the recommended final step to unlock AgentCore's advanced capabilities including built-in observability, auto-scaling, and multi-agent orchestration.
     *   **Key Features:** AgentCore Runtime deployment, LangGraph and Strands variants over one core, programmatic invocation via boto3, MCP integration through an OAuth2 Gateway with in-memory token refresh, CloudWatch observability, managed infrastructure.
     *   **Use Case:** Production deployments requiring managed scaling, observability dashboards, enterprise security, and supervisor/worker orchestration.
     *   **Includes:**
         *   **[`finance-agent/`](./neo4j-agentcore-agents/finance-agent/)** — SEC filings and corporate finance agent. Simplest to deploy, no Docker. Strands variant adds Neo4j-backed semantic memory.
-        *   **[`basic-agent/`](./neo4j-agentcore-agents/basic-agent/)** — Aviation fleet agent. Single ReAct agent with database-schema caching and OAuth2 token refresh.
+        *   **[`fleet-agent/`](./neo4j-agentcore-agents/fleet-agent/)** — Aviation fleet agent. Single ReAct agent with database-schema caching and OAuth2 token refresh.
         *   **[`orchestrator-agent/`](./neo4j-agentcore-agents/orchestrator-agent/)** — Multi-agent supervisor. Classifies intent and routes to Maintenance or Operations specialists, then synthesizes cross-domain answers.
 
 ---

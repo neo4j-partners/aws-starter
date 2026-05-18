@@ -76,7 +76,7 @@ def load_credentials() -> dict:
         if not credentials_file.exists():
             raise FileNotFoundError(
                 f"Credentials file not found: {credentials_file}\n"
-                "Copy .mcp-credentials.json from basic-agent or MCP server deployment."
+                "Copy .mcp-credentials.json from fleet-agent or MCP server deployment."
             )
         with open(credentials_file) as f:
             _CREDENTIALS = json.load(f)

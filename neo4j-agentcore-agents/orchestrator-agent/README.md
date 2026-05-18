@@ -65,7 +65,7 @@ agents. This agent is the reference for multi-agent routing and observability.
 
 ```bash
 uv sync
-../sync-credentials.sh             # or: cp ../basic-agent/.mcp-credentials.json .
+../sync-credentials.sh             # or: cp ../fleet-agent/.mcp-credentials.json .
 
 ./agent.sh start                   # serves http://localhost:8080
 ./agent.sh test-maintenance        # query that routes to Maintenance
@@ -124,4 +124,4 @@ See `queries.txt` for the full set of 20.
 ## See Also
 
 - [../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) for the full system design
-- [../basic-agent/](../basic-agent/) for the single-agent version
+- [../fleet-agent/](../fleet-agent/) for the single-agent version

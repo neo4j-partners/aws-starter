@@ -1,7 +1,7 @@
 [project]
 name = "neo4j-mcp-agent"
 version = "0.1.0"
-description = "Neo4j MCP basic agent — LangGraph and Strands variants over a shared common/ core"
+description = "Neo4j MCP fleet agent — LangGraph and Strands variants over a shared common/ core"
 requires-python = ">=3.10"
 dependencies = [
     # Shared core

@@ -6,7 +6,7 @@ Protocol (MCP)**, connecting to a Neo4j MCP server over an **Amazon Bedrock
 AgentCore Gateway** with OAuth2 auth, and reasons with Claude on Bedrock.
 
 The three agents are progressively more advanced. Start with the finance agent
-for the simplest path, then explore the basic agent for the framework split,
+for the simplest path, then explore the fleet agent for the framework split,
 then the orchestrator for multi-agent routing.
 
 ## How It Works
@@ -31,10 +31,10 @@ full system design.
 | Agent | Domain | What it demonstrates | Deploy |
 |-------|--------|----------------------|--------|
 | [finance-agent/](./finance-agent/) | SEC filings, companies, risk factors | Simplest path. One `common/` core wired to both LangGraph and Strands. Strands variant adds Neo4j-backed semantic memory. Defaults to low-cost Haiku 4.5. | `agentcore deploy` (no Docker) |
-| [basic-agent/](./basic-agent/) | Aviation fleet | Single ReAct agent with database-schema caching and OAuth2 token refresh, built once and run on either LangGraph or Strands. | `agentcore deploy` or Docker |
+| [fleet-agent/](./fleet-agent/) | Aviation fleet | Single ReAct agent with database-schema caching and OAuth2 token refresh, built once and run on either LangGraph or Strands. | `agentcore deploy` or Docker |
 | [orchestrator-agent/](./orchestrator-agent/) | Aviation fleet | Multi-agent supervisor. Classifies intent and routes to Maintenance or Operations specialists, then synthesizes cross-domain answers. | `agentcore deploy` or Docker |
 
-`finance-agent` and `basic-agent` each ship two framework variants over a
+`finance-agent` and `fleet-agent` each ship two framework variants over a
 shared, framework-agnostic `common/` package:
 
 - `langgraph/` uses LangChain `create_react_agent`.
@@ -74,18 +74,18 @@ langgraph/agent.sh test           # sends a sample query
 
 ## Local Docker Testing
 
-`basic-agent` and `orchestrator-agent` also run as containers through the
+`fleet-agent` and `orchestrator-agent` also run as containers through the
 `local-test` harness:
 
 ```bash
 uv sync                                    # from this directory
 uv run local-test sync-credentials
-uv run local-test all basic-agent          # build, run, test
-uv run local-test build basic-agent --variant strands
+uv run local-test all fleet-agent          # build, run, test
+uv run local-test build fleet-agent --variant strands
 ```
 
 The harness keys the image and container by agent name and ignores the
-variant. The two `basic-agent` variants therefore cannot run as separate
+variant. The two `fleet-agent` variants therefore cannot run as separate
 containers at the same time. Run one variant at a time. `finance-agent` has no
 Docker path. Use its variant `agent.sh` scripts instead.
 
@@ -95,9 +95,9 @@ Deploy without the CDK using raw CloudFormation:
 
 ```bash
 cd cfn
-./deploy.sh basic-agent
+./deploy.sh fleet-agent
 ./deploy.sh orchestrator-agent
-./cleanup.sh basic-agent
+./cleanup.sh fleet-agent
 ```
 
 ## References

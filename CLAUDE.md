@@ -58,10 +58,10 @@ uv run python simple-agent.py "query"  # Simple agent (static token)
 ```bash
 cd neo4j-agentcore-agents
 
-# Basic Agent — LangGraph and Strands variants over a shared common/ core.
+# Fleet Agent — LangGraph and Strands variants over a shared common/ core.
 # uv project (pyproject.toml, uv.lock, .venv, .mcp-credentials.json) is at
 # the agent root; each variant has its own agent.sh + Dockerfile.
-cd basic-agent
+cd fleet-agent
 uv sync                      # Install deps (also installs the common package)
 langgraph/agent.sh start     # Run LangGraph variant locally (port 8080)
 langgraph/agent.sh test      # Test local agent
@@ -93,13 +93,13 @@ cd neo4j-agentcore-agents
 uv sync
 
 uv run local-test sync-credentials   # Copy creds from MCP server
-uv run local-test all basic-agent    # Build, run, test all-in-one
-uv run local-test build basic-agent  # Build Docker image (default: langgraph variant)
-uv run local-test build basic-agent --variant strands  # Build Strands variant
-uv run local-test run basic-agent    # Start container
-uv run local-test test basic-agent   # Send test request
-uv run local-test logs basic-agent   # View container logs
-uv run local-test stop basic-agent   # Stop container
+uv run local-test all fleet-agent    # Build, run, test all-in-one
+uv run local-test build fleet-agent  # Build Docker image (default: langgraph variant)
+uv run local-test build fleet-agent --variant strands  # Build Strands variant
+uv run local-test run fleet-agent    # Start container
+uv run local-test test fleet-agent   # Send test request
+uv run local-test logs fleet-agent   # View container logs
+uv run local-test stop fleet-agent   # Stop container
 uv run local-test status             # Check all containers
 ```
 

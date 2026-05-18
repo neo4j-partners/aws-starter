@@ -4,7 +4,7 @@
 
 ### ELI5
 
-Two agents in `neo4j-agentcore-agents/` (`finance-agent` and `basic-agent`)
+Two agents in `neo4j-agentcore-agents/` (`finance-agent` and `fleet-agent`)
 are written for LangGraph only. We want each one to exist in two flavors —
 LangGraph and Strands — sitting side by side so they can be compared and
 deployed independently. The credential, config, and schema plumbing they share
@@ -15,11 +15,11 @@ installed and run through `uv`.
 
 ### Why
 
-- `finance-agent` and `basic-agent` are LangGraph-only today. There is no
+- `finance-agent` and `fleet-agent` are LangGraph-only today. There is no
   Strands variant to compare framework behavior or deploy as an alternative.
 - The credential loading, OAuth2 token refresh, model/config, and (for
-  `basic-agent`) schema fetch logic is duplicated. `finance-agent` already
-  factored part of this into `agent_common.py`; `basic-agent`'s
+  `fleet-agent`) schema fetch logic is duplicated. `finance-agent` already
+  factored part of this into `agent_common.py`; `fleet-agent`'s
   `aircraft-agent.py` is a monolith with the same logic inlined. Evidence: both
   agents contain the same `load_credentials` / `check_token_expiry` /
   `refresh_token` shape and the same `MultiServerMCPClient` Gateway wiring.
@@ -31,7 +31,7 @@ installed and run through `uv`.
 ### Scope
 
 - `neo4j-agentcore-agents/finance-agent/`
-- `neo4j-agentcore-agents/basic-agent/`
+- `neo4j-agentcore-agents/fleet-agent/`
 - `neo4j-agentcore-agents/sync-credentials.sh` and `local_test.py` (path
   references only, if needed)
 - Repository `CLAUDE.md` (command paths for the two agents)
@@ -40,7 +40,7 @@ installed and run through `uv`.
 
 - `finance-agent/agent_common.py` as a flat module (its contents move into the
   `common/` package).
-- `basic-agent/aircraft-agent.py` as a monolith (decomposed into `common/` plus
+- `fleet-agent/aircraft-agent.py` as a monolith (decomposed into `common/` plus
   `langgraph/agent.py`).
 - Any `pip`/`requirements.txt`-style install path in the touched agents (uv
   only).
@@ -52,14 +52,14 @@ installed and run through `uv`.
   entrypoints move into `langgraph/` and `strands/`.
 - Duplicated credential/token/schema logic becomes one `common/` package per
   agent.
-- `basic-agent` LangGraph behavior (schema caching, token streaming, ADOT
+- `fleet-agent` LangGraph behavior (schema caching, token streaming, ADOT
   tracing, load-test harness) is preserved exactly, just sourced from
   `common/`.
 
 ### Added
 
 - Per agent: a `common/` package (`config`, `credentials`, and for
-  `basic-agent` a framework-agnostic `schema` fetch/cache).
+  `fleet-agent` a framework-agnostic `schema` fetch/cache).
 - Per agent: `langgraph/` and `strands/` directories, each with `agent.py`
   (AgentCore entrypoint), `simple-agent.py` (local CLI), `Dockerfile`, and
   `agent.sh`.
@@ -73,7 +73,7 @@ installed and run through `uv`.
 
 ### Deliberately not doing
 
-- Not touching `orchestrator-agent/` — the request is finance + basic only.
+- Not touching `orchestrator-agent/` — the request is finance + fleet only.
 - Not merging `langgraph-neo4j-mcp-agent/` into this tree — it is the
   standalone + SageMaker-notebook story and stays separate.
 - Not changing the Neo4j MCP server, the Gateway, or credential file format.
@@ -92,7 +92,7 @@ installed and run through `uv`.
   `strands-neo4j-mcp-agent/` (splits deployable agents across two trees).
 - **One uv project per agent, shared deps.** Single `pyproject.toml` +
   `uv.lock` + `.mcp-credentials.json` at the agent root; both frameworks'
-  deps coexist (`basic-agent` already ships `strands-agents`). Dropped:
+  deps coexist (`fleet-agent` already ships `strands-agents`). Dropped:
   separate project per variant (two `uv sync`s, more files).
 - **`common` is an installed package, not a `sys.path` insert.** Directories
   named `langgraph/` and `strands/` would shadow the installed `langgraph` and
@@ -111,22 +111,22 @@ installed and run through `uv`.
   docs-only tooling for finance-agent.
 - **uv everywhere.** All variants, `agent.sh`, and `Dockerfile`s install and
   run via uv (`uv sync`, `uv run`); no pip/requirements path. The existing
-  `basic-agent` Dockerfile already does this and is the pattern to follow.
+  `fleet-agent` Dockerfile already does this and is the pattern to follow.
 
 ### Where to look
 
 - `finance-agent/agent_common.py` — the already-factored shared logic; the
   template for the `common/` package contents.
-- `basic-agent/aircraft-agent.py` — the monolith to decompose; contains the
+- `fleet-agent/aircraft-agent.py` — the monolith to decompose; contains the
   schema fetch/cache and streaming patterns to preserve in the LangGraph
   variant.
-- `basic-agent/agent.sh` and `basic-agent/Dockerfile` — the uv-based deploy
+- `fleet-agent/agent.sh` and `fleet-agent/Dockerfile` — the uv-based deploy
   pattern to replicate for every variant.
-- `basic-agent/invoke_agent.py`, `queries.txt` — stay at the agent root,
+- `fleet-agent/invoke_agent.py`, `queries.txt` — stay at the agent root,
   shared by both variants' load-test path.
 - `neo4j-agentcore-agents/sync-credentials.sh`, `local_test.py` — verify
   credential paths still resolve to the agent root.
-- `CLAUDE.md` — the `cd finance-agent` / `cd basic-agent` command blocks need
+- `CLAUDE.md` — the `cd finance-agent` / `cd fleet-agent` command blocks need
   variant subpaths.
 
 ### Done when
@@ -136,7 +136,7 @@ installed and run through `uv`.
 - `uv sync` in each agent root installs `common` as an importable package; no
   `sys.path` manipulation exists in any entrypoint.
 - Both LangGraph variants run locally and produce the same behavior as before
-  the split (finance: ReAct over Gateway tools; basic: schema-cached, streamed,
+  the split (finance: ReAct over Gateway tools; fleet: schema-cached, streamed,
   load-testable).
 - Both Strands variants run locally: per-request MCP context, token refreshed
   via the transport factory, streamed response from `stream_async()`.
@@ -152,7 +152,7 @@ installed and run through `uv`.
 
 ### Goal
 
-`finance-agent` and `basic-agent` each expose a LangGraph and a Strands variant
+`finance-agent` and `fleet-agent` each expose a LangGraph and a Strands variant
 over a shared `common/` package, all uv-managed and independently deployable to
 AgentCore Runtime, with LangGraph behavior unchanged and Strands written
 natively.
@@ -176,7 +176,7 @@ natively.
 - **Strands lifecycle correctness** (token expiry on long-running runtime) —
   the native pattern (per-request context + factory token) is the mitigation;
   verify the factory is invoked per request.
-- **basic-agent decomposition drift** — LangGraph behavior must match
+- **fleet-agent decomposition drift** — LangGraph behavior must match
   pre-split; validated by a before/after request comparison.
 - **agentcore multi-variant config** — two deployable entrypoints per agent
   root may need distinct agent names in `.bedrock_agentcore.yaml`.
@@ -204,7 +204,7 @@ Outcome: existing finance behavior preserved under `langgraph/`.
 - [ ] Move `agent.py` and `simple-agent.py` into `finance-agent/langgraph/`,
       swapping inline logic for `from common import ...`.
 - [ ] Add `finance-agent/langgraph/Dockerfile` and `agent.sh` (uv-based,
-      basic-agent pattern, distinct agent name).
+      fleet-agent pattern, distinct agent name).
 - [ ] Validate: local start + test request returns a correct ReAct answer
       over Gateway tools; credential refresh path exercised.
 
@@ -221,24 +221,24 @@ Outcome: a Strands-native finance agent deployable the same way.
 - [ ] Validate: local start + test request; confirm the transport factory runs
       per request and a refreshed token is used.
 
-#### Phase 4 — basic-agent skeleton + shared core (incl. schema)
+#### Phase 4 — fleet-agent skeleton + shared core (incl. schema)
 
-Outcome: `basic-agent` decomposed into the new layout with a
+Outcome: `fleet-agent` decomposed into the new layout with a
 framework-agnostic schema module.
 
-- [ ] Create `basic-agent/common/` (`config`, `credentials`, `schema` —
+- [ ] Create `fleet-agent/common/` (`config`, `credentials`, `schema` —
       raw-MCP schema fetch + cache extracted from `aircraft-agent.py`).
-- [ ] Single `basic-agent/pyproject.toml` (uv, both frameworks, `common`
+- [ ] Single `fleet-agent/pyproject.toml` (uv, both frameworks, `common`
       package); regenerate `uv.lock`; keep `invoke_agent.py` + `queries.txt`
       at agent root.
 - [ ] Validate: `uv sync`; `common` imports; schema fetch helper callable in
       isolation.
 
-#### Phase 5 — basic-agent LangGraph variant
+#### Phase 5 — fleet-agent LangGraph variant
 
-Outcome: pre-split basic behavior preserved exactly under `langgraph/`.
+Outcome: pre-split fleet behavior preserved exactly under `langgraph/`.
 
-- [ ] Build `basic-agent/langgraph/agent.py` + `simple-agent.py` from the
+- [ ] Build `fleet-agent/langgraph/agent.py` + `simple-agent.py` from the
       decomposed monolith (schema-cached system prompt, token streaming, ADOT).
 - [ ] Add `langgraph/Dockerfile` + `agent.sh`; wire `load-test` to the
       root-level `invoke_agent.py`.
@@ -246,11 +246,11 @@ Outcome: pre-split basic behavior preserved exactly under `langgraph/`.
       `agent.sh load-test` works.
 - [ ] Retire `aircraft-agent.py`.
 
-#### Phase 6 — basic-agent Strands variant (native)
+#### Phase 6 — fleet-agent Strands variant (native)
 
-Outcome: Strands-native basic agent with schema via system prompt.
+Outcome: Strands-native fleet agent with schema via system prompt.
 
-- [ ] Add `basic-agent/strands/agent.py` (native pattern; cached schema
+- [ ] Add `fleet-agent/strands/agent.py` (native pattern; cached schema
       injected into `system_prompt` at `Agent(...)` construction) +
       `simple-agent.py` + `Dockerfile` + `agent.sh`.
 - [ ] Validate: local start + test request; schema present in prompt; token
@@ -262,7 +262,7 @@ Outcome: tooling and docs reflect the new structure.
 
 - [ ] Update `sync-credentials.sh` / `local_test.py` path references if needed
       (creds still land at each agent root).
-- [ ] Update `CLAUDE.md` command blocks for finance + basic with variant
+- [ ] Update `CLAUDE.md` command blocks for finance + fleet with variant
       subpaths.
 - [ ] Confirm no `requirements.txt`/pip path remains in either agent.
 - [ ] Validate: documented commands run as written from a clean checkout.
@@ -282,7 +282,7 @@ paths.
 | 1 — finance-agent skeleton + shared core | Complete |
 | 2 — finance-agent LangGraph variant | Complete |
 | 3 — finance-agent Strands variant (native) | Complete |
-| 4 — basic-agent skeleton + shared core | Complete |
-| 5 — basic-agent LangGraph variant | Complete |
-| 6 — basic-agent Strands variant (native) | Complete |
+| 4 — fleet-agent skeleton + shared core | Complete |
+| 5 — fleet-agent LangGraph variant | Complete |
+| 6 — fleet-agent Strands variant (native) | Complete |
 | 7 — repo wiring + docs | Complete |

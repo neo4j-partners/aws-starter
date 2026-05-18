@@ -1,4 +1,4 @@
-# Basic Agent
+# Fleet Agent
 
 A single ReAct agent that answers natural language questions about an
 aviation fleet graph. It connects to a Neo4j MCP server through an AgentCore
@@ -17,6 +17,22 @@ User input (POST /invocations)
 The agent loads `.mcp-credentials.json`, mints an OAuth2 Bearer token, and
 connects to the Gateway. Before each request it refreshes the token in memory
 when it is missing or close to expiring.
+
+## Populating the database
+
+This agent expects the **Aircraft Digital Twin** graph (the entities listed in
+`queries.txt`). If the Neo4j instance is empty, generate and load that dataset
+with [`sample-data/`](../../sample-data/):
+
+```bash
+cd ../../sample-data
+cp .env.sample .env        # set Aura creds + OPENAI_API_KEY
+./setup.sh
+```
+
+Point `neo4j-agentcore-mcp-server/.env` at the same `NEO4J_URI` and redeploy.
+No agent change is needed — the schema is fetched at runtime via the MCP
+`get-schema` tool, so the agent picks up the data automatically.
 
 ## Unique Features
 
@@ -81,8 +97,8 @@ From the parent `neo4j-agentcore-agents/` directory:
 
 ```bash
 uv run local-test sync-credentials
-uv run local-test all basic-agent                  # build, run, test
-uv run local-test build basic-agent --variant strands
+uv run local-test all fleet-agent                  # build, run, test
+uv run local-test build fleet-agent --variant strands
 ```
 
 The harness keys the image and container by agent name and ignores the

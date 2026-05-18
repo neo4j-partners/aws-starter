@@ -67,8 +67,8 @@ ensure_credentials() {
     if [ ! -f ".mcp-credentials.json" ]; then
         echo -e "${RED}ERROR: .mcp-credentials.json not found${NC}"
         echo ""
-        echo "Copy credentials from basic-agent or MCP server deployment:"
-        echo "  cp ../basic-agent/.mcp-credentials.json ."
+        echo "Copy credentials from fleet-agent or MCP server deployment:"
+        echo "  cp ../fleet-agent/.mcp-credentials.json ."
         exit 1
     fi
 }

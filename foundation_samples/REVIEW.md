@@ -6,7 +6,7 @@ best practices.
 
 Context: `sample-agentcore-mcp-server` and `simple-agentcore-agent` were removed
 from `foundation_samples/` because the finalized `neo4j-agentcore-mcp-server`
-stack and `neo4j-agentcore-agents/basic-agent` already cover those patterns.
+stack and `neo4j-agentcore-agents/fleet-agent` already cover those patterns.
 `simple-oauth-gateway` is retained because it is the only example in the repo
 that demonstrates the AgentCore **Gateway interceptor Lambda** pattern (inbound
 auth interception, identity-header injection, request/response transformation,

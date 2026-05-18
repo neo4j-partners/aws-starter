@@ -672,8 +672,8 @@ To limit testers to only specific agents or gateways, narrow the resource ARNs:
     "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream"
   ],
   "Resource": [
-    "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/basic_agent_*",
-    "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/basic_agent_*/runtime-endpoint/*"
+    "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/fleet_agent_*",
+    "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/fleet_agent_*/runtime-endpoint/*"
   ]
 }
 ```
@@ -848,7 +848,7 @@ For the sandbox tester, create a separate cross-account role with the [Sandbox T
 6. **Verify sandbox tester** by invoking the agent:
    ```bash
    # As sandbox tester role (SigV4 path)
-   cd neo4j-agentcore-agents/basic-agent
+   cd neo4j-agentcore-agents/fleet-agent
    uv run python invoke_agent.py "What is the database schema?"
 
    # Or via Gateway JWT (no IAM required, just credentials)

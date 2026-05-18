@@ -248,8 +248,8 @@ auto_detect_datazone() {
             echo "  Domain:  $DATAZONE_DOMAIN_ID"
             echo "  Project: $DATAZONE_PROJECT_ID"
         else
-            echo -e "${YELLOW}⚠ DataZone IDs not detected - profiles will not have AmazonBedrockManaged tag${NC}"
-            echo "  Run '$0 --detect' for details"
+            echo -e "${YELLOW}⚠ DataZone IDs not detected - profile creation will be refused${NC}"
+            echo "  Run '$0 --detect' for details (or set ALLOW_UNTAGGED_PROFILE=1 for non-SMUS use)"
         fi
     fi
 }

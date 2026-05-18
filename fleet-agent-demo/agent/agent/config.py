@@ -17,7 +17,7 @@ class Settings:
     """
 
     model_id: str = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-    aws_region: str = "us-west-2"
+    aws_region: str = "us-east-1"
     vector_index_name: str = "maintenanceChunkEmbeddings"
     embed_model_id: str = "amazon.titan-embed-text-v2:0"
     embed_dimensions: int = 1024

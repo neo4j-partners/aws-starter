@@ -57,9 +57,9 @@ class Settings(BaseSettings):
 
     # Amazon Bedrock — used when llm_provider is "bedrock". Credentials come
     # from the standard AWS chain (env vars / ~/.aws), not from this file.
-    # AgentCore region for this repo. Pinned to us-east-1; override only via
-    # the explicit BEDROCK_REGION env var.
-    bedrock_region: str = "us-east-1"
+    # Region is the shared AWS_REGION (also read by the agent); defaults to
+    # us-east-1, this repo's AgentCore region. Override via AWS_REGION.
+    aws_region: str = "us-east-1"
     # Claude Sonnet 4.6 via the cross-region "global" inference profile.
     bedrock_llm_model: str = "global.anthropic.claude-sonnet-4-6"
     bedrock_llm_max_tokens: int = 8000

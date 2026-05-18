@@ -204,9 +204,9 @@ no LLM calls and no keys.
   `amazon.titan-embed-text-v2:0` (Titan V2, 1024-dim). The vector index is
   created at that dimension on each `clean`+`setup`, so changing the model
   needs a matching `BEDROCK_EMBEDDING_DIMENSIONS` and a re-run.
-- **Region** is pinned to `us-east-1` (this repo's AgentCore region);
-  override only via the explicit `BEDROCK_REGION` env var. Ensure the chosen
-  models are enabled there.
+- **Region** comes from the shared `AWS_REGION` (one knob for the pipeline
+  and the agent); defaults to `us-east-1`, this repo's AgentCore region.
+  Override via `AWS_REGION` and ensure the chosen models are enabled there.
 - **Chunking**: `CHUNK_SIZE=800`, `CHUNK_OVERLAP=100` by default. Set
   `ENRICH_SAMPLE_SIZE` to cap chunks per document for fast test runs.
 

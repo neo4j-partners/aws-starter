@@ -54,7 +54,7 @@ def get_agent_config() -> tuple[str, str]:
 
         agent_config = config.get("agents", {}).get(default_agent, {})
         arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
-        region = agent_config.get("aws", {}).get("region", "us-west-2")
+        region = agent_config.get("aws", {}).get("region", "us-east-1")
 
         if not arn:
             raise ValueError(

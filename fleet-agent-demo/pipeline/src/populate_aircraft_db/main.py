@@ -94,7 +94,7 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
 
     if provider == "bedrock":
         # AWS credentials come from the standard boto3 chain, not this file.
-        region = settings.bedrock_region
+        region = settings.aws_region
         llm_model = settings.bedrock_llm_model
         llm_max_tokens = settings.bedrock_llm_max_tokens
         embedding_model = settings.bedrock_embedding_model

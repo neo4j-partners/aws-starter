@@ -65,7 +65,7 @@ def load_credentials() -> dict:
         print("ERROR: Credentials file not found: .mcp-credentials.json")
         print()
         print("Copy it from your neo4j-agentcore-mcp-server deployment:")
-        print("  cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .")
+        print("  cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .")
         sys.exit(1)
 
     with open(CREDENTIALS_FILE) as f:

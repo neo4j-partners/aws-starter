@@ -227,7 +227,7 @@ the runtime env on `deploy`):
 | `NEO4J_PASSWORD` | (required) |
 | `NEO4J_DATABASE` | `neo4j` |
 | `MODEL_ID` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
-| `AWS_REGION` | `us-west-2` |
+| `AWS_REGION` | `us-east-1` |
 | `VECTOR_INDEX_NAME` | `maintenanceChunkEmbeddings` |
 | `EMBED_MODEL_ID` | `amazon.titan-embed-text-v2:0` |
 | `EMBED_DIMENSIONS` | `1024` |

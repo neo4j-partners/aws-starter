@@ -141,7 +141,7 @@ This script shows the underlying protocol that the MCP client library abstracts 
 
 ### 6. Run the LangGraph Agent
 
-See [langgraph-neo4j-mcp-agent/README.md](../langgraph-neo4j-mcp-agent/README.md) for instructions on running a LangGraph ReAct agent that connects to this MCP server.
+See [langgraph-mcp-agent/README.md](../neo4j-agentcore-agents/langgraph-mcp-agent/README.md) for instructions on running a LangGraph ReAct agent that connects to this MCP server.
 
 ### 7. Cleanup
 
@@ -195,9 +195,9 @@ Tests Runtime directly with raw HTTP, bypassing Gateway. Useful for debugging.
 |---------|-------------|
 | `./cloud-http.sh` | Run JSON-RPC tests against Runtime endpoint |
 
-### langgraph-neo4j-mcp-agent/ (LangGraph Agent)
+### langgraph-mcp-agent/ (LangGraph Agent)
 
-A standalone ReAct agent demonstrating full end-to-end MCP integration. See [langgraph-neo4j-mcp-agent/README.md](../langgraph-neo4j-mcp-agent/README.md).
+A standalone ReAct agent demonstrating full end-to-end MCP integration. See [langgraph-mcp-agent/README.md](../neo4j-agentcore-agents/langgraph-mcp-agent/README.md).
 
 ## Configuration
 

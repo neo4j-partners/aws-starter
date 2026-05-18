@@ -48,7 +48,7 @@ cd neo4j-agentcore-mcp-server
 Copy the OAuth2 credentials from the MCP server deployment to the LangGraph agent project.
 
 ```bash
-cp neo4j-agentcore-mcp-server/.mcp-credentials.json langgraph-neo4j-mcp-agent/
+cp neo4j-agentcore-mcp-server/.mcp-credentials.json neo4j-agentcore-agents/langgraph-mcp-agent/
 ```
 
 This file contains:
@@ -62,12 +62,12 @@ This file contains:
 Verify the MCP server connection by running the simple agent from your local machine (requires AWS CLI credentials with Bedrock access):
 
 ```bash
-cd langgraph-neo4j-mcp-agent
+cd neo4j-agentcore-agents/langgraph-mcp-agent
 uv sync
 uv run python -m neo4j_mcp_agent.simple_agent "What is the database schema?"
 ```
 
-This uses [`simple_agent.py`](./langgraph-neo4j-mcp-agent/neo4j_mcp_agent/simple_agent.py) which reads credentials from `.mcp-credentials.json` and queries the Neo4j MCP server via the AgentCore Gateway.
+This uses [`simple_agent.py`](./neo4j-agentcore-agents/langgraph-mcp-agent/neo4j_mcp_agent/simple_agent.py) which reads credentials from `.mcp-credentials.json` and queries the Neo4j MCP server via the AgentCore Gateway.
 
 ---
 
@@ -116,12 +116,12 @@ cd aws-starter
 
 Create a Bedrock inference profile to enable Claude access from SageMaker notebooks.
 
-**Reference:** [`langgraph-neo4j-mcp-agent/README.md`](./langgraph-neo4j-mcp-agent/README.md#quick-start)
+**Reference:** [`neo4j-agentcore-agents/langgraph-mcp-agent/README.md`](./neo4j-agentcore-agents/langgraph-mcp-agent/README.md#quick-start)
 
 SageMaker Unified Studio has a permissions boundary that blocks direct Bedrock model access. The `setup-inference-profile.sh` script creates properly-tagged inference profiles that work within these constraints.
 
 ```bash
-cd langgraph-neo4j-mcp-agent
+cd neo4j-agentcore-agents/langgraph-mcp-agent
 
 # See available options
 ./inference-profiles/setup-inference-profile.sh --help
@@ -140,7 +140,7 @@ Copy the output ARN - you'll paste it into notebooks in the following steps.
 
 Verify your Bedrock setup by running the minimal LangGraph agent notebook.
 
-**Notebook:** [`langgraph-neo4j-mcp-agent/minimal_langgraph_agent.ipynb`](./langgraph-neo4j-mcp-agent/minimal_langgraph_agent.ipynb)
+**Notebook:** [`neo4j-agentcore-agents/langgraph-mcp-agent/notebooks/minimal_langgraph_agent.ipynb`](./neo4j-agentcore-agents/langgraph-mcp-agent/notebooks/minimal_langgraph_agent.ipynb)
 
 This notebook tests basic LangGraph functionality with simple tools (time, math) without requiring MCP or database connections:
 
@@ -159,7 +159,7 @@ REGION = "us-east-1"
 
 Test the Neo4j MCP connection using AWS Strands Agents.
 
-**Notebook:** [`langgraph-neo4j-mcp-agent/neo4j_strands_mcp_agent.ipynb`](./langgraph-neo4j-mcp-agent/neo4j_strands_mcp_agent.ipynb)
+**Notebook:** [`neo4j-agentcore-agents/langgraph-mcp-agent/notebooks/neo4j_strands_mcp_agent.ipynb`](./neo4j-agentcore-agents/langgraph-mcp-agent/notebooks/neo4j_strands_mcp_agent.ipynb)
 
 Copy values from `.mcp-credentials.json` into the notebook's configuration cell:
 
@@ -178,7 +178,7 @@ This notebook uses the Strands Agents framework (AWS's native agent library) to 
 
 Test the complete LangGraph + MCP integration with Neo4j.
 
-**Notebook:** [`langgraph-neo4j-mcp-agent/neo4j_simple_mcp_agent.ipynb`](./langgraph-neo4j-mcp-agent/neo4j_simple_mcp_agent.ipynb)
+**Notebook:** [`neo4j-agentcore-agents/langgraph-mcp-agent/notebooks/neo4j_simple_mcp_agent.ipynb`](./neo4j-agentcore-agents/langgraph-mcp-agent/notebooks/neo4j_simple_mcp_agent.ipynb)
 
 Similar to Step 8, paste your credentials into the configuration cell:
 
@@ -253,7 +253,7 @@ Swap `langgraph` for `strands` to run the Strands variant, which adds Neo4j-back
 
 ### 🤖 **LangGraph MCP Agent**
 
-*   **[`langgraph-neo4j-mcp-agent`](./langgraph-neo4j-mcp-agent/)**
+*   **[`neo4j-agentcore-agents/langgraph-mcp-agent`](./neo4j-agentcore-agents/langgraph-mcp-agent/)**
     *   **Status:** ✅ Ready to Run
     *   **Description:** A standalone LangGraph ReAct agent that connects to any MCP server via AgentCore Gateway. Demonstrates the complete pattern of using LangChain + MCP + AWS Bedrock Claude to build intelligent agents that can reason and call tools. The agent dynamically discovers tools from connected MCP servers and uses a reasoning loop to decide which tools to call.
     *   **Key Features:** ReAct pattern for multi-step reasoning, OAuth2 Gateway authentication, Claude Sonnet 4 via AWS Bedrock Converse API, automatic tool discovery via `langchain-mcp-adapters`, streaming responses.

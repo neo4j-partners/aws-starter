@@ -23,6 +23,10 @@ set -e
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
 AGENT_NAME="orchestrator_agent"
+# AgentCore deployment region. AgentCore's primary region is us-east-1
+# (also supported in us-west-2). `configure` pins it into
+# .bedrock_agentcore.yaml, which `deploy`/`status` then read.
+REGION="us-east-1"
 cd "$ROOT_DIR"
 
 # Colors for output
@@ -128,7 +132,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${GREEN}Configuring orchestrator for AWS deployment...${NC}"
         echo ""
-        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME"
+        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" -r "$REGION"
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"

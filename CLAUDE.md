@@ -37,10 +37,10 @@ cd neo4j-agentcore-mcp-server
 ### LangGraph Agent (Standalone)
 
 ```bash
-cd langgraph-neo4j-mcp-agent
+cd neo4j-agentcore-agents/langgraph-mcp-agent
 
 # Copy credentials from MCP server deployment
-cp ../neo4j-agentcore-mcp-server/.mcp-credentials.json .
+cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
 
 uv sync                      # Install dependencies
 ./agent.sh "query"           # Run production agent (auto-refresh OAuth2)
@@ -164,7 +164,7 @@ uv run cdk deploy                    # Run CDK commands
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **Neo4j MCP Server** | `neo4j-agentcore-mcp-server/` | MCP server on AgentCore Runtime with Gateway auth |
-| **LangGraph Agent** | `langgraph-neo4j-mcp-agent/` | Standalone ReAct agent, notebooks for SageMaker |
+| **LangGraph Agent** | `neo4j-agentcore-agents/langgraph-mcp-agent/` | Standalone ReAct agent, notebooks for SageMaker |
 | **AgentCore Agents** | `neo4j-agentcore-agents/` | Gateway-based agents (finance + orchestrator) |
 | **Fleet Agent Demo** | `fleet-agent-demo/` | GraphRAG pipeline + direct-to-Neo4j fleet agent |
 | **Databricks Samples** | `databrick_samples/` | Unity Catalog HTTP connection integration |

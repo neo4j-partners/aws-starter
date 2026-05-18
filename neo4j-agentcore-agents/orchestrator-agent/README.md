@@ -116,6 +116,7 @@ uv run local-test all orchestrator-agent
 | Variable | Default |
 |----------|---------|
 | `MODEL_ID` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+| `AWS_REGION` | `us-east-1` |
 
 ## Example Queries
 

@@ -13,7 +13,7 @@ llm = ChatBedrockConverse(
     model=INFERENCE_PROFILE_ARN,
     provider="anthropic",
     region_name="us-east-1",
-    base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",  # Bypasses GetInferenceProfile
+    base_model_id="anthropic.claude-haiku-4-5-20251001-v1:0",  # Bypasses GetInferenceProfile
 )
 ```
 
@@ -41,8 +41,8 @@ INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:ACCOUNT:application-inference
 REGION = "us-east-1"
 
 BASE_MODEL_IDS = {
-    "haiku": "anthropic.claude-3-5-haiku-20241022-v1:0",
-    "sonnet": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "haiku": "anthropic.claude-haiku-4-5-20251001-v1:0",
+    "sonnet": "anthropic.claude-sonnet-4-5-20250929-v1:0",
     "haiku45": "anthropic.claude-haiku-4-5-20251001-v1:0",
     "sonnet45": "anthropic.claude-sonnet-4-5-20250929-v1:0",
 }
@@ -130,7 +130,7 @@ llm = ChatBedrockConverse(
     provider="anthropic",  # Required when using an ARN
     region_name="us-east-1",
     temperature=0,
-    base_model_id="anthropic.claude-3-5-haiku-20241022-v1:0",  # Skips bedrock:GetInferenceProfile
+    base_model_id="anthropic.claude-haiku-4-5-20251001-v1:0",  # Skips bedrock:GetInferenceProfile
 )
 ```
 

@@ -210,6 +210,7 @@ via `client/local.py`, `curl`, or `./agent.sh invoke-cloud "..."`.
 ```bash
 uv run python client/demo.py            # all questions, local
 uv run python client/demo.py --remote   # all questions, deployed agent
+uv run python client/demo.py --memory   # Context Graph memory showcase
 ```
 
 | Question | What it shows |
@@ -227,10 +228,25 @@ Cross-session memory demo (requires `NEO4J_URI` and `NEO4J_PASSWORD`, see
 ```bash
 ./agent.sh memory-demo            # default user
 ./agent.sh memory-demo analyst-1  # scoped to a specific user_id
+
+uv run python client/demo.py --memory   # 4-section showcase
 ```
 
-This runs two sessions: the first states a durable fact, the second confirms
-the agent recalls it from the Context Graph in a fresh session.
+`./agent.sh memory-demo` runs two sessions: the first states a durable fact,
+the second confirms the agent recalls it from the Context Graph in a fresh
+session.
+
+`client/demo.py --memory` runs a fuller four-section showcase against the
+deployed agent (it ignores `--remote` / `-n`, since Context Graph memory
+lives only in the deployed runtime):
+
+1. **Cold start** — a brand-new user; the agent should admit it knows nothing.
+2. **Teaching** — the user states a durable preference; the agent persists it
+   via `add_memory`.
+3. **Cross-session recall** — a fresh session, same user, the preference never
+   restated; recall here proves memory survives across sessions.
+4. **Per-user isolation** — a different user asks the same question; the first
+   user's memory must not leak across the tenant boundary.
 
 ## Commands
 
@@ -255,6 +271,12 @@ the agent recalls it from the Context Graph in a fresh session.
 | `MODEL_ID` | No | `global.anthropic.claude-haiku-4-5-20251001-v1:0` |
 | `AWS_REGION` | No | `us-west-2` |
 | `NEO4J_URI`, `NEO4J_PASSWORD` | No | Unset. Enables Strands semantic memory when set |
+| `PORT` | No | `8080`. HTTP port the runtime binds; `./agent.sh start` sets `7020` for local |
+
+The deployed AgentCore container always listens on **8080** — that is the
+platform's fixed `/invocations` contract and is not configurable. For local
+runs, `./agent.sh start` exports `PORT=7020` so it does not collide with
+anything already on 8080; the same `server/runtime_app.py` serves both.
 
 ## Refreshing Credentials
 

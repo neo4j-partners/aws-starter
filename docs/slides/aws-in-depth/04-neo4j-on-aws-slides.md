@@ -185,17 +185,16 @@ The Gateway is a managed service providing one endpoint for many tools:
 
 ---
 
-## The Agents in This Repo
+## The MCP Project and Its Two Agent Examples
 
-Agents connect to the Neo4j MCP server through the Gateway:
+The repo has two parts: `neo4j-agentcore-mcp-server/` deploys the Neo4j MCP server (`./deploy.sh`), and `neo4j-agentcore-agents/` holds the agents that query the graph. The two reference agents show the two ways an agent reaches Neo4j:
 
-| Agent | Pattern |
-|-------|---------|
-| **Fleet Agent** | Strands agent over a shared core |
-| **Finance Agent** | Same LangGraph / Strands split over its own core |
-| **Orchestrator Agent** | Multi-agent supervisor with routing |
+| Agent | Domain | Framework + Model | How it reaches Neo4j |
+|-------|--------|-------------------|----------------------|
+| **Fleet Agent** | Aviation fleet | Strands ReAct, Claude Sonnet 4.5 | Direct driver with `neo4j-graphrag` retrievers (Text2Cypher + Vector) |
+| **Finance Agent** | Transaction / financial-crime graph | Strands ReAct, Claude Haiku 4.5 | Through the AgentCore Gateway and MCP server (OAuth2, `read-cypher`) |
 
-Fleet Agent uses one `agent.sh` (`./agent.sh start`) with `runtime_app.py` and a Dockerfile over a shared `common/` core and uv project.
+Same graph, two access patterns: embed GraphRAG retrievers in the agent, or call the managed MCP server through the Gateway. The Orchestrator Agent (next section) routes across specialists built on these patterns.
 
 ---
 

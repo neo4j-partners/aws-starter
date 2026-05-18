@@ -144,9 +144,17 @@ If credentials or model access fail mid-run, record the failing stage. To
 isolate stages: `./setup.sh generate`, `./setup.sh load-operational` (no LLM,
 no key), `./setup.sh load`, `./setup.sh verify`.
 
-**Result:**
-<!-- stage-by-stage outcome, node/relationship counts, Bedrock calls,
-     timing, any errors and how resolved -->
+**Result:** IN PROGRESS — first `./setup.sh` attempt aborted partway.
+- Stage 1 (generate): PASS. 20 aircraft, 80 systems, 340 components, 160
+  sensors, 345,600 sensor readings, 110 maintenance events, 40 airports,
+  8,116 flights, 3,124 delays, 25 component removals (seed 42, full=false).
+- Stage 2 (clean): aborted by operator. The Aura instance held ~360,758
+  nodes from a prior run; `populate-aircraft-db clean` deletes in 500-node
+  batches and was too slow (had reached ~126k deleted). Operator is
+  clearing the database directly (single `MATCH (n) DETACH DELETE n` /
+  instance reset) before re-running the load.
+- Next: re-run from the load stage once the DB is empty (`./setup.sh load`
+  to skip regenerating CSVs, or full `./setup.sh`).
 
 ---
 

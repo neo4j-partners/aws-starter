@@ -121,3 +121,49 @@ uv run python tests/test_fastmcp.py
 - [LangChain MCP Adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [AWS Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
+
+## Running the Notebooks in SageMaker Studio
+
+Each notebook has a configuration cell near the top. Paste your inference profile ARN and, where required, the Gateway credentials from `.mcp-credentials.json`, then run all cells.
+
+### `notebooks/minimal_langgraph_agent.ipynb`
+
+LangGraph + Bedrock smoke test with simple tools (time, math). No MCP or database connection required.
+
+1. Open the notebook in JupyterLab.
+2. Paste your inference profile ARN in the configuration cell.
+3. Run all cells to verify Claude is working.
+
+```python
+INFERENCE_PROFILE_ARN = "arn:aws:bedrock:us-east-1:123456789:application-inference-profile/abc123"
+REGION = "us-east-1"
+```
+
+### `notebooks/neo4j_strands_mcp_agent.ipynb`
+
+Strands MCP agent over the Gateway. Copy values from `.mcp-credentials.json` into the configuration cell.
+
+```python
+INFERENCE_PROFILE_ARN = "your-inference-profile-arn"
+GATEWAY_URL = "https://...amazonaws.com/mcp"  # from gateway_url
+ACCESS_TOKEN = "eyJ..."                        # from access_token
+REGION = "us-east-1"
+```
+
+This notebook uses the Strands Agents framework, AWS's native agent library, to query Neo4j.
+
+### `notebooks/neo4j_simple_mcp_agent.ipynb`
+
+Simple MCP agent over the Gateway. Paste your credentials into the configuration cell.
+
+```python
+INFERENCE_PROFILE_ARN = "your-inference-profile-arn"
+GATEWAY_URL = "your-gateway-url"
+ACCESS_TOKEN = "your-access-token"
+REGION = "us-east-1"
+```
+
+This notebook demonstrates:
+- Low-level MCP client with `streamablehttp_client`
+- LangGraph `create_react_agent` with dynamically loaded MCP tools
+- ReAct reasoning pattern for multi-step database queries

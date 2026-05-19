@@ -167,6 +167,10 @@ aws sso login --sso-session <your-sso-session>     # if using AWS SSO
 - `configure` is required first even if `.bedrock_agentcore.yaml` already
   exists: it pins the entrypoint and records account, region, and execution
   role.
+- `configure` and `destroy` forward any extra args to the underlying
+  `agentcore` command, so non-interactive runs work, e.g.
+  `./agent.sh configure -ni -dt direct_code_deploy -rt PYTHON_3_13` and
+  `./agent.sh destroy --force`.
 
 ### Drive the deployed runtime
 

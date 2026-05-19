@@ -631,7 +631,10 @@ MATCH (seed:Chunk)
 WHERE seed.embedding IS NOT NULL AND seed.text IS NOT NULL
 WITH seed, rand() AS r ORDER BY r LIMIT 1
 WITH seed,
-     reduce(s = seed.text, x IN ['\\n', '.', ',', ':', ';'] |
+     reduce(s = seed.text, x IN
+         ['\\n', '.', ',', ':', ';',
+          '[', ']', '"', '+', '-', '!', '(', ')', '{', '}',
+          '^', '~', '*', '?', '\\\\', '/', '&', '|'] |
          replace(s, x, ' ')) AS raw
 WITH seed,
      [w IN split(raw, ' ') WHERE size(w) > 4] AS words
@@ -680,8 +683,8 @@ def _hybrid_comparison(driver: Driver, limit: int) -> None:
         ft_rows, _, _ = driver.execute_query(
             _HYBRID_FT_Q, ft_index=_FULLTEXT_INDEX, limit=limit,
         )
-    except Exception:
-        print("  (fulltext index not available \u2014 run 'setup' first)\n")
+    except Exception as exc:
+        print(f"  (fulltext query failed: {exc})\n")
         return
     if ft_rows:
         print(f"  Seed: \"{ft_rows[0]['seed_text']}\u2026\"\n")

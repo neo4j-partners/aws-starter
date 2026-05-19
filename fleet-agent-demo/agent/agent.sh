@@ -119,7 +119,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
         echo ""
-        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME"
+        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" "${@:2}"
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"
@@ -165,7 +165,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${YELLOW}Removing agent from AgentCore Runtime...${NC}"
         echo ""
-        uv run agentcore destroy
+        uv run agentcore destroy "${@:2}"
         echo ""
         echo -e "${GREEN}Cleanup complete!${NC}"
         ;;

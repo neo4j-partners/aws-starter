@@ -132,10 +132,8 @@ runs and no ECR repository is used. Run the full demo against the deployed
 agent with `uv run finance-demo --remote` (see [Demo](#demo)).
 
 The `Dockerfile` at the agent root is **not** part of cloud deploy (direct
-code deploy never builds a container) and is **not** driven by the
-`neo4j-agentcore-agents/` `local-test` tool, which only supports `fleet-agent`
-and `orchestrator-agent`. It exists for running the runtime by hand in a
-container that mirrors the AgentCore environment on port 8080:
+code deploy never builds a container). It exists for running the runtime by
+hand in a container that mirrors the AgentCore environment on port 8080:
 
 ```bash
 docker build --platform linux/arm64 -t finance-agent .

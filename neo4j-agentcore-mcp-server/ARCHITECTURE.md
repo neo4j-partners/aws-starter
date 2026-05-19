@@ -328,8 +328,8 @@ Using Claude means we use the Neo4j MCP server's standard tool names without mod
 
 This happens when updating a stack that had different parameters. Delete and redeploy:
 ```bash
-./deploy.sh cleanup
-./deploy.sh
+./deploy.py cleanup
+./deploy.py
 ```
 
 **Deployment fails with ROLLBACK_COMPLETE**
@@ -338,9 +338,9 @@ The deploy script automatically handles this by deleting the failed stack and re
 
 **Test fails with authentication error or expired token**
 
-1. Regenerate credentials: `./deploy.sh credentials`
+1. Regenerate credentials: `./deploy.py credentials`
 2. Check token status: `./cloud.sh token`
-3. Verify the stack deployed successfully: `./deploy.sh status`
+3. Verify the stack deployed successfully: `./deploy.py status`
 
 **Neo4j connection fails**
 

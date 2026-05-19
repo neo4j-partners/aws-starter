@@ -6,7 +6,7 @@ Deploy the Neo4j MCP server to Amazon Bedrock AgentCore with Gateway access for 
 
 ## Overview
 
-This project deploys the [Neo4j MCP server](https://github.com/neo4j/mcp) to AWS via AgentCore Gateway, enabling LLM agents to query Neo4j databases using the Model Context Protocol (MCP). Access is restricted to machine-to-machine (M2M) authentication only, designed specifically for agent access.
+This project deploys the [Neo4j MCP server](https://github.com/neo4j-partners/neo4j-mcp-canary) to AWS via AgentCore Gateway, enabling LLM agents to query Neo4j databases using the Model Context Protocol (MCP). Access is restricted to machine-to-machine (M2M) authentication only, designed specifically for agent access.
 
 **Key Capabilities:**
 - AgentCore Gateway configuration with OAuth2 authentication
@@ -45,9 +45,19 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed diagrams, the authenticati
 - Python 3.10+
 - Neo4j Aura database (or other Neo4j instance)
 
-> **Important:** The Neo4j database must be running and accessible before deployment. The Neo4j MCP server verifies database connectivity on startup and exits immediately if it cannot connect. If using Neo4j Aura, ensure the database instance is resumed (not paused) before running `./deploy.sh`.
+> **Important:** The Neo4j database must be running and accessible before deployment. The Neo4j MCP server verifies database connectivity on startup and exits immediately if it cannot connect. If using Neo4j Aura, ensure the database instance is resumed (not paused) before running `./deploy.py`.
 
-### 1. Configure Credentials
+### 1. Clone the Neo4j MCP Server
+
+The ARM64 image is built from a local clone of the Neo4j MCP server source. Clone the [neo4j-mcp-canary](https://github.com/neo4j-partners/neo4j-mcp-canary) repository:
+
+```bash
+git clone https://github.com/neo4j-partners/neo4j-mcp-canary.git
+```
+
+You will point `NEO4J_MCP_REPO` in `.env` at this clone's path in the next step.
+
+### 2. Configure Credentials
 
 Edit the `.env` file in the parent directory:
 
@@ -58,6 +68,9 @@ NEO4J_DATABASE=neo4j
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your-neo4j-password
 
+# Build Configuration (path to the neo4j-mcp-canary clone from step 1)
+NEO4J_MCP_REPO=/path/to/neo4j-mcp-canary
+
 # Stack Configuration
 STACK_NAME=neo4j-agentcore-mcp-server
 AWS_REGION=us-east-1
@@ -65,13 +78,13 @@ AWS_REGION=us-east-1
 
 > **Note:** No AGENT_USERNAME/AGENT_PASSWORD needed. The stack uses M2M OAuth2 with automatically generated client credentials.
 
-### 2. Deploy
+### 3. Deploy
 
 ```bash
 # If using a non-default AWS profile:
 export AWS_PROFILE=my-profile
 
-./deploy.sh
+./deploy.py
 ```
 
 This command:
@@ -87,10 +100,10 @@ This command:
 
 Deployment takes approximately 5-10 minutes.
 
-### 3. Generate Credentials
+### 4. Generate Credentials
 
 ```bash
-./deploy.sh credentials
+./deploy.py credentials
 ```
 
 This generates `.mcp-credentials.json` with:
@@ -98,7 +111,7 @@ This generates `.mcp-credentials.json` with:
 - OAuth2 client credentials (client_id, client_secret)
 - Pre-fetched JWT token (valid for ~1 hour)
 
-### 4. Test via Gateway (Recommended)
+### 5. Test via Gateway (Recommended)
 
 ```bash
 ./cloud.sh
@@ -121,9 +134,9 @@ Available commands:
 ./cloud.sh query    # Run a test query
 ```
 
-> **Note:** If the token expires, run `./deploy.sh credentials` to refresh it.
+> **Note:** If the token expires, run `./deploy.py credentials` to refresh it.
 
-### 5. Test Direct Runtime (Debugging)
+### 6. Test Direct Runtime (Debugging)
 
 ```bash
 ./cloud-http.sh
@@ -139,36 +152,36 @@ It performs:
 
 This script shows the underlying protocol that the MCP client library abstracts away.
 
-### 6. Run the LangGraph Agent
+### 7. Run the LangGraph Agent
 
 See [langgraph-mcp-agent/README.md](../neo4j-agentcore-agents/langgraph-mcp-agent/README.md) for instructions on running a LangGraph ReAct agent that connects to this MCP server.
 
-### 7. Cleanup
+### 8. Cleanup
 
 ```bash
-./deploy.sh cleanup
+./deploy.py cleanup
 ```
 
 Removes all AWS resources.
 
 ## Commands
 
-### deploy.sh
+### deploy.py
 
 | Command | Description |
 |---------|-------------|
-| `./deploy.sh` | Full deployment (build, push, stack) |
-| `./deploy.sh build` | Build ARM64 image only |
-| `./deploy.sh push` | Push to ECR only |
-| `./deploy.sh stack` | Deploy CDK stack only |
-| `./deploy.sh synth` | Synthesize and preview the generated template |
-| `./deploy.sh status` | Show stack status and outputs |
-| `./deploy.sh credentials` | Generate `.mcp-credentials.json` with Gateway URL and JWT token |
-| `./deploy.sh cleanup` | Delete stack and ECR repository |
+| `./deploy.py` | Full deployment (build, push, stack) |
+| `./deploy.py --skip-build` | Push existing image and deploy stack (skip Docker build) |
+| `./deploy.py redeploy` | Fast redeploy (build, push, update runtime) |
+| `./deploy.py stack` | Deploy CDK stack only |
+| `./deploy.py synth` | Synthesize and preview the generated template |
+| `./deploy.py status` | Show stack status and outputs |
+| `./deploy.py credentials` | Generate `.mcp-credentials.json` with Gateway URL and JWT token |
+| `./deploy.py cleanup` | Delete stack, ECR repository, and password secret |
 
 ### cloud.sh (Gateway Testing)
 
-Uses `.mcp-credentials.json` generated by `./deploy.sh credentials`.
+Uses `.mcp-credentials.json` generated by `./deploy.py credentials`.
 
 | Command | Description |
 |---------|-------------|
@@ -209,6 +222,7 @@ All configuration is read from `../.env`:
 | `NEO4J_DATABASE` | Yes | Database name |
 | `NEO4J_USERNAME` | Yes | Neo4j username (passed to container) |
 | `NEO4J_PASSWORD` | Yes | Neo4j password (passed to container) |
+| `NEO4J_MCP_REPO` | Yes | Path to local [neo4j-mcp-canary](https://github.com/neo4j-partners/neo4j-mcp-canary) clone (ARM64 image is built from here) |
 | `AWS_REGION` | No | AWS region (default: us-east-1) |
 | `STACK_NAME` | No | CDK stack name (default: neo4j-agentcore-mcp-server) |
 
@@ -250,7 +264,7 @@ neo4j-agentcore-mcp-server/
 ├── client/
 │   ├── gateway_client.py             # Gateway client (uses .mcp-credentials.json)
 │   └── mcp_operations.py             # MCP operation helpers
-├── deploy.sh                         # Deployment script
+├── deploy.py                         # Deployment script
 ├── cloud.sh                          # Gateway testing (MCP client)
 ├── cloud-http.sh                     # Direct Runtime testing (raw HTTP)
 ├── local.sh                          # Local Docker testing
@@ -260,7 +274,7 @@ neo4j-agentcore-mcp-server/
 
 ### Credentials File
 
-The `.mcp-credentials.json` file (generated by `./deploy.sh credentials`) contains:
+The `.mcp-credentials.json` file (generated by `./deploy.py credentials`) contains:
 
 ```json
 {
@@ -306,6 +320,6 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for:
 
 ## Resources
 
-- [Neo4j MCP Server](https://github.com/neo4j/mcp)
+- [Neo4j MCP Server (neo4j-mcp-canary)](https://github.com/neo4j-partners/neo4j-mcp-canary)
 - [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)

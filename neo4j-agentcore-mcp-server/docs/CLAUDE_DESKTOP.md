@@ -10,7 +10,7 @@ The MCP server deployed on AgentCore uses **Cognito JWT authentication**. Claude
 
 - Claude Desktop installed ([download](https://claude.ai/download))
 - Node.js installed (for `npx`)
-- The MCP server deployed via `./deploy.sh`
+- The MCP server deployed via `./deploy.py`
 - Cognito credentials configured in `.env`
 
 ## Step 1: Get Your Stack Configuration

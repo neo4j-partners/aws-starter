@@ -89,14 +89,6 @@ uv sync
 ./agent.sh invoke-cloud "Which routes have the most delays?"
 ```
 
-## Local Docker Testing
-
-From the parent `neo4j-agentcore-agents/` directory:
-
-```bash
-uv run local-test all orchestrator-agent
-```
-
 ## Commands
 
 | Command | Description |

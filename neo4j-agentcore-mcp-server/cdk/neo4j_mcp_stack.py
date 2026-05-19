@@ -81,13 +81,17 @@ class Neo4jMcpStack(Stack):
             description="Neo4j database username",
         )
 
-        self.neo4j_password = CfnParameter(
+        # The password itself never enters the template, CFN parameters, or the
+        # deploy CLI. deploy.py stores it in Secrets Manager and passes only the
+        # secret ARN here; the runtime env var below resolves it via a
+        # CloudFormation {{resolve:secretsmanager}} dynamic reference.
+        self.neo4j_password_secret_arn = CfnParameter(
             self,
-            "Neo4jPassword",
+            "Neo4jPasswordSecretArn",
             type="String",
-            no_echo=True,
-            description="Neo4j database password",
-            min_length=1,
+            description="ARN of the Secrets Manager secret holding the Neo4j password",
+            allowed_pattern=r"^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]+:secret:.+$",
+            constraint_description="Must be a valid Secrets Manager secret ARN",
         )
 
         self.agent_name = CfnParameter(
@@ -220,14 +224,8 @@ class Neo4jMcpStack(Stack):
                                 f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:token-vault/*",
                             ],
                         ),
-                        iam.PolicyStatement(
-                            sid="RuntimeAccess",
-                            effect=iam.Effect.ALLOW,
-                            actions=["bedrock-agentcore:GetAgentRuntime"],
-                            resources=[
-                                f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:runtime/*"
-                            ],
-                        ),
+                        # GetAgentRuntime is scoped to the specific runtime ARN
+                        # in _create_agent_runtime (ARN is unknown here).
                     ]
                 ),
                 "SecretsManagerPolicy": iam.PolicyDocument(
@@ -266,12 +264,27 @@ class Neo4jMcpStack(Stack):
                     },
                 },
             ),
-            managed_policies=[
-                iam.ManagedPolicy.from_aws_managed_policy_name("BedrockAgentCoreFullAccess")
-            ],
+            # No BedrockAgentCoreFullAccess managed policy. The inline policy
+            # below grants only the least-privilege actions the AgentCore
+            # Runtime execution role actually needs (per AWS runtime-permissions
+            # guidance): ECR pull, CloudWatch Logs, X-Ray, metrics, and the
+            # workload identity token.
             inline_policies={
                 "AgentCoreExecutionPolicy": iam.PolicyDocument(
                     statements=[
+                        iam.PolicyStatement(
+                            sid="GetAgentAccessToken",
+                            effect=iam.Effect.ALLOW,
+                            actions=[
+                                "bedrock-agentcore:GetWorkloadAccessToken",
+                                "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+                                "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+                            ],
+                            resources=[
+                                f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:workload-identity-directory/default",
+                                f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:workload-identity-directory/default/workload-identity/*",
+                            ],
+                        ),
                         iam.PolicyStatement(
                             sid="ECRImageAccess",
                             effect=iam.Effect.ALLOW,
@@ -333,21 +346,20 @@ class Neo4jMcpStack(Stack):
             self,
             "GatewayExecutionRole",
             role_name=f"{self.stack_name}-gateway-execution-role",
-            assumed_by=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            assumed_by=iam.ServicePrincipal(
+                "bedrock-agentcore.amazonaws.com",
+                conditions={
+                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "ArnLike": {
+                        "aws:SourceArn": f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:*"
+                    },
+                },
+            ),
             inline_policies={
                 "GatewayPolicy": iam.PolicyDocument(
                     statements=[
-                        iam.PolicyStatement(
-                            sid="InvokeRuntime",
-                            effect=iam.Effect.ALLOW,
-                            actions=[
-                                "bedrock-agentcore:InvokeRuntime",
-                                "bedrock-agentcore:InvokeRuntimeWithResponseStream",
-                            ],
-                            resources=[
-                                f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:runtime/*"
-                            ],
-                        ),
+                        # InvokeRuntime is scoped to the specific runtime ARN
+                        # in _create_agent_runtime (ARN is unknown here).
                         iam.PolicyStatement(
                             sid="CloudWatchLogs",
                             effect=iam.Effect.ALLOW,
@@ -426,7 +438,10 @@ class Neo4jMcpStack(Stack):
                 "NEO4J_URI": self.neo4j_uri.value_as_string,
                 "NEO4J_DATABASE": self.neo4j_database.value_as_string,
                 "NEO4J_USERNAME": self.neo4j_username.value_as_string,
-                "NEO4J_PASSWORD": self.neo4j_password.value_as_string,
+                # CloudFormation resolves this dynamic reference at deploy time
+                # using the deploying principal's credentials, so the execution
+                # role needs no Secrets Manager permission.
+                "NEO4J_PASSWORD": f"{{{{resolve:secretsmanager:{self.neo4j_password_secret_arn.value_as_string}:SecretString}}}}",
                 "NEO4J_MCP_TRANSPORT": "http",
                 "NEO4J_MCP_HTTP_HOST": "0.0.0.0",
                 "NEO4J_MCP_HTTP_PORT": "8000",
@@ -441,6 +456,34 @@ class Neo4jMcpStack(Stack):
                 "NEO4J_LOG_LEVEL": "info",
                 "NEO4J_READ_ONLY": "true",
             },
+        )
+
+        # Scope runtime permissions to this specific runtime ARN instead of a
+        # wildcard. Done here (not in _create_iam_roles) because the runtime ARN
+        # is only known after the runtime is created. The runtime does not
+        # depend on either of these roles, so there is no dependency cycle.
+        runtime_arn = self.mcp_server_runtime.attr_agent_runtime_arn
+        runtime_resources = [runtime_arn, f"{runtime_arn}/*"]
+
+        self.gateway_execution_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                sid="InvokeRuntime",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock-agentcore:InvokeRuntime",
+                    "bedrock-agentcore:InvokeRuntimeWithResponseStream",
+                ],
+                resources=runtime_resources,
+            )
+        )
+
+        self.custom_resource_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                sid="RuntimeAccess",
+                effect=iam.Effect.ALLOW,
+                actions=["bedrock-agentcore:GetAgentRuntime"],
+                resources=runtime_resources,
+            )
         )
 
     def _create_gateway(self):

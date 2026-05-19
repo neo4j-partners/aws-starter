@@ -75,20 +75,6 @@ langgraph/agent.sh start          # serves http://localhost:8080
 langgraph/agent.sh test           # sends a sample query
 ```
 
-## Local Docker Testing
-
-`orchestrator-agent` also runs as a container through the `local-test`
-harness:
-
-```bash
-uv sync                                    # from this directory
-uv run local-test sync-credentials
-uv run local-test all orchestrator-agent   # build, run, test
-```
-
-`finance-agent` has no Docker path. Use its variant `agent.sh` scripts
-instead.
-
 ## CloudFormation Deployment
 
 Deploy without the CDK using raw CloudFormation:

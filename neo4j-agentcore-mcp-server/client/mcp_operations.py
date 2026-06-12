@@ -156,7 +156,7 @@ def resolve_tool_name(tool_map: dict[str, str], base_name: str) -> str:
 
     Example:
         >>> tool_map = await get_tool_map(session)
-        >>> actual_name = resolve_tool_name(tool_map, "get-schema")
+        >>> actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
         >>> result = await session.call_tool(actual_name, {})
     """
     if base_name in tool_map:
@@ -233,7 +233,7 @@ async def run_full_tests(session: ClientSession):
     # Gateway-prefixed name like "neo4j-mcp-server-target___get-schema"
     print("1. Testing get-schema...")
     try:
-        actual_name = resolve_tool_name(tool_map, "get-schema")
+        actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
         result = await session.call_tool(actual_name, {})
         if result.content and result.content[0].text:
             text = result.content[0].text
@@ -251,7 +251,7 @@ async def run_full_tests(session: ClientSession):
     # Test 2: read-cypher with simple query
     print("2. Testing read-cypher (RETURN 1 as test)...")
     try:
-        actual_name = resolve_tool_name(tool_map, "read-cypher")
+        actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(actual_name, {"query": "RETURN 1 as test"})
         if result.content and result.content[0].text:
             print(f"   Result: {result.content[0].text}")
@@ -265,7 +265,7 @@ async def run_full_tests(session: ClientSession):
     # Test 3: read-cypher with labels query
     print("3. Testing read-cypher (CALL db.labels())...")
     try:
-        actual_name = resolve_tool_name(tool_map, "read-cypher")
+        actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(
             actual_name, {"query": "CALL db.labels() YIELD label RETURN label LIMIT 5"}
         )
@@ -281,7 +281,7 @@ async def run_full_tests(session: ClientSession):
     # Test 4: read-cypher with count query
     print("4. Testing read-cypher (count nodes)...")
     try:
-        actual_name = resolve_tool_name(tool_map, "read-cypher")
+        actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(
             actual_name, {"query": "MATCH (n) RETURN count(n) as nodeCount"}
         )
@@ -325,7 +325,7 @@ async def get_schema(session: ClientSession):
     3. session.call_tool() is called with the actual name
     """
     tool_map = await get_tool_map(session)
-    actual_name = resolve_tool_name(tool_map, "get-schema")
+    actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
     result = await session.call_tool(actual_name, {})
     if result.content:
         print(result.content[0].text)
@@ -341,7 +341,7 @@ async def run_query(session: ClientSession):
     3. session.call_tool() is called with the actual name
     """
     tool_map = await get_tool_map(session)
-    actual_name = resolve_tool_name(tool_map, "read-cypher")
+    actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
     result = await session.call_tool(
         actual_name,
         {"query": "MATCH (n) RETURN labels(n)[0] as label, count(*) as count ORDER BY count DESC LIMIT 10"},

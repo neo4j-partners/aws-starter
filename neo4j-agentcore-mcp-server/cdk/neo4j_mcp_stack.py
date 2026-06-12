@@ -442,18 +442,18 @@ class Neo4jMcpStack(Stack):
                 # using the deploying principal's credentials, so the execution
                 # role needs no Secrets Manager permission.
                 "NEO4J_PASSWORD": f"{{{{resolve:secretsmanager:{self.neo4j_password_secret_arn.value_as_string}:SecretString}}}}",
-                "NEO4J_MCP_TRANSPORT": "http",
-                "NEO4J_MCP_HTTP_HOST": "0.0.0.0",
-                "NEO4J_MCP_HTTP_PORT": "8000",
-                "NEO4J_MCP_HTTP_AUTH_MODE": "env",
-                # Gateway discovers tools without Neo4j Basic Auth. These default to
-                # true in the canary server; set explicitly so the AgentCore
-                # dependency on unauthenticated discovery is visible and pinned.
-                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_PING": "true",
-                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_TOOLS_LIST": "true",
-                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_INITIALIZE": "true",
-                "NEO4J_HTTP_ALLOW_UNAUTHENTICATED_NOTIFICATIONS_INITIALIZE": "true",
-                "NEO4J_LOG_LEVEL": "info",
+                # mcp-neo4j-cypher (Python/FastMCP) env contract. This server
+                # uses the env-credential model: it connects to Neo4j with the
+                # NEO4J_USERNAME/NEO4J_PASSWORD above (unlike the canary, which
+                # rejects them in HTTP mode and expects per-request Basic Auth).
+                "NEO4J_TRANSPORT": "http",
+                "NEO4J_MCP_SERVER_HOST": "0.0.0.0",
+                "NEO4J_MCP_SERVER_PORT": "8000",
+                # AgentCore Runtime proxies MCP to the container at /mcp.
+                "NEO4J_MCP_SERVER_PATH": "/mcp",
+                # Disable DNS-rebinding host checks; AgentCore's proxied requests
+                # arrive with a Host header not in the default localhost allowlist.
+                "NEO4J_MCP_SERVER_ALLOWED_HOSTS": "*",
                 "NEO4J_READ_ONLY": "true",
             },
         )

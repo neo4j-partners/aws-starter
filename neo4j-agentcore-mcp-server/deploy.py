@@ -61,6 +61,16 @@ DEFAULT_REGION = "us-east-1"
 DEFAULT_STACK_NAME = "neo4j-agentcore-mcp-server"
 DEFAULT_ECR_REPO_NAME = "neo4j-mcp-server"
 
+# CDK bootstrap normally attaches AdministratorAccess to the cfn-exec-role.
+# Org SCPs commonly deny attaching AdministratorAccess (anti-privilege-
+# escalation guardrail), so bootstrap with scoped policies instead. These
+# cover the full stack (all services + IAM role creation) without using the
+# AdministratorAccess ARN. Override via CDK_BOOTSTRAP_EXECUTION_POLICIES.
+DEFAULT_CDK_BOOTSTRAP_EXECUTION_POLICIES = (
+    "arn:aws:iam::aws:policy/PowerUserAccess,"
+    "arn:aws:iam::aws:policy/IAMFullAccess"
+)
+
 # Commands that do not need Neo4j connectivity tested up front.
 NO_NEO4J_CHECK = {"status", "cleanup", "credentials", "redeploy", "help"}
 
@@ -106,6 +116,7 @@ class Config:
     stack_name: str
     ecr_repo_name: str
     image_tag: str
+    cdk_bootstrap_execution_policies: str
     # Set by ensure_password_secret() before the stack deploy.
     neo4j_password_secret_arn: str = ""
 
@@ -149,6 +160,10 @@ def load_env() -> Config:
     stack_name = os.environ.get("STACK_NAME") or DEFAULT_STACK_NAME
     ecr_repo_name = os.environ.get("ECR_REPO_NAME") or DEFAULT_ECR_REPO_NAME
     neo4j_mcp_repo = os.environ.get("NEO4J_MCP_REPO", "")
+    bootstrap_policies = (
+        os.environ.get("CDK_BOOTSTRAP_EXECUTION_POLICIES")
+        or DEFAULT_CDK_BOOTSTRAP_EXECUTION_POLICIES
+    )
 
     image_tag = os.environ.get("IMAGE_TAG", "")
     if not image_tag:
@@ -174,6 +189,7 @@ def load_env() -> Config:
         stack_name=stack_name,
         ecr_repo_name=ecr_repo_name,
         image_tag=image_tag,
+        cdk_bootstrap_execution_policies=bootstrap_policies,
     )
 
 
@@ -500,8 +516,20 @@ def cmd_stack(aws: Aws, cfg: Config) -> None:
     cfn = aws.client("cloudformation")
     if not _exists(lambda: cfn.describe_stacks(StackName="CDKToolkit")):
         log_info("CDK not bootstrapped in this region, bootstrapping...")
+        log_info(
+            "CFN execution policies: "
+            f"{cfg.cdk_bootstrap_execution_policies}"
+        )
+        bootstrap_cmd = [
+            "cdk", "bootstrap", f"aws://{account_id}/{cfg.aws_region}",
+        ]
+        if cfg.cdk_bootstrap_execution_policies:
+            bootstrap_cmd += [
+                "--cloudformation-execution-policies",
+                cfg.cdk_bootstrap_execution_policies,
+            ]
         subprocess.run(
-            ["cdk", "bootstrap", f"aws://{account_id}/{cfg.aws_region}"],
+            bootstrap_cmd,
             cwd=CDK_DIR,
             env=_cdk_env(cfg),
             check=True,
@@ -883,6 +911,10 @@ Environment Variables (from .env):
     STACK_NAME         CDK stack name (default: neo4j-agentcore-mcp-server)
     ECR_REPO_NAME      ECR repository name (default: neo4j-mcp-server)
     IMAGE_TAG          Docker image tag (default: git short SHA from MCP repo)
+    CDK_BOOTSTRAP_EXECUTION_POLICIES
+                       Comma-separated managed policy ARNs for the CDK
+                       cfn-exec-role (default: PowerUserAccess + IAMFullAccess;
+                       avoids AdministratorAccess, which org SCPs often deny)
 
 Examples:
   ./deploy.py                   # Full deployment (build + push + stack)

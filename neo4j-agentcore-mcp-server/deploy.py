@@ -24,20 +24,30 @@ Commands:
     synth        Synthesize CloudFormation template (dry run)
     status       Show stack status and outputs
     credentials  Generate .mcp-credentials.json with Gateway URL and JWT token
+    stack-name   Print the resolved stack name on stdout (for scripts)
     cleanup      Delete stack, ECR repository, and password secret
     help         Show this help
+
+Multiple deployments:
+    --env NAME selects .env.NAME instead of .env, and writes credentials to
+    .mcp-credentials.NAME.json. The suffix is the only selector, so the
+    config and its credentials can never be paired up wrongly.
 """
 
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -52,14 +62,39 @@ from botocore.exceptions import ClientError
 # ============================================================================
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-ENV_FILE = SCRIPT_DIR / ".env"
 # NEO4J_MCP_REPO is read from .env (path to the local Neo4j MCP server repo).
 CDK_DIR = SCRIPT_DIR / "cdk"
-CREDENTIALS_FILE = SCRIPT_DIR / ".mcp-credentials.json"
+
+# An optional --env suffix selects which deployment to act on, so several
+# Neo4j instances can be deployed side by side from this directory. The
+# suffix names both files, which is what keeps a config and its generated
+# credentials from drifting apart.
+#
+# The suffix is appended to the stack name, so it has to leave the result valid
+# for every resource derived from it: alphanumeric runs joined by single
+# hyphens, and no underscores. Constrained to that here so "--env _foo" is
+# reported against the value the caller typed rather than against a derived
+# stack name they never wrote.
+ENV_SUFFIX_PATTERN = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
 
 DEFAULT_REGION = "us-east-1"
 DEFAULT_STACK_NAME = "neo4j-agentcore-mcp-server"
 DEFAULT_ECR_REPO_NAME = "neo4j-mcp-server"
+
+# Every resource in the stack derives its name from STACK_NAME, so the shortest
+# per-resource budget caps the stack name itself. The table of derived names is
+# shared with the CDK stack (cdk/naming.py) so this script and the synth it
+# eventually runs cannot disagree about what a usable stack name is, and so the
+# length budget stays computed from the suffixes rather than written down.
+# Checked here as well as at synth because CloudFormation only complains once a
+# deploy is already underway, after the image has been built and pushed.
+sys.path.insert(0, str(CDK_DIR))
+from naming import (  # noqa: E402  (needs CDK_DIR on sys.path first)
+    MAX_STACK_NAME_LEN,
+    STACK_NAME_PATTERN,
+    STACK_NAME_RESERVED_WORDS,
+    binding_length_constraint,
+)
 
 # CDK bootstrap normally attaches AdministratorAccess to the cfn-exec-role.
 # Org SCPs commonly deny attaching AdministratorAccess (anti-privilege-
@@ -72,7 +107,7 @@ DEFAULT_CDK_BOOTSTRAP_EXECUTION_POLICIES = (
 )
 
 # Commands that do not need Neo4j connectivity tested up front.
-NO_NEO4J_CHECK = {"status", "cleanup", "credentials", "redeploy", "help"}
+NO_NEO4J_CHECK = {"status", "cleanup", "credentials", "redeploy", "help", "stack-name"}
 
 
 class DeployError(Exception):
@@ -84,8 +119,11 @@ class DeployError(Exception):
 # ============================================================================
 
 
+# Progress goes to stderr so stdout carries only what a caller asked for. That
+# is what lets `./deploy.py stack-name` be captured with $(...) without picking
+# up log lines, and it leaves the terminal output unchanged.
 def log_info(message: str) -> None:
-    print(f"INFO  {message}")
+    print(f"INFO  {message}", file=sys.stderr)
 
 
 def log_error(message: str) -> None:
@@ -93,20 +131,32 @@ def log_error(message: str) -> None:
 
 
 def log_success(message: str) -> None:
-    print(f"OK    {message}")
+    print(f"OK    {message}", file=sys.stderr)
 
 
 def log_step(message: str) -> None:
-    print()
-    print("=" * 70)
-    print(message)
-    print("=" * 70)
+    print(file=sys.stderr)
+    print("=" * 70, file=sys.stderr)
+    print(message, file=sys.stderr)
+    print("=" * 70, file=sys.stderr)
+
+
+def env_file(suffix: str) -> Path:
+    """Path to the .env this invocation reads (.env, or .env.<suffix>)."""
+    return SCRIPT_DIR / (f".env.{suffix}" if suffix else ".env")
+
+
+def credentials_file(suffix: str) -> Path:
+    """Path to the credentials file paired with this invocation's .env."""
+    name = f".mcp-credentials.{suffix}.json" if suffix else ".mcp-credentials.json"
+    return SCRIPT_DIR / name
 
 
 @dataclass
 class Config:
     """Resolved configuration loaded from .env plus defaults."""
 
+    env_suffix: str
     neo4j_uri: str
     neo4j_database: str
     neo4j_username: str
@@ -146,18 +196,25 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return env
 
 
-def load_env() -> Config:
+def load_env(suffix: str = "") -> Config:
     """Load .env into os.environ and resolve defaults (mirrors set -a; source)."""
-    if not ENV_FILE.is_file():
-        log_error(".env file not found in current directory")
-        log_error("Copy .env.sample to .env and fill in your credentials")
-        raise DeployError(".env not found")
+    env_path = env_file(suffix)
+    if not env_path.is_file():
+        log_error(f"{env_path.name} file not found in {SCRIPT_DIR}")
+        log_error(f"Copy .env.sample to {env_path.name} and fill in your credentials")
+        raise DeployError(f"{env_path.name} not found")
 
-    for key, value in _parse_env_file(ENV_FILE).items():
+    for key, value in _parse_env_file(env_path).items():
         os.environ[key] = value
 
     region = os.environ.get("AWS_REGION") or DEFAULT_REGION
-    stack_name = os.environ.get("STACK_NAME") or DEFAULT_STACK_NAME
+    # Each deployment needs its own stack name - it namespaces the Cognito
+    # domain, the IAM roles, the Gateway, and the Secrets Manager path. Deriving
+    # it from the --env suffix makes that automatic, so a new .env.NAME cannot
+    # silently deploy over an existing stack the way three hand-copied files
+    # once did. An explicit STACK_NAME still wins.
+    default_stack_name = f"{DEFAULT_STACK_NAME}-{suffix}" if suffix else DEFAULT_STACK_NAME
+    stack_name = os.environ.get("STACK_NAME") or default_stack_name
     ecr_repo_name = os.environ.get("ECR_REPO_NAME") or DEFAULT_ECR_REPO_NAME
     neo4j_mcp_repo = os.environ.get("NEO4J_MCP_REPO", "")
     bootstrap_policies = (
@@ -180,6 +237,7 @@ def load_env() -> Config:
             log_info(f"No git repo found at {neo4j_mcp_repo}, using tag: latest")
 
     return Config(
+        env_suffix=suffix,
         neo4j_uri=os.environ.get("NEO4J_URI", ""),
         neo4j_database=os.environ.get("NEO4J_DATABASE", ""),
         neo4j_username=os.environ.get("NEO4J_USERNAME", ""),
@@ -194,7 +252,7 @@ def load_env() -> Config:
 
 
 def validate_env(cfg: Config) -> None:
-    """Ensure all required values are present."""
+    """Ensure all required values are present and the stack name is usable."""
     required = {
         "NEO4J_URI": cfg.neo4j_uri,
         "NEO4J_DATABASE": cfg.neo4j_database,
@@ -208,6 +266,42 @@ def validate_env(cfg: Config) -> None:
         for name in missing:
             log_error(f"  - {name}")
         raise DeployError("missing required environment variables")
+
+    validate_stack_name(cfg.stack_name)
+
+
+def validate_stack_name(stack_name: str) -> None:
+    """Reject stack names that any derived resource name cannot accommodate."""
+    if STACK_NAME_PATTERN.fullmatch(stack_name) is None:
+        log_error(f"STACK_NAME '{stack_name}' is not a valid stack name")
+        log_error(
+            "It must start with a letter and hold only letters, digits, and "
+            "single separating hyphens (no leading, trailing, or doubled hyphen)"
+        )
+        raise DeployError("invalid STACK_NAME")
+
+    reserved = [w for w in STACK_NAME_RESERVED_WORDS if w in stack_name.lower()]
+    if reserved:
+        log_error(f"STACK_NAME '{stack_name}' contains {', '.join(reserved)}")
+        log_error(
+            "Cognito rejects those words in a domain prefix, and this stack's "
+            f"prefix is '{stack_name.lower()}-<account-id>'"
+        )
+        raise DeployError("STACK_NAME contains a Cognito reserved word")
+
+    if len(stack_name) > MAX_STACK_NAME_LEN:
+        # Named from the table, so this keeps pointing at whichever resource is
+        # actually the tightest if a suffix is ever renamed.
+        binding = binding_length_constraint()
+        log_error(
+            f"STACK_NAME '{stack_name}' is {len(stack_name)} characters; "
+            f"the limit is {MAX_STACK_NAME_LEN}"
+        )
+        log_error(
+            f"'{binding.render(stack_name)}' would exceed the "
+            f"{binding.max_length}-character limit on the {binding.resource}"
+        )
+        raise DeployError("STACK_NAME too long")
 
 
 def test_neo4j_connection(cfg: Config) -> None:
@@ -413,18 +507,92 @@ def cmd_build(cfg: Config) -> None:
     log_success("Image built successfully")
 
 
-def _docker_ecr_login(aws: Aws, account_id: str, cfg: Config) -> None:
+# Unresolvable host used only to keep docker off the platform credential
+# helper; see _isolated_docker_env(). Never contacted.
+NO_CREDSTORE_MARKER = "deploy-py-no-credstore.invalid"
+
+
+def _docker_context_host() -> str | None:
+    """Endpoint of the user's active docker context, or None if undiscoverable.
+
+    Read from the real config (no DOCKER_CONFIG override), because the throwaway
+    config dir below has no contexts/ store.
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "context", "inspect", "--format",
+             "{{.Endpoints.docker.Host}}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return result.stdout.strip() or None
+
+
+@contextlib.contextmanager
+def _isolated_docker_env() -> Iterator[dict[str, str]]:
+    """Subprocess env pointing docker at a throwaway config with no credsStore.
+
+    `docker login` does not just authenticate; it saves the credential through
+    the `credsStore` named in ~/.docker/config.json (osxkeychain here). A stale
+    keychain item for the registry makes that save fail with errSecDuplicateItem
+    (-25299) even though the ECR token is perfectly good, and the helper's exit 1
+    fails the whole push. Pointing DOCKER_CONFIG at a temp dir with no credsStore
+    keeps the token in that dir for the life of the push, and never reads or
+    writes the user's config or keychain.
+    """
+    with tempfile.TemporaryDirectory(prefix="deploy-docker-") as tmp_dir:
+        config = Path(tmp_dir) / "config.json"
+        # An empty "auths" map is not enough: the docker CLI treats a config
+        # with no credentials at all as unconfigured and auto-detects the
+        # platform helper (osxkeychain), putting us right back in the keychain.
+        # One inert placeholder entry makes the config count as configured, so
+        # the CLI stays on its plain-file store.
+        config.write_text(json.dumps({"auths": {NO_CREDSTORE_MARKER: {}}}))
+        config.chmod(0o600)  # briefly holds the ECR token in plaintext
+        env = os.environ.copy()
+        env["DOCKER_CONFIG"] = tmp_dir
+        # Without contexts/, docker would silently fall back to the default
+        # socket and miss OrbStack/Colima/etc. Carry the endpoint over instead.
+        if host := _docker_context_host():
+            env["DOCKER_HOST"] = host
+        yield env
+
+
+def _docker_ecr_login(
+    aws: Aws, account_id: str, cfg: Config, env: dict[str, str]
+) -> None:
     log_info("Authenticating with ECR...")
     token = aws.client("ecr").get_authorization_token()
     auth = token["authorizationData"][0]["authorizationToken"]
     username, password = base64.b64decode(auth).decode().split(":", 1)
     registry = f"{account_id}.dkr.ecr.{cfg.aws_region}.amazonaws.com"
-    subprocess.run(
-        ["docker", "login", "--username", username, "--password-stdin", registry],
-        input=password,
-        text=True,
-        check=True,
-    )
+    try:
+        subprocess.run(
+            ["docker", "login", "--username", username, "--password-stdin", registry],
+            input=password,
+            text=True,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+    except subprocess.CalledProcessError as exc:
+        log_error(f"docker login failed for {registry} (exit {exc.returncode})")
+        for stream in (exc.stdout, exc.stderr):
+            if stream and stream.strip():
+                log_error(stream.strip())
+        log_error(
+            "ECR issued the authorization token, so the AWS side is fine - this "
+            "is docker failing to use it. The local credential store is already "
+            "bypassed for this login, so it is not a keychain/credsStore "
+            "problem. Check that the docker daemon is running at "
+            f"{env.get('DOCKER_HOST', 'the default socket')} (`docker version`) "
+            f"and that {registry} is reachable."
+        )
+        raise DeployError("docker login failed") from exc
+    log_success("Authenticated with ECR")
 
 
 def cmd_push(aws: Aws, cfg: Config) -> None:
@@ -449,23 +617,35 @@ def cmd_push(aws: Aws, cfg: Config) -> None:
     else:
         log_info("ECR repository already exists")
 
-    _docker_ecr_login(aws, account_id, cfg)
+    # Login, tag and push all share one throwaway docker config, so the token
+    # written by `docker login` is visible to `docker push` and is deleted with
+    # the temp dir when the push finishes.
+    with _isolated_docker_env() as docker_env:
+        _docker_ecr_login(aws, account_id, cfg, docker_env)
 
-    log_info("Tagging image...")
-    subprocess.run(
-        ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
-         f"{ecr_uri}:{cfg.image_tag}"],
-        check=True,
-    )
-    subprocess.run(
-        ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
-         f"{ecr_uri}:latest"],
-        check=True,
-    )
+        log_info("Tagging image...")
+        subprocess.run(
+            ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
+             f"{ecr_uri}:{cfg.image_tag}"],
+            check=True,
+            env=docker_env,
+        )
+        subprocess.run(
+            ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
+             f"{ecr_uri}:latest"],
+            check=True,
+            env=docker_env,
+        )
 
-    log_info("Pushing image to ECR...")
-    subprocess.run(["docker", "push", f"{ecr_uri}:{cfg.image_tag}"], check=True)
-    subprocess.run(["docker", "push", f"{ecr_uri}:latest"], check=True)
+        log_info("Pushing image to ECR...")
+        subprocess.run(
+            ["docker", "push", f"{ecr_uri}:{cfg.image_tag}"],
+            check=True,
+            env=docker_env,
+        )
+        subprocess.run(
+            ["docker", "push", f"{ecr_uri}:latest"], check=True, env=docker_env
+        )
 
     log_success(
         f"Image pushed successfully: {ecr_uri}:{cfg.image_tag} + latest"
@@ -636,9 +816,10 @@ def cmd_status(aws: Aws, cfg: Config) -> None:
         print(f"  Token URL: {outputs.get('CognitoTokenUrl', '')}")
         print(f"  Runtime ARN: {outputs.get('MCPServerRuntimeArn', '')}")
         print()
+        env_flag = f" --env {cfg.env_suffix}" if cfg.env_suffix else ""
         print("Next steps:")
-        print("  1. Generate credentials:  ./deploy.py credentials")
-        print("  2. Test the deployment:   ./cloud.sh")
+        print(f"  1. Generate credentials:  ./deploy.py{env_flag} credentials")
+        print(f"  2. Test the deployment:   ./cloud.sh{env_flag}")
 
 
 # ============================================================================
@@ -866,13 +1047,14 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
         "region": cfg.aws_region,
         "stack_name": cfg.stack_name,
     }
-    CREDENTIALS_FILE.write_text(json.dumps(credentials_data, indent=2))
-    print("   Credentials written to .mcp-credentials.json")
+    output_path = credentials_file(cfg.env_suffix)
+    output_path.write_text(json.dumps(credentials_data, indent=2))
+    print(f"   Credentials written to {output_path.name}")
 
     log_success("Credentials file generated")
     print()
     print("Usage:")
-    print("  - File: .mcp-credentials.json")
+    print(f"  - File: {output_path.name}")
     print("  - Token expires at the time shown in token_expires_at")
     print("  - Run './deploy.py credentials' to refresh the token")
 
@@ -893,11 +1075,37 @@ Commands:
   synth        Synthesize CloudFormation template (dry run)
   status       Show stack status and outputs
   credentials  Generate .mcp-credentials.json with Gateway URL and JWT token
+  stack-name   Print the resolved stack name (for scripts)
   cleanup      Delete the stack and ECR repository
   help         Show this help message
 
 Options:
   --skip-build    Skip Docker build, just push existing image and deploy
+  --env NAME      Act on the deployment configured in .env.NAME instead of
+                  .env, writing its credentials to .mcp-credentials.NAME.json.
+                  May also be given as MCP_ENV=NAME in the environment.
+
+Multiple Deployments:
+  Each deployment is one .env.NAME file, and the NAME suffix picks both the
+  config and its credentials file, so the two cannot drift apart:
+
+    .env.fleet    ->  ./deploy.py --env fleet     ->  .mcp-credentials.fleet.json
+    .env.finance  ->  ./deploy.py --env finance   ->  .mcp-credentials.finance.json
+    .env          ->  ./deploy.py                 ->  .mcp-credentials.json
+
+  The stack name is derived from the suffix, so each deployment is namespaced
+  automatically and no .env.NAME file needs to set STACK_NAME:
+
+    ./deploy.py --env fleet   ->  neo4j-agentcore-mcp-server-fleet
+    ./deploy.py               ->  neo4j-agentcore-mcp-server
+
+  That name namespaces the Cognito domain, the IAM roles, the Gateway, and the
+  Secrets Manager password path. Setting STACK_NAME in a .env.NAME file
+  overrides the derived name; it must stay unique per deployment, since a
+  shared name means the second deployment overwrites the first.
+
+  Deployments sharing one MCP server image can keep the same ECR_REPO_NAME and
+  NEO4J_MCP_REPO; the image is built and pushed once per deploy either way.
 
 Environment Variables (from .env):
   Required:
@@ -908,7 +1116,11 @@ Environment Variables (from .env):
 
   Optional:
     AWS_REGION         AWS region (default: us-east-1)
-    STACK_NAME         CDK stack name (default: neo4j-agentcore-mcp-server)
+    STACK_NAME         CDK stack name (default: neo4j-agentcore-mcp-server,
+                       plus -NAME when --env NAME is given; max 41 chars,
+                       letters and digits joined by single hyphens, must start
+                       with a letter, and may not contain aws/amazon/cognito,
+                       which Cognito forbids in the derived domain prefix)
     ECR_REPO_NAME      ECR repository name (default: neo4j-mcp-server)
     IMAGE_TAG          Docker image tag (default: git short SHA from MCP repo)
     CDK_BOOTSTRAP_EXECUTION_POLICIES
@@ -925,6 +1137,10 @@ Examples:
   ./deploy.py status            # Check deployment status
   ./deploy.py credentials       # Generate credentials file for MCP clients
   ./deploy.py cleanup           # Remove everything
+
+  ./deploy.py --env fleet              # Deploy the .env.fleet deployment
+  ./deploy.py --env fleet credentials  # Write .mcp-credentials.fleet.json
+  ./deploy.py --env fleet status       # Status of the .env.fleet stack
 """
 
 
@@ -937,8 +1153,44 @@ def cmd_help() -> None:
 # ============================================================================
 
 
+def _extract_env_suffix(args: list[str]) -> tuple[str, list[str]]:
+    """Split `--env NAME` / `--env=NAME` out of the argument list.
+
+    Defaults to the MCP_ENV variable so the shell wrappers can forward a
+    selection they already parsed. Returns the suffix and the args with the
+    flag removed, leaving command detection unchanged.
+    """
+    suffix = os.environ.get("MCP_ENV", "")
+    remaining: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--env":
+            if i + 1 >= len(args):
+                log_error("--env requires a name, for example: --env fleet")
+                raise DeployError("--env is missing its value")
+            suffix = args[i + 1]
+            i += 2
+        elif arg.startswith("--env="):
+            suffix = arg[len("--env=") :]
+            i += 1
+        else:
+            remaining.append(arg)
+            i += 1
+
+    if suffix and ENV_SUFFIX_PATTERN.fullmatch(suffix) is None:
+        log_error(f"Invalid --env name: {suffix!r}")
+        log_error(
+            "Use letters and digits joined by single hyphens. The name becomes "
+            "part of the stack name, which permits nothing else."
+        )
+        raise DeployError("invalid --env name")
+
+    return suffix, remaining
+
+
 def main(argv: list[str]) -> int:
-    args = argv[1:]
+    suffix, args = _extract_env_suffix(argv[1:])
     skip_build = "--skip-build" in args
     command = args[0] if args else ""
 
@@ -946,13 +1198,25 @@ def main(argv: list[str]) -> int:
         cmd_help()
         return 0
 
-    cfg = load_env()
+    cfg = load_env(suffix)
+
+    # Bare stack name on stdout, nothing else, so the shell scripts can resolve
+    # a deployment the same way this script does instead of keeping their own
+    # copy of the naming rule. Ahead of validate_env because the resolved name
+    # is all this command reports: failing it over an unset NEO4J_MCP_REPO would
+    # break a caller's $(...) on a value the answer does not depend on.
+    if command == "stack-name":
+        validate_stack_name(cfg.stack_name)
+        print(cfg.stack_name)
+        return 0
+
     validate_env(cfg)
 
     if command not in NO_NEO4J_CHECK:
         test_neo4j_connection(cfg)
 
     log_info("Configuration:")
+    log_info(f"  Env File: {env_file(cfg.env_suffix).name}")
     log_info(f"  Region: {cfg.aws_region}")
     log_info(f"  Stack Name: {cfg.stack_name}")
     log_info(f"  ECR Repository: {cfg.ecr_repo_name}")
@@ -995,5 +1259,13 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         sys.exit(130)
     except subprocess.CalledProcessError as exc:
-        log_error(f"Command failed: {' '.join(map(str, exc.cmd))}")
+        log_error(
+            f"Command failed (exit {exc.returncode}): "
+            f"{' '.join(map(str, exc.cmd))}"
+        )
+        # Only set when the caller captured output; otherwise the child already
+        # printed its own error straight to the terminal.
+        for stream in (exc.stdout, exc.stderr):
+            if isinstance(stream, str) and stream.strip():
+                log_error(stream.strip())
         sys.exit(exc.returncode or 1)

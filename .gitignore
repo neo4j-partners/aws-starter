@@ -195,6 +195,8 @@ logs/
 credentials.json
 secrets.json
 .mcp-credentials.json
+# Per-deployment credentials from ./deploy.py --env NAME
+.mcp-credentials.*.json
 neo4j-sso-config.json
 *_secret*
 *.secret

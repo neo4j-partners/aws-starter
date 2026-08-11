@@ -34,14 +34,14 @@ The file maps to the UI fields like this:
 | `gateway_url` | **Host** + **Base path** | Split the URL: scheme and domain go in Host, the `/mcp` path goes in Base path |
 | `client_id` | **Client ID** | |
 | `client_secret` | **Client secret** | |
-| `scope` | **OAuth scope** | e.g. `simple-neo4j-mcp-server-mcp/invoke` |
+| `scope` | **OAuth scope** | e.g. `neo4j-agentcore-mcp-server-mcp/invoke` |
 | `token_url` | **Token endpoint** | Cognito `/oauth2/token` URL |
 
 For example, a `gateway_url` of
-`https://simple-neo4j-mcp-server-gateway-xxxx.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`
+`https://neo4j-agentcore-mcp-server-gateway-xxxx.gateway.bedrock-agentcore.us-east-1.amazonaws.com/mcp`
 splits into:
 
-- **Host**: `https://simple-neo4j-mcp-server-gateway-xxxx.gateway.bedrock-agentcore.us-east-1.amazonaws.com`
+- **Host**: `https://neo4j-agentcore-mcp-server-gateway-xxxx.gateway.bedrock-agentcore.us-east-1.amazonaws.com`
 - **Base path**: `/mcp`
 
 ## Step 1: Connection basics
@@ -80,7 +80,7 @@ Click **Next** to continue to authentication.
 | **Port** | `443` (the default). |
 | **Client ID** | `client_id` from the credentials file. |
 | **Client secret** | `client_secret` from the credentials file. |
-| **OAuth scope** | `scope` from the credentials file, for example `simple-neo4j-mcp-server-mcp/invoke`. |
+| **OAuth scope** | `scope` from the credentials file, for example `neo4j-agentcore-mcp-server-mcp/invoke`. |
 | **Token endpoint** | `token_url` from the credentials file. Scroll down if it is below the OAuth scope field. |
 | **Base path** | `/mcp`. This is the path you removed from the Host value. |
 
@@ -117,6 +117,14 @@ The flag is stored as a connection option named `is_mcp_connection`. Set it
 directly with the Databricks CLI. Updating a connection replaces the full
 options map, and `client_secret` is write-only (the API never returns it), so
 the update must resend every option, including the secret.
+
+**Schema-scoped connections must be addressed by their full name.** A connection
+created under a catalog and schema, for example
+`` `graph-on-databricks`.supplier_risk.`supplier-mcp` ``, does not appear in
+`databricks connections list`, and `databricks connections get <name>` reports
+`Connection '<name>' does not exist`. Use the full three-part name in every
+command below, so `<connection-name>` becomes
+`graph-on-databricks.supplier_risk.supplier-mcp`.
 
 First read the current options:
 

@@ -25,12 +25,23 @@ from aws_cdk import (
 from constructs import Construct
 import os
 
+# Every name in this stack derives from the stack name, and the whole set is
+# validated in __init__ before any construct is created. The table and its
+# limits live in naming.py because deploy.py enforces the same constraint
+# before it builds anything, and a second copy here could drift from it.
+from naming import validate_derived_names
+
 
 class Neo4jMcpStack(Stack):
     """Stack deploying Neo4j MCP Server on Amazon Bedrock AgentCore Runtime with Gateway."""
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Before any construct exists, so the failure names the resource that
+        # cannot be built rather than surfacing as CDK's generic complaint about
+        # whichever L2 name it happens to check first.
+        validate_derived_names(self.stack_name)
 
         self._create_parameters()
         self._create_auth_resources()
@@ -92,16 +103,6 @@ class Neo4jMcpStack(Stack):
             description="ARN of the Secrets Manager secret holding the Neo4j password",
             allowed_pattern=r"^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]+:secret:.+$",
             constraint_description="Must be a valid Secrets Manager secret ARN",
-        )
-
-        self.agent_name = CfnParameter(
-            self,
-            "AgentName",
-            type="String",
-            default="Neo4jMCPServer",
-            description="Name for the MCP server runtime",
-            allowed_pattern=r"^[a-zA-Z][a-zA-Z0-9_]{0,47}$",
-            constraint_description="Must start with a letter, max 48 chars, alphanumeric and underscores only",
         )
 
         self.network_mode = CfnParameter(
@@ -408,8 +409,12 @@ class Neo4jMcpStack(Stack):
         )
 
     def _create_agent_runtime(self):
-        # Convert stack name to underscore format for runtime name
-        self.runtime_name = f"{self.stack_name.replace('-', '_')}_{self.agent_name.value_as_string}"
+        # The stack name already namespaces every resource here, so it is the
+        # whole runtime name - only the hyphens become underscores to satisfy
+        # the AgentRuntimeName charset.
+        # _validate_derived_names has already checked this against the
+        # AgentRuntimeName pattern and its 48-character limit.
+        self.runtime_name = self.stack_name.replace("-", "_")
 
         # MCP Server Runtime using CfnRuntime (L1 construct)
         # Only machine_client allowed (Gateway-only access)

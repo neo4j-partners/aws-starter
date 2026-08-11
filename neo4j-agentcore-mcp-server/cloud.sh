@@ -24,11 +24,16 @@
 #   schema    Get Neo4j database schema
 #   query     Run a test query (node counts by label)
 #
+# OPTIONS:
+#   --env NAME  Test the deployment configured in .env.NAME, reading
+#               .mcp-credentials.NAME.json. Must come before the command.
+#
 # EXAMPLES:
 #   ./deploy.py credentials  # Generate credentials first
 #   ./cloud.sh               # Run full test suite
 #   ./cloud.sh token         # Check token status
 #   ./cloud.sh tools         # List available tools
+#   ./cloud.sh --env fleet tools   # List tools on the .env.fleet deployment
 #
 # NOTE:
 #   Tool names are prefixed with target name when accessed via Gateway.
@@ -44,12 +49,37 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Optional leading --env NAME picks .mcp-credentials.NAME.json, matching the
+# .env.NAME that deployed it. Exported so gateway_client.py resolves the same
+# file without re-parsing arguments.
+MCP_ENV="${MCP_ENV:-}"
+if [[ "${1:-}" == "--env" ]]; then
+    if [[ -z "${2:-}" ]]; then
+        echo "ERROR: --env requires a name, for example: --env fleet"
+        exit 1
+    fi
+    MCP_ENV="$2"
+    shift 2
+elif [[ "${1:-}" == --env=* ]]; then
+    MCP_ENV="${1#--env=}"
+    shift
+fi
+export MCP_ENV
+
+if [[ -n "$MCP_ENV" ]]; then
+    CREDENTIALS_FILE=".mcp-credentials.$MCP_ENV.json"
+    ENV_FLAG=" --env $MCP_ENV"
+else
+    CREDENTIALS_FILE=".mcp-credentials.json"
+    ENV_FLAG=""
+fi
+
 # Check for credentials file
 check_credentials() {
-    if [[ ! -f "$SCRIPT_DIR/.mcp-credentials.json" ]]; then
-        echo "ERROR: Credentials file not found: .mcp-credentials.json"
+    if [[ ! -f "$SCRIPT_DIR/$CREDENTIALS_FILE" ]]; then
+        echo "ERROR: Credentials file not found: $CREDENTIALS_FILE"
         echo ""
-        echo "Run './deploy.py credentials' to generate it"
+        echo "Run './deploy.py$ENV_FLAG credentials' to generate it"
         exit 1
     fi
 }

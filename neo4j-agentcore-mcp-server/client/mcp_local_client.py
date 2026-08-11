@@ -15,6 +15,8 @@ Usage:
 
 Environment:
     MCP_SERVER_URL - Server URL (default: http://localhost:8000/mcp)
+    MCP_ENV        - Deployment suffix; reads .env.NAME instead of .env.
+                     Set for you by './local.sh --env NAME'.
 """
 
 import asyncio
@@ -35,7 +37,25 @@ from mcp_operations import (
 CONTAINER_NAME = "neo4j-mcp-server"
 DEFAULT_SERVER_URL = "http://localhost:8000/mcp"
 SCRIPT_DIR = Path(__file__).parent.parent  # neo4j-agentcore-mcp-server directory
-ENV_FILE = SCRIPT_DIR.parent / ".env"
+
+# MCP_ENV carries the --env suffix chosen on the command line.
+ENV_SUFFIX = os.environ.get("MCP_ENV", "")
+
+
+def _resolve_env_file() -> Path:
+    """Locate the .env for the selected deployment.
+
+    Suffixed files live beside deploy.py, which is what writes and reads them.
+    Without a suffix this keeps reading the repository-root .env, which is
+    where this client has always looked and which holds different values than
+    the server-local one.
+    """
+    if ENV_SUFFIX:
+        return SCRIPT_DIR / f".env.{ENV_SUFFIX}"
+    return SCRIPT_DIR.parent / ".env"
+
+
+ENV_FILE = _resolve_env_file()
 
 
 def load_env() -> dict:

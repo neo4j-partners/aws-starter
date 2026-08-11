@@ -21,7 +21,12 @@
 #
 # ENVIRONMENT (from .env):
 #   AWS_REGION      AWS region (default: us-east-1)
-#   STACK_NAME      CDK stack name (default: neo4j-agentcore-mcp-server)
+#   STACK_NAME      CDK stack name (default: resolved by './deploy.py stack-name',
+#                   which derives it from the --env suffix)
+#
+# OPTIONS:
+#   --env NAME  Read .env.NAME instead of .env, targeting that deployment's
+#               stack. Must be the first argument.
 #
 # SEE ALSO:
 #   ./local.sh  - Local Docker server testing (no auth)
@@ -32,7 +37,32 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/.env"
+
+# Optional leading --env NAME selects .env.NAME, so this debugs the same
+# deployment that ./deploy.py --env NAME created.
+MCP_ENV="${MCP_ENV:-}"
+if [[ "${1:-}" == "--env" ]]; then
+    if [[ -z "${2:-}" ]]; then
+        echo "ERROR: --env requires a name, for example: --env fleet"
+        exit 1
+    fi
+    MCP_ENV="$2"
+    shift 2
+elif [[ "${1:-}" == --env=* ]]; then
+    MCP_ENV="${1#--env=}"
+    shift
+fi
+
+if [[ -n "$MCP_ENV" ]]; then
+    ENV_FILE="$SCRIPT_DIR/.env.$MCP_ENV"
+    # Falling back to defaults here would silently debug the wrong stack.
+    if [[ ! -f "$ENV_FILE" ]]; then
+        echo "ERROR: Env file not found: .env.$MCP_ENV"
+        exit 1
+    fi
+else
+    ENV_FILE="$SCRIPT_DIR/.env"
+fi
 
 # Load environment
 if [[ -f "$ENV_FILE" ]]; then
@@ -41,8 +71,12 @@ if [[ -f "$ENV_FILE" ]]; then
     set +a
 fi
 
-# Defaults
-STACK_NAME="${STACK_NAME:-neo4j-agentcore-mcp-server}"
+# Defaults. deploy.py resolves the stack name (including the --env suffix), so
+# this debugs whatever './deploy.py --env NAME' actually deployed instead of
+# keeping a second copy of the naming rule here that could drift from it.
+if [[ -z "${STACK_NAME:-}" ]]; then
+    STACK_NAME=$("$SCRIPT_DIR/deploy.py" ${MCP_ENV:+--env "$MCP_ENV"} stack-name)
+fi
 REGION="${AWS_REGION:-us-east-1}"
 
 # Get stack outputs

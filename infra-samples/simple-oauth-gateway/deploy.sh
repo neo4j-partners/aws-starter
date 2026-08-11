@@ -48,6 +48,77 @@ show_help() {
     exit 0
 }
 
+# Unresolvable host used only to keep docker off the platform credential
+# helper; see isolate_docker_config(). Never contacted.
+NO_CREDSTORE_MARKER="deploy-sh-no-credstore.invalid"
+
+DOCKER_CONFIG_TMP=""
+
+release_docker_config() {
+    if [ -n "$DOCKER_CONFIG_TMP" ]; then
+        rm -rf "$DOCKER_CONFIG_TMP"
+        DOCKER_CONFIG_TMP=""
+    fi
+}
+
+# Runs on the normal path and on error, so the ECR token never outlives the run.
+# ( ) subshells do not inherit this trap, so the dir survives until the push that
+# needs it is done. The signal traps only turn the signal into an exit: cleaning
+# up from the handler itself would pull the config dir out from under a deploy
+# that bash then carried on with.
+trap release_docker_config EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Prepare a throwaway docker config dir with no credsStore in DOCKER_CONFIG_TMP.
+#
+# `docker login` does not just authenticate; it saves the credential through the
+# credsStore named in ~/.docker/config.json (osxkeychain on a Mac). A stale
+# keychain item for the registry makes that save fail with errSecDuplicateItem
+# (-25299) even though the ECR token is perfectly good, and the helper's exit 1
+# fails the whole deploy. Pointing DOCKER_CONFIG at a dir with no credsStore
+# keeps the token there for the life of the push, and never reads or writes the
+# user's config or keychain.
+isolate_docker_config() {
+    local real_dir="${DOCKER_CONFIG:-$HOME/.docker}"
+    local entry context
+
+    DOCKER_CONFIG_TMP=$(mktemp -d)
+    chmod 700 "$DOCKER_CONFIG_TMP"  # briefly holds the ECR token in plaintext
+
+    # config.json is the only file we want to replace. Everything else in the
+    # real dir still has to be visible: cli-plugins/ is where the buildx
+    # subcommand itself comes from, buildx/ holds the arm64-builder instance,
+    # and contexts/ resolves the docker endpoint (OrbStack, Colima, ...).
+    # Dotfiles are left out on purpose: they are Docker Hub token bookkeeping
+    # that an ECR push never reads, and not linking them keeps this code path
+    # from writing anything back into the real dir.
+    for entry in "$real_dir"/*; do
+        [ -e "$entry" ] || continue
+        if [ "$(basename "$entry")" = "config.json" ]; then
+            continue
+        fi
+        ln -s "$entry" "$DOCKER_CONFIG_TMP/"
+    done
+
+    # An empty "auths" map is not enough: the docker CLI treats a config with no
+    # credentials at all as unconfigured and auto-detects the platform helper
+    # (osxkeychain), putting us right back in the keychain. One inert
+    # placeholder entry makes the config count as configured, so the CLI stays
+    # on its plain-file store. currentContext lives in config.json rather than
+    # contexts/, so carry it over too or docker falls back to the default
+    # socket and misses the active context's daemon.
+    context=$(docker context show 2>/dev/null || true)
+    if [ -n "$context" ]; then
+        printf '{"auths":{"%s":{}},"currentContext":"%s"}\n' \
+            "$NO_CREDSTORE_MARKER" "$context" > "$DOCKER_CONFIG_TMP/config.json"
+    else
+        printf '{"auths":{"%s":{}}}\n' \
+            "$NO_CREDSTORE_MARKER" > "$DOCKER_CONFIG_TMP/config.json"
+    fi
+    chmod 600 "$DOCKER_CONFIG_TMP/config.json"
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -168,21 +239,53 @@ if [ "$SKIP_BUILD" = false ]; then
         echo "  ECR repository exists: $REPO_NAME"
     fi
 
-    # Login to ECR
-    print_step "Logging in to ECR..."
-    aws ecr get-login-password --region "$REGION" | \
-        docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com" > /dev/null
+    REGISTRY="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+    IMAGE_URI="$REGISTRY/$REPO_NAME:latest"
 
-    # Build and push image
-    IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO_NAME:latest"
-    print_step "Building and pushing image..."
-    echo "  Image: $IMAGE_URI"
+    # Login and push share one throwaway docker config, so the token written by
+    # `docker login` is visible to the pushing build. Exported in a subshell so
+    # the rest of the deploy runs against the user's own docker config.
+    isolate_docker_config
+    (
+        export DOCKER_CONFIG="$DOCKER_CONFIG_TMP"
 
-    docker buildx build \
-        --platform linux/arm64 \
-        -t "$IMAGE_URI" \
-        --push \
-        "$SCRIPT_DIR/mcp-server"
+        print_step "Logging in to ECR..."
+        # Fetch the token as its own step instead of piping it straight into
+        # docker: a pipeline reports only docker's exit status, so an AWS-side
+        # failure would show up as docker choking on empty stdin and get blamed
+        # on the wrong side.
+        if ! ECR_PASSWORD=$(aws ecr get-login-password --region "$REGION" 2>&1); then
+            print_error "aws ecr get-login-password failed for region $REGION"
+            echo "$ECR_PASSWORD"
+            print_error "No token was issued, so docker was never contacted. Check that"
+            print_error "your AWS credentials are valid for account $ACCOUNT_ID in $REGION."
+            exit 1
+        fi
+
+        # Keep the successful case quiet, but never swallow a failure: docker's
+        # own message is the only thing that says why the login did not take.
+        if ! LOGIN_OUTPUT=$(printf '%s' "$ECR_PASSWORD" | \
+                docker login --username AWS --password-stdin "$REGISTRY" 2>&1); then
+            print_error "docker login failed for $REGISTRY"
+            echo "$LOGIN_OUTPUT"
+            print_error "ECR issued the authorization token, so the AWS side is fine."
+            print_error "The local credential store is already bypassed for this login,"
+            print_error "so this is not a keychain/credsStore problem. Check that the"
+            print_error "docker daemon is running (\`docker version\`) and that the"
+            print_error "registry is reachable."
+            exit 1
+        fi
+
+        print_step "Building and pushing image..."
+        echo "  Image: $IMAGE_URI"
+
+        docker buildx build \
+            --platform linux/arm64 \
+            -t "$IMAGE_URI" \
+            --push \
+            "$SCRIPT_DIR/mcp-server"
+    )
+    release_docker_config
 
     echo -e "  ${GREEN}Image pushed successfully!${NC}"
 else

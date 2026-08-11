@@ -412,7 +412,7 @@ class Neo4jMcpStack(Stack):
         # The stack name already namespaces every resource here, so it is the
         # whole runtime name - only the hyphens become underscores to satisfy
         # the AgentRuntimeName charset.
-        # _validate_derived_names has already checked this against the
+        # validate_derived_names has already checked this against the
         # AgentRuntimeName pattern and its 48-character limit.
         self.runtime_name = self.stack_name.replace("-", "_")
 

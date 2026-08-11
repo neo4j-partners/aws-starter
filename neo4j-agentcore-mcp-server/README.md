@@ -279,7 +279,7 @@ directory, or `.env.NAME` when given `--env NAME`:
 | `NEO4J_PASSWORD` | Yes | Neo4j password (passed to container) |
 | `NEO4J_MCP_REPO` | Yes | Path to local [neo4j-mcp-canary](https://github.com/neo4j-partners/neo4j-mcp-canary) clone (ARM64 image is built from here) |
 | `AWS_REGION` | No | AWS region (default: us-east-1) |
-| `STACK_NAME` | No | CDK stack name. Defaults to `neo4j-agentcore-mcp-server`, with `-NAME` appended under `--env NAME`. Max 41 characters, letters and digits joined by single hyphens, starting with a letter, and free of `aws`/`amazon`/`cognito`. The cap is IAM's 64-character role name limit less the 23 characters of `-gateway-execution-role` |
+| `STACK_NAME` | No | CDK stack name. Defaults to `neo4j-agentcore-mcp-server`, with `-NAME` appended under `--env NAME`. Letters and digits joined by single hyphens, starting with a letter, and free of `aws`/`amazon`/`cognito`. Every resource name derives from it, so a length cap also applies, computed in [`cdk/naming.py`](./cdk/naming.py) from whichever derived name has the least room (41 characters at present). `./deploy.py` rejects an unusable name before building anything and names the resource that is over |
 
 > **Note:** `./local.sh` is the exception. Without `--env` it reads `../.env`
 > from the repository root, not the `.env` here. With `--env NAME` it reads

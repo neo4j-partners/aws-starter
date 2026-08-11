@@ -88,7 +88,10 @@ DEFAULT_ECR_REPO_NAME = "neo4j-mcp-server"
 # length budget stays computed from the suffixes rather than written down.
 # Checked here as well as at synth because CloudFormation only complains once a
 # deploy is already underway, after the image has been built and pushed.
-sys.path.insert(0, str(CDK_DIR))
+# Appended rather than prepended: cdk/ only has to be searched after the
+# standard library, and putting it first would let a future cdk/<stdlib>.py
+# shadow a real import in this script.
+sys.path.append(str(CDK_DIR))
 from naming import (  # noqa: E402  (needs CDK_DIR on sys.path first)
     MAX_STACK_NAME_LEN,
     STACK_NAME_PATTERN,
@@ -1063,7 +1066,7 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
 # Help
 # ============================================================================
 
-HELP_TEXT = """\
+HELP_TEXT = f"""\
 Neo4j MCP Server - AgentCore Deployment Script (CDK)
 
 Usage: ./deploy.py [command] [options]
@@ -1117,7 +1120,7 @@ Environment Variables (from .env):
   Optional:
     AWS_REGION         AWS region (default: us-east-1)
     STACK_NAME         CDK stack name (default: neo4j-agentcore-mcp-server,
-                       plus -NAME when --env NAME is given; max 41 chars,
+                       plus -NAME when --env NAME is given; max {MAX_STACK_NAME_LEN} chars,
                        letters and digits joined by single hyphens, must start
                        with a letter, and may not contain aws/amazon/cognito,
                        which Cognito forbids in the derived domain prefix)

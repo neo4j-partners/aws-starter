@@ -55,7 +55,7 @@ from urllib.parse import urlparse
 
 import boto3
 import httpx
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, WaiterError
 
 # ============================================================================
 # Configuration
@@ -830,12 +830,94 @@ def cmd_status(aws: Aws, cfg: Config) -> None:
 # ============================================================================
 
 
+def _find_runtime_id(aws: Aws, cfg: Config) -> str:
+    """Runtime ID for this stack, or "" if there is no such runtime.
+
+    Prefers the stack output and falls back to a name lookup, since a stack
+    left in DELETE_FAILED may no longer report its outputs.
+    """
+    with contextlib.suppress(ClientError):
+        runtime_id = _stack_outputs(aws, cfg.stack_name).get("MCPServerRuntimeId")
+        if runtime_id:
+            return runtime_id
+
+    # Same derivation as the stack's _create_agent_runtime().
+    runtime_name = cfg.stack_name.replace("-", "_")
+    client = aws.client("bedrock-agentcore-control")
+    kwargs: dict = {}
+    while True:
+        page = client.list_agent_runtimes(**kwargs)
+        for runtime in page.get("agentRuntimes", []):
+            if runtime.get("agentRuntimeName") == runtime_name:
+                return runtime.get("agentRuntimeId", "")
+        token = page.get("nextToken")
+        if not token:
+            return ""
+        kwargs["nextToken"] = token
+
+
+def _delete_agent_runtime(
+    aws: Aws, cfg: Config, timeout: int = 600, delay: int = 10
+) -> None:
+    """Delete the AgentCore runtime out of band and wait for it to disappear.
+
+    CloudFormation's AWS::BedrockAgentCore::Runtime handler gives up with
+    NotStabilized before AgentCore finishes deleting a runtime, which drops the
+    whole stack into DELETE_FAILED. Deleting the runtime here first (and waiting
+    as long as it actually takes) leaves the stack's own delete a no-op.
+    """
+    runtime_id = _find_runtime_id(aws, cfg)
+    if not runtime_id:
+        log_info("No AgentCore runtime found, skipping")
+        return
+
+    client = aws.client("bedrock-agentcore-control")
+    log_info(f"Deleting AgentCore runtime: {runtime_id}")
+    try:
+        client.delete_agent_runtime(agentRuntimeId=runtime_id)
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] not in _NOT_FOUND_CODES:
+            raise
+        return
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _exists(lambda: client.get_agent_runtime(agentRuntimeId=runtime_id)):
+            log_success("Runtime deleted")
+            return
+        log_info(f"Runtime still deleting, waiting {delay}s...")
+        time.sleep(delay)
+
+    # Not fatal: cdk destroy runs next and may still finish the job.
+    log_error(f"Runtime {runtime_id} still present after {timeout}s")
+
+
+def _retry_stack_delete(aws: Aws, cfg: Config) -> bool:
+    """Delete the stack directly after cdk destroy failed. True if it is gone."""
+    if not stack_exists(aws, cfg):
+        return True
+
+    log_info("cdk destroy failed; retrying the stack delete directly...")
+    cfn = aws.client("cloudformation")
+    try:
+        cfn.delete_stack(StackName=cfg.stack_name)
+        cfn.get_waiter("stack_delete_complete").wait(
+            StackName=cfg.stack_name,
+            WaiterConfig={"Delay": 15, "MaxAttempts": 80},
+        )
+    except (ClientError, WaiterError) as exc:
+        log_error(f"Stack delete retry failed: {exc}")
+        return False
+    return True
+
+
 def cmd_cleanup(aws: Aws, cfg: Config) -> None:
     log_step("Cleanup: Delete Stack and ECR Repository")
 
     log_info("This will delete:")
-    log_info(f"  - CDK stack: {cfg.stack_name}")
-    log_info(f"  - ECR repository: {cfg.ecr_repo_name}")
+    log_info(f"  - AgentCore runtime and CDK stack: {cfg.stack_name}")
+    log_info(f"  - Secrets Manager secret: {secret_name(cfg)}")
+    log_info(f"  - ECR repository: {cfg.ecr_repo_name} (confirmed separately)")
     print()
 
     reply = input("Are you sure you want to proceed? (y/N): ")
@@ -843,25 +925,38 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
         log_info("Cleanup cancelled")
         return
 
+    stack_deleted = True
     if stack_exists(aws, cfg):
+        _delete_agent_runtime(aws, cfg)
+
         log_info(f"Deleting CDK stack: {cfg.stack_name}")
         setup_cdk_deps()
-        subprocess.run(
+        result = subprocess.run(
             ["cdk", "destroy", cfg.stack_name, "--force"],
             cwd=CDK_DIR,
             env=_cdk_env(cfg),
-            check=True,
         )
-        log_success("Stack deleted")
+        # A failed destroy must not strand the ECR and secret cleanup below, so
+        # this reports at the end rather than raising here.
+        stack_deleted = result.returncode == 0 or _retry_stack_delete(aws, cfg)
+        if stack_deleted:
+            log_success("Stack deleted")
     else:
         log_info("Stack does not exist, skipping")
 
     if ecr_repo_exists(aws, cfg):
-        log_info(f"Deleting ECR repository: {cfg.ecr_repo_name}")
-        aws.client("ecr").delete_repository(
-            repositoryName=cfg.ecr_repo_name, force=True
+        log_info(
+            f"ECR repository '{cfg.ecr_repo_name}' is shared by every env suffix - "
+            "deleting it removes the image other deployments run on."
         )
-        log_success("ECR repository deleted")
+        reply = input(f"Delete ECR repository '{cfg.ecr_repo_name}'? (y/N): ")
+        if reply[:1] in ("y", "Y"):
+            aws.client("ecr").delete_repository(
+                repositoryName=cfg.ecr_repo_name, force=True
+            )
+            log_success("ECR repository deleted")
+        else:
+            log_info("Leaving ECR repository in place")
     else:
         log_info("ECR repository does not exist, skipping")
 
@@ -873,6 +968,15 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
         log_success("Secret deleted")
     else:
         log_info("Secret does not exist, skipping")
+
+    if not stack_deleted:
+        log_error(f"Stack '{cfg.stack_name}' was not deleted.")
+        log_error("Everything else was cleaned up. Check the stack events with:")
+        log_error(
+            f"  aws cloudformation describe-stack-events "
+            f"--stack-name {cfg.stack_name} --max-items 20"
+        )
+        raise DeployError("stack delete failed")
 
     log_success("Cleanup complete")
 

@@ -1,0 +1,15 @@
+[project]
+name = "sec-filings-graphrag-demo"
+version = "0.1.0"
+description = "A small SEC-filings GraphRAG retrieval comparison using Neo4j and Amazon Bedrock"
+requires-python = ">=3.10"
+dependencies = [
+    "ipykernel",
+    "neo4j",
+    "neo4j-graphrag[bedrock]>=1.18",
+    "pypdf",
+    "python-dotenv",
+]
+
+[tool.uv]
+package = false

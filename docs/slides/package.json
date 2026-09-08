@@ -16,6 +16,7 @@
     "@marp-team/marp-cli": "^4.5.1"
   },
   "overrides": {
-    "@puppeteer/browsers": "3.2.2"
+    "@puppeteer/browsers": "3.2.2",
+    "@xmldom/xmldom": "0.9.12"
   }
 }

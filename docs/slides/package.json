@@ -13,6 +13,9 @@
     "serve": "npm run build:all && python3 -m http.server 8080 --directory build"
   },
   "devDependencies": {
-    "@marp-team/marp-cli": "^4.2.3"
+    "@marp-team/marp-cli": "^4.5.1"
+  },
+  "overrides": {
+    "@puppeteer/browsers": "3.2.2"
   }
 }

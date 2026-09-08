@@ -2,8 +2,9 @@
 
 This notebook builds a deterministic graph from NVIDIA and Amazon 10-K
 filings. It is the small, learning-focused introduction to GraphRAG in this
-repository. The retrieval comparison is completed in later implementation
-phases.
+repository. It currently includes graph ingestion and all four retrieval
+strategies; the compact comparison and final grounded answer are completed in
+a later implementation phase.
 
 ## Requirements
 

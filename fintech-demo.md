@@ -294,61 +294,79 @@ checkout.
 
 ### Phase 1: Scaffold the sample
 
-**Status:** Pending
+**Status:** Complete
 
 **Outcome:** The sample has a minimal, installable structure with all required
 local inputs.
 
-- [ ] Create the `sec-filings-graphrag-demo` directory and proposed files.
-- [ ] Copy only the NVIDIA and Amazon filings into its `data` directory.
-- [ ] Define the direct runtime dependencies and generate the lockfile.
-- [ ] Add a minimal environment-variable sample with Neo4j and AWS settings.
-- [ ] Confirm a clean environment can create and select the notebook kernel.
+- [x] Create the `sec-filings-graphrag-demo` directory and proposed files.
+- [x] Copy only the NVIDIA and Amazon filings into its `data` directory.
+- [x] Define the direct runtime dependencies and generate the lockfile.
+- [x] Add a minimal environment-variable sample with Neo4j and AWS settings.
+- [x] Confirm a clean environment can create and select the notebook kernel.
 
 **Validation:** Installation succeeds from a clean checkout and the notebook
 can import every required package.
 
+**Progress:** The scaffold, two local PDFs, environment sample, direct
+dependencies, and lockfile are present. A fresh environment was created with
+the current Python 3.14 runtime; all required imports passed and a temporary
+Jupyter kernelspec was created successfully.
+
 ### Phase 2: Build the deterministic graph
 
-**Status:** Pending
+**Status:** Complete
 
 **Outcome:** Running the ingestion cells creates the same document graph on
 every clean run.
 
-- [ ] Load and validate the two filing metadata records and PDF paths.
-- [ ] Extract text, split it into ordered chunks, and assign deterministic
+- [x] Load and validate the two filing metadata records and PDF paths.
+- [x] Extract text, split it into ordered chunks, and assign deterministic
   chunk IDs.
-- [ ] Generate embeddings with one named model configuration.
-- [ ] Write Company, Document, and Chunk nodes with their three relationship
+- [x] Generate embeddings with one named model configuration.
+- [x] Write Company, Document, and Chunk nodes with their three relationship
   types using parameterized queries.
-- [ ] Add the disabled-by-default reset and the non-empty-database guard.
-- [ ] Stop immediately with a useful error if either filing fails.
-- [ ] Report concise node and relationship counts after ingestion.
+- [x] Add the disabled-by-default reset and the non-empty-database guard.
+- [x] Stop immediately with a useful error if either filing fails.
+- [x] Report concise node and relationship counts after ingestion.
 
 **Validation:** The graph contains exactly two Company and two Document nodes;
 all chunks have text, embeddings, IDs, document links, and the expected reading
 order.
 
+**Progress:** The notebook validates both metadata records and bundled PDFs,
+extracts 83 NVIDIA chunks and 56 Amazon chunks deterministically, generates
+1024-dimensional Titan embeddings, and writes the graph in one transaction.
+An offline service simulation verified 139 unique chunk IDs, 139 document
+links, and 137 correctly ordered `NEXT_CHUNK` links. Live Bedrock and Neo4j
+validation remains part of Phase 5.
+
 ### Phase 3: Add the four retrieval patterns
 
-**Status:** Pending
+**Status:** Complete
 
 **Outcome:** One shared interface runs the same question through four distinct
 retrieval strategies.
 
-- [ ] Create and await the vector and full-text indexes.
-- [ ] Implement vector retrieval with `VectorRetriever`.
-- [ ] Implement graph-enriched vector retrieval with
+- [x] Create and await the vector and full-text indexes.
+- [x] Implement vector retrieval with `VectorRetriever`.
+- [x] Implement graph-enriched vector retrieval with
   `VectorCypherRetriever`.
-- [ ] Implement keyword retrieval with one full-text query.
-- [ ] Implement hybrid graph retrieval with `HybridCypherRetriever`.
-- [ ] Normalize results into rank, score, chunk ID, and text preview.
-- [ ] Include company, ticker, and adjacent context only when graph enrichment
+- [x] Implement keyword retrieval with one full-text query.
+- [x] Implement hybrid graph retrieval with `HybridCypherRetriever`.
+- [x] Normalize results into rank, score, chunk ID, and text preview.
+- [x] Include company, ticker, and adjacent context only when graph enrichment
   supplies them.
 
 **Validation:** Both questions return results from all four strategies; every
 result has a chunk ID, and graph-enriched results contain the expected source
 and neighboring context.
+
+**Progress:** The notebook creates and awaits `chunkEmbeddings` and
+`search_chunks`, defines all four strategies behind one `retrieve` helper, and
+normalizes their result shape. The notebook is valid JSON and all four current
+code cells parse on Python 3.14. Live result validation still requires the
+configured Neo4j database and Bedrock access.
 
 ### Phase 4: Finish the teaching flow
 

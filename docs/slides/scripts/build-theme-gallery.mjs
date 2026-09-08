@@ -40,11 +40,22 @@ const decks = readdirSync(SLIDE_DIR)
 
     return {
       file,
+      source: join(SLIDE_DIR, file),
       order,
       title,
       output: file.replace(/\.md$/, ".html"),
       description: descriptions[file] ?? `${title} slide deck.`,
     };
+  })
+  .concat({
+    file: "semantic-slides.md",
+    source: "../../slides/semantic-slides.md",
+    order: "07",
+    title: "Enterprise Knowledge Layer",
+    output: "semantic-slides.html",
+    description:
+      "AWS, Neo4j, data query patterns, and an enterprise knowledge layer for AI agents.",
+    assets: ["../../slides/semantic-reference-architecture.svg"],
   });
 
 const requested = process.argv[2] ?? "all";
@@ -68,7 +79,7 @@ for (const deck of selected) {
   execFileSync(
     "marp",
     [
-      join(SLIDE_DIR, deck.file),
+      deck.source,
       "-o",
       join("build", deck.output),
       "--html",
@@ -85,6 +96,12 @@ for (const deck of selected) {
 const imagesDir = join(SLIDE_DIR, "images");
 if (existsSync(imagesDir)) {
   cpSync(imagesDir, join("build", "images"), { recursive: true });
+}
+
+for (const deck of selected) {
+  for (const asset of deck.assets ?? []) {
+    copyFileSync(asset, join("build", asset.split("/").at(-1)));
+  }
 }
 
 writeFileSync(join("build", ".nojekyll"), "");

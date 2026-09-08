@@ -10,6 +10,8 @@ The core workflow centers on:
 
 📊 **[View the presentation slides](https://neo4j-partners.github.io/aws-starter/)**: a seven-part deck covering the aircraft graph data model, dual data architecture, GraphRAG, graph-enriched search, Neo4j Aura and agents, the Neo4j MCP server, and the AWS AgentCore architecture.
 
+🧠 **[View the Enterprise Knowledge Layer slides](https://neo4j-partners.github.io/aws-starter/semantic-slides.html)**: an introduction to AWS and Neo4j, generative AI, data query patterns, and the enterprise knowledge layer.
+
 For a detailed explanation of how all the pieces fit together, see the **[Architecture Documentation](./docs/ARCHITECTURE.md)** which includes Mermaid diagrams, component descriptions, and end-to-end request flows.
 
 ---

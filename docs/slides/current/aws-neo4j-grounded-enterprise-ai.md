@@ -205,6 +205,54 @@ li {
 
 ---
 
+<!-- _class: knowledge-slide -->
+
+## AWS Glue stays tabular while Neo4j receives Cypher
+
+<div class="cols">
+<div>
+
+### Runtime path
+
+```text
+Glue Visual ETL
+  └─ SQL / JDBC → connector + translator
+                         └─ Cypher / Bolt → Neo4j
+```
+
+- Driver: `org.neo4j.jdbc.Neo4jDriver`
+- Enable: `enableSQLTranslation=true`
+
+</div>
+<div>
+
+### The mapping in practice
+
+```text
+Movie                     → (:Movie)
+title                     → .title
+Person_ACTED_IN_Movie     →
+(:Person)-[:ACTED_IN]->(:Movie)
+```
+
+```sql
+SELECT m.title FROM Movie m
+```
+
+```cypher
+MATCH (m:Movie)
+RETURN m.title
+```
+
+</div>
+</div>
+
+<div class="callout"><strong>Model first:</strong> Glue expects queryable metadata. Define labels, relationship types, and properties; load nodes before relationships. Only supported SQL constructs are translated.</div>
+
+<small>Sources: [Neo4j Connector for AWS Glue](https://neo4j.com/docs/neo4j-aws-glue/), [Getting Started](https://neo4j.com/docs/neo4j-aws-glue/getting-started/), [JDBC SQL-to-Cypher translation](https://neo4j.com/docs/jdbc-manual/current/sql2cypher/), and [connector announcement](https://neo4j.com/blog/developer/neo4j-connector-for-aws-glue/)</small>
+
+---
+
 ![bg contain](./neo4j-in-aws.svg)
 
 ---
@@ -334,14 +382,14 @@ Agent C → open account balance
 
 ## A Context Graph turns enterprise knowledge into the right context now
 
-<p class="overview">For a specific user, task, workflow, or decision, it connects governed knowledge with current state and relevant experience.</p>
+<p class="overview">The Knowledge Layer is the same for everyone. A Context Graph is what a single request pulls out of it.</p>
 
 <div class="cols">
 <div>
 
-- **Knowledge graph:** Business meaning, entities, relationships, source mappings, and policy.
-- **Situational context:** The request, user, permissions, workflow state, and current facts.
-- **Memory and traces:** Prior interactions, evidence, decisions, outcomes, and feedback.
+- **The Knowledge Layer:** Standing meaning, governed facts, and memory are already in place before anyone asks.
+- **This request's situation:** The user, permissions, task, and workflow state narrow the layer to what is relevant.
+- **Assembled, then discarded:** The layer persists. The Context Graph exists for one request.
 
 <div class="callout"><strong>Knowledge Graph:</strong> What do these connections mean?<br><strong>Context Graph:</strong> What matters right now?</div>
 

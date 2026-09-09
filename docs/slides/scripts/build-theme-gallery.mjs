@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -22,12 +23,6 @@ const activeDecks = [
     output: "aws-neo4j-grounded-enterprise-ai.html",
     description:
       "How AWS and Neo4j combine governed data, connected context, semantic discovery, and agent memory for grounded enterprise AI.",
-    assets: [
-      "current/aws-neo4j-layer-map.svg",
-      "current/exec-knowledge-layer.svg",
-      "current/neocarta.svg",
-      "current/neo4j-agent-memory-diagram.svg",
-    ],
   },
   {
     file: "fraud-data-architecture.md",
@@ -37,10 +32,6 @@ const activeDecks = [
     output: "fraud-data-architecture.html",
     description:
       "How AWS transaction evidence and Neo4j connected context work together to expose a fraud ring.",
-    assets: [
-      "current/dual-data-architecture-aws.svg",
-      "current/fraud-ring-property-graph-detailed.svg",
-    ],
   },
   {
     file: "neocarta-slides.md",
@@ -50,7 +41,6 @@ const activeDecks = [
     output: "neocarta-slides.html",
     description:
       "How Neocarta builds and serves a semantic map in Neo4j, plus an architectural comparison with Rosetta SDL.",
-    assets: ["current/neocarta.svg"],
   },
 ];
 
@@ -134,8 +124,14 @@ for (const deck of selected) {
 }
 
 for (const deck of selected) {
-  for (const asset of deck.assets ?? []) {
-    copyFileSync(asset, join("build", asset.split("/").at(-1)));
+  if (!deck.source.startsWith("current/")) {
+    continue;
+  }
+
+  for (const asset of localImageAssets(deck.source)) {
+    const destination = join(dirname(join("build", deck.output)), asset.href);
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(asset.source, destination);
   }
 }
 
@@ -157,6 +153,29 @@ if (requested === "all") {
     join("build", "slides.html"),
   );
   writeFileSync(join("build", "index.html"), renderIndex());
+}
+
+function localImageAssets(source) {
+  const sourceDirectory = dirname(source);
+  const markdown = readFileSync(source, "utf8");
+  const assets = new Map();
+  const imagePattern = /!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/g;
+
+  for (const match of markdown.matchAll(imagePattern)) {
+    const href = match[1].replace(/[?#].*$/, "");
+
+    if (!href || /^(?:[a-z][a-z\d+.-]*:|\/\/|\/|#)/i.test(href)) {
+      continue;
+    }
+
+    const asset = join(sourceDirectory, href);
+    if (!existsSync(asset)) {
+      throw new Error(`Image referenced by ${source} was not found: ${href}`);
+    }
+    assets.set(href, { href, source: asset });
+  }
+
+  return assets.values();
 }
 
 function renderIndex() {

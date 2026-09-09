@@ -15,30 +15,42 @@ const ARCHIVE_DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
 
 const activeDecks = [
   {
-    file: "neocarta-slides.md",
-    source: "current/neocarta-slides.md",
-    order: "01",
-    title: "Neocarta: A Semantic Map for Enterprise Data",
-    output: "neocarta-slides.html",
-    description:
-      "How Neocarta builds and serves a semantic map in Neo4j, plus an architectural comparison with Rosetta SDL.",
-    assets: ["current/neocarta.svg"],
-  },
-  {
     file: "aws-neo4j-grounded-enterprise-ai.md",
     source: "current/aws-neo4j-grounded-enterprise-ai.md",
-    order: "02",
+    order: "01",
     title: "AWS + Neo4j: Connected Context for Grounded Enterprise AI",
     output: "aws-neo4j-grounded-enterprise-ai.html",
     description:
       "How AWS and Neo4j combine governed data, connected context, semantic discovery, and agent memory for grounded enterprise AI.",
     assets: [
       "current/aws-neo4j-layer-map.svg",
-      "current/dual-data-architecture-aws.svg",
       "current/exec-knowledge-layer.svg",
       "current/neocarta.svg",
       "current/neo4j-agent-memory-diagram.svg",
     ],
+  },
+  {
+    file: "fraud-data-architecture.md",
+    source: "current/fraud-data-architecture.md",
+    order: "02",
+    title: "Fraud Data Architecture",
+    output: "fraud-data-architecture.html",
+    description:
+      "How AWS transaction evidence and Neo4j connected context work together to expose a fraud ring.",
+    assets: [
+      "current/dual-data-architecture-aws.svg",
+      "current/fraud-ring-property-graph-detailed.svg",
+    ],
+  },
+  {
+    file: "neocarta-slides.md",
+    source: "current/neocarta-slides.md",
+    order: "03",
+    title: "Neocarta: A Semantic Map for Enterprise Data",
+    output: "neocarta-slides.html",
+    description:
+      "How Neocarta builds and serves a semantic map in Neo4j, plus an architectural comparison with Rosetta SDL.",
+    assets: ["current/neocarta.svg"],
   },
 ];
 

@@ -6,8 +6,9 @@ This directory builds the Marp presentation gallery published through GitHub Pag
 
 The gallery builds these editable sources from `docs/slides/current/`:
 
-- `docs/slides/current/neocarta-slides.md`
 - `docs/slides/current/aws-neo4j-grounded-enterprise-ai.md`
+- `docs/slides/current/fraud-data-architecture.md`
+- `docs/slides/current/neocarta-slides.md`
 
 The supporting SVG files remain beside the Markdown sources so local Marp preview continues to work. Presentation outlines and supporting notes live in `docs/slides/planning/`.
 
@@ -27,7 +28,7 @@ npm run serve
 
 Open <http://localhost:8080/> to view the gallery.
 
-For a live Marp preview of the two current source decks:
+For a live Marp preview of the current source decks:
 
 ```bash
 npm run preview

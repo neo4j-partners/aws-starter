@@ -11,8 +11,9 @@ if (!supportedFormats.has(format)) {
 }
 
 const decks = [
-  "current/neocarta-slides.md",
   "current/aws-neo4j-grounded-enterprise-ai.md",
+  "current/fraud-data-architecture.md",
+  "current/neocarta-slides.md",
 ];
 
 const assets = [

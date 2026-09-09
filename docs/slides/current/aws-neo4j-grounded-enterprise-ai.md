@@ -66,38 +66,6 @@ section.lead h2 {
   max-width: 980px;
 }
 
-section.fraud-overview {
-  padding: 24px 48px;
-}
-
-section.fraud-overview h2 {
-  margin: 0 0 8px;
-}
-
-section.fraud-overview p {
-  margin: 0;
-  text-align: center;
-}
-
-section.data-sources-overview {
-  padding: 24px 64px;
-}
-
-section.data-sources-overview h2 {
-  margin: 0 0 8px;
-}
-
-section.data-sources-overview p {
-  margin: 0;
-  text-align: center;
-}
-
-section.data-sources-overview .callout {
-  font-size: 22px;
-  margin-top: 8px;
-  padding: 8px 18px;
-}
-
 .promise {
   color: #475569;
   font-size: 21px;
@@ -218,45 +186,7 @@ Connected result without a full data copy
 
 <!-- _class: lead -->
 
-# What data lives where?
-
-## A fraud investigation needs authoritative evidence and connected context
-
----
-
-## A fraud ring shows why an investigation needs both views
-
-One transfer can look ordinary. Its connections can reveal coordinated activity.
-
-```text
-Customer A → Account A → Device X ← Account B ← Customer B
-
-Account A → Account B → Account C → Account A
-```
-
-- **Shared identity signal:** Two customers use the same device.
-- **Circular movement:** Funds return to the starting account.
-- **Corroborating evidence:** Phone numbers, addresses, merchants, and timing strengthen or weaken the case.
-
-<div class="callout"><strong>Investigation question:</strong> Which accounts form a circular payment chain, and what AWS activity makes that chain unusual?</div>
-
----
-
-<!-- _class: data-sources-overview -->
-
-## Keep transaction evidence in AWS and connected context in Neo4j
-
-![w:940](./dual-data-architecture-aws.svg)
-
-<div class="callout"><strong>Two query paths:</strong> Athena retrieves AWS transactions; Cypher traverses connected context in Neo4j.</div>
-
----
-
-<!-- _class: fraud-overview -->
-
-## The fraud ring as a property graph
-
-![h:600](./fraud-ring-property-graph-detailed.svg)
+# Enterprise Knowledge Layer
 
 ---
 

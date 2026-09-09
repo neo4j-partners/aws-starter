@@ -108,6 +108,48 @@ section.lead h2 {
   margin: 6px 0;
 }
 
+section.knowledge-slide {
+  padding: 40px 56px;
+}
+
+section.knowledge-slide h2 {
+  margin-bottom: 8px;
+}
+
+section.knowledge-slide .overview {
+  color: #475569;
+  font-size: 23px;
+  margin: 0 0 12px;
+}
+
+section.knowledge-slide .cols {
+  align-items: center;
+  gap: 24px;
+  grid-template-columns: 0.95fr 1.05fr;
+}
+
+section.knowledge-slide ul {
+  font-size: 21px;
+  margin: 4px 0 0;
+  padding-left: 24px;
+}
+
+section.knowledge-slide li {
+  margin: 9px 0;
+}
+
+section.knowledge-slide img {
+  display: block;
+  margin: 0 auto;
+}
+
+section.knowledge-slide pre {
+  background: #f8fafc;
+  border: 2px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 18px;
+}
+
 li {
   opacity: 1 !important;
   visibility: visible !important;
@@ -161,6 +203,228 @@ li {
 
 ---
 
+![bg contain](./neo4j%20in%20aws.svg)
+
+---
+
+<!-- _class: lead -->
+
+# Enterprise Knowledge Layer
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## A shared Knowledge Layer makes connected context reusable
+
+<p class="overview">Keep meaning in one governed layer so every agent uses consistent definitions and rules.</p>
+
+<div class="cols">
+<div>
+
+- **Knowledge Layer:** Provides one governed place for enterprise knowledge.
+- **Business meaning:** Defines shared terms, relationships, and rules.
+- **Connected context:** Links concepts to data, policies, owners, and processes.
+- **Lighter agents:** Query the shared layer when they need context.
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-lighter-agents-compact.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## Three parts ground every answer
+
+<p class="overview">Combine business meaning, enterprise data, and past experience.</p>
+
+<div class="cols">
+<div>
+
+- **Knowledge Layer ontology:** Connects business concepts to systems, processes, policies, and owners.
+- **Enterprise data:** Supplies governed facts from authoritative systems.
+- **Memory:** Stores previous actions, decisions, and results.
+- **Decision trace:** Records the evidence and reasoning behind each result.
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-three-parts-compact.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## The Knowledge Layer turns each request into a governed action plan
+
+<p class="overview">The layer grounds the request. The agent or application executes the plan.</p>
+
+<div class="cols">
+<div>
+
+- **Interpret intent:** Resolve the business meaning of the request.
+- **Select sources and tools:** Choose authoritative systems and generate their queries.
+- **Apply policy:** Limit the plan to permitted data and actions.
+- **Explain result:** Return the sources, evidence, and decision path.
+- **Update memory:** Store useful outcomes for future requests.
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-request-flow-compact.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## Start with meaning, then add data and memory
+
+<p class="overview">Begin with shared meaning and mappings. Add graph data and memory when the use case needs them.</p>
+
+<div class="cols">
+<div>
+
+- **Ontology-Based Semantic Layer:** Defines concepts, maps sources, and routes tools.
+- **Query in place:** Keeps AWS data in its source system.
+- **Materialized data:** Stores repeated or graph-heavy data in Neo4j when speed matters.
+- **Memory:** Uses prior decisions to improve future actions.
+
+</div>
+<div>
+
+```text
+Ontology-Based Semantic Layer
+  meaning + mappings + tools
+              ↓
+   query external data in place
+              ↓
+   add graph data when useful
+              ↓
+     add memory over time
+              ↓
+    full Knowledge Layer
+```
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+## Policy and prior decisions make each result explainable
+
+```text
+Finding → business meaning → policy → prior decision → evidence
+```
+
+- **Explain the result:** Link each finding to its meaning, policy, and evidence.
+- **Reuse prior work:** Find similar decisions, evidence, and outcomes.
+- **Keep the path inspectable:** Let reviewers trace each answer back to governed sources.
+
+| Adjacent AWS capability | What Neo4j adds |
+| --- | --- |
+| **Amazon Bedrock Knowledge Bases** retrieves relevant passages from documents. | **Enterprise Knowledge Layer** queries connected business concepts, relationships, provenance, and prior decisions. |
+
+---
+
+<!-- _class: lead -->
+
+# Agent Memory
+
+## Make facts, relationships, decisions, and evidence reusable across agent interactions
+
+---
+
+## Agent Memory preserves facts, context, and reasoning
+
+![w:760](./neo4j-agent-memory-diagram.svg)
+
+<div class="callout"><strong>Long-term model:</strong> POLE+O represents Person, Object, Location, Event, and Organization. Temporal validity records when a fact was true.</div>
+
+<!-- Source: https://github.com/neo4j-labs/agent-memory -->
+
+---
+
+## Neo4j Agent Memory
+
+The [Neo4j Labs agent-memory](https://neo4j.com/labs/agent-memory/) library backs agent memory with a graph.
+
+- **Three memory types:** Short-term conversations, long-term knowledge using the [POLE+O model](https://neo4j.com/labs/agent-memory/explanation/poleo-model), and reasoning traces.
+- **Entity resolution:** Extracts and deduplicates entities instead of accumulating append-only blobs.
+- **Per-user scoping:** The core API's `user_identifier=` isolates memory for each user across sessions.
+- **Pluggable:** Integrates with Strands, LangChain, other frameworks, and an MCP server.
+
+<!-- Source: docs/slides/archive/aws-in-depth/01-neo4j-for-agentic-ai-slides.md -->
+
+---
+
+## Example: The Finance Agent
+
+`neo4j-agentcore-agents/finance-agent` wires memory into a Strands agent as tools.
+
+- **`core/memory.py`:** Provides a user-scoped wrapper around the library's context-graph tools.
+- **Four tools:** `search_context`, `add_memory`, `get_user_preferences`, and `get_entity_graph`.
+- **Per-user isolation:** Every write links a `:User` node; recall stays scoped to that user across sessions.
+- **Graph through MCP:** Reaches Neo4j through the MCP server and AgentCore Gateway with OAuth 2.0 and an automatically refreshed token.
+- **One graph stack:** Memory lives in Neo4j alongside the domain knowledge graph.
+
+<!-- Source: docs/slides/archive/aws-in-depth/01-neo4j-for-agentic-ai-slides.md -->
+
+---
+
+## Graph memory makes each result inspectable and reusable
+
+- **Short-term memory:** Keep the active conversation and investigation session.
+- **Long-term memory:** Store entities, facts, relationships, and temporal context.
+- **Reasoning memory:** Record tool calls, evidence, decision traces, and feedback.
+- **Reusable outcomes:** Connect a confirmed result to the policies, patterns, and evidence that supported it.
+
+| Adjacent AWS capability | What Neo4j adds |
+| --- | --- |
+| **AgentCore Memory** provides managed short-term and long-term memory for AWS agents. | **Neo4j Agent Memory** makes entities, relationships, temporal facts, and reasoning traces directly traversable. |
+
+<div class="callout"><strong>Integration:</strong> Use the Strands Agents SDK integration to add graph-native memory to an AWS agent.</div>
+
+---
+
+## These capabilities meet inside an AWS-hosted agent workflow
+
+![w:1160](./aws-hosted-agent-knowledge-layer-workflow.svg)
+
+<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway manages tool access and OAuth 2.0. Each source service enforces data access.</div>
+
+---
+
+<!-- _class: lead -->
+
+# Virtual Graph
+
+## Query connected views of governed AWS data without moving every record into Neo4j
+
+---
+
+![bg contain](./virtual-graph.png)
+
+---
+
 ## Virtual Graph will extend Cypher to governed AWS tables in place
 
 ```text
@@ -184,120 +448,6 @@ Connected result without a full data copy
 
 ---
 
-<!-- _class: lead -->
-
-# Enterprise Knowledge Layer
-
----
-
-## A shared knowledge layer makes connected context reusable
-
-![w:700](./exec-knowledge-layer.svg)
-
-<div class="callout"><strong>Purpose:</strong> Connect business meaning, data assets, policies, provenance, and prior decisions in one governed graph.</div>
-
-<!-- Source: https://neo4j.com/blog/agentic-ai/enterprise-knowledge-layer/ -->
-
----
-
-## Policy and precedent make each graph finding explainable
-
-```text
-Alert
-  → suspicious graph pattern
-  → fraud typology
-  → governing policy
-  → prior investigation
-  → evidence and outcome
-```
-
-- **Explain the finding:** Link the alert to the pattern and policy that make it significant.
-- **Reuse prior work:** Find similar investigations, evidence, decisions, and outcomes.
-- **Keep the path inspectable:** Let reviewers trace each answer back to governed sources.
-
-| Adjacent AWS capability | What Neo4j adds |
-| --- | --- |
-| **Amazon Bedrock Knowledge Bases** retrieves relevant passages from documents. | **Enterprise Knowledge Layer** queries connected business concepts, relationships, provenance, and prior decisions. |
-
----
-
-## NeoCarta builds a semantic map from metadata and usage
-
-![w:850](./neocarta.svg)
-
-<div class="callout"><strong>Inputs:</strong> Catalog metadata, business glossary terms, and query-usage lineage. <strong>Output:</strong> An embedded Neo4j semantic graph exposed through MCP.</div>
-
-<!-- Source: https://github.com/neo4j-labs/neocarta -->
-
----
-
-## The semantic map improves discovery, routing, and SQL generation
-
-```text
-Business question
-   → governed business term
-   → approved table and columns
-   → known join path
-   → generated SQL
-   → cited result
-```
-
-- **Data discovery:** Find physical assets from the language a customer uses.
-- **Query routing:** Select the catalog, dataset, and query tool that fit the question.
-- **Text-to-SQL:** Give the agent table meaning and known joins before query generation.
-
-<div class="callout"><strong>AWS adjacency:</strong> Glue Data Catalog and SageMaker Catalog stay authoritative. <span class="status-roadmap">Planned NeoCarta metadata support</span> differs from the available AWS Glue ETL connector.</div>
-
-<small>NeoCarta is a Neo4j Labs project supported by the Neo4j field team. It is not a Neo4j product.</small>
-
----
-
-## Agent Memory preserves facts, context, and reasoning
-
-![w:760](./neo4j-agent-memory-diagram.svg)
-
-<div class="callout"><strong>Long-term model:</strong> POLE+O represents Person, Object, Location, Event, and Organization. Temporal validity records when a fact was true.</div>
-
-<!-- Source: https://github.com/neo4j-labs/agent-memory -->
-
----
-
-## Graph memory makes each result inspectable and reusable
-
-- **Short-term memory:** Keep the active conversation and investigation session.
-- **Long-term memory:** Store entities, facts, relationships, and temporal context.
-- **Reasoning memory:** Record tool calls, evidence, decision traces, and feedback.
-- **Reusable outcomes:** Connect a confirmed result to the policies, patterns, and evidence that supported it.
-
-| Adjacent AWS capability | What Neo4j adds |
-| --- | --- |
-| **AgentCore Memory** provides managed short-term and long-term memory for AWS agents. | **Neo4j Agent Memory** makes entities, relationships, temporal facts, and reasoning traces directly traversable. |
-
-<div class="callout"><strong>Integration:</strong> Use the Strands Agents SDK integration to add graph-native memory to an AWS agent.</div>
-
----
-
-## These capabilities meet inside an AWS-hosted agent workflow
-
-```text
-User question
-     ↓
-AgentCore Runtime + Strands agent
-     ↓
-Amazon Bedrock model
-     ↓ selects a tool through AgentCore Gateway
-     ├─ Neo4j MCP → Cypher over persisted graph
-     ├─ SQL tool  → Athena over S3 tables
-     ├─ Document retrieval
-     └─ Enterprise API
-     ↓
-Answer with evidence and provenance
-```
-
-<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway manages tool access and OAuth 2.0. Each source service enforces data access.</div>
-
----
-
 ## Virtual Graph fits inside a multi-tool knowledge layer
 
 | Retrieval need | Route | Best fit |
@@ -309,12 +459,6 @@ Answer with evidence and provenance
 | **Operational action** | Enterprise API | Case updates, alerts, approvals, and workflow steps |
 
 <div class="callout"><strong>Design rule:</strong> The knowledge layer selects the right path. Each source remains responsible for execution and access control.</div>
-
----
-
-## Together, connected knowledge grounds the AWS agent stack
-
-![w:1160](./aws-neo4j-layer-map.svg#complete)
 
 ---
 
@@ -332,20 +476,6 @@ Answer with evidence and provenance
 
 ---
 
-## Position current capabilities separately from preview and roadmap
-
-| Status | Capabilities |
-| --- | --- |
-| <span class="status-now">Available now</span> | AuraDB on AWS; Cypher and Graph Data Science; Spark, Glue, Kafka, driver, and MCP integration paths; the Enterprise Knowledge Layer pattern; NeoCarta Labs; Neo4j Agent Memory Labs |
-| <span class="status-preview">Public preview</span> | Neo4j Virtual Graph for Snowflake, Databricks, and Google BigQuery |
-| <span class="status-roadmap">In build or planned</span> | Virtual Graph support for AWS S3 Tables and Glue Data Catalog; NeoCarta support for Glue Data Catalog metadata |
-
-<div class="callout"><strong>Position clearly:</strong> Match the customer proposal to the status shown here. Validate preview and roadmap details before making commitments.</div>
-
-<!-- Sources: https://neo4j.com/blog/auradb/neo4j-virtual-graph-is-now-in-public-preview/ and https://github.com/neo4j-labs/neocarta -->
-
----
-
 ## Start with one governed question that needs both views
 
 1. **Find the question:** Choose one investigation that needs AWS transaction evidence and connected Neo4j context.
@@ -355,3 +485,9 @@ Answer with evidence and provenance
 5. **Expand with evidence:** Reuse the proven pattern for the next valuable question.
 
 <div class="callout"><strong>First customer motion:</strong> Ask, “Which governed investigation is slow today because transaction evidence and connected context live in separate places?”</div>
+
+---
+
+## Together, connected knowledge grounds the AWS agent stack
+
+![w:1160](./aws-neo4j-layer-map.svg#complete)

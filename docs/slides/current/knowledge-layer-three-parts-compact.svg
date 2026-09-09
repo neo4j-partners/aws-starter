@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title desc">
+  <title id="title">Inputs to an Enterprise Knowledge Layer</title>
+  <desc id="desc">Ontology, enterprise data, and memory flow into an Enterprise Knowledge Layer.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#0f766e"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      text { font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+      .label { fill: #0f172a; font-size: 27px; font-weight: 700; }
+      .detail { fill: #475569; font-size: 19px; font-weight: 500; }
+      .flow { fill: none; stroke: #0f766e; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .node-line { fill: none; stroke: #0f766e; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <rect width="700" height="760" fill="#ffffff"/>
+
+  <!-- Input cards -->
+  <g filter="url(#shadow)">
+    <rect x="25" y="35" width="300" height="118" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="375" y="35" width="300" height="118" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="200" y="228" width="300" height="118" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+
+  <!-- Ontology -->
+  <g class="node-line">
+    <line x1="63" y1="87" x2="91" y2="70"/>
+    <line x1="63" y1="87" x2="93" y2="109"/>
+    <line x1="91" y1="70" x2="93" y2="109"/>
+    <circle cx="63" cy="87" r="7" fill="#ccfbf1"/>
+    <circle cx="91" cy="70" r="7" fill="#ccfbf1"/>
+    <circle cx="93" cy="109" r="7" fill="#ccfbf1"/>
+  </g>
+  <text x="125" y="87" class="label">Ontology</text>
+  <text x="125" y="118" class="detail">Meaning + rules</text>
+
+  <!-- Enterprise data -->
+  <g fill="#ccfbf1" stroke="#0f766e" stroke-width="3">
+    <ellipse cx="422" cy="69" rx="28" ry="10"/>
+    <path d="M394 69v38c0 6 13 11 28 11s28-5 28-11V69"/>
+    <path d="M394 88c0 6 13 11 28 11s28-5 28-11" fill="none"/>
+  </g>
+  <text x="470" y="87" class="label">Enterprise</text>
+  <text x="470" y="116" class="label">data</text>
+
+  <!-- Memory -->
+  <g fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M247 260a25 25 0 1 1-5 33"/>
+    <path d="M230 279l12 14 15-11"/>
+    <circle cx="247" cy="260" r="5" fill="#ccfbf1"/>
+  </g>
+  <text x="304" y="278" class="label">Memory</text>
+  <text x="304" y="310" class="detail">Actions + outcomes</text>
+
+  <!-- Converging flow -->
+  <path class="flow" d="M175 153 V405 Q175 435 205 435 H235 Q255 435 255 455 V505"/>
+  <path class="flow" d="M525 153 V405 Q525 435 495 435 H465 Q445 435 445 455 V505"/>
+  <path class="flow" d="M350 346 V505"/>
+
+  <!-- Shared layer -->
+  <g filter="url(#shadow)">
+    <rect x="85" y="520" width="530" height="168" rx="24" fill="#ecfeff" stroke="#14b8a6" stroke-width="3"/>
+  </g>
+  <g transform="translate(132 564)" class="node-line">
+    <line x1="8" y1="35" x2="48" y2="10"/>
+    <line x1="8" y1="35" x2="48" y2="62"/>
+    <line x1="48" y1="10" x2="88" y2="35"/>
+    <line x1="48" y1="62" x2="88" y2="35"/>
+    <circle cx="8" cy="35" r="8" fill="#ffffff"/>
+    <circle cx="48" cy="10" r="8" fill="#ffffff"/>
+    <circle cx="48" cy="62" r="8" fill="#ffffff"/>
+    <circle cx="88" cy="35" r="8" fill="#ffffff"/>
+  </g>
+  <text x="255" y="592" fill="#0f172a" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="32" font-weight="750">Enterprise</text>
+  <text x="255" y="633" fill="#0f172a" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="32" font-weight="750">Knowledge Layer</text>
+</svg>

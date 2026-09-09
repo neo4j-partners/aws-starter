@@ -27,6 +27,19 @@ code {
   font-size: 21px;
 }
 
+table {
+  font-size: 20px;
+  width: 100%;
+}
+
+th {
+  background: #e2e8f0;
+}
+
+td, th {
+  padding: 10px 13px;
+}
+
 section.lead {
   background: linear-gradient(135deg, #f8fafc 0%, #ecfeff 100%);
 }
@@ -47,6 +60,24 @@ section.lead h2 {
   border-left: 6px solid #14b8a6;
   margin-top: 18px;
   padding: 12px 18px;
+}
+
+.cols {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: 1fr 1fr;
+}
+
+section.compact {
+  font-size: 23px;
+}
+
+section.compact li {
+  margin: 9px 0;
+}
+
+section.compact .callout {
+  font-size: 21px;
 }
 
 section.data-sources-overview {
@@ -81,6 +112,44 @@ section.fraud-overview p {
   text-align: center;
 }
 
+section.workload-comparison {
+  font-size: 18px;
+  line-height: 1.25;
+  padding: 32px 52px;
+}
+
+section.workload-comparison h2 {
+  font-size: 35px;
+  margin: 0 0 14px;
+}
+
+section.workload-comparison h3 {
+  color: #0f766e;
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+section.workload-comparison ul {
+  margin: 0;
+  padding-left: 22px;
+}
+
+section.workload-comparison li {
+  margin: 7px 0;
+}
+
+section.investigation-flow {
+  font-size: 23px;
+}
+
+section.investigation-flow li {
+  margin: 13px 0;
+}
+
+section.investigation-flow .callout {
+  font-size: 21px;
+}
+
 li {
   opacity: 1 !important;
   visibility: visible !important;
@@ -100,28 +169,30 @@ li {
 One transfer can look ordinary. Its connections can reveal coordinated activity.
 
 ```text
-Customer A → Account A → Device X ← Account B ← Customer B
-
-Account A → Account B → Account C → Account A
+Account ACC-1001 ⇄ Account ACC-2047
+         ↘         ↙
+   742 Evergreen Terrace
 ```
 
-- **Shared identity signal:** Two customers use the same device.
-- **Circular movement:** Funds return to the starting account.
-- **Corroborating evidence:** Phone numbers, addresses, merchants, and timing strengthen or weaken the case.
+- **Shared identity signal:** Accounts belonging to different customers use the same address.
+- **Reciprocal movement:** A $4,200 wire and a $3,800 ACH transfer move in opposite directions.
+- **Corroborating evidence:** Devices, phone numbers, merchants, and timing strengthen or weaken the case.
 
-<div class="callout"><strong>Investigation question:</strong> Which accounts form a circular payment chain, and what AWS activity makes that chain unusual?</div>
+<div class="callout"><strong>Investigation question:</strong> Do the shared address and reciprocal transfers indicate ordinary household activity or coordinated fraud?</div>
 
 ---
 
+<!-- _class: compact -->
+
 ## Why a knowledge graph fits fraud investigations
 
-- **Entities become nodes:** Customers, accounts, devices, addresses, merchants, alerts, and cases.
-- **Connections become relationships:** Owns, uses, transferred to, paid, registered at, and triggered.
-- **The model mirrors the investigation:** Connections are explicit instead of hidden behind foreign keys and join tables.
-- **New context layers in:** Add signals, typologies, policies, and entity types without redesigning the whole model.
-- **One pattern supports many risks:** Apply the same approach to fraud, AML, cyber investigations, and supply-chain risk.
+- **See the full network:** Connect customers, accounts, devices, addresses, merchants, alerts, and cases in one view.
+- **Find hidden relationships:** Reveal shared identifiers and indirect connections that isolated transactions do not show.
+- **Follow the money:** Trace transfers across any number of accounts without knowing the chain length in advance.
+- **Explain why a pattern matters:** Link suspicious activity to known fraud patterns, policies, KYC documents, and prior cases.
+- **Adapt as schemes change:** Add new entities and connections without rebuilding a rigid relational model.
 
-<div class="callout"><strong>Connected domains fit graphs:</strong> The data model follows the network an investigator needs to explore.</div>
+<div class="callout"><strong>Investigator value:</strong> Move from isolated transactions to an evidence-backed view of who is connected, how money moved, and why the pattern matters.</div>
 
 ---
 
@@ -132,6 +203,8 @@ Account A → Account B → Account C → Account A
 ![h:600](./fraud-ring-property-graph-detailed.svg)
 
 ---
+
+<!-- _class: compact -->
 
 ## What the graph enables for investigators
 
@@ -153,13 +226,13 @@ Account A → Account B → Account C → Account A
 <div class="cols">
 <div>
 
-### Amazon Athena: transaction activity over time
+### AWS analytics: transaction activity at scale
 
-- **Aggregation:** Totals, averages, ranges, and standard deviation for amounts and risk scores.
-- **Time-series trends:** Hourly, daily, and monthly rollups by account, merchant, or channel.
-- **Filtering and ranking:** Transactions above P95 and accounts generating the most alerts.
-- **Key-based joins:** Connect transactions to accounts, customers, and merchants.
-- **Dashboards:** Transaction volume, alerts, exposure, losses, and case throughput.
+- **Aggregation:** Athena calculates totals, averages, min/max, and standard deviation for amounts and risk scores.
+- **Time-series trends:** SQL produces hourly, daily, and monthly rollups by account, merchant, or channel.
+- **Filtering and ranking:** SQL finds transactions above P95 and accounts generating the most alerts.
+- **Key-based joins:** Fixed joins connect transactions to accounts, customers, and merchants.
+- **Dashboards:** Amazon QuickSight presents volume, alerts, exposure, losses, and case throughput.
 
 </div>
 <div>
@@ -183,13 +256,15 @@ Account A → Account B → Account C → Account A
 
 ![w:940](./dual-data-architecture-aws.svg)
 
-<div class="callout"><strong>Two query paths:</strong> Athena retrieves AWS transactions; Cypher traverses connected context in Neo4j.</div>
+<div class="callout"><strong>Two query paths:</strong> Athena queries transaction evidence in S3 Tables; Cypher traverses connected context in Neo4j.</div>
 
 ---
 
+<!-- _class: investigation-flow -->
+
 ## One investigation uses both data paths
 
-1. **Detect in AWS:** Athena identifies unusual transactions, accounts, or merchants in governed S3 data.
+1. **Detect in AWS:** SQL in Athena flags unusual transactions, accounts, or merchants in governed S3 data.
 2. **Expand in Neo4j:** The investigation starts from those identifiers and traverses the connected network.
 3. **Find the pattern:** Cypher detects shared identities, circular transfers, and exposed entities.
 4. **Explain the finding:** Policies, fraud typologies, KYC documents, and prior cases establish significance.

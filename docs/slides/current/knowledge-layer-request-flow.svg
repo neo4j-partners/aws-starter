@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">Enterprise Knowledge Layer request flow</title>
+  <desc id="description">A business request moves through intent, source selection, policy, and explanation. The layer uses governed enterprise systems and saves useful outcomes in memory.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrow-slate" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 Z" fill="#64748b"/>
+    </marker>
+    <filter id="shadow" x="-12%" y="-18%" width="124%" height="145%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .eyebrow { font-size: 18px; font-weight: 800; letter-spacing: 2.4px; fill: #0f766e; }
+      .heading { font-size: 38px; font-weight: 760; fill: #0f172a; }
+      .subheading { font-size: 21px; fill: #475569; }
+      .step-number { font-size: 17px; font-weight: 800; fill: #0f766e; }
+      .step-title { font-size: 23px; font-weight: 750; fill: #0f172a; }
+      .step-copy { font-size: 17px; fill: #475569; }
+      .label { font-size: 18px; font-weight: 750; fill: #0f172a; }
+      .small { font-size: 16px; fill: #475569; }
+      .flow { fill: none; stroke: #0f766e; stroke-width: 4; marker-end: url(#arrow); }
+      .support { fill: none; stroke: #64748b; stroke-width: 3; stroke-dasharray: 8 8; marker-end: url(#arrow-slate); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+
+  <text class="eyebrow" x="72" y="75">REQUEST FLOW</text>
+  <text class="heading" x="72" y="124">The Knowledge Layer turns a request into a governed result</text>
+  <text class="subheading" x="72" y="162">Shared meaning and policy guide each step.</text>
+
+  <!-- request and answer -->
+  <g filter="url(#shadow)">
+    <rect x="72" y="274" width="190" height="128" rx="18" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <rect x="1338" y="274" width="190" height="128" rx="18" fill="#ecfeff" stroke="#14b8a6" stroke-width="2"/>
+  </g>
+  <text class="label" x="167" y="326" text-anchor="middle">Business</text>
+  <text class="label" x="167" y="351" text-anchor="middle">request</text>
+  <text class="small" x="167" y="380" text-anchor="middle">Plain language</text>
+  <text class="label" x="1433" y="326" text-anchor="middle">Grounded</text>
+  <text class="label" x="1433" y="351" text-anchor="middle">result</text>
+  <text class="small" x="1433" y="380" text-anchor="middle">Sources included</text>
+
+  <!-- Enterprise Knowledge Layer -->
+  <rect x="292" y="214" width="1016" height="248" rx="24" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="324" y="250" font-size="17" font-weight="800" letter-spacing="1.7" fill="#0f766e">ENTERPRISE KNOWLEDGE LAYER</text>
+
+  <g filter="url(#shadow)">
+    <rect x="324" y="278" width="216" height="134" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="568" y="278" width="216" height="134" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="812" y="278" width="216" height="134" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="1056" y="278" width="216" height="134" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+  </g>
+
+  <text class="step-number" x="346" y="308">01</text>
+  <text class="step-title" x="346" y="344">Interpret intent</text>
+  <text class="step-copy" x="346" y="376">Map words to</text>
+  <text class="step-copy" x="346" y="398">business meaning</text>
+
+  <text class="step-number" x="590" y="308">02</text>
+  <text class="step-title" x="590" y="344">Select sources</text>
+  <text class="step-copy" x="590" y="376">Find approved data</text>
+  <text class="step-copy" x="590" y="398">and tools</text>
+
+  <text class="step-number" x="834" y="308">03</text>
+  <text class="step-title" x="834" y="344">Apply policy</text>
+  <text class="step-copy" x="834" y="376">Check access and</text>
+  <text class="step-copy" x="834" y="398">business rules</text>
+
+  <text class="step-number" x="1078" y="308">04</text>
+  <text class="step-title" x="1078" y="344">Explain result</text>
+  <text class="step-copy" x="1078" y="376">Return evidence and</text>
+  <text class="step-copy" x="1078" y="398">the decision path</text>
+
+  <!-- main request path -->
+  <path class="flow" d="M 262 338 H 314"/>
+  <path class="flow" d="M 540 345 H 558"/>
+  <path class="flow" d="M 784 345 H 802"/>
+  <path class="flow" d="M 1028 345 H 1046"/>
+  <path class="flow" d="M 1272 338 H 1328"/>
+
+  <!-- governed enterprise systems -->
+  <g filter="url(#shadow)">
+    <rect x="292" y="552" width="760" height="192" rx="22" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+  </g>
+  <text class="eyebrow" x="328" y="592" fill="#64748b">GOVERNED ENTERPRISE SYSTEMS</text>
+
+  <rect x="328" y="622" width="200" height="82" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="552" y="622" width="200" height="82" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="776" y="622" width="240" height="82" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text class="label" x="428" y="657" text-anchor="middle">Catalogs</text>
+  <text class="small" x="428" y="684" text-anchor="middle">Meaning and owners</text>
+  <text class="label" x="652" y="657" text-anchor="middle">Data</text>
+  <text class="small" x="652" y="684" text-anchor="middle">Trusted facts</text>
+  <text class="label" x="896" y="657" text-anchor="middle">Policies and tools</text>
+  <text class="small" x="896" y="684" text-anchor="middle">Rules and actions</text>
+
+  <!-- systems support the flow -->
+  <path class="support" d="M 652 552 V 480 H 676 V 422"/>
+  <path class="support" d="M 896 552 V 480 H 920 V 422"/>
+
+  <!-- memory -->
+  <g filter="url(#shadow)">
+    <rect x="1090" y="552" width="438" height="192" rx="22" fill="#ecfeff" stroke="#14b8a6" stroke-width="2"/>
+  </g>
+  <text class="eyebrow" x="1126" y="592">MEMORY</text>
+  <text class="label" x="1126" y="642">Save useful outcomes</text>
+  <text class="small" x="1126" y="677">Reuse prior decisions, evidence,</text>
+  <text class="small" x="1126" y="701">and results in future requests.</text>
+
+  <!-- explained result updates memory -->
+  <path class="flow" d="M 1433 412 V 532"/>
+  <text class="small" x="1460" y="486">Update</text>
+
+  <!-- memory feeds future intent -->
+  <path class="support" d="M 1090 713 H 1038 Q 1010 713 1010 741 V 778 H 432 V 422"/>
+  <text class="small" x="713" y="805" text-anchor="middle">Use prior outcomes in the next request</text>
+</svg>

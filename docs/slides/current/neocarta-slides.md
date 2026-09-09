@@ -156,7 +156,7 @@ queries. It gives an agent the context to write one, and a separate
 database tool executes it. That boundary is the whole design, and it
 comes back in the Rosetta SDL comparison.
 
-Deck structure: ten core slides, then seven optional modules, then a
+Deck structure: eleven core slides, then five optional modules, then a
 close. If we are short on time I drop modules from the back.
 -->
 
@@ -344,33 +344,65 @@ composes, a governed tool executes.
 
 ---
 
+## Extending Neocarta to AWS
+
+| Step | Planned expansion |
+| --- | --- |
+| **Connect** | Add a Glue Data Catalog connector using Neocarta's existing connector contract |
+| **Normalize** | Map AWS databases, tables, columns, and catalog metadata into the shared Neo4j model |
+| **Enrich** | Link AWS assets to business terms, known join paths, and usage evidence |
+| **Serve** | Expose AWS metadata through the same CLI and MCP retrieval tools used across platforms |
+| **Validate** | Prove semantic discovery through governed Athena queries over S3 Tables |
+
+<div class="callout"><strong>Same pattern, new source:</strong> Make Glue a first-class Neocarta source while Glue remains authoritative and Athena remains the query engine. <span class="status-roadmap">Planned:</span> Glue Data Catalog connector.</div>
+
+<!--
+The AWS expansion starts with a Glue Data Catalog connector. That
+closes the current gap in Neocarta's AWS source coverage without creating
+a separate AWS-specific graph model.
+
+The connector will extract Glue metadata and normalize it into Neocarta's
+shared Database, Schema, Table, and Column model. It can then enrich those
+AWS assets with business terms, known joins, and usage evidence.
+
+Once the metadata is in the shared model, the CLI, MCP tools, glossary
+bridge, and retrieval strategies already used for other platforms can
+serve it to agents.
+
+The boundary stays explicit: Glue remains the authoritative catalog,
+Athena executes the query, S3 Tables holds the data, and Neocarta adds
+the semantic context and cross-source relationships.
+-->
+
+---
+
 <!-- _class: section -->
 
 # Neocarta and Rosetta SDL
 
-## The same architecture, reached from opposite directions
+## Where they align, where they differ, and when each fits
 
 <!--
-That is Neocarta. Now the question everybody in this room is going to ask,
-so I want to get to it before the deep dives.
+The AWS target and Glue roadmap establish Neocarta's direction. Rosetta
+SDL is the useful comparison because it implements a deeper AWS-specific
+application around the same semantic-map idea.
 
 There is another Neo4j-based project solving this problem, and it is
 worth knowing about: Rosetta SDL. It is an AWS reference application that
 maps business language onto Glue and Athena metadata in Neo4j and serves
 it to agents. Same core idea, built from the other end.
 
-Neocarta started as a library and grew outward across platforms. Rosetta
-SDL started as a complete AWS application and worked inward to the
-semantic layer. They meet in the middle, at the same runtime shape.
+Neocarta is a cross-platform library and context service. Rosetta SDL is
+a complete AWS reference application. They share a semantic-map
+foundation, then differ in platform scope, execution, and deployment.
 
-Three slides. What they share, where they diverge, and why they compose
-rather than compete. If you are choosing between them, this is the part
-that decides it.
+Three slides: the shared foundation, the primary responsibility
+boundary, then the remaining implementation differences.
 -->
 
 ---
 
-## Building a Semantic Map Is the Core Feature of Both
+## What Neocarta and Rosetta SDL Share
 
 **Rosetta SDL** is an AWS reference application. It maps business language onto Glue and Athena metadata in Neo4j, then serves it to agents over MCP.
 
@@ -396,12 +428,10 @@ Both combine graph traversal with full-text and embedding search rather
 than picking one. And both leave the source data alone, so only metadata
 crosses into the graph.
 
-One correction worth making out loud. An earlier version of this deck
-framed these five as things Neocarta planned to adopt from Rosetta SDL.
-That was wrong. Neocarta ships all five today. The core model carries
-REFERENCES for joins, the Dataplex connector brings BusinessTerm and
-TAGGED_WITH, the query log connector brings Query with USES_TABLE and
-USES_COLUMN, and the MCP server serves business-term-bridged hybrid search.
+Neocarta ships all five today. The core model carries REFERENCES for
+joins, the Dataplex connector brings BusinessTerm and TAGGED_WITH, the
+query log connector brings Query with USES_TABLE and USES_COLUMN, and the
+MCP server serves business-term-bridged hybrid search.
 
 The differences are real and they are on the next slide. They are
 differences of scope, not of what the two projects set out to do.
@@ -409,7 +439,7 @@ differences of scope, not of what the two projects set out to do.
 
 ---
 
-## Where the Two Diverge
+## Where Their Scope and Responsibilities Differ
 
 | | Rosetta SDL | Neocarta |
 | --- | --- | --- |
@@ -421,8 +451,8 @@ differences of scope, not of what the two projects set out to do.
 <div class="callout"><strong>Choose on scope, not features:</strong> One AWS data lake with an admin experience points to Rosetta SDL. Metadata from several platforms behind your own agent points to Neocarta.</div>
 
 <!--
-Four dimensions. There are more, and module B6 has them, but these four
-decide it.
+These four dimensions usually decide the fit. The next slide covers the
+remaining implementation differences.
 
 Product shape. Rosetta SDL is something you deploy: FastAPI service,
 React admin interface, Cognito auth, CDK stack. Neocarta is something you
@@ -440,49 +470,41 @@ fails closed on a parse error. Neocarta parses SQL during query log
 ingestion, but it is not in the execution path, so it cannot be your
 firewall.
 
-That last row sounds like a Neocarta weakness. The next slide argues it is
-the opposite.
+That last row is not a hidden product weakness. It is the consequence of
+Neocarta stopping at context while a separately governed tool owns
+execution.
 -->
 
 ---
 
-## Plan and Execute: Why the Two Compose
+## Other Differences
 
-```text
-Rosetta SDL plan mode          Neocarta by design
-        |                              |
-  plan_query(question)          retrieval tools
-        |                              |
-        v                              v
-  SQL, no execution            context, no execution
-        |                              |
-        +-------------> Agent <--------+
-                          |
-                          v
-              Athena MCP / database MCP / driver
-```
-
-<div class="callout"><strong>Same runtime shape, opposite directions:</strong> Rosetta SDL added a mode that withholds execution. Neocarta started there.</div>
+| | Rosetta SDL | Neocarta |
+| --- | --- | --- |
+| **Metric safety** | Compiles approved metrics to SQL with no LLM, so SQL is reproducible | Stores and retrieves metric definitions for the agent to use |
+| **SQL controls** | sqlglot AST firewall, fails closed, limits allowed tables | Parses SQL at ingestion, not in the execution path |
+| **Documents** | Document metadata and chunk search in S3 Vectors | Structured metadata, glossary, semantic models, query history |
+| **Interfaces** | FastAPI service, React admin UI, Cognito auth, CDK stack | Python package, CLI, MCP server |
 
 <!--
-This is the most interesting thing in the comparison.
+These differences matter when the first four dimensions do not settle
+the choice.
 
-Rosetta SDL has two modes. execute_query runs the query internally against
-Athena or S3 Vectors. plan_query returns the SQL and search parameters
-without executing, so the agent can hand them to an external Athena MCP
-server on a separate gateway.
+Metric safety is the strongest thing Rosetta SDL has. A governed metric
+compiles to SQL deterministically, with no LLM in the path, so the same
+question produces the same SQL every time. Neocarta stores metric
+definitions, including OSI metrics with dialect-specific expressions, but
+generation is the agent's job. If reproducible numbers for approved
+business measures are your requirement, that is a real difference.
 
-Why did they build plan mode? Because in a multi-gateway architecture the
-execution tools already exist somewhere else, and you want the governed
-SQL, not the results.
+SQL controls follow from execution. Rosetta SDL is in the execution path
+so it can be a firewall. Neocarta is not, so it cannot.
 
-That is exactly the position Neocarta occupies. Not as a mode, as the
-whole design.
+Rosetta SDL indexes document chunks in S3 Vectors and can route an
+unstructured question there. Neocarta is structured metadata only.
 
-So these are not competing answers. Rosetta SDL is a complete application
-that can also behave as a context service. Neocarta is a context service
-you compose into your own application. If you are already running Athena
-and S3 Vectors MCP servers, both projects hand you the same shape of thing.
+Rosetta SDL also provides an application UI and deployment stack, while
+Neocarta provides a package, CLI, and MCP server.
 -->
 
 ---
@@ -901,105 +923,17 @@ ranked list of table names. That is a starting point. This is a query plan.
 ---
 <!-- /MODULE:B3 -->
 
-<!-- MODULE:B4 aws-path ~4min -->
+<!-- MODULE:B4 process-knowledge ~4min -->
 <!-- _class: section -->
 
-# Module B4: The AWS Path
-
-## Glue Data Catalog as a source, and where the agent runs
-
-<div class="timing">Two slides, about four minutes</div>
-
-<!--
-MODULE B4. Two slides, about four minutes.
-
-Keep this for an AWS audience or whenever the Rosetta SDL comparison
-raised the question of what Neocarta is missing on AWS. Drop it otherwise.
--->
-
----
-
-## AWS Glue Data Catalog as a Neocarta Source
-
-- **The one open item** from the Rosetta SDL comparison
-- **Same graph model,** same MCP tools, same retrieval strategies
-- **Glue and SageMaker Catalog stay authoritative**
-- **Neocarta adds the semantic links** they do not carry
-
-<div class="callout"><strong>Positioning:</strong> This extends catalog metadata with business meaning and join paths. It does not replace the catalog. <span class="status-roadmap">Planned:</span> Glue Data Catalog connector.</div>
-
-<!--
-Earlier I said Neocarta already ships everything the comparison slide
-listed. This is the exception, and it is worth being precise about it.
-
-Rosetta SDL scans AWS Glue and populates its graph from it. Neocarta has
-no Glue connector today. That is a real gap for an AWS data estate.
-
-What makes it a tractable gap rather than a rewrite is the connector
-contract. A Glue connector is an extractor, a transformer, and a loader
-that produce the shared model. Everything downstream, all the retrieval
-tools, the hybrid search, the glossary bridge, works the day it lands,
-because none of that is connector-specific.
-
-The positioning matters too. Glue Data Catalog and SageMaker Catalog
-remain the authoritative catalogs. Neocarta reads from them and adds the
-layer they do not have: business term links, traversable join paths, and
-usage history.
--->
-
----
-
-## Zero-Copy, and Where the Agent Runs
-
-```text
-AWS system of record                Neo4j
-  S3, Glue, Athena                    semantic map
-  business data stays                 metadata and links
-        ^                                   ^
-        |                                   |
-        +---------- Agent ------------------+
-                      |
-              AgentCore Runtime, Strands, Lambda, or your own host
-```
-
-- **Zero-copy:** business data never leaves the AWS system of record
-- **Two calls, two purposes:** map for context, Athena for data
-- **Deployment is the agent's problem,** not the library's
-
-<!--
-The data boundary in one picture.
-
-Business data stays in S3, governed by Glue and queried by Athena. The
-semantic map lives in Neo4j and holds metadata, business links, and usage
-history. Nothing about the map requires copying rows.
-
-The agent makes two kinds of calls. It asks the map what data is relevant
-and how it joins. Then it asks Athena for the actual numbers.
-
-Where the agent runs is genuinely open. Because Neocarta is a library and
-an MCP server rather than a deployed application, it does not impose a
-host. AgentCore Runtime, Strands, Lambda, a notebook, your own service.
-
-That is the trade against Rosetta SDL, which ships a CDK stack and an
-AgentCore deployment path. Rosetta SDL answers the deployment question
-for you. Neocarta leaves it to you. Which of those is better depends
-entirely on whether you already have an answer.
--->
-
----
-<!-- /MODULE:B4 -->
-
-<!-- MODULE:B5 process-knowledge ~4min -->
-<!-- _class: section -->
-
-# Module B5: Reusable Query and Process Knowledge
+# Module B4: Reusable Query and Process Knowledge
 
 ## From query logs to paths an agent can start from
 
 <div class="timing">Two slides, about four minutes</div>
 
 <!--
-MODULE B5. Two slides, about four minutes. This is direction, not shipped
+MODULE B4. Two slides, about four minutes. This is direction, not shipped
 behavior. Be clear about that when you present it.
 -->
 
@@ -1088,23 +1022,20 @@ does not remove the need to be right.
 -->
 
 ---
-<!-- /MODULE:B5 -->
+<!-- /MODULE:B4 -->
 
-<!-- MODULE:B6 governance ~4min -->
+<!-- MODULE:B5 governance ~4min -->
 <!-- _class: section -->
 
-# Module B6: Governance and the Remaining Differences
+# Module B5: Governance
 
-## Trusted context, and the four contrasts cut from the core
+## How trusted context stays trustworthy
 
-<div class="timing">Two slides, about four minutes</div>
+<div class="timing">One slide, about two minutes</div>
 
 <!--
-MODULE B6. Two slides, about four minutes.
-
-The second slide is the overflow from the core comparison. If someone
-asked about metrics, SQL safety, documents, or the admin UI during the
-core, you probably owe them this module.
+MODULE B5. One slide, about two minutes. Keep this when the audience needs
+the operating model behind trusted retrieval.
 -->
 
 ---
@@ -1140,126 +1071,7 @@ definition, not whatever the embedding search ranked first.
 -->
 
 ---
-
-## The Remaining Four Differences
-
-| | Rosetta SDL | Neocarta |
-| --- | --- | --- |
-| **Metric safety** | Compiles approved metrics to SQL with no LLM, so SQL is reproducible | Stores and retrieves metric definitions for the agent to use |
-| **SQL controls** | sqlglot AST firewall, fails closed, limits allowed tables | Parses SQL at ingestion, not in the execution path |
-| **Documents** | Document metadata and chunk search in S3 Vectors | Structured metadata, glossary, semantic models, query history |
-| **Interfaces** | FastAPI service, React admin UI, Cognito auth, CDK stack | Python package, CLI, MCP server |
-
-<!--
-The four rows cut from the core comparison, for the audience that asked.
-
-Metric safety is the strongest thing Rosetta SDL has. A governed metric
-compiles to SQL deterministically, with no LLM in the path, so the same
-question produces the same SQL every time. Neocarta stores metric
-definitions, including OSI metrics with dialect-specific expressions, but
-generation is the agent's job. If reproducible numbers for approved
-business measures are your requirement, that is a real difference.
-
-SQL controls follow from execution. Rosetta SDL is in the execution path
-so it can be a firewall. Neocarta is not, so it cannot.
-
-Documents. Rosetta SDL indexes document chunks in S3 Vectors and can route
-an unstructured question there. Neocarta is structured metadata only.
-
-Interfaces. Rosetta SDL gives you a UI and a deployment. Neocarta gives you
-a package.
--->
-
----
-<!-- /MODULE:B6 -->
-
-<!-- MODULE:B7 virtual-graph ~3min -->
-<!-- _class: section -->
-
-# Module B7: Neocarta and Virtual Graphs
-
-## Two different problems, one combined flow
-
-<div class="timing">Two slides, about three minutes</div>
-
-<!--
-MODULE B7. Two slides, about three minutes.
-
-This is the module most likely to be answered by a question instead. If
-somebody asks whether Neocarta overlaps with Virtual Graph, run it. If
-nobody asks, it is the first thing to drop.
--->
-
----
-
-## Two Different Problems
-
-| | Neocarta | Virtual graph |
-| --- | --- | --- |
-| **Question it answers** | What data matters, what it means, which source | How do I query that source with Cypher |
-| **Output** | Context: tables, columns, joins, business meaning | Results: a translated query against source tables |
-| **Mechanism** | Metadata graph plus hybrid retrieval | Cypher translated to source-native SQL |
-| **Shared trait** | Represents source schemas without copying source data | Same |
-
-<!--
-These get confused because both put a graph in front of data that lives
-somewhere else. The similarity ends there.
-
-Neocarta answers a routing and meaning question. Out of four hundred
-tables, which three matter for this question, what do their columns mean,
-and how do they join. Its output is context.
-
-A virtual graph answers a query question. You have a source, you want to
-traverse it with Cypher, and the virtual graph translates that traversal
-into SQL against the source tables. Its output is results.
-
-The shared trait is real and worth stating: neither requires copying all
-your source data into Neo4j.
-
-So the honest answer to "do these overlap" is no, they compose.
--->
-
----
-
-## The Combined Flow
-
-```text
-Question
-   |
-   v
-Neocarta        which source, which tables, what do they mean
-   |
-   v
-Retrieval       virtual graph (Cypher -> source SQL)
-                or native query tool (SQL, API)
-   |
-   v
-Answer          with sources cited
-```
-
-<div class="callout"><strong>Routing then retrieval:</strong> Neocarta narrows the search space and supplies meaning. The retrieval layer goes and gets the data.</div>
-
-<!--
-Put together, it is two stages.
-
-Stage one, Neocarta. The agent finds out which source holds the relevant
-data, which tables, what the columns mean, and how they join.
-
-Stage two, retrieval. Now that the agent knows what it wants, it uses the
-right tool to go get it. That could be a virtual graph if the source is
-one that Virtual Graph supports and the question is traversal-shaped. It
-could be a plain SQL tool. It could be an API.
-
-The reason this ordering matters: a virtual graph makes a source queryable,
-but it does not tell you which source to query or what the columns mean.
-Point an agent at six virtual graphs with no semantic layer and it is back
-to guessing.
-
-Routing and meaning first, retrieval second.
--->
-
----
-<!-- /MODULE:B7 -->
+<!-- /MODULE:B5 -->
 
 ## Start With One Governed Question
 

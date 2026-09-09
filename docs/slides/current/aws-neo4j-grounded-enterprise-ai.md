@@ -160,9 +160,7 @@ li {
 
 # AWS + Neo4j: Connected Context for Grounded Enterprise AI
 
-## Place Neo4j graph, knowledge, and memory beside AWS data and agent services
-
-<div class="promise">A field guide for architecture conversations, connected investigations, and co-sell motions</div>
+## Neo4j graph, knowledge, and memory integrated with AWS data and agent services
 
 ---
 
@@ -339,17 +337,45 @@ Finding → business meaning → policy → prior decision → evidence
 - **Reuse prior work:** Find similar decisions, evidence, and outcomes.
 - **Keep the path inspectable:** Let reviewers trace each answer back to governed sources.
 
-| Adjacent AWS capability | What Neo4j adds |
-| --- | --- |
-| **Amazon Bedrock Knowledge Bases** retrieves relevant passages from documents. | **Enterprise Knowledge Layer** queries connected business concepts, relationships, provenance, and prior decisions. |
-
 ---
 
 <!-- _class: lead -->
 
-# Agent Memory
+# Neo4j Agent Memory
 
-## Make facts, relationships, decisions, and evidence reusable across agent interactions
+## Open-source, graph-native memory for conversations, durable knowledge, and agent reasoning
+
+<div class="promise"><a href="https://neo4j.com/labs/agent-memory/">Library documentation</a> · <a href="https://github.com/neo4j-labs/agent-memory">GitHub project</a></div>
+
+---
+
+## Graph memory makes each result inspectable and reusable
+
+<div class="cols">
+<div>
+
+### What it remembers
+
+- **Short-term:** Conversations, messages, and session context.
+- **Long-term:** Entities, facts, preferences, relationships, and temporal context.
+- **Reasoning:** Tool calls, evidence, decisions, outcomes, and feedback.
+
+</div>
+<div>
+
+### What the graph adds
+
+- **Traversable provenance:** Follow a memory back to its exact source turn and evidence.
+- **Canonical identity:** Connect memory to the same domain entities the agent queries.
+- **Actor-scoped recall:** Keep each user's memory isolated across sessions.
+- **Retained history:** Supersede outdated memory without erasing its correction path.
+
+</div>
+</div>
+
+<div class="callout"><strong>Store deliberately:</strong> Entity extraction identifies what a turn is about. Policy or confirmation decides what becomes durable memory.</div>
+
+<!-- Source: /Users/ryanknight/projects/aws/neo4j-aws-graphrag-workshop/site/content/06-neo4j-memory/index.en.md -->
 
 ---
 
@@ -363,61 +389,26 @@ Finding → business meaning → policy → prior decision → evidence
 
 ---
 
-## Neo4j Agent Memory
+## Example: The Finance Agent remembers across sessions
 
-The [Neo4j Labs agent-memory](https://neo4j.com/labs/agent-memory/) library backs agent memory with a graph.
+`neo4j-agentcore-agents/finance-agent` adds four Strands tools: `search_context`, `add_memory`, `get_user_preferences`, and `get_entity_graph`.
 
-- **Three memory types:** Short-term conversations, long-term knowledge using the [POLE+O model](https://neo4j.com/labs/agent-memory/explanation/poleo-model), and reasoning traces.
-- **Entity resolution:** Extracts and deduplicates entities instead of accumulating append-only blobs.
-- **Per-user scoping:** The core API's `user_identifier=` isolates memory for each user across sessions.
-- **Pluggable:** Integrates with Strands, LangChain, other frameworks, and an MCP server.
+1. **Cold start:** A new user asks what the agent remembers; the agent reports nothing.
+2. **Teach:** The user states a durable portfolio or risk preference; the agent stores it with `add_memory`.
+3. **Recall:** A fresh session for the same user retrieves the preference without it being restated.
+4. **Isolate:** A second user asks the same question and cannot see the first user's memory.
 
-<!-- Source: docs/slides/archive/aws-in-depth/01-neo4j-for-agentic-ai-slides.md -->
+<div class="callout"><strong>One graph stack:</strong> The memory wrapper uses the library's user-scoped core API against the same Neo4j instance as the finance graph. Domain graph tools remain behind AgentCore Gateway and MCP.</div>
 
----
-
-## Example: The Finance Agent
-
-`neo4j-agentcore-agents/finance-agent` wires memory into a Strands agent as tools.
-
-- **`core/memory.py`:** Provides a user-scoped wrapper around the library's context-graph tools.
-- **Four tools:** `search_context`, `add_memory`, `get_user_preferences`, and `get_entity_graph`.
-- **Per-user isolation:** Every write links a `:User` node; recall stays scoped to that user across sessions.
-- **Graph through MCP:** Reaches Neo4j through the MCP server and AgentCore Gateway with OAuth 2.0 and an automatically refreshed token.
-- **One graph stack:** Memory lives in Neo4j alongside the domain knowledge graph.
-
-<!-- Source: docs/slides/archive/aws-in-depth/01-neo4j-for-agentic-ai-slides.md -->
-
----
-
-## Graph memory makes each result inspectable and reusable
-
-- **Short-term memory:** Keep the active conversation and investigation session.
-- **Long-term memory:** Store entities, facts, relationships, and temporal context.
-- **Reasoning memory:** Record tool calls, evidence, decision traces, and feedback.
-- **Reusable outcomes:** Connect a confirmed result to the policies, patterns, and evidence that supported it.
-
-| Adjacent AWS capability | What Neo4j adds |
-| --- | --- |
-| **AgentCore Memory** provides managed short-term and long-term memory for AWS agents. | **Neo4j Agent Memory** makes entities, relationships, temporal facts, and reasoning traces directly traversable. |
-
-<div class="callout"><strong>Integration:</strong> Use the Strands Agents SDK integration to add graph-native memory to an AWS agent.</div>
-
----
-
-## These capabilities meet inside an AWS-hosted agent workflow
-
-![w:1160](./aws-hosted-agent-knowledge-layer-workflow.svg)
-
-<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway manages tool access and OAuth 2.0. Each source service enforces data access.</div>
+<!-- Sources: neo4j-agentcore-agents/finance-agent/README.md and neo4j-agentcore-agents/finance-agent/core/memory.py -->
 
 ---
 
 <!-- _class: lead -->
 
-# Virtual Graph
+# Virtual Graph for AWS
 
-## Query connected views of governed AWS data without moving every record into Neo4j
+## Planned: Query Amazon S3 Tables with Cypher through Athena
 
 ---
 
@@ -425,40 +416,61 @@ The [Neo4j Labs agent-memory](https://neo4j.com/labs/agent-memory/) library back
 
 ---
 
-## Virtual Graph will extend Cypher to governed AWS tables in place
+## Planned AWS query path: Cypher through Athena to S3 Tables
+
+<div class="cols">
+<div>
 
 ```text
-Cypher question
+Cypher query
       ↓
-Virtual graph model
-      ↓ translates traversal into SQL
+Neo4j Virtual Graph
+translates Cypher to SQL
+      ↓ SQL
+Amazon Athena
+      ├── uses → AWS Glue Data Catalog
+      │          registered S3 table
+      │          bucket catalog
+      └── reads → Amazon S3 Tables
+                 Apache Iceberg data
       ↓
-S3 Tables with Apache Iceberg + AWS Glue Data Catalog
-      ↓
-Connected result without a full data copy
+Cypher result
 ```
 
-- **Athena and Redshift Spectrum:** Use SQL to query data in external sources.
-- **Virtual Graph:** Presents a graph model, accepts Cypher, and translates the traversal into SQL against the source tables.
-- **Governance:** Keeps AWS tables and catalog controls in the query path.
+</div>
+<div>
 
-<div class="callout"><span class="status-preview">Available in public preview:</span> Snowflake, Databricks, and Google BigQuery. <span class="status-roadmap">In build for AWS:</span> S3 Tables and Glue Data Catalog support.</div>
+### AWS service roles
+
+- **Query engine:** Amazon Athena executes the generated SQL.
+- **Catalog:** AWS Glue Data Catalog exposes the registered S3 Tables catalog to Athena.
+- **Storage:** Amazon S3 Tables remains the authoritative data store.
+
+</div>
+</div>
+
+<div class="callout"><strong>No source-data copy:</strong> Virtual Graph queries the tables in place instead of copying them into Neo4j.</div>
+
+<small><span class="status-preview">Public preview:</span> Snowflake, Databricks, and Google BigQuery. <span class="status-roadmap">Planned for AWS:</span> Athena, AWS Glue Data Catalog, and Amazon S3 Tables.</small>
 
 <!-- Source: https://neo4j.com/blog/auradb/neo4j-virtual-graph-is-now-in-public-preview/ -->
 
 ---
 
-## Virtual Graph fits inside a multi-tool knowledge layer
+## Choose the execution path that fits the workload
 
-| Retrieval need | Route | Best fit |
+| Workload | Recommended path | Execution |
 | --- | --- | --- |
-| **Fast connected context** | Cypher over the persisted Neo4j graph | Repeated traversal, graph patterns, and selected operational context |
-| **AWS data in place**<br><span class="status-roadmap">Planned</span> | Cypher through Virtual Graph, translated to SQL | Connected questions over governed S3 Tables without a full copy |
-| **Aggregate evidence** | SQL through Athena | Totals, trends, rankings, and time-window analysis |
-| **Policy text** | Document retrieval | Passages from policies, playbooks, and regulatory guidance |
-| **Operational action** | Enterprise API | Case updates, alerts, approvals, and workflow steps |
+| **Query current S3 Tables data without copying it**<br><span class="status-roadmap">Planned</span> | Cypher through Virtual Graph | Athena queries S3 Tables through the catalog registered in AWS Glue Data Catalog. |
+| **Run frequent, low-latency traversals or graph algorithms** | Materialize selected data in Neo4j | Neo4j executes Cypher against the persisted graph. |
 
-<div class="callout"><strong>Design rule:</strong> The knowledge layer selects the right path. Each source remains responsible for execution and access control.</div>
+---
+
+<!-- _class: lead -->
+
+# Closing
+
+## From connected context to a governed AI operating model
 
 ---
 
@@ -468,23 +480,16 @@ Connected result without a full data copy
 - **AWS Marketplace:** Purchase eligible Aura plans through AWS billing and marketplace terms.
 - **Private connectivity:** Use AWS PrivateLink with supported Aura enterprise configurations.
 - **Self-managed:** Deploy Neo4j on Amazon EKS or Amazon EC2 when the customer manages the runtime.
-- **AgentCore regions:** AgentCore is generally available in nine AWS Regions, including `us-east-1` and `us-west-2`. Confirm feature-level availability for the target region.
-
-<div class="callout"><strong>Field choice:</strong> Start with the customer's operating model, procurement path, networking controls, and region requirements.</div>
 
 <small>Sources: [Aura through cloud marketplaces](https://neo4j.com/docs/aura/cloud-providers/), [Aura secure connections](https://neo4j.com/docs/aura/security/secure-connections/), and [AgentCore supported regions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-regions.html)</small>
 
 ---
 
-## Start with one governed question that needs both views
+## These capabilities meet inside an AWS-hosted agent workflow
 
-1. **Find the question:** Choose one investigation that needs AWS transaction evidence and connected Neo4j context.
-2. **Map the sources:** Identify the S3 tables, catalogs, graph entities, policies, and systems involved.
-3. **Prove both paths:** Use Athena for activity and Cypher for connections in one evidence-backed answer.
-4. **Review the result:** Add automated checks, investigator feedback, and policy review.
-5. **Expand with evidence:** Reuse the proven pattern for the next valuable question.
+![w:1160](./aws-hosted-agent-knowledge-layer-workflow.svg)
 
-<div class="callout"><strong>First customer motion:</strong> Ask, “Which governed investigation is slow today because transaction evidence and connected context live in separate places?”</div>
+<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway manages tool access and OAuth 2.0. Each source service enforces data access.</div>
 
 ---
 

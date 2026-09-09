@@ -50,16 +50,16 @@ small {
   font-size: 13px;
 }
 
-.lead {
+section.lead {
   background: linear-gradient(135deg, #f8fafc 0%, #ecfeff 100%);
 }
 
-.lead h1 {
+section.lead h1 {
   font-size: 58px;
   max-width: 1050px;
 }
 
-.lead h2 {
+section.lead h2 {
   color: #0f766e;
   font-size: 29px;
   font-weight: 500;
@@ -113,17 +113,17 @@ li {
   visibility: visible !important;
 }
 
-.section {
+section.section {
   background: linear-gradient(135deg, #0f172a 0%, #134e4a 100%);
 }
 
-.section h1 {
+section.section h1 {
   color: #f8fafc;
   font-size: 44px;
   max-width: 980px;
 }
 
-.section h2 {
+section.section h2 {
   color: #5eead4;
   font-size: 25px;
   font-weight: 500;
@@ -299,25 +299,20 @@ graph model SVG when built, and highlight this path on it.
 
 ```text
 "Which customers placed the largest orders last quarter?"
-      |
       v
 [agent]       calls one Neocarta retrieval tool
-      |
       v
 [Neocarta]    returns orders and customers, with columns, types,
               sample values, and orders.customer_id -> customers.id
-      |
       v
 [agent LLM]   writes the SQL, using that reference as the JOIN
-      |
       v
 [query tool]  runs the SQL against BigQuery
-      |
       v
 [agent]       answers, citing the tables and the query it ran
 ```
 
-<div class="callout"><strong>Where the join comes from:</strong> <code>REFERENCES</code> is already in the graph, so the foreign key arrives inside the first retrieval result. No second lookup. Neocarta supplies the schema and never writes or runs SQL.</div>
+<div class="callout"><strong>Where the join comes from:</strong> <code>REFERENCES</code> is already in the graph, so the foreign key arrives in the first retrieval result. Neocarta supplies the schema and never writes or runs SQL.</div>
 
 <!--
 One request, end to end, and the point of this slide is who is doing each

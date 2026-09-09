@@ -417,33 +417,6 @@ Agent C → open account balance
 
 ---
 
-<!-- _class: knowledge-slide -->
-
-## A Context Graph is persistent connected memory for agents
-
-<p class="overview">It links long-term enterprise knowledge, short-term interaction state, and reasoning memory in one queryable graph.</p>
-
-<div class="cols">
-<div>
-
-- **Long-term knowledge:** Entities, relationships, business meaning, policies, and authoritative facts.
-- **Short-term state:** Conversation, user intent, task, workflow state, and tool observations.
-- **Reasoning memory:** Decisions linked to their situation, rationale, actions, outcomes, and precedents.
-
-<div class="callout"><strong>Each request retrieves relevant context and adds new state or traces.</strong> The graph persists and compounds across requests.</div>
-
-</div>
-<div>
-
-![h:430](./knowledge-layer-context-graph-compact.svg)
-
-</div>
-</div>
-
-<!-- Sources: https://neo4j.com/blog/agentic-ai/what-is-context-graph/, https://neo4j.com/blog/agentic-ai/context-graph-ai-agent-memory/, https://neo4j.com/blog/agentic-ai/hands-on-with-context-graphs-and-neo4j/, and /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
-
----
-
 ![bg contain](./exec-knowledge-layer.svg)
 
 ---
@@ -655,6 +628,33 @@ Agent C → open account balance
 <div class="callout"><strong>One graph stack:</strong> The memory wrapper uses the library's user-scoped core API against the same Neo4j instance as the finance graph. Domain graph tools remain behind AgentCore Gateway and MCP.</div>
 
 <!-- Sources: neo4j-agentcore-agents/finance-agent/README.md and neo4j-agentcore-agents/finance-agent/core/memory.py -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## A Context Graph is persistent connected memory for agents
+
+<p class="overview">It links long-term enterprise knowledge, short-term interaction state, and reasoning memory in one queryable graph.</p>
+
+<div class="cols">
+<div>
+
+- **Long-term knowledge:** Entities, relationships, business meaning, policies, and authoritative facts.
+- **Short-term state:** Conversation, user intent, task, workflow state, and tool observations.
+- **Reasoning memory:** Decisions linked to their situation, rationale, actions, outcomes, and precedents.
+
+<div class="callout"><strong>Each request retrieves relevant context and adds new state or traces.</strong> The graph persists and compounds across requests.</div>
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-context-graph-compact.svg)
+
+</div>
+</div>
+
+<!-- Sources: https://neo4j.com/blog/agentic-ai/what-is-context-graph/, https://neo4j.com/blog/agentic-ai/context-graph-ai-agent-memory/, https://neo4j.com/blog/agentic-ai/hands-on-with-context-graphs-and-neo4j/, and /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
 
 ---
 

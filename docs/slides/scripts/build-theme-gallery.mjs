@@ -322,14 +322,6 @@ ${renderCards(activeDecks, "Deck")}
         </div>
       </section>
 
-      <section aria-labelledby="archived-presentations">
-        <h2 id="archived-presentations">Archive</h2>
-        <p class="section-intro">Earlier AWS + Neo4j in-depth presentation decks.</p>
-        <div class="decks">
-${renderCards(archiveDecks, "Archive")}
-        </div>
-      </section>
-
       <div class="actions">
         <a class="button" href="https://github.com/neo4j-partners/aws-starter">View project on GitHub</a>
       </div>

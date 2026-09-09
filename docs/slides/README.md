@@ -14,7 +14,7 @@ The supporting SVG files remain beside the Markdown sources so local Marp previe
 
 ## Archived decks
 
-The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`, while earlier working drafts live in `docs/slides/archive/drafts/`. The build publishes the in-depth decks under `/archive/` and lists them in a separate Archive section on the gallery page.
+The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`, while earlier working drafts live in `docs/slides/archive/drafts/`. The build publishes the in-depth decks under `/archive/`, but they are not listed on the gallery page.
 
 ## Quick start
 

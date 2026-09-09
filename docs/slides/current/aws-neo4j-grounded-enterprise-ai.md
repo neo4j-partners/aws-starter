@@ -199,7 +199,7 @@ li {
 | **Neo4j Connector for AWS Glue** | AWS Glue | Load data from AWS sources into Neo4j with managed ETL jobs. |
 | **Neo4j Connector for Kafka** | Amazon MSK | Stream events into Neo4j and publish graph changes to Kafka. |
 | **Neo4j drivers** | Lambda, ECS, EKS, EC2 | Connect new or existing AWS applications to Neo4j. |
-| **Neo4j MCP tools** | AgentCore and Strands | Connect AWS-hosted agents to Neo4j graph retrieval tools. |
+| **Neo4j MCP tools** | Amazon Bedrock AgentCore and Strands Agents | Connect AWS-hosted agents to Neo4j graph retrieval tools. |
 
 <small>Sources: [Neo4j Spark Connector](https://neo4j.com/docs/spark/current/), [Kafka Connector](https://neo4j.com/docs/kafka/current/), [connectors and drivers](https://neo4j.com/docs/connectors/), and [Neo4j MCP](https://neo4j.com/developer/genai-ecosystem/model-context-protocol-mcp/)</small>
 
@@ -247,7 +247,7 @@ RETURN m.title
 </div>
 </div>
 
-<div class="callout"><strong>Model first:</strong> Glue expects queryable metadata. Define labels, relationship types, and properties; load nodes before relationships. Only supported SQL constructs are translated.</div>
+<div class="callout"><strong>Model first:</strong> Glue expects queryable metadata. Create a blueprint graph with the labels, relationship types, and properties; load nodes before relationships. Only supported SQL constructs are translated.</div>
 
 <small>Sources: [Neo4j Connector for AWS Glue](https://neo4j.com/docs/neo4j-aws-glue/), [Getting Started](https://neo4j.com/docs/neo4j-aws-glue/getting-started/), [JDBC SQL-to-Cypher translation](https://neo4j.com/docs/jdbc-manual/current/sql2cypher/), and [connector announcement](https://neo4j.com/blog/developer/neo4j-connector-for-aws-glue/)</small>
 
@@ -644,8 +644,8 @@ translates Cypher to SQL
       ↓ SQL
 Amazon Athena
       ├── uses → AWS Glue Data Catalog
-      │          registered S3 table
-      │          bucket catalog
+      │          s3tablescatalog parent
+      │          + table-bucket child catalog
       └── reads → Amazon S3 Tables
                  Apache Iceberg data
       ↓
@@ -658,7 +658,8 @@ Cypher result
 ### AWS service roles
 
 - **Query engine:** Amazon Athena executes the generated SQL.
-- **Catalog:** AWS Glue Data Catalog exposes the registered S3 Tables catalog to Athena.
+- **Catalog:** AWS Glue Data Catalog exposes each S3 table bucket as a child federated catalog under `s3tablescatalog`.
+- **Access:** IAM or AWS Lake Formation permissions govern the catalog and table resources Athena can query.
 - **Storage:** Amazon S3 Tables remains the authoritative data store.
 
 </div>
@@ -668,7 +669,7 @@ Cypher result
 
 <small><span class="status-preview">Public preview:</span> Snowflake, Databricks, and Google BigQuery. <span class="status-roadmap">Planned for AWS:</span> Athena, AWS Glue Data Catalog, and Amazon S3 Tables.</small>
 
-<!-- Source: https://neo4j.com/blog/auradb/neo4j-virtual-graph-is-now-in-public-preview/ -->
+<!-- Sources: https://neo4j.com/blog/auradb/neo4j-virtual-graph-is-now-in-public-preview/, https://docs.aws.amazon.com/athena/latest/ug/gdc-register-s3-table-bucket-cat.html, and https://docs.aws.amazon.com/glue/latest/dg/enable-s3-tables-catalog-integration.html -->
 
 ---
 
@@ -676,7 +677,7 @@ Cypher result
 
 | Workload | Recommended path | Execution |
 | --- | --- | --- |
-| **Query current S3 Tables data without copying it**<br><span class="status-roadmap">Planned</span> | Cypher through Virtual Graph | Athena queries S3 Tables through the catalog registered in AWS Glue Data Catalog. |
+| **Query current S3 Tables data without copying it**<br><span class="status-roadmap">Planned</span> | Cypher through Virtual Graph | Athena queries the table-bucket child catalog mounted in AWS Glue Data Catalog. |
 | **Run frequent, low-latency traversals or graph algorithms** | Materialize selected data in Neo4j | Neo4j executes Cypher against the persisted graph. |
 
 ---
@@ -704,7 +705,9 @@ Cypher result
 
 ![w:1160](./aws-hosted-agent-knowledge-layer-workflow.svg)
 
-<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway manages tool access and OAuth 2.0. Each source service enforces data access.</div>
+<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway controls agentic traffic and supports inbound and outbound authentication, including OAuth 2.0. Each target service still enforces data access.</div>
+
+<!-- Sources: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html and https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html -->
 
 ---
 

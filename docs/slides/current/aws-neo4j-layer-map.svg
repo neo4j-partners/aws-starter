@@ -48,7 +48,7 @@
     <text class="layer-name" x="125" y="385">Models</text>
     <text class="service" x="525" y="385">Amazon Bedrock</text>
     <text class="layer-name" x="125" y="507">Analytics and processing</text>
-    <text class="service" x="525" y="507">Athena · EMR · Glue · MSK · SageMaker</text>
+    <text class="service" x="525" y="507">Athena · EMR · Glue · MSK · SageMaker AI</text>
     <text class="layer-name" x="125" y="629">Catalog and governance</text>
     <text class="service" x="525" y="629">Glue Data Catalog · SageMaker Catalog · Lake Formation</text>
     <text class="layer-name" x="125" y="751">Storage</text>
@@ -81,7 +81,7 @@
     <text class="layer-name" x="125" y="375">Models</text>
     <text class="service" x="425" y="375">Amazon Bedrock</text>
     <text class="layer-name" x="125" y="497">Analytics and processing</text>
-    <text class="service" x="425" y="497">Athena · EMR · Glue · MSK · SageMaker</text>
+    <text class="service" x="425" y="497">Athena · EMR · Glue · MSK · SageMaker AI</text>
     <text class="layer-name" x="125" y="619">Catalog and governance</text>
     <text class="service" x="425" y="619">Glue Data Catalog · SageMaker Catalog</text>
     <text class="layer-name" x="125" y="741">Storage</text>
@@ -124,7 +124,7 @@
     <text class="layer-name" x="125" y="372">Models</text>
     <text class="service" x="425" y="372">Amazon Bedrock</text>
     <text class="layer-name" x="125" y="494">Analytics and processing</text>
-    <text class="service" x="425" y="494">Athena · EMR · Glue · MSK · SageMaker</text>
+    <text class="service" x="425" y="494">Athena · EMR · Glue · MSK · SageMaker AI</text>
     <text class="layer-name" x="125" y="616">Catalog and governance</text>
     <text class="service" x="425" y="616">Glue · SageMaker Catalog · Lake Formation</text>
     <text class="layer-name" x="125" y="738">Storage</text>

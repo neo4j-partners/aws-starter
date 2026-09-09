@@ -21,13 +21,13 @@
   <rect x="40" y="104" width="470" height="472" rx="16" fill="#FFFFFF" stroke="#E7E4DB" filter="url(#shadow)"/>
   <path d="M40,148 V118 a14,14 0 0 1 14,-14 H496 a14,14 0 0 1 14,14 V148 Z" fill="#232F3E"/>
   <text x="62" y="133" font-size="14.5" font-weight="700" fill="#FFFFFF">Amazon SageMaker Lakehouse</text>
-  <text x="488" y="133" text-anchor="end" font-size="10" fill="#FF9900">Amazon S3 + AWS Glue</text>
+  <text x="488" y="133" text-anchor="end" font-size="10" fill="#FF9900">AWS Glue Data Catalog + Lake Formation</text>
 
   <text x="275" y="184" text-anchor="middle" font-size="12" font-style="italic" fill="#6B7280">Financial activity in open tables</text>
 
   <rect x="60" y="204" width="430" height="218" rx="10" fill="#F2F8FC" stroke="#9CC9E4" stroke-width="1.3"/>
   <text x="80" y="232" font-size="12.5" font-weight="700" fill="#146EB4">AMAZON S3 TABLES</text>
-  <text x="472" y="232" text-anchor="end" font-size="9.5" font-style="italic" fill="#5E97C9">cataloged by AWS Glue</text>
+  <text x="472" y="232" text-anchor="end" font-size="9.5" font-style="italic" fill="#5E97C9">mounted in AWS Glue Data Catalog</text>
 
   <g fill="#FFFFFF" stroke="#6FAED2" stroke-width="1.2">
     <rect x="80" y="260" width="178" height="42" rx="7"/>
@@ -119,10 +119,10 @@
   <text x="592" y="249" text-anchor="middle" font-size="10" fill="#92660A">rules, thresholds, and escalation criteria</text>
 
   <!-- Bidirectional connector -->
-  <text x="590" y="395" text-anchor="middle" font-size="9" fill="#146EB4">ingest: S3 tables → graph</text>
+  <text x="590" y="395" text-anchor="middle" font-size="9" fill="#146EB4">ingest: S3 Tables → graph</text>
   <line x1="510" y1="407" x2="670" y2="407" stroke="#146EB4" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
-  <text x="590" y="429" text-anchor="middle" font-size="10.5" font-weight="700" fill="#146EB4">AWS Glue + Neo4j Spark</text>
-  <text x="590" y="442" text-anchor="middle" font-size="10.5" font-weight="700" fill="#146EB4">Connector</text>
+  <text x="590" y="429" text-anchor="middle" font-size="10.5" font-weight="700" fill="#146EB4">Neo4j Connector</text>
+  <text x="590" y="442" text-anchor="middle" font-size="10.5" font-weight="700" fill="#146EB4">for AWS Glue</text>
   <line x1="670" y1="462" x2="510" y2="462" stroke="#146EB4" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
   <text x="590" y="479" text-anchor="middle" font-size="9" fill="#146EB4">write-back: graph findings → S3 results</text>
 </svg>

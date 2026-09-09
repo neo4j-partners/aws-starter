@@ -354,7 +354,7 @@ composes, a governed tool executes.
 | **Serve** | Expose AWS metadata through the same CLI and MCP retrieval tools used across platforms |
 | **Validate** | Prove semantic discovery through governed Athena queries over S3 Tables |
 
-<div class="callout"><strong>Same pattern, new source:</strong> Make Glue a first-class Neocarta source while Glue remains authoritative and Athena remains the query engine. <span class="status-roadmap">Planned:</span> Glue Data Catalog connector.</div>
+<div class="callout"><strong>Same pattern, new source:</strong> Read S3 Tables metadata through the Glue federated catalog; keep S3 Tables authoritative and Athena as the query engine. <span class="status-roadmap">Planned:</span> Glue Data Catalog connector.</div>
 
 <!--
 The AWS expansion starts with a Glue Data Catalog connector. That
@@ -369,10 +369,12 @@ Once the metadata is in the shared model, the CLI, MCP tools, glossary
 bridge, and retrieval strategies already used for other platforms can
 serve it to agents.
 
-The boundary stays explicit: Glue remains the authoritative catalog,
-Athena executes the query, S3 Tables holds the data, and Neocarta adds
-the semantic context and cross-source relationships.
+The boundary stays explicit: Glue exposes the federated catalog, Athena
+executes the query, S3 Tables remains authoritative for its tables, and
+Neocarta adds the semantic context and cross-source relationships.
 -->
+
+<!-- AWS sources: https://docs.aws.amazon.com/glue/latest/dg/enable-s3-tables-catalog-integration.html and https://docs.aws.amazon.com/athena/latest/ug/gdc-register-s3-table-bucket-cat.html -->
 
 ---
 
@@ -444,7 +446,7 @@ differences of scope, not of what the two projects set out to do.
 | | Rosetta SDL | Neocarta |
 | --- | --- | --- |
 | **Product shape** | Complete application: API, admin UI, deployment | Library, CLI, graph model, MCP server |
-| **Platform scope** | AWS: Glue, Athena, S3 Vectors, Bedrock | Eleven connectors across clouds and open formats |
+| **Platform scope** | AWS: AWS Glue, Amazon Athena, S3 Vectors, Amazon Bedrock | Eleven connectors across clouds and open formats |
 | **Query execution** | Plans, validates, and runs Athena queries | Supplies context, relies on a separate tool |
 | **Safety controls** | sqlglot SQL firewall, fail-closed | Not the execution firewall |
 

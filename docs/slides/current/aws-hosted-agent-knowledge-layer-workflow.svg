@@ -63,7 +63,7 @@
   </g>
   <text x="338" y="240" class="eyebrow" fill="#475569">SECURE TOOL PLANE</text>
   <text x="338" y="278" class="title">AgentCore Gateway</text>
-  <text x="338" y="306" class="copy">OAuth 2.0 and tool access</text>
+  <text x="338" y="306" class="copy">Authentication and tool access</text>
   <rect x="338" y="337" width="254" height="54" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
   <text x="465" y="371" text-anchor="middle" class="chip-title">Neo4j MCP</text>
 
@@ -136,5 +136,5 @@
 
   <!-- Outcome -->
   <rect x="650" y="596" width="910" height="42" rx="12" fill="#ecfeff" stroke="#99f6e4" stroke-width="2"/>
-  <text x="1105" y="623" text-anchor="middle" fill="#0f766e" font-size="17" font-weight="760">One shared context grounds every agent while AWS remains the execution and security boundary.</text>
+  <text x="1105" y="623" text-anchor="middle" fill="#0f766e" font-size="17" font-weight="760">AWS hosts the agent and secures tool traffic; every target still enforces its own data access.</text>
 </svg>

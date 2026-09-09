@@ -232,7 +232,7 @@ Account ACC-1001 ⇄ Account ACC-2047
 - **Time-series trends:** SQL produces hourly, daily, and monthly rollups by account, merchant, or channel.
 - **Filtering and ranking:** SQL finds transactions above P95 and accounts generating the most alerts.
 - **Key-based joins:** Fixed joins connect transactions to accounts, customers, and merchants.
-- **Dashboards:** Amazon QuickSight presents volume, alerts, exposure, losses, and case throughput.
+- **Dashboards:** Amazon Quick Sight presents volume, alerts, exposure, losses, and case throughput.
 
 </div>
 <div>
@@ -248,6 +248,8 @@ Account ACC-1001 ⇄ Account ACC-2047
 </div>
 </div>
 
+<!-- Sources: https://docs.aws.amazon.com/athena/latest/ug/functions.html and https://docs.aws.amazon.com/quick/latest/userguide/what-is.html -->
+
 ---
 
 <!-- _class: data-sources-overview -->
@@ -257,6 +259,8 @@ Account ACC-1001 ⇄ Account ACC-2047
 ![w:940](./dual-data-architecture-aws.svg)
 
 <div class="callout"><strong>Two query paths:</strong> Athena queries transaction evidence in S3 Tables; Cypher traverses connected context in Neo4j.</div>
+
+<!-- Sources: https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables.html and https://docs.aws.amazon.com/athena/latest/ug/gdc-register-s3-table-bucket-cat.html -->
 
 ---
 

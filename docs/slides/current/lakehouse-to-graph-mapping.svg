@@ -15,7 +15,7 @@
   <!-- ================= mapping lane (drawn first so panels sit on top) ================= -->
   <rect x="420" y="96" width="258" height="336" rx="12" fill="#F2F7FA" stroke="#9FB8C1" stroke-width="1.2" stroke-dasharray="6,4"/>
   <rect x="428" y="104" width="242" height="34" rx="6" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.5"/>
-  <text x="549" y="121" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="700" fill="#1B3139">AWS Glue + Neo4j Spark Connector</text>
+  <text x="549" y="121" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="700" fill="#1B3139">Neo4j Connector for AWS Glue</text>
   <text x="549" y="153" text-anchor="middle" font-size="11.5" fill="#3D5A63">Rows become nodes, foreign</text>
   <text x="549" y="168" text-anchor="middle" font-size="11.5" fill="#3D5A63">keys become relationships</text>
 
@@ -23,7 +23,7 @@
   <rect x="36" y="88" width="372" height="440" rx="16" fill="#FFFFFF" stroke="#1B3139" stroke-width="2"/>
   <rect x="52" y="104" width="340" height="34" rx="6" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.5"/>
   <text x="222" y="121" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="700" fill="#1B3139">Amazon SageMaker Lakehouse</text>
-  <text x="222" y="160" text-anchor="middle" font-size="11.5" fill="#3D5A63">Apache Iceberg on Amazon S3 &#183; AWS Glue Catalog &#183; Athena</text>
+  <text x="222" y="160" text-anchor="middle" font-size="11.5" fill="#3D5A63">S3 Tables (Apache Iceberg) &#183; AWS Glue Data Catalog &#183; Athena</text>
 
   <g fill="#FFFFFF" stroke="#1B3139" stroke-width="1.2">
     <rect x="52" y="174" width="340" height="52" rx="8"/>
@@ -142,7 +142,7 @@
   <!-- legend -->
   <rect x="706" y="436" width="342" height="76" rx="10" fill="#F2F7FA" stroke="#1B3139" stroke-width="1.2"/>
   <rect x="722" y="452" width="22" height="16" rx="5" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.4"/>
-  <text x="754" y="460" dominant-baseline="central" font-size="11.5" fill="#1B3139">Loaded from S3 tables via Glue + Spark</text>
+  <text x="754" y="460" dominant-baseline="central" font-size="11.5" fill="#1B3139">Loaded from S3 Tables through AWS Glue</text>
   <rect x="722" y="482" width="22" height="16" rx="5" fill="#FFFFFF" stroke="#1B3139" stroke-width="1.4" stroke-dasharray="5,3"/>
   <text x="754" y="490" dominant-baseline="central" font-size="11.5" fill="#1B3139">Knowledge layer, graph only: policy, playbook, case</text>
 

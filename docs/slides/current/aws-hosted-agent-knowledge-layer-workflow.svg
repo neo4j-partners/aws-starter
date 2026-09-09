@@ -17,6 +17,7 @@
       .eyebrow { font-size: 15px; font-weight: 800; letter-spacing: 1.6px; }
       .title { fill: #0f172a; font-size: 25px; font-weight: 760; }
       .pill-title { fill: #0f172a; font-size: 21px; font-weight: 760; }
+      .runtime-title { fill: #0f172a; font-size: 23px; font-weight: 760; text-anchor: middle; }
       .copy { fill: #475569; font-size: 17px; }
       .small { fill: #64748b; font-size: 15px; }
       .chip-title { fill: #0f172a; font-size: 18px; font-weight: 750; }
@@ -42,7 +43,7 @@
     <rect x="30" y="152" width="245" height="334" rx="22" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/>
   </g>
   <text x="58" y="187" class="eyebrow" fill="#c2410c">AWS-HOSTED AGENT</text>
-  <text x="58" y="226" class="title">AgentCore Runtime</text>
+  <text x="152" y="226" class="runtime-title">AgentCore Runtime</text>
   <text x="58" y="251" class="copy">Runs the agent securely</text>
 
   <rect x="58" y="280" width="189" height="72" rx="13" fill="#ffffff" stroke="#fed7aa" stroke-width="2"/>
@@ -58,15 +59,15 @@
 
   <!-- Secure tool plane -->
   <g filter="url(#shadow)">
-    <rect x="340" y="205" width="240" height="226" rx="20" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+    <rect x="310" y="205" width="310" height="226" rx="20" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
   </g>
-  <text x="368" y="240" class="eyebrow" fill="#475569">SECURE TOOL PLANE</text>
-  <text x="368" y="278" class="title">AgentCore Gateway</text>
-  <text x="368" y="306" class="copy">OAuth 2.0 and tool access</text>
-  <rect x="368" y="337" width="184" height="54" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
-  <text x="460" y="371" text-anchor="middle" class="chip-title">Neo4j MCP</text>
+  <text x="338" y="240" class="eyebrow" fill="#475569">SECURE TOOL PLANE</text>
+  <text x="338" y="278" class="title">AgentCore Gateway</text>
+  <text x="338" y="306" class="copy">OAuth 2.0 and tool access</text>
+  <rect x="338" y="337" width="254" height="54" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="465" y="371" text-anchor="middle" class="chip-title">Neo4j MCP</text>
 
-  <path class="flow" d="M275 318H330"/>
+  <path class="flow" d="M275 318H300"/>
 
   <!-- Enterprise Knowledge Layer -->
   <g filter="url(#shadow)">
@@ -98,14 +99,14 @@
   <text x="1345" y="244" class="chip-copy">Reuse decisions,</text>
   <text x="1345" y="265" class="chip-copy">evidence, and outcomes</text>
 
-  <path class="flow-teal" d="M580 258H640"/>
+  <path class="flow-teal" d="M620 258H640"/>
 
-  <path class="flow-teal" d="M650 326H590"/>
-  <path class="flow-teal" d="M340 358H285"/>
+  <path class="flow-teal" d="M650 326H630"/>
+  <path class="flow-teal" d="M310 358H285"/>
 
   <!-- Governed sources -->
   <text x="650" y="405" class="eyebrow" fill="#475569">GOVERNED SOURCES AND ACTION TOOLS</text>
-  <text x="650" y="432" class="small">The plan chooses authoritative systems; each service still enforces access.</text>
+  <text x="650" y="432" class="small">The plan selects authoritative systems; each source enforces access.</text>
 
   <g filter="url(#shadow)">
     <rect x="650" y="461" width="208" height="104" rx="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
@@ -129,9 +130,9 @@
   <text x="1343" y="524" class="chip-copy">Read data or perform</text>
   <text x="1343" y="545" class="chip-copy">approved actions</text>
 
-  <path class="flow" d="M580 387C612 387 620 513 640 513"/>
+  <path class="flow" d="M620 387C632 387 634 513 640 513"/>
 
-  <path class="flow-teal" d="M1105 451V366"/>
+  <path class="flow-teal" d="M1439 451V366"/>
 
   <!-- Outcome -->
   <rect x="650" y="596" width="910" height="42" rx="12" fill="#ecfeff" stroke="#99f6e4" stroke-width="2"/>

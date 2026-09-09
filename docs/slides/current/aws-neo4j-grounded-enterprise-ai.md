@@ -203,7 +203,7 @@ li {
 
 ---
 
-![bg contain](./neo4j%20in%20aws.svg)
+![bg contain](./neo4j-in-aws.svg)
 
 ---
 

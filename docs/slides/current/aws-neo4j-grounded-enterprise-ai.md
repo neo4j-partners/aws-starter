@@ -66,6 +66,19 @@ section.lead h2 {
   max-width: 980px;
 }
 
+section.fraud-overview {
+  padding: 24px 48px;
+}
+
+section.fraud-overview h2 {
+  margin: 0 0 8px;
+}
+
+section.fraud-overview p {
+  margin: 0;
+  text-align: center;
+}
+
 .promise {
   color: #475569;
   font-size: 21px;
@@ -136,7 +149,7 @@ li {
 
 ---
 
-## AWS and Neo4j have a clear division of labor
+## AWS provides cloud-scale services; Neo4j provides connected context
 
 | AWS | Neo4j |
 | --- | --- |
@@ -145,21 +158,17 @@ li {
 | **Analyze:** Use SQL, Spark, streaming, and ML for activity at scale. | **Traverse:** Find paths, communities, shared identifiers, and network patterns. |
 | **Run AI:** Supply models, agent runtimes, gateways, and application infrastructure. | **Ground AI:** Give agents connected facts, semantic routing, tools, and memory. |
 
-<div class="callout"><strong>AWS adjacency:</strong> Neo4j complements Athena and Redshift for connected analysis. AWS remains the system of record.</div>
-
 ---
 
-## Neo4j connects through AWS services customers already use
+## Neo4j connection patterns for AWS
 
-| Integration path | AWS home | What it enables |
+| Integration path | AWS home | Description |
 | --- | --- | --- |
-| **Neo4j Spark Connector** | Amazon EMR | Read graph data into Spark and write Spark DataFrames to Neo4j. |
-| **Neo4j Connector for AWS Glue** | AWS Glue | Build managed ETL jobs from AWS data sources to Neo4j. |
-| **Neo4j Connector for Kafka** | Amazon MSK | Stream events into Neo4j and publish graph changes. |
-| **Neo4j drivers** | Lambda, ECS, EKS, EC2 | Run Cypher from existing application services. |
-| **Neo4j MCP tools** | AgentCore and Strands | Let AWS-hosted agents call graph retrieval tools. |
-
-<div class="callout"><strong>Field message:</strong> Extend the architecture through AWS services already present in the customer environment.</div>
+| **Neo4j Spark Connector** | Amazon EMR | Exchange data between Spark DataFrames and Neo4j graphs. |
+| **Neo4j Connector for AWS Glue** | AWS Glue | Load data from AWS sources into Neo4j with managed ETL jobs. |
+| **Neo4j Connector for Kafka** | Amazon MSK | Stream events into Neo4j and publish graph changes to Kafka. |
+| **Neo4j drivers** | Lambda, ECS, EKS, EC2 | Connect new or existing AWS applications to Neo4j. |
+| **Neo4j MCP tools** | AgentCore and Strands | Connect AWS-hosted agents to Neo4j graph retrieval tools. |
 
 <small>Sources: [Neo4j Spark Connector](https://neo4j.com/docs/spark/current/), [Kafka Connector](https://neo4j.com/docs/kafka/current/), [connectors and drivers](https://neo4j.com/docs/connectors/), and [Neo4j MCP](https://neo4j.com/developer/genai-ecosystem/model-context-protocol-mcp/)</small>
 
@@ -188,21 +197,19 @@ Connected result without a full data copy
 
 ---
 
+<!-- _class: lead -->
+
+# What data lives where?
+
+## A fraud investigation needs authoritative evidence and connected context
+
+---
+
+<!-- _class: fraud-overview -->
+
 ## A fraud ring shows why an investigation needs both views
 
-One transfer can look ordinary. Its connections can reveal coordinated activity.
-
-```text
-Customer A → Account A → Device X ← Account B ← Customer B
-
-Account A → Account B → Account C → Account A
-```
-
-- **Shared identity signal:** Two customers use the same device.
-- **Circular movement:** Funds return to the starting account.
-- **Corroborating evidence:** Phone numbers, addresses, merchants, and timing strengthen or weaken the case.
-
-<div class="callout"><strong>Investigation question:</strong> Which accounts form a circular payment chain, and what AWS activity makes that chain unusual?</div>
+![h:600](./fraud-ring-property-graph-detailed.svg)
 
 ---
 

@@ -19,6 +19,7 @@ const assets = [
   "current/aws-neo4j-layer-map.svg",
   "current/dual-data-architecture-aws.svg",
   "current/exec-knowledge-layer.svg",
+  "current/fraud-ring-property-graph-detailed.svg",
   "current/neocarta.svg",
   "current/neo4j-agent-memory-diagram.svg",
 ];

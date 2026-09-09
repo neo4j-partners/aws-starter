@@ -281,7 +281,7 @@ Agent C → open account balance
 
 ## Enterprise knowledge becomes queryable and actionable
 
-<p class="overview">It is shared, governed, executable software between enterprise systems and their consumers.</p>
+<p class="overview">The Knowledge Layer is shared, governed, executable software that sits between enterprise systems and their consumers.</p>
 
 <div class="cols">
 <div>
@@ -321,7 +321,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-three-parts-compact.svg)
+![h:430](./knowledge-layer-three-parts-compact-v2.svg)
 
 </div>
 </div>
@@ -348,7 +348,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-three-parts-compact.svg)
+![h:430](./knowledge-layer-context-graph-compact.svg)
 
 </div>
 </div>
@@ -396,6 +396,33 @@ Agent C → open account balance
 
 <!-- _class: knowledge-slide -->
 
+## The ontology connects meaning to systems and accountability
+
+<p class="overview">Five connected sub-ontologies describe how the business operates.</p>
+
+<div class="cols">
+<div>
+
+- **Domain:** Business concepts and relationships.
+- **Technical:** Descriptions of systems, sources, and data assets, plus mappings from business concepts to those assets.
+- **Process:** Tasks, decisions, workflows, and actions.
+- **Policy:** Access rules, conditions, constraints, and permitted actions.
+- **Organization:** Roles, ownership, responsibilities, and accountability.
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-five-ontologies-compact.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
 ## The semantic map bridges business meaning and enterprise data
 
 <p class="overview">It uses ontology concepts, technical asset descriptions, and mappings to route requests to authoritative source systems.</p>
@@ -414,33 +441,6 @@ Agent C → open account balance
 <div>
 
 ![h:430](./knowledge-layer-city-map-compact.svg)
-
-</div>
-</div>
-
-<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
-
----
-
-<!-- _class: knowledge-slide -->
-
-## The ontology connects meaning to systems and accountability
-
-<p class="overview">Five connected sub-ontologies describe how the business operates.</p>
-
-<div class="cols">
-<div>
-
-- **Domain:** Business concepts and relationships.
-- **Technical:** Descriptions of systems, sources, and data assets, plus mappings from business concepts to those assets.
-- **Process:** Tasks, decisions, workflows, and actions.
-- **Policy:** Access rules, conditions, constraints, and permitted actions.
-- **Organization:** Roles, ownership, responsibilities, and accountability.
-
-</div>
-<div>
-
-![h:430](./knowledge-layer-five-ontologies-compact.svg)
 
 </div>
 </div>

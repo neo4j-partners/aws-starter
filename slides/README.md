@@ -1,6 +1,6 @@
-# Enterprise Knowledge Layer Slides
+# Financial Fraud Knowledge Layer Slides
 
-This folder contains the Enterprise Knowledge Layer deck in [Marp](https://marp.app/) format. The main deck is `semantic-slides.md`.
+This folder contains the financial fraud investigation knowledge-layer deck in [Marp](https://marp.app/) format. The main deck is `semantic-slides.md`.
 
 ## Quick Start
 

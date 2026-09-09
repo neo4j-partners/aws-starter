@@ -51,11 +51,11 @@ const decks = readdirSync(SLIDE_DIR)
     file: "semantic-slides.md",
     source: "../../slides/semantic-slides.md",
     order: "07",
-    title: "Enterprise Knowledge Layer",
+    title: "Aircraft Digital Twin Knowledge Layer",
     output: "semantic-slides.html",
     description:
-      "AWS, Neo4j, data query patterns, and an enterprise knowledge layer for AI agents.",
-    assets: ["../../slides/semantic-reference-architecture.svg"],
+      "AWS, Neo4j, fleet query patterns, and an aircraft digital-twin knowledge layer for AI agents.",
+    assets: ["../../slides/dual-data-architecture-aws.svg"],
   });
 
 const requested = process.argv[2] ?? "all";

@@ -27,253 +27,268 @@ ol > li {
 }
 </style>
 
-# Enterprise Knowledge Layer
+# Making Financial Data Easier to Investigate
 
-## Semantic grounding, agent routing, and reusable process memory
-
----
-
-## Five Ways AWS Connects to Neo4j
-
-Choose the connection that fits the data flow and the workload.
-
-- **Spark Connector on Amazon EMR:** moves large Spark DataFrames into Neo4j and reads graph data back into Spark.
-- **AWS Glue Connector:** builds managed ETL jobs from S3, RDS, Redshift, DynamoDB, and other Glue sources.
-- **Kafka Connector on Amazon MSK:** streams events into Neo4j and publishes graph changes to Kafka topics.
-- **Neo4j drivers in AWS applications:** let Lambda, ECS, EKS, and EC2 services run Cypher queries.
-- **MCP for AWS agents:** lets Bedrock and AgentCore agents call graph tools through a standard interface.
-
-<small>Sources: [Neo4j data connectors](https://neo4j.com/docs/connectors/), [Spark Connector](https://neo4j.com/docs/spark/current/), [Kafka Connector](https://neo4j.com/docs/kafka/current/), and [Neo4j MCP](https://neo4j.com/developer/genai-ecosystem/model-context-protocol-mcp/)</small>
+## A connected knowledge layer links customers, accounts, transactions, fraud signals, and investigation guidance
 
 ---
 
-## Neo4j and AWS: What Each Platform Brings to Generative AI
+## A Transaction Becomes Suspicious Because of Its Connections
+
+One transfer may look ordinary. The surrounding pattern tells a different story.
+
+```text
+Customer A -> Account A -> Device X <- Account B <- Customer B
+
+Account A -> Account B -> Account C -> Account A
+```
+
+- Two customers share a device even though their profiles appear unrelated
+- Money moves through several accounts and returns to where it started
+- The accounts also share phone numbers, addresses, or merchants
+
+Fraud-ring detection is a connected-data problem, not only a transaction-scoring problem.
+
+---
+
+## AWS Stores and Analyzes Activity; Neo4j Reveals Connections
+
+- **AWS SQL:** answers questions about numbers over time, such as transaction amounts, frequency, velocity, and risk scores.
+- **Neo4j Cypher:** answers questions about connections, such as which customers, accounts, devices, merchants, and transfers form a suspicious pattern.
+- **Together:** identify a connected pattern, then retrieve the transaction evidence needed to investigate it.
+
+**Example:** Which accounts form a circular payment chain, and what activity makes that chain unusual?
+
+---
+
+## Neo4j Supplies Context; AWS Runs the AI Experience
 
 | Platform | Role for generative AI |
 | --- | --- |
-| **Neo4j** | Provides connected facts, semantic relationships, graph retrieval, provenance, business rules, and durable memory. |
-| **Amazon Bedrock** | Provides models for extraction, embeddings, reasoning, and response generation. |
-| **Strands Agents** | Runs the agent loop and connects models to graph and AWS tools. |
-| **Amazon Bedrock AgentCore** | Publishes governed tools through Gateway and runs deployed agents through Runtime. |
+| **Neo4j** | Keeps a connected picture of customers, accounts, fraud signals, investigation history, and the policies that explain them. |
+| **Amazon Bedrock** | Provides managed access to foundation models that power an AI assistant's reasoning and responses. |
+| **Strands Agents** | An open-source SDK for building and orchestrating AI assistants that use models and tools. |
+| **Amazon Bedrock AgentCore** | Hosts and runs AI agents securely at scale, with isolated sessions and managed infrastructure. |
 
-**Together:** Neo4j gives the model grounded context. AWS provides the model and agent services that use it.
-
----
-
-## AWS and Neo4j: Different Data, Different Query Patterns
-
-- **AWS SQL:** answers questions about measurements over time.
-- **Neo4j Cypher:** answers questions about how plant assets and documents are connected.
-- **Together:** use SQL results and graph paths when a question needs both measurements and topology.
+**Together:** Neo4j gives an AI assistant the right context. AWS provides the models and services that use it.
 
 ---
 
-## AWS SQL: The Plant's Numbers Over Time
+## Keep Transaction History and Connected Context in the Right Stores
 
-- **Aggregation:** calculates average, minimum, maximum, and standard deviation for pressure, temperature, and flow tags.
-- **Time-series trends:** creates hourly, daily, and monthly rollups for each tag.
-- **Filtering and ranking:** finds readings above the 95th percentile and tags that create the most alarms.
-- **Joins on keys:** connects readings to instruments and equipment one relationship at a time.
-- **Dashboards and reporting:** shows uptime, throughput, and alarm counts.
+![w:1150](./dual-data-architecture-aws.svg)
 
-**Amazon Athena:** runs standard SQL against data in Amazon S3. **Amazon Timestream:** stores and analyzes industrial telemetry with time-series SQL.
+<!--
+The architecture diagram shows financial data in Amazon S3 tables alongside a
+Neo4j fraud knowledge graph. Policies, fraud typologies, and investigation guidance
+give meaning to customers, accounts, identity signals, and suspicious relationships.
+Selected graph findings can be written back to curated Amazon S3 results. The graph
+complements, rather than replaces, systems of record.
+-->
+
+---
+
+## AWS SQL Finds Unusual Financial Activity Over Time
+
+- **Aggregation and trends:** calculates totals, counts, averages, and hourly or daily activity by customer, account, merchant, or channel.
+- **Filtering and ranking:** finds accounts above velocity thresholds and merchants associated with the most flagged transactions.
+- **Joins on keys:** connects customers, accounts, transactions, and merchants one relationship at a time.
+- **Dashboards and reporting:** shows alert volumes, losses, review outcomes, and investigation workloads.
+
+**Amazon Athena:** runs standard SQL against data in Amazon S3. **Amazon Timestream:** stores and analyzes data that changes over time.
 
 <small>Sources: [Amazon Athena](https://docs.aws.amazon.com/athena/) and [Amazon Timestream for LiveAnalytics](https://docs.aws.amazon.com/timestream/latest/developerguide/what-is-timestream.html)</small>
 
 ---
 
-## Neo4j Cypher: How the Plant Is Connected
+## Neo4j Cypher Finds Patterns That Span Many Connections
 
-- **Multi-hop traversal:** follows a piping path across many lines and vessels.
-- **Pattern search:** finds every pressure safety valve with no relief path to the flare header.
-- **Path and reachability:** shows what is upstream of, or isolated by, a valve.
-- **Variable depth:** follows an unknown number of connections without setting a fixed join count.
-- **GraphRAG:** links P&ID drawings, standard operating procedures, and process hazard analysis documents to the equipment they describe.
+- **Follow connections:** move from a customer to accounts, devices, phone numbers, addresses, merchants, and other customers.
+- **Find a pattern:** identify circular transfers, shared identities, or coordinated activity across several accounts.
+- **Understand reach:** show which other customers and accounts are connected to a suspicious signal.
+- **Keep following:** explore as many relationships as an investigation requires without assembling a new chain of joins each time.
+- **Use governed guidance:** link alerts and patterns to the policies, typologies, and investigation steps that explain them.
 
-**Together:** AWS holds the measurements. Neo4j explains the equipment, documents, and paths that give those measurements meaning.
+**Together:** AWS holds financial activity and operational records. Neo4j shows the connections and guidance that give those records meaning.
 
 ---
 
-## What the Knowledge Layer Stores
+## The Knowledge Layer Maps Data to Its Meaning
 
-It is a graph of metadata and operational knowledge, not necessarily a copy of source data.
+It does not have to copy every raw transaction or source record.
 
 | Graph concern | Examples |
 | --- | --- |
-| **Technical metadata** | Sources, schemas, tables, columns, APIs, documents |
-| **Business semantics** | Terms, definitions, processes, policies |
-| **Retrieval knowledge** | Source instructions, query patterns, routing context |
-| **Process memory** | Agent traces, evidence, evaluations, path weights |
+| **Where data comes from** | Tables, payment systems, case tools, policies, and external data providers |
+| **What the data means** | Customers, accounts, transactions, devices, merchants, alerts, cases, and rules |
+| **How to find an answer** | Which sources to use and which questions each one can answer |
+| **What past investigations taught us** | Evidence, quality checks, investigator feedback, outcomes, and proven steps |
 
-The result connects business language to the technical mechanisms that can answer a question.
-
----
-
-## Reference Architecture
-
-![bg contain](./semantic-reference-architecture.svg)
-
-<!--
-The architecture diagram shows source schemas, business ontology, and enterprise
-documentation feeding a schema graph and semantic links. The enterprise knowledge
-graph then provides context and routing alongside execution history and weights.
-It guides native queries and API calls; it does not replace systems of record.
--->
+The result connects an investigator's words to the data, policies, and tools that can answer the question.
 
 ---
 
-## 1. Discover Source Schemas
+## 1. Map the Financial Data Without Moving It
 
-Use connectors, schema exports, or query-log analysis to construct a **metadata-only schema graph**.
+Create a map of where financial data lives and how it is organized while the source systems remain authoritative.
 
 ```text
-Database      -> Table      -> Column
-Source system -> API        -> Operation -> Parameter
-Repository    -> Collection -> Document
+S3 tables       -> customers / accounts / transactions / merchants
+Identity system -> customer -> phone / address / device
+Case platform   -> alert -> investigation -> outcome
+Document set    -> policy -> fraud typology -> investigation playbook
 ```
 
-- Preserve the original system as the system of record
-- Capture relationships and constraints from the source metadata
-- Add agent-readable descriptions for technical names and abbreviations
+- Keep the original systems as the trusted sources of data
+- Capture how records relate to each other in the source data
+- Add plain-language descriptions for account identifiers, transaction codes, channels, and risk flags
 
 ---
 
-## 2. Build the Business Ontology
+## 2. Give Fraud Data a Shared Vocabulary
 
-The ontology represents business terms, their relationships, and the processes they participate in.
+Define the terms investigators use and show how those terms relate to data and policy.
 
 It can be assembled from:
 
-- Existing ontologies and data dictionaries
-- Process documentation, collaboration content, query logs, and audit records
-- Domain-expert curation where associations are missing or ambiguous
+- Existing definitions for customers, accounts, transactions, alerts, cases, and fraud signals
+- Fraud policies, regulatory guidance, typology libraries, investigation playbooks, query logs, and audit records
+- Fraud-investigator and data-owner input where definitions or associations are unclear
 
-Schema discovery and ontology development can progress independently.
+Mapping the data and defining the shared vocabulary can happen independently.
 
 ---
 
-## 3. Create Semantic Bindings
+## 3. Connect Each Question to Evidence and Guidance
 
-The critical integration step links a business concept to the technical paths that represent it.
+Connect a fraud question to the data, rules, and investigation history that can answer it.
 
 ```text
-Business term -> Business process -> Source system -> Table / API / document
+Fraud pattern -> detection rule -> source system -> table / API / policy
 ```
 
-One concept can connect to multiple retrieval paths: a profile table, transaction history, a policy document, and the governing business process.
+One account can connect to several sources: its transactions, identity signals, device history, alerts, prior cases, and the policy that governs the investigation.
 
-This makes the technical estate discoverable in business terms.
-
----
-
-## 4. Supply Context at the Decision Point
-
-For each new request, an agent can:
-
-1. Identify the relevant business concepts
-2. Traverse to related processes, sources, schema elements, documents, and known patterns
-3. Retrieve only the context needed for the decision
-4. Issue a native query or API call to the selected source
-5. Construct a response from the returned evidence
-
-This replaces all-schema, all-policy prompt stuffing with focused, task-specific context.
+This makes financial data and investigation guidance discoverable in the language an investigator uses.
 
 ---
 
-## 5. Persist the Execution Path
+## 4. Give an AI Assistant Only the Context It Needs
 
-A novel request becomes a traversable process graph:
+For each new question, an AI assistant can:
+
+1. Identify the relevant customers, accounts, transactions, fraud signals, and policies
+2. Follow connections to related entities, data sources, guidance, and known investigations
+3. Retrieve only the context needed for the investigation
+4. Ask the selected source system for the required evidence
+5. Construct a response that cites the returned evidence
+
+Instead of giving the assistant every table and document, the knowledge layer supplies the information needed for that question.
+
+---
+
+## 5. Turn Each Investigation Into Reusable Knowledge
+
+Each new question creates a record of how it was answered:
 
 ```text
-Question
-  -> selected business concepts
-  -> source selection
-  -> query or API invocation
-  -> retrieved evidence
-  -> response
-  -> evaluation and performance metrics
+Question: Which accounts may belong to the same fraud ring?
+  -> relevant customers, accounts, and identity signals
+  -> data sources and policies used
+  -> transaction and graph evidence found
+  -> response and investigator decision
+  -> quality, timing, and outcome measures
 ```
 
-Capture the decisions, actions, evidence, latency, resource use, feedback, and outcome at each step.
+Capture the evidence, decisions, feedback, elapsed time, and outcome at each step.
 
 ---
 
-## Shared Memory Becomes Process Optimization
+## Proven Investigations Make Future Answers Better
 
-Later agents find semantically similar questions and inspect comparable paths.
+Later AI assistants can find similar questions and reuse the steps that worked.
 
-- Reuse high-confidence retrieval and execution paths
-- Skip proven steps and avoid previously unsuccessful routes
-- Improve a path when quality or performance is insufficient
-- Weight each graph relationship by observed quality and suitability
+- Reuse high-confidence ways of finding and checking evidence
+- Skip redundant work and avoid approaches that produced poor results
+- Improve a method when the evidence is incomplete or retrieval is too slow
+- Give more weight to connections that repeatedly support confirmed outcomes
 
-The graph becomes shared procedural memory: optimized business processes, not isolated chat histories.
+The connected knowledge layer becomes shared investigation memory, not a collection of isolated chat histories.
 
 ---
 
-## Evaluation and Governance Are Graph Inputs
+## Human Review Keeps Automated Assistance Accountable
 
 | Feedback channel | What it contributes |
 | --- | --- |
-| **Agent evaluator** | Trace-level quality and performance assessment; adjusts path weights |
-| **User feedback** | Explicit approvals or rejections and implicit response sentiment |
-| **Expert review** | Authoritative validation, annotations, suppression, and policy direction |
+| **Automated quality check** | Tests whether an answer is supported, complete, and timely |
+| **Investigator feedback** | Records whether the result was useful and what evidence was missing |
+| **Fraud and compliance review** | Validates conclusions, adds context, and clarifies governed investigation guidance |
 
-Keep rejected paths with low weights and an explanation. They provide a record of what failed and why a preferred alternative is safer.
+Keep rejected approaches with an explanation. They show what failed and why another method is preferred.
 
 ---
 
-## Virtual Graph and Knowledge Layer
+## Two Graph Approaches Solve Different Problems
 
-These are complementary graph patterns with different execution models.
+Both approaches connect data, but they serve different purposes.
 
-| Virtual graph | NeoCarta knowledge layer |
+| Virtual graph: one view across existing data | Knowledge layer: helps people and AI investigate |
 | --- | --- |
-| Maps schemas behind a unified graph query interface | Maps schemas, business semantics, retrieval instructions, and process knowledge |
-| Translates a graph query into a native target query at runtime | Guides an agent to make native SQL, API, or source-specific calls |
-| Supports federated retrieval | Supports grounding, routing, trace persistence, and path optimization |
+| Lets one query reach data that remains in several systems | Connects financial data, business meaning, policy, and instructions for finding evidence |
+| Translates a graph query into the query each source system understands | Guides an AI assistant to use SQL, APIs, graph queries, or source-specific tools |
+| Retrieves connected data without copying it first | Explains answers, selects sources, and learns from prior investigations |
 
-A virtual graph can serve as a retrieval capability within the knowledge layer.
-
----
-
-## Data Placement Is a Workload Decision
-
-Start zero-copy: graph metadata, semantics, paths, and history while source data remains in its systems of record.
-
-Selective graph materialization is justified when a workload needs:
-
-- Repeated low-latency reads that federation cannot meet
-- Multi-hop relationship analysis that is inefficient in a tabular source
-- Native graph algorithms or graph-native traversal
-
-Materialization is a targeted optimization discovered from observed traces, not a prerequisite for the semantic layer.
+A virtual graph can serve as one retrieval capability inside the knowledge layer.
 
 ---
 
-## Specialized Graph Analytics and Simulations
+## Keep Raw Transactions in Their Systems of Record
 
-Keep operational simulation as a dedicated analytics workload.
+Start by mapping and linking records while transaction history remains in the systems designed to store and govern it.
+
+Copy selected data into the graph only when an investigation needs:
+
+- Repeated, fast traversal that querying the source systems cannot support
+- Relationship analysis that is slow or difficult with tables and joins
+- Connected features that support fraud detection, prioritization, or investigation
+
+Copying data is a targeted performance choice, not a prerequisite for building the knowledge layer.
+
+---
+
+## Use Graph Analytics for Network-Level Fraud Signals
+
+Keep community detection, centrality, similarity, and path analysis as dedicated graph analytics workloads.
 
 ```text
-Persisted operational graph
-           -> In-memory scenario projection
-           -> Graph algorithms and impact analysis
-           -> Ranked mitigation options and reasoning
+Persisted fraud graph
+           -> In-memory view of a suspicious network
+           -> Community, path, and influence analysis
+           -> Ranked accounts and connections for review
 ```
 
-The knowledge layer treats the simulation as a governed capability: agents discover it, invoke validated procedures, and reuse tested workflows.
+The knowledge layer helps an AI assistant select an approved analysis, use validated parameters, explain the result, and reuse proven workflows.
 
 ---
 
-## Implementation Sequence
+## AWS and Neo4j Support Several Integration Paths
 
-1. Inventory sources, APIs, documentation, logs, and existing terminology
-2. Create the metadata-only schema graph
-3. Build the ontology and validate high-value business-to-technical links
-4. Implement one narrow workflow with complete trace capture
-5. Add automated evaluation, feedback capture, and expert review queues
-6. Reuse, weight, annotate, and suppress paths based on outcomes
-7. Materialize graph-native workloads only where measured gaps justify it
+- **[Spark Connector on Amazon EMR](https://neo4j.com/docs/spark/current/):** moves Spark DataFrames into Neo4j and reads graph data back into Spark.
+- **[AWS Glue Connector](https://neo4j.com/docs/connectors/):** builds managed ETL jobs from S3, RDS, Redshift, DynamoDB, and other Glue sources.
+- **[Kafka Connector on Amazon MSK](https://neo4j.com/docs/kafka/current/):** streams transaction events into Neo4j and graph changes back to Kafka.
+- **[Neo4j drivers](https://neo4j.com/docs/connectors/):** let Lambda, ECS, EKS, and EC2 services run Cypher queries.
+- **[MCP for AWS agents](https://neo4j.com/developer/genai-ecosystem/model-context-protocol-mcp/):** lets Bedrock and AgentCore agents call graph tools.
 
-Start with a single governed workflow, then expand the graph and its reusable process memory.
+---
+
+## Start With One Investigation That Needs Both Views
+
+1. Map the financial sources and how customers, accounts, transactions, and identity signals connect
+2. Define the fraud signals, policies, and investigation outcomes in shared language
+3. Start with one question: “Which accounts may belong to the same fraud ring, and what evidence connects them?”
+4. Connect the graph pattern to transaction evidence in AWS
+5. Add automated checks, investigator feedback, and compliance review
+6. Reuse proven steps, and copy selected data into the graph only when performance requires it
+
+Start with one governed fraud investigation, then expand the knowledge layer as more useful questions emerge.

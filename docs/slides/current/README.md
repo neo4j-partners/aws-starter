@@ -35,3 +35,14 @@ npm run build:html
 ```
 
 The deck uses local SVG and PNG files in this folder. Keep `--allow-local-files` in preview and build commands so Marp can load them.
+
+## AWS Technical Review
+
+Last reviewed on 2026-09-09 against current AWS documentation for:
+
+- [Amazon Bedrock AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-how-it-works.html) and [AgentCore Gateway](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html)
+- [Amazon S3 Tables](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables.html), [AWS Glue Data Catalog integration](https://docs.aws.amazon.com/glue/latest/dg/enable-s3-tables-catalog-integration.html), and [Amazon Athena access](https://docs.aws.amazon.com/athena/latest/ug/gdc-register-s3-table-bucket-cat.html)
+- [Amazon SageMaker Lakehouse](https://docs.aws.amazon.com/sagemaker-unified-studio/latest/userguide/lakehouse-how.html), [Amazon SageMaker Catalog](https://docs.aws.amazon.com/sagemaker-unified-studio/latest/userguide/working-with-business-catalog.html), and [Amazon SageMaker AI](https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html) naming
+- [Amazon Quick Sight](https://docs.aws.amazon.com/quick/latest/userguide/what-is.html) naming and dashboard capabilities
+
+Capabilities labeled **Planned** describe intended Neo4j or project integrations, not currently supported AWS-native features.

@@ -154,6 +154,45 @@ section.knowledge-slide .callout {
   font-size: 18px;
 }
 
+section.virtual-graph-slide {
+  padding: 38px 56px;
+}
+
+section.virtual-graph-slide h2 {
+  margin-bottom: 10px;
+}
+
+section.virtual-graph-slide .cols {
+  align-items: start;
+  gap: 24px;
+  grid-template-columns: 1.08fr 0.92fr;
+}
+
+section.virtual-graph-slide h3 {
+  margin: 6px 0 8px;
+}
+
+section.virtual-graph-slide ul {
+  font-size: 20px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+section.virtual-graph-slide li {
+  margin: 8px 0;
+}
+
+section.virtual-graph-slide img {
+  display: block;
+  margin: 0 auto;
+}
+
+section.virtual-graph-slide .callout {
+  font-size: 18px;
+  margin-top: 8px;
+  padding: 9px 14px;
+}
+
 li {
   opacity: 1 !important;
   visibility: visible !important;
@@ -380,18 +419,18 @@ Agent C → open account balance
 
 <!-- _class: knowledge-slide -->
 
-## A Context Graph turns enterprise knowledge into the right context now
+## A Context Graph is persistent connected memory for agents
 
-<p class="overview">The Knowledge Layer is the same for everyone. A Context Graph is what a single request pulls out of it.</p>
+<p class="overview">It links long-term enterprise knowledge, short-term interaction state, and reasoning memory in one queryable graph.</p>
 
 <div class="cols">
 <div>
 
-- **The Knowledge Layer:** Standing meaning, governed facts, and memory are already in place before anyone asks.
-- **This request's situation:** The user, permissions, task, and workflow state narrow the layer to what is relevant.
-- **Assembled, then discarded:** The layer persists. The Context Graph exists for one request.
+- **Long-term knowledge:** Entities, relationships, business meaning, policies, and authoritative facts.
+- **Short-term state:** Conversation, user intent, task, workflow state, and tool observations.
+- **Reasoning memory:** Decisions linked to their situation, rationale, actions, outcomes, and precedents.
 
-<div class="callout"><strong>Knowledge Graph:</strong> What do these connections mean?<br><strong>Context Graph:</strong> What matters right now?</div>
+<div class="callout"><strong>Each request retrieves relevant context and adds new state or traces.</strong> The graph persists and compounds across requests.</div>
 
 </div>
 <div>
@@ -401,7 +440,7 @@ Agent C → open account balance
 </div>
 </div>
 
-<!-- Sources: https://neo4j.com/blog/graph-database/1-of-3-the-difference-between-a-graph-a-knowledge-graph-and-a-context-graph/ and /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+<!-- Sources: https://neo4j.com/blog/agentic-ai/what-is-context-graph/, https://neo4j.com/blog/agentic-ai/context-graph-ai-agent-memory/, https://neo4j.com/blog/agentic-ai/hands-on-with-context-graphs-and-neo4j/, and /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
 
 ---
 
@@ -631,41 +670,30 @@ Agent C → open account balance
 
 ---
 
+<!-- _class: virtual-graph-slide -->
+
 ## Planned AWS query path: Cypher through Athena to S3 Tables
 
 <div class="cols">
 <div>
 
-```text
-Cypher query
-      ↓
-Neo4j Virtual Graph
-translates Cypher to SQL
-      ↓ SQL
-Amazon Athena
-      ├── uses → AWS Glue Data Catalog
-      │          s3tablescatalog parent
-      │          + table-bucket child catalog
-      └── reads → Amazon S3 Tables
-                 Apache Iceberg data
-      ↓
-Cypher result
-```
+![w:680](./virtual-graph-aws-query-path.svg)
 
 </div>
 <div>
 
-### AWS service roles
+### What each component does
 
-- **Query engine:** Amazon Athena executes the generated SQL.
-- **Catalog:** AWS Glue Data Catalog exposes each S3 table bucket as a child federated catalog under `s3tablescatalog`.
-- **Access:** IAM or AWS Lake Formation permissions govern the catalog and table resources Athena can query.
-- **Storage:** Amazon S3 Tables remains the authoritative data store.
+- **Translate:** Virtual Graph turns Cypher into SQL and maps the returned rows back to a Cypher result.
+- **Execute:** Athena runs the SQL against the table bucket.
+- **Resolve:** Glue exposes each table bucket as a child federated catalog under `s3tablescatalog`.
+- **Govern:** IAM or Lake Formation permissions control access to catalog and table resources.
+- **Store:** S3 Tables remains the authoritative source.
 
 </div>
 </div>
 
-<div class="callout"><strong>No source-data copy:</strong> Virtual Graph queries the tables in place instead of copying them into Neo4j.</div>
+<div class="callout"><strong>Read in place:</strong> Virtual Graph queries current S3 Tables data without materializing a second copy in Neo4j.</div>
 
 <small><span class="status-preview">Public preview:</span> Snowflake, Databricks, and Google BigQuery. <span class="status-roadmap">Planned for AWS:</span> Athena, AWS Glue Data Catalog, and Amazon S3 Tables.</small>
 
@@ -705,7 +733,7 @@ Cypher result
 
 ![w:1160](./aws-hosted-agent-knowledge-layer-workflow.svg)
 
-<div class="callout"><strong>Security boundary:</strong> AgentCore Gateway controls agentic traffic and supports inbound and outbound authentication, including OAuth 2.0. Each target service still enforces data access.</div>
+<div class="callout"><strong>Security boundary:</strong> Gateway supports OAuth 2.0 for tool traffic; targets enforce data access.</div>
 
 <!-- Sources: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html and https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html -->
 

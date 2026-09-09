@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title description">
-  <title id="title">A Context Graph is what one request pulls out of the Knowledge Layer</title>
-  <desc id="description">The standing Knowledge Layer, holding ontology, enterprise data, and memory, combines with the situation of a single request to assemble a Context Graph scoped to that request.</desc>
+  <title id="title">A Context Graph is persistent connected memory for agents</title>
+  <desc id="description">A persistent Context Graph links long-term enterprise knowledge, short-term interaction state, and reasoning memory. A request retrieves relevant connected context and adds new state or decision traces.</desc>
 
   <defs>
     <filter id="shadow" x="-20%" y="-25%" width="140%" height="160%">
@@ -11,78 +11,106 @@
     </marker>
     <style>
       text { font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
-      .eyebrow { fill: #ccfbf1; font-size: 15px; font-weight: 750; letter-spacing: 1.7px; text-anchor: middle; }
-      .layer-title { fill: #ffffff; font-size: 31px; font-weight: 750; text-anchor: middle; }
-      .component-title { fill: #0f172a; font-size: 20px; font-weight: 750; text-anchor: middle; }
-      .component-copy { fill: #475569; font-size: 14.5px; font-weight: 500; text-anchor: middle; }
-      .chip { fill: #0f766e; font-size: 13.5px; font-weight: 650; text-anchor: middle; }
-      .badge-teal { fill: #0f766e; font-size: 13px; font-weight: 750; letter-spacing: 0.8px; text-anchor: middle; }
-      .badge-slate { fill: #475569; font-size: 13px; font-weight: 750; letter-spacing: 0.8px; text-anchor: middle; }
+      .eyebrow { fill: #ccfbf1; font-size: 14px; font-weight: 750; letter-spacing: 1.6px; text-anchor: middle; }
+      .graph-title { fill: #ffffff; font-size: 31px; font-weight: 750; text-anchor: middle; }
+      .component-title { fill: #0f172a; font-size: 18px; font-weight: 750; text-anchor: middle; }
+      .component-copy { fill: #475569; font-size: 13px; font-weight: 500; text-anchor: middle; }
+      .chip { fill: #0f766e; font-size: 12.5px; font-weight: 650; text-anchor: middle; }
+      .flow-title { fill: #0f172a; font-size: 16px; font-weight: 750; text-anchor: middle; }
+      .flow-copy { fill: #475569; font-size: 13px; font-weight: 500; text-anchor: middle; }
     </style>
   </defs>
 
   <rect width="700" height="760" fill="#ffffff"/>
 
-  <!-- Input cards -->
+  <!-- Persistent Context Graph -->
   <g filter="url(#shadow)">
-    <rect x="50" y="60" width="290" height="340" rx="18" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
-    <rect x="360" y="60" width="290" height="340" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="42" y="36" width="616" height="520" rx="24" fill="#f8fafc" stroke="#0f766e" stroke-width="3"/>
+    <path d="M66 36h568a24 24 0 0 1 24 24v72H42V60a24 24 0 0 1 24-24Z" fill="#0f766e"/>
   </g>
+  <text class="eyebrow" x="350" y="72">PERSISTENT · SHARED · QUERYABLE</text>
+  <text class="graph-title" x="350" y="112">Context Graph</text>
 
-  <!-- The standing Knowledge Layer -->
-  <circle cx="195" cy="118" r="31" fill="#ccfbf1"/>
-  <g fill="#ffffff" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round">
-    <line x1="177" y1="120" x2="197" y2="103"/>
-    <line x1="177" y1="120" x2="199" y2="138"/>
-    <line x1="197" y1="103" x2="216" y2="121"/>
-    <line x1="199" y1="138" x2="216" y2="121"/>
-    <circle cx="177" cy="120" r="5"/>
-    <circle cx="197" cy="103" r="5"/>
-    <circle cx="199" cy="138" r="5"/>
-    <circle cx="216" cy="121" r="5"/>
+  <!-- Long-term knowledge -->
+  <rect x="60" y="164" width="180" height="334" rx="18" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+  <circle cx="150" cy="215" r="28" fill="#ccfbf1"/>
+  <g fill="#ffffff" stroke="#0f766e" stroke-width="2.3" stroke-linecap="round">
+    <line x1="134" y1="216" x2="152" y2="201"/>
+    <line x1="134" y1="216" x2="154" y2="232"/>
+    <line x1="152" y1="201" x2="168" y2="217"/>
+    <line x1="154" y1="232" x2="168" y2="217"/>
+    <circle cx="134" cy="216" r="4.5"/>
+    <circle cx="152" cy="201" r="4.5"/>
+    <circle cx="154" cy="232" r="4.5"/>
+    <circle cx="168" cy="217" r="4.5"/>
   </g>
-  <text class="component-title" x="195" y="184">Knowledge Layer</text>
-  <line x1="95" y1="206" x2="295" y2="206" stroke="#ccfbf1" stroke-width="2"/>
-  <rect x="85" y="226" width="220" height="34" rx="17" fill="#ecfeff"/>
-  <text class="chip" x="195" y="248">Knowledge Layer ontology</text>
-  <rect x="85" y="268" width="220" height="34" rx="17" fill="#ecfeff"/>
-  <text class="chip" x="195" y="290">Enterprise data</text>
-  <rect x="85" y="310" width="220" height="34" rx="17" fill="#ecfeff"/>
-  <text class="chip" x="195" y="332">Memory</text>
-  <rect x="105" y="356" width="180" height="34" rx="17" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1.5"/>
-  <text class="badge-teal" x="195" y="378">STANDING · SHARED</text>
+  <text class="component-title" x="150" y="270">Long-term</text>
+  <text class="component-title" x="150" y="291">knowledge</text>
+  <text class="component-copy" x="150" y="317">What the enterprise knows</text>
+  <line x1="82" y1="335" x2="218" y2="335" stroke="#ccfbf1" stroke-width="2"/>
+  <rect x="78" y="354" width="144" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="150" y="376">Entities + relations</text>
+  <rect x="78" y="398" width="144" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="150" y="420">Meaning + policy</text>
+  <rect x="78" y="442" width="144" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="150" y="464">Authoritative facts</text>
 
-  <!-- The situation of one request -->
-  <circle cx="505" cy="118" r="31" fill="#e2e8f0"/>
-  <g fill="none" stroke="#475569" stroke-width="2.5">
-    <circle cx="505" cy="118" r="18"/>
-    <circle cx="505" cy="118" r="8"/>
-    <circle cx="505" cy="118" r="2.5" fill="#475569"/>
+  <!-- Short-term interaction state -->
+  <rect x="260" y="164" width="180" height="334" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <circle cx="350" cy="215" r="28" fill="#e2e8f0"/>
+  <g fill="none" stroke="#475569" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M333 202h34v24h-16l-10 8v-8h-8z"/>
+    <circle cx="342" cy="214" r="2" fill="#475569"/>
+    <circle cx="350" cy="214" r="2" fill="#475569"/>
+    <circle cx="358" cy="214" r="2" fill="#475569"/>
   </g>
-  <text class="component-title" x="505" y="184">This request&#8217;s situation</text>
-  <line x1="405" y1="206" x2="605" y2="206" stroke="#e2e8f0" stroke-width="2"/>
-  <text class="component-copy" x="505" y="243">The question actually asked</text>
-  <text class="component-copy" x="505" y="271">The user and their permissions</text>
-  <text class="component-copy" x="505" y="299">The task and workflow state</text>
-  <text class="component-copy" x="505" y="327">Facts true at this moment</text>
-  <rect x="415" y="356" width="180" height="34" rx="17" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
-  <text class="badge-slate" x="505" y="378">PER REQUEST</text>
+  <text class="component-title" x="350" y="270">Short-term</text>
+  <text class="component-title" x="350" y="291">state</text>
+  <text class="component-copy" x="350" y="317">What is happening now</text>
+  <line x1="282" y1="335" x2="418" y2="335" stroke="#e2e8f0" stroke-width="2"/>
+  <rect x="278" y="354" width="144" height="34" rx="17" fill="#f1f5f9"/>
+  <text class="chip" x="350" y="376">Conversation + user</text>
+  <rect x="278" y="398" width="144" height="34" rx="17" fill="#f1f5f9"/>
+  <text class="chip" x="350" y="420">Task + workflow</text>
+  <rect x="278" y="442" width="144" height="34" rx="17" fill="#f1f5f9"/>
+  <text class="chip" x="350" y="464">Tool observations</text>
 
-  <!-- Assembly -->
-  <g fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round">
-    <path d="M195 408v26q0 18 18 18h137"/>
-    <path d="M505 408v26q0 18-18 18H350"/>
+  <!-- Reasoning memory -->
+  <rect x="460" y="164" width="180" height="334" rx="18" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+  <circle cx="550" cy="215" r="28" fill="#ccfbf1"/>
+  <g fill="none" stroke="#0f766e" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M535 203h14l8 8v18h-22z"/>
+    <path d="M549 203v9h8"/>
+    <path d="M562 222l7 7"/>
+    <path d="M565 229h7v-7"/>
   </g>
-  <circle cx="350" cy="452" r="5.5" fill="#0f766e"/>
-  <path d="M350 452v24" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <text class="component-title" x="550" y="270">Reasoning</text>
+  <text class="component-title" x="550" y="291">memory</text>
+  <text class="component-copy" x="550" y="317">Why decisions were made</text>
+  <line x1="482" y1="335" x2="618" y2="335" stroke="#ccfbf1" stroke-width="2"/>
+  <rect x="478" y="354" width="144" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="550" y="376">Situation + action</text>
+  <rect x="478" y="398" width="144" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="550" y="420">Rationale + outcome</text>
+  <rect x="478" y="442" width="144" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="550" y="464">Precedents + traces</text>
 
-  <g filter="url(#shadow)">
-    <rect x="50" y="490" width="600" height="240" rx="24" fill="#f8fafc" stroke="#0f766e" stroke-width="3"/>
-    <path d="M74 490h552a24 24 0 0 1 24 24v76H50v-76a24 24 0 0 1 24-24Z" fill="#0f766e"/>
-  </g>
-  <text class="eyebrow" x="350" y="530">ASSEMBLED, THEN DISCARDED</text>
-  <text class="layer-title" x="350" y="572">Context Graph</text>
-  <text x="350" y="634" text-anchor="middle" fill="#475569" font-size="15" font-weight="500">The slice of the layer this request is allowed to use</text>
-  <rect x="175" y="658" width="350" height="52" rx="26" fill="#ecfeff" stroke="#14b8a6" stroke-width="2.5"/>
-  <text x="350" y="692" text-anchor="middle" fill="#0f172a" font-size="20" font-weight="750">What matters right now?</text>
+  <!-- The three memory types remain connected -->
+  <line x1="241" y1="331" x2="259" y2="331" stroke="#0f766e" stroke-width="3"/>
+  <circle cx="250" cy="331" r="5" fill="#0f766e"/>
+  <line x1="441" y1="331" x2="459" y2="331" stroke="#0f766e" stroke-width="3"/>
+  <circle cx="450" cy="331" r="5" fill="#0f766e"/>
+
+  <!-- Request-time retrieval -->
+  <rect x="42" y="610" width="224" height="106" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text class="flow-title" x="154" y="650">User · task · workflow</text>
+  <text class="flow-copy" x="154" y="676">Selects what is relevant</text>
+
+  <path d="M276 663h120" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <rect x="406" y="610" width="252" height="106" rx="18" fill="#ecfeff" stroke="#14b8a6" stroke-width="2.5"/>
+  <text class="flow-title" x="532" y="650">Relevant connected context</text>
+  <text class="flow-copy" x="532" y="676">Retrieved for this request</text>
+
+  <path d="M350 556v36q0 18 18 18h156" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
 </svg>

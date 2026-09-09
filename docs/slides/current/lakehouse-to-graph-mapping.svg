@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="558" viewBox="0 0 1100 558" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0E5A8A"/>
+    </marker>
+    <marker id="ars" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0E5A8A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="558" fill="#FFFFFF"/>
+
+  <g transform="translate(0,-42)">
+
+  <!-- ================= mapping lane (drawn first so panels sit on top) ================= -->
+  <rect x="420" y="96" width="258" height="336" rx="12" fill="#F2F7FA" stroke="#9FB8C1" stroke-width="1.2" stroke-dasharray="6,4"/>
+  <rect x="428" y="104" width="242" height="34" rx="6" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.5"/>
+  <text x="549" y="121" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="700" fill="#1B3139">AWS Glue + Neo4j Spark Connector</text>
+  <text x="549" y="153" text-anchor="middle" font-size="11.5" fill="#3D5A63">Rows become nodes, foreign</text>
+  <text x="549" y="168" text-anchor="middle" font-size="11.5" fill="#3D5A63">keys become relationships</text>
+
+  <!-- ================= left: AWS lakehouse ================= -->
+  <rect x="36" y="88" width="372" height="440" rx="16" fill="#FFFFFF" stroke="#1B3139" stroke-width="2"/>
+  <rect x="52" y="104" width="340" height="34" rx="6" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.5"/>
+  <text x="222" y="121" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="700" fill="#1B3139">Amazon SageMaker Lakehouse</text>
+  <text x="222" y="160" text-anchor="middle" font-size="11.5" fill="#3D5A63">Apache Iceberg on Amazon S3 &#183; AWS Glue Catalog &#183; Athena</text>
+
+  <g fill="#FFFFFF" stroke="#1B3139" stroke-width="1.2">
+    <rect x="52" y="174" width="340" height="52" rx="8"/>
+    <rect x="52" y="234" width="340" height="52" rx="8"/>
+    <rect x="52" y="294" width="340" height="52" rx="8"/>
+    <rect x="52" y="354" width="340" height="52" rx="8"/>
+  </g>
+  <g font-size="14.5" font-weight="700" fill="#1B3139">
+    <text x="68" y="193" dominant-baseline="central">customers</text>
+    <text x="68" y="253" dominant-baseline="central">accounts</text>
+    <text x="68" y="313" dominant-baseline="central">transactions</text>
+    <text x="68" y="373" dominant-baseline="central">merchants</text>
+  </g>
+  <g font-size="10.5" fill="#3D5A63" text-anchor="end">
+    <text x="376" y="193" dominant-baseline="central">50K rows</text>
+    <text x="376" y="253" dominant-baseline="central">120K rows</text>
+    <text x="376" y="313" dominant-baseline="central">5M+ rows</text>
+    <text x="376" y="373" dominant-baseline="central">8K rows</text>
+  </g>
+  <g font-size="10" font-family="Menlo, Consolas, monospace" fill="#3D5A63">
+    <text x="68" y="212" dominant-baseline="central">customer_id &#183; name &#183; dob &#183; ssn_hash</text>
+    <text x="68" y="272" dominant-baseline="central">account_id &#183; customer_id &#183; status &#183; limit</text>
+    <text x="68" y="332" dominant-baseline="central">txn_id &#183; from_account &#183; to_account &#183; amount &#183; ts</text>
+    <text x="68" y="392" dominant-baseline="central">merchant_id &#183; name &#183; category &#183; mcc_code</text>
+  </g>
+  <text x="52" y="424" font-size="11" fill="#3D5A63">+ alerts &#183; cases &#183; channels &#183; devices &#183; review outcomes</text>
+
+  <rect x="52" y="436" width="340" height="76" rx="10" fill="#F2F7FA" stroke="#1B3139" stroke-width="1.2"/>
+  <text x="68" y="459" font-size="12" font-weight="700" fill="#0E2A33">CURATED RESULTS IN AMAZON S3</text>
+  <rect x="68" y="472" width="152" height="28" rx="6" fill="#FFFFFF" stroke="#1B3139" stroke-width="1.2"/>
+  <text x="144" y="486" text-anchor="middle" dominant-baseline="central" font-size="12" font-family="Menlo, Consolas, monospace" font-weight="700" fill="#0E2A33">fraud_candidates</text>
+  <text x="232" y="490" font-size="10.5" fill="#3D5A63">graph findings for analytics</text>
+
+  <!-- ================= mapping chips ================= -->
+  <g fill="#FFFFFF" stroke="#1B3139" stroke-width="1.2">
+    <rect x="461" y="180" width="176" height="40" rx="8"/>
+    <rect x="461" y="240" width="176" height="40" rx="8"/>
+    <rect x="461" y="300" width="176" height="40" rx="8"/>
+    <rect x="461" y="360" width="176" height="40" rx="8"/>
+  </g>
+  <g text-anchor="middle" font-size="10" font-family="Menlo, Consolas, monospace" fill="#1B3139">
+    <text x="549" y="192" dominant-baseline="central">customer_id</text>
+    <text x="549" y="252" dominant-baseline="central">account_id &#183; customer_id</text>
+    <text x="549" y="312" dominant-baseline="central">from_account &#183; to_account</text>
+    <text x="549" y="372" dominant-baseline="central">merchant_id</text>
+  </g>
+  <g text-anchor="middle" font-size="11.5" font-weight="700" fill="#0E5A8A">
+    <text x="549" y="209" dominant-baseline="central">&#8594; (:Customer)</text>
+    <text x="549" y="269" dominant-baseline="central">&#8594; (:Account) + OWNS</text>
+    <text x="549" y="329" dominant-baseline="central">&#8594; TRANSFERRED_TO</text>
+    <text x="549" y="389" dominant-baseline="central">&#8594; (:Merchant) + PAID</text>
+  </g>
+  <g stroke="#0E5A8A" stroke-width="2" marker-end="url(#ar)">
+    <line x1="394" y1="200" x2="457" y2="200"/>
+    <line x1="394" y1="260" x2="457" y2="260"/>
+    <line x1="394" y1="320" x2="457" y2="320"/>
+    <line x1="394" y1="380" x2="457" y2="380"/>
+    <line x1="639" y1="200" x2="688" y2="200"/>
+    <line x1="639" y1="260" x2="688" y2="260"/>
+    <line x1="639" y1="320" x2="688" y2="320"/>
+    <line x1="639" y1="380" x2="688" y2="380"/>
+  </g>
+
+  <!-- ================= right: Neo4j graph ================= -->
+  <rect x="690" y="88" width="374" height="440" rx="16" fill="#FFFFFF" stroke="#1B3139" stroke-width="2"/>
+  <rect x="706" y="104" width="342" height="34" rx="6" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.5"/>
+  <text x="877" y="121" text-anchor="middle" dominant-baseline="central" font-size="15" font-weight="700" fill="#1B3139">Neo4j Fraud Knowledge Graph</text>
+  <text x="877" y="160" text-anchor="middle" font-size="11.5" fill="#3D5A63">Entities, relationships, policies and cases &#183; Cypher</text>
+
+  <!-- relationships -->
+  <g stroke="#0E5A8A" stroke-width="1.6" marker-end="url(#ars)">
+    <line x1="768" y1="219" x2="768" y2="241"/>
+    <line x1="768" y1="279" x2="768" y2="301"/>
+    <line x1="768" y1="339" x2="768" y2="361"/>
+    <line x1="830" y1="200" x2="922" y2="200"/>
+    <line x1="924" y1="260" x2="832" y2="260"/>
+    <line x1="986" y1="361" x2="986" y2="339"/>
+    <line x1="986" y1="301" x2="986" y2="279"/>
+  </g>
+  <g font-size="10" font-weight="600" fill="#0E5A8A">
+    <text x="760" y="233" text-anchor="end">OWNS</text>
+    <text x="776" y="286">TRANSFERRED_TO</text>
+    <text x="776" y="352">PAID</text>
+    <text x="877" y="192" text-anchor="middle">USED_DEVICE</text>
+    <text x="878" y="252" text-anchor="middle">GOVERNS</text>
+    <text x="978" y="353" text-anchor="end">FOLLOWS</text>
+    <text x="978" y="293" text-anchor="end">IMPLEMENTS</text>
+  </g>
+  <text x="776" y="297" font-size="9" fill="#3D5A63">{amount &#183; ts &#183; channel}</text>
+
+  <!-- nodes loaded from S3 tables -->
+  <g fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.5">
+    <rect x="708" y="183" width="120" height="34" rx="16"/>
+    <rect x="708" y="243" width="120" height="34" rx="16"/>
+    <rect x="708" y="303" width="120" height="34" rx="16"/>
+    <rect x="708" y="363" width="120" height="34" rx="16"/>
+    <rect x="926" y="183" width="120" height="34" rx="16"/>
+  </g>
+  <!-- graph-only knowledge nodes -->
+  <g fill="#FFFFFF" stroke="#1B3139" stroke-width="1.4" stroke-dasharray="5,3">
+    <rect x="926" y="243" width="120" height="34" rx="16"/>
+    <rect x="926" y="303" width="120" height="34" rx="16"/>
+    <rect x="926" y="363" width="120" height="34" rx="16"/>
+  </g>
+  <g text-anchor="middle" font-size="12.5" font-weight="600" fill="#1B3139">
+    <text x="768" y="200" dominant-baseline="central">Customer</text>
+    <text x="768" y="260" dominant-baseline="central">Account</text>
+    <text x="768" y="320" dominant-baseline="central">Account</text>
+    <text x="768" y="380" dominant-baseline="central">Merchant</text>
+    <text x="986" y="200" dominant-baseline="central">Device</text>
+    <text x="986" y="260" dominant-baseline="central">Policy</text>
+    <text x="986" y="320" dominant-baseline="central">Playbook</text>
+    <text x="986" y="380" dominant-baseline="central">Case</text>
+  </g>
+
+  <!-- legend -->
+  <rect x="706" y="436" width="342" height="76" rx="10" fill="#F2F7FA" stroke="#1B3139" stroke-width="1.2"/>
+  <rect x="722" y="452" width="22" height="16" rx="5" fill="#B7DF7A" stroke="#6FA82E" stroke-width="1.4"/>
+  <text x="754" y="460" dominant-baseline="central" font-size="11.5" fill="#1B3139">Loaded from S3 tables via Glue + Spark</text>
+  <rect x="722" y="482" width="22" height="16" rx="5" fill="#FFFFFF" stroke="#1B3139" stroke-width="1.4" stroke-dasharray="5,3"/>
+  <text x="754" y="490" dominant-baseline="central" font-size="11.5" fill="#1B3139">Knowledge layer, graph only: policy, playbook, case</text>
+
+  <!-- write-back path -->
+  <text x="542" y="459" text-anchor="middle" font-size="11.5" font-weight="700" fill="#0E5A8A">findings written back to S3</text>
+  <line x1="686" y1="474" x2="398" y2="474" stroke="#0E5A8A" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="542" y="493" text-anchor="middle" font-size="10" fill="#3D5A63">reporting &#183; audit &#183; ML features</text>
+
+  <!-- caption -->
+  <text x="550" y="560" text-anchor="middle" font-size="13.5" fill="#1B3139">The lakehouse stays the system of record for transaction evidence. Neo4j adds the relationships,</text>
+  <text x="550" y="580" text-anchor="middle" font-size="13.5" fill="#1B3139">policies, and cases that rows and columns cannot express.</text>
+  </g>
+</svg>

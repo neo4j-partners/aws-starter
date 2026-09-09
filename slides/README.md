@@ -1,6 +1,6 @@
-# Financial Fraud Knowledge Layer Slides
+# AWS and Neo4j Grounded Enterprise AI Slides
 
-This folder contains the financial fraud investigation knowledge-layer deck in [Marp](https://marp.app/) format. The main deck is `semantic-slides.md`.
+This folder contains the AWS and Neo4j grounded enterprise AI deck in [Marp](https://marp.app/) format. The main deck is `aws-neo4j-grounded-enterprise-ai.md`.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ From the repository root, run:
 npx --yes @marp-team/marp-cli@4.4.0 --input-dir slides --server --allow-local-files
 ```
 
-Open [http://localhost:8080/semantic-slides.md](http://localhost:8080/semantic-slides.md) in your browser. Marp reloads the slide deck when you save `semantic-slides.md`.
+Open [http://localhost:8080/aws-neo4j-grounded-enterprise-ai.md](http://localhost:8080/aws-neo4j-grounded-enterprise-ai.md) in your browser. Marp reloads the slide deck when you save `aws-neo4j-grounded-enterprise-ai.md`.
 
 Press <kbd>P</kbd> in the browser to open presenter view.
 
@@ -27,7 +27,7 @@ Press <kbd>P</kbd> in the browser to open presenter view.
 Run this command from the repository root:
 
 ```bash
-npx --yes @marp-team/marp-cli@4.4.0 slides/semantic-slides.md --html --allow-local-files --output slides/semantic-slides.html
+npx --yes @marp-team/marp-cli@4.4.0 slides/aws-neo4j-grounded-enterprise-ai.md --html --allow-local-files --output slides/aws-neo4j-grounded-enterprise-ai.html
 ```
 
 The deck uses local SVG and PNG files in this folder. Keep `--allow-local-files` in preview and build commands so Marp can load them.

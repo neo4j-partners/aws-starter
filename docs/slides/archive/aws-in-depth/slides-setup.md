@@ -49,5 +49,5 @@ for f in *-slides.md; do marp "$f" --pdf --allow-local-files; done
 - Decks 01-03 are platform-neutral Neo4j/GraphRAG content (no AWS or
   Databricks specifics) so they are reusable.
 - Em-dashes were removed from all prose per the project writing style.
-- Decks live in `docs/slides/aws-in-depth/`. Image paths are relative
+- Decks live in `docs/slides/archive/aws-in-depth/`. Image paths are relative
   (`images/<name>`), so the deck folder stays portable if moved.

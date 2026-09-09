@@ -1,4 +1,4 @@
-name: Deploy AWS In-Depth Slides
+name: Deploy AWS + Neo4j Slides
 
 on:
   push:
@@ -7,8 +7,7 @@ on:
     paths:
       - .github/workflows/deploy-aws-in-depth-slides.yml
       - docs/slides/**
-      - slides/semantic-slides.md
-      - slides/semantic-reference-architecture.svg
+      - slides/**
   workflow_dispatch:
 
 permissions:

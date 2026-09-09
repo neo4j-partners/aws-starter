@@ -31,7 +31,7 @@
   <text x="71" y="179" text-anchor="end" class="label">Query</text><text x="71" y="194" text-anchor="end" class="label">Logs</text>
   <g class="small"><text x="103" y="177">• Request logs</text><text x="103" y="195">• Query history</text></g>
   <text x="71" y="286" text-anchor="end" class="label">Data</text><text x="71" y="301" text-anchor="end" class="label">Catalogs</text>
-  <g class="small"><text x="101" y="242">• Unity Catalog</text><text x="101" y="264">• Collibra</text><text x="101" y="286">• Informatica</text><text x="101" y="308">• Alation</text><text x="101" y="330">• AWS Glue</text></g>
+  <g class="small"><text x="101" y="242">• Unity Catalog</text><text x="101" y="264">• Collibra</text><text x="101" y="286">• Informatica</text><text x="101" y="308">• Alation</text><text x="101" y="330">• AWS Glue (planned)</text></g>
   <text x="71" y="431" text-anchor="end" class="label">Lakes</text><text x="71" y="446" text-anchor="end" class="label">Databases</text><text x="71" y="461" text-anchor="end" class="label">Warehouses</text>
   <g class="small"><text x="96" y="395">• Google BigQuery</text><text x="96" y="409">• Databricks</text><text x="96" y="423">• Neo4j</text><text x="96" y="437">• Pinecone</text><text x="96" y="451">• Snowflake</text><text x="96" y="465">• MongoDB</text><text x="96" y="479">• Amazon SageMaker Lakehouse</text></g>
 

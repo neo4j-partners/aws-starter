@@ -1,10 +1,23 @@
-# Workshop Slides
+# AWS + Neo4j Presentation Site
 
-Presentation-ready slides formatted for [Marp](https://marp.app/).
+This directory builds the Marp presentation gallery published through GitHub Pages.
 
-## Quick Start
+## Current decks
 
-Requires Node.js 22 LTS (`brew install node@22`) and a one-time `npm ci` in this directory.
+The gallery builds these editable sources from the repository-level `slides/` directory:
+
+- `slides/neocarta-slides.md`
+- `slides/aws-neo4j-grounded-enterprise-ai.md`
+
+The supporting SVG files remain beside the Markdown sources in `slides/` so local Marp preview continues to work.
+
+## Archived decks
+
+The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`. The build publishes those decks under `/archive/` and lists them in a separate Archive section on the gallery page.
+
+## Quick start
+
+Requires Node.js 22 LTS and a one-time dependency install in this directory.
 
 ```bash
 cd docs/slides
@@ -12,78 +25,38 @@ npm ci
 npm run serve
 ```
 
-Opens at http://localhost:8080/ with the deck gallery.
+Open <http://localhost:8080/> to view the gallery.
 
-### Live Marp preview server
-
-`npm run preview` runs the Marp CLI live server (auto-reloads on edits):
+For a live Marp preview of the two current source decks:
 
 ```bash
 npm run preview
 ```
 
-Marp CLI has no `--port` flag; the server port comes from the `PORT` environment variable (default 8080). To run on port 8010:
+## Build commands
 
-```bash
-PORT=8010 npm run preview
-```
-
-Then open http://localhost:8010/.
-
-## Deck Gallery
-
-Build every deck in `aws-in-depth/` into `build/`:
+Build the complete gallery, including the archive:
 
 ```bash
 npm run build:all
 ```
 
-This creates a clickable gallery at `build/index.html` linking all six decks:
-
-- `01-neo4j-for-agentic-ai-slides.html`
-- `02-aircraft-data-model-slides.html`
-- `03-graphrag-and-genai-slides.html`
-- `04-graph-enriched-search-slides.html`
-- `05-neo4j-aura-and-agents-slides.html`
-- `06-neo4j-on-aws-slides.html`
-
-The build script copies the `aws-in-depth/images/` assets into `build/images/` and writes `.nojekyll` so GitHub Pages serves the output as-is. The custom Marp themes in `themes/` (`finance`, `graph-lakehouse`) are registered during the build, so any deck can opt in through its frontmatter `theme:` field.
-
-Build a single deck:
+Build one deck by source filename:
 
 ```bash
-node scripts/build-theme-gallery.mjs 02-aircraft-data-model-slides.md
+node scripts/build-theme-gallery.mjs neocarta-slides.md
 ```
 
-## Publishing
-
-The GitHub Actions workflow `.github/workflows/deploy-aws-in-depth-slides.yml` runs on pushes to `main` that touch `docs/slides/**`. It runs `npm ci`, `npm audit`, and `npm run build:all`, then publishes `build/` to GitHub Pages. The full gallery is served at the Pages URL.
-
-## Export to PDF or PPTX
+Export the current decks to standalone formats:
 
 ```bash
-cd docs/slides
 npm run build:pdf
+npm run build:html
 npm run build:pptx
 ```
 
-These write to `dist/` using `marp --input-dir aws-in-depth`.
+Build output is written to `docs/slides/build/` or `docs/slides/dist/`; both directories are ignored by Git.
 
-## Troubleshooting
+## Publishing
 
-**`require is not defined in ES module scope` error?**
-- Marp CLI is incompatible with Node.js 25+. Install Node 22 LTS: `brew install node@22`
-
-**Images not showing?**
-- Run `npm run build:all`; the build script copies local image assets into `build/images/`.
-
-## Slide Format
-
-All slides use Marp markdown format with pagination, syntax-highlighted code blocks, tables, and two-column layouts. See any slide file for the frontmatter template.
-
-## Additional Resources
-
-- [Marp Documentation](https://marpit.marp.app/)
-- [Marp CLI Usage](https://github.com/marp-team/marp-cli)
-- [Marp Themes](https://github.com/marp-team/marp-core/tree/main/themes)
-- [Creating Custom Themes](https://marpit.marp.app/theme-css)
+The workflow `.github/workflows/deploy-aws-in-depth-slides.yml` runs when `docs/slides/**`, `slides/**`, or the workflow itself changes on `main`. It installs dependencies, audits them, builds the gallery, and deploys `docs/slides/build/` to GitHub Pages.

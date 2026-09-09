@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2700" role="img" aria-labelledby="title description">
+  <title id="title">AWS and Neo4j platform layer map in three states</title>
+  <desc id="description">Three views show the AWS platform, Neo4j capabilities placed beside AWS services, and the complete architecture.</desc>
+  <view id="aws" viewBox="0 180 1600 720"/>
+  <view id="neo4j" viewBox="0 1080 1600 720"/>
+  <view id="complete" viewBox="0 1980 1600 720"/>
+  <defs>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .canvas { fill: #ffffff; }
+      .frame { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 2; }
+      .eyebrow { font-size: 18px; font-weight: 800; letter-spacing: 2.5px; fill: #64748b; }
+      .title { font-size: 39px; font-weight: 750; fill: #0f172a; }
+      .subtitle { font-size: 20px; fill: #475569; }
+      .layer-name { font-size: 23px; font-weight: 750; fill: #0f172a; }
+      .service { font-size: 19px; font-weight: 620; fill: #334155; }
+      .neo-title { font-size: 22px; font-weight: 760; fill: #075985; }
+      .neo-copy { font-size: 18px; font-weight: 610; fill: #0c4a6e; }
+      .aws-chip { fill: #fff7ed; stroke: #fb923c; stroke-width: 2; }
+      .neo-chip { fill: #ecfeff; stroke: #14b8a6; stroke-width: 2; }
+      .layer { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .layer-alt { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 2; }
+      .arrow { fill: none; stroke: #64748b; stroke-width: 3; stroke-dasharray: 8 7; }
+      .status { font-size: 16px; font-weight: 750; fill: #0f766e; }
+    </style>
+  </defs>
+
+  <!-- State 1: AWS only -->
+  <g transform="translate(0 0)">
+    <rect class="canvas" width="1600" height="900"/>
+    <rect class="frame" x="45" y="35" width="1510" height="830" rx="24"/>
+    <text class="eyebrow" x="90" y="88">STATE 1 · AWS PLATFORM</text>
+    <text class="title" x="90" y="137">AWS provides the governed data, analytics, AI, and application foundation</text>
+    <text class="subtitle" x="90" y="171">The same five-layer map anchors every integration and capability in this deck.</text>
+
+    <g filter="url(#shadow)">
+      <rect class="layer" x="90" y="215" width="1420" height="105" rx="16"/>
+      <rect class="layer-alt" x="90" y="337" width="1420" height="105" rx="16"/>
+      <rect class="layer" x="90" y="459" width="1420" height="105" rx="16"/>
+      <rect class="layer-alt" x="90" y="581" width="1420" height="105" rx="16"/>
+      <rect class="layer" x="90" y="703" width="1420" height="105" rx="16"/>
+    </g>
+    <text class="layer-name" x="125" y="263">Applications and agents</text>
+    <text class="service" x="525" y="263">AgentCore Runtime · AgentCore Gateway · Strands Agents</text>
+    <text class="layer-name" x="125" y="385">Models</text>
+    <text class="service" x="525" y="385">Amazon Bedrock</text>
+    <text class="layer-name" x="125" y="507">Analytics and processing</text>
+    <text class="service" x="525" y="507">Athena · EMR · Glue · MSK · SageMaker</text>
+    <text class="layer-name" x="125" y="629">Catalog and governance</text>
+    <text class="service" x="525" y="629">Glue Data Catalog · SageMaker Catalog · Lake Formation</text>
+    <text class="layer-name" x="125" y="751">Storage</text>
+    <text class="service" x="525" y="751">Amazon S3 · Amazon S3 Tables with Apache Iceberg</text>
+  </g>
+
+  <!-- State 2: Neo4j placement -->
+  <g transform="translate(0 900)">
+    <rect class="canvas" width="1600" height="900"/>
+    <rect class="frame" x="45" y="35" width="1510" height="830" rx="24"/>
+    <text class="eyebrow" x="90" y="88">STATE 2 · NEO4J PLACEMENT</text>
+    <text class="title" x="90" y="137">Neo4j adds connected context across the AWS platform</text>
+    <text class="subtitle" x="90" y="171">Each capability sits beside an AWS service and preserves AWS systems of record.</text>
+
+    <g filter="url(#shadow)">
+      <rect class="layer" x="90" y="215" width="920" height="105" rx="16"/>
+      <rect class="layer-alt" x="90" y="337" width="920" height="105" rx="16"/>
+      <rect class="layer" x="90" y="459" width="920" height="105" rx="16"/>
+      <rect class="layer-alt" x="90" y="581" width="920" height="105" rx="16"/>
+      <rect class="layer" x="90" y="703" width="920" height="105" rx="16"/>
+
+      <rect class="neo-chip" x="1040" y="215" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="337" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="459" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="581" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="703" width="470" height="105" rx="16"/>
+    </g>
+    <text class="layer-name" x="125" y="253">Applications and agents</text>
+    <text class="service" x="425" y="253">AgentCore · Strands</text>
+    <text class="layer-name" x="125" y="375">Models</text>
+    <text class="service" x="425" y="375">Amazon Bedrock</text>
+    <text class="layer-name" x="125" y="497">Analytics and processing</text>
+    <text class="service" x="425" y="497">Athena · EMR · Glue · MSK · SageMaker</text>
+    <text class="layer-name" x="125" y="619">Catalog and governance</text>
+    <text class="service" x="425" y="619">Glue Data Catalog · SageMaker Catalog</text>
+    <text class="layer-name" x="125" y="741">Storage</text>
+    <text class="service" x="425" y="741">Amazon S3 · S3 Tables</text>
+
+    <text class="neo-title" x="1070" y="251">Cypher, drivers, and MCP</text>
+    <text class="neo-copy" x="1070" y="282">Connected tools for AWS agents</text>
+    <text class="neo-title" x="1070" y="373">Context for Amazon Bedrock</text>
+    <text class="neo-copy" x="1070" y="404">Connected facts and policies</text>
+    <text class="neo-title" x="1070" y="495">Graph analytics</text>
+    <text class="neo-copy" x="1070" y="526">Traversal, patterns, communities</text>
+    <text class="neo-title" x="1070" y="617">Enterprise Knowledge Layer</text>
+    <text class="neo-copy" x="1070" y="648">NeoCarta semantic map</text>
+    <text class="neo-title" x="1070" y="739">Neo4j graph database</text>
+    <text class="neo-copy" x="1070" y="770">AuraDB or self-managed</text>
+  </g>
+
+  <!-- State 3: Complete architecture -->
+  <g transform="translate(0 1800)">
+    <rect class="canvas" width="1600" height="900"/>
+    <rect class="frame" x="45" y="35" width="1510" height="830" rx="24"/>
+    <text class="eyebrow" x="90" y="88">STATE 3 · COMPLETE ARCHITECTURE</text>
+    <text class="title" x="90" y="137">AWS runs the platform; Neo4j supplies connected knowledge and memory</text>
+    <text class="subtitle" x="90" y="171">Governed AWS data stays authoritative while graph context grounds applications and agents.</text>
+
+    <g filter="url(#shadow)">
+      <rect class="aws-chip" x="90" y="215" width="920" height="105" rx="16"/>
+      <rect class="aws-chip" x="90" y="337" width="920" height="105" rx="16"/>
+      <rect class="aws-chip" x="90" y="459" width="920" height="105" rx="16"/>
+      <rect class="aws-chip" x="90" y="581" width="920" height="105" rx="16"/>
+      <rect class="aws-chip" x="90" y="703" width="920" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="215" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="337" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="459" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="581" width="470" height="105" rx="16"/>
+      <rect class="neo-chip" x="1040" y="703" width="470" height="105" rx="16"/>
+    </g>
+    <text class="layer-name" x="125" y="250">Applications and agents</text>
+    <text class="service" x="425" y="250">AgentCore Runtime · Gateway · Strands</text>
+    <text class="layer-name" x="125" y="372">Models</text>
+    <text class="service" x="425" y="372">Amazon Bedrock</text>
+    <text class="layer-name" x="125" y="494">Analytics and processing</text>
+    <text class="service" x="425" y="494">Athena · EMR · Glue · MSK · SageMaker</text>
+    <text class="layer-name" x="125" y="616">Catalog and governance</text>
+    <text class="service" x="425" y="616">Glue · SageMaker Catalog · Lake Formation</text>
+    <text class="layer-name" x="125" y="738">Storage</text>
+    <text class="service" x="425" y="738">Amazon S3 · S3 Tables with Iceberg</text>
+
+    <text class="neo-title" x="1070" y="249">MCP tools + Agent Memory</text>
+    <text class="neo-copy" x="1070" y="280">Evidence and decision context</text>
+    <text class="neo-title" x="1070" y="371">Context for Amazon Bedrock</text>
+    <text class="neo-copy" x="1070" y="402">Connected facts and policies</text>
+    <text class="neo-title" x="1070" y="493">Virtual Graph + GDS</text>
+    <text class="neo-copy" x="1070" y="524">Graph paths · AWS support in build</text>
+    <text class="neo-title" x="1070" y="615">Knowledge Layer + NeoCarta</text>
+    <text class="neo-copy" x="1070" y="646">Meaning, metadata, provenance</text>
+    <text class="neo-title" x="1070" y="737">Neo4j graph database</text>
+    <text class="neo-copy" x="1070" y="768">AuraDB or EKS and EC2</text>
+  </g>
+</svg>

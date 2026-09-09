@@ -4,65 +4,91 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
-const SLIDE_DIR = "aws-in-depth";
-const DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
+const ARCHIVE_DIR = "archive/aws-in-depth";
+const ARCHIVE_DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
 
-const descriptions = {
+const activeDecks = [
+  {
+    file: "neocarta-slides.md",
+    source: "../../slides/neocarta-slides.md",
+    order: "01",
+    title: "Neocarta: A Semantic Map for Enterprise Data",
+    output: "neocarta-slides.html",
+    description:
+      "How Neocarta builds and serves a semantic map in Neo4j, plus an architectural comparison with Rosetta SDL.",
+    assets: ["../../slides/neocarta.svg"],
+  },
+  {
+    file: "aws-neo4j-grounded-enterprise-ai.md",
+    source: "../../slides/aws-neo4j-grounded-enterprise-ai.md",
+    order: "02",
+    title: "AWS + Neo4j: Connected Context for Grounded Enterprise AI",
+    output: "aws-neo4j-grounded-enterprise-ai.html",
+    description:
+      "How AWS and Neo4j combine governed data, connected context, semantic discovery, and agent memory for grounded enterprise AI.",
+    assets: [
+      "../../slides/aws-neo4j-layer-map.svg",
+      "../../slides/dual-data-architecture-aws.svg",
+      "../../slides/exec-knowledge-layer.svg",
+      "../../slides/neocarta.svg",
+      "../../slides/neo4j-agent-memory-diagram.svg",
+    ],
+  },
+];
+
+const archiveDescriptions = {
   "01-neo4j-for-agentic-ai-slides.md":
-    "Neo4j for agentic AI: managed graph database, GraphRAG retrieval, retrievers to agents.",
+    "Neo4j for agentic AI: managed graph database, GraphRAG retrieval, and the path from retrievers to agents.",
   "02-aircraft-data-model-slides.md":
-    "Aircraft digital-twin property graph plus the dual analytics-and-graph data architecture.",
-  "03-graphrag-and-genai-slides.md":
-    "GraphRAG patterns and generative AI grounding.",
-  "04-graph-enriched-search-slides.md":
-    "Graph-enriched search beyond keyword retrieval.",
-  "05-neo4j-aura-and-agents-slides.md":
-    "Neo4j Aura and agent integration patterns.",
-  "06-neo4j-on-aws-slides.md":
-    "Neo4j on AWS Bedrock AgentCore: MCP server, Gateway, and runtime.",
+    "Aircraft digital-twin property graph and a dual analytics-and-graph data architecture.",
+  "03-graphrag-and-retrievers-slides.md":
+    "GraphRAG retrieval patterns, vector search, vector Cypher retrieval, and text-to-Cypher.",
+  "04-neo4j-on-aws-slides.md":
+    "Neo4j on Amazon Bedrock AgentCore, including the MCP server, Gateway, and runtime architecture.",
 };
 
-const decks = readdirSync(SLIDE_DIR)
-  .filter((name) => DECK_PATTERN.test(name))
+const archiveTitles = {
+  "01-neo4j-for-agentic-ai-slides.md": "Neo4j for Agentic AI",
+  "02-aircraft-data-model-slides.md": "The Aircraft Data Model",
+  "03-graphrag-and-retrievers-slides.md": "GraphRAG and Retrievers",
+  "04-neo4j-on-aws-slides.md": "Neo4j on AWS Bedrock AgentCore",
+};
+
+const archiveDecks = readdirSync(ARCHIVE_DIR)
+  .filter((name) => ARCHIVE_DECK_PATTERN.test(name))
   .sort()
   .map((file) => {
-    const [, order, slug] = file.match(DECK_PATTERN);
-    const title = slug
+    const [, order, slug] = file.match(ARCHIVE_DECK_PATTERN);
+    const fallbackTitle = slug
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
+    const title = archiveTitles[file] ?? fallbackTitle;
 
     return {
       file,
-      source: join(SLIDE_DIR, file),
+      source: join(ARCHIVE_DIR, file),
       order,
       title,
-      output: file.replace(/\.md$/, ".html"),
-      description: descriptions[file] ?? `${title} slide deck.`,
+      output: join("archive", file.replace(/\.md$/, ".html")),
+      description: archiveDescriptions[file] ?? `${title} slide deck.`,
     };
-  })
-  .concat({
-    file: "semantic-slides.md",
-    source: "../../slides/semantic-slides.md",
-    order: "07",
-    title: "Aircraft Digital Twin Knowledge Layer",
-    output: "semantic-slides.html",
-    description:
-      "AWS, Neo4j, fleet query patterns, and an aircraft digital-twin knowledge layer for AI agents.",
-    assets: ["../../slides/dual-data-architecture-aws.svg"],
   });
 
+const decks = [...activeDecks, ...archiveDecks];
 const requested = process.argv[2] ?? "all";
 const selected =
   requested === "all"
     ? decks
-    : decks.filter((deck) => deck.file === requested || deck.output === requested);
+    : decks.filter(
+        (deck) => deck.file === requested || deck.output === requested,
+      );
 
 if (selected.length === 0) {
   console.error(`Unknown deck: ${requested}`);
@@ -76,12 +102,14 @@ rmSync("build", { force: true, recursive: true });
 mkdirSync("build", { recursive: true });
 
 for (const deck of selected) {
+  const output = join("build", deck.output);
+  mkdirSync(dirname(output), { recursive: true });
   execFileSync(
     "marp",
     [
       deck.source,
       "-o",
-      join("build", deck.output),
+      output,
       "--html",
       "--allow-local-files",
       "--theme-set",
@@ -93,44 +121,39 @@ for (const deck of selected) {
   );
 }
 
-const imagesDir = join(SLIDE_DIR, "images");
-if (existsSync(imagesDir)) {
-  cpSync(imagesDir, join("build", "images"), { recursive: true });
-}
-
 for (const deck of selected) {
   for (const asset of deck.assets ?? []) {
     copyFileSync(asset, join("build", asset.split("/").at(-1)));
   }
 }
 
+const archiveImagesDir = join(ARCHIVE_DIR, "images");
+if (
+  archiveDecks.some((deck) => selected.includes(deck)) &&
+  existsSync(archiveImagesDir)
+) {
+  cpSync(archiveImagesDir, join("build", "archive", "images"), {
+    recursive: true,
+  });
+}
+
 writeFileSync(join("build", ".nojekyll"), "");
 
 if (requested === "all") {
   copyFileSync(
-    join("build", decks[0].output),
+    join("build", activeDecks[0].output),
     join("build", "slides.html"),
   );
   writeFileSync(join("build", "index.html"), renderIndex());
 }
 
 function renderIndex() {
-  const cards = decks
-    .map(
-      (deck) => `        <a class="deck-card" href="./${deck.output}">
-          <span class="deck-order">${deck.order}</span>
-          <strong>${escapeHtml(deck.title)}</strong>
-          <span class="deck-desc">${escapeHtml(deck.description)}</span>
-        </a>`,
-    )
-    .join("\n");
-
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AWS + Neo4j In Depth</title>
+    <title>AWS + Neo4j Presentations</title>
     <style>
       :root {
         color-scheme: light;
@@ -143,9 +166,7 @@ function renderIndex() {
         --bg: #f8fafc;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         background:
@@ -168,6 +189,11 @@ function renderIndex() {
         margin: 0 0 16px;
       }
 
+      h2 {
+        font-size: 26px;
+        margin: 52px 0 8px;
+      }
+
       p {
         color: var(--muted);
         font-size: 19px;
@@ -175,6 +201,8 @@ function renderIndex() {
         margin: 0;
         max-width: 760px;
       }
+
+      .section-intro { font-size: 16px; }
 
       .eyebrow {
         color: var(--accent);
@@ -189,7 +217,7 @@ function renderIndex() {
         display: grid;
         gap: 16px;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        margin: 40px 0 0;
+        margin: 24px 0 0;
       }
 
       .deck-card {
@@ -213,6 +241,7 @@ function renderIndex() {
         font-size: 13px;
         font-weight: 800;
         letter-spacing: 0.1em;
+        text-transform: uppercase;
       }
 
       .deck-card strong {
@@ -233,7 +262,7 @@ function renderIndex() {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        margin: 32px 0 0;
+        margin: 40px 0 0;
       }
 
       .button {
@@ -251,12 +280,25 @@ function renderIndex() {
   </head>
   <body>
     <main>
-      <div class="eyebrow">AWS + Neo4j In Depth</div>
-      <h1>Neo4j MCP server on Amazon Bedrock AgentCore</h1>
-      <p>A seven-part presentation covering the aircraft graph data model, dual data architecture, GraphRAG, graph-enriched search, Neo4j Aura and agents, the Neo4j MCP server, and the AWS AgentCore architecture.</p>
-      <section class="decks" aria-label="Slide decks">
-${cards}
+      <div class="eyebrow">AWS + Neo4j</div>
+      <h1>Presentations</h1>
+      <p>Current presentations on semantic data discovery and grounded enterprise AI with AWS and Neo4j.</p>
+
+      <section aria-labelledby="current-presentations">
+        <h2 id="current-presentations">Current presentations</h2>
+        <div class="decks">
+${renderCards(activeDecks, "Deck")}
+        </div>
       </section>
+
+      <section aria-labelledby="archived-presentations">
+        <h2 id="archived-presentations">Archive</h2>
+        <p class="section-intro">Earlier AWS + Neo4j in-depth presentation decks.</p>
+        <div class="decks">
+${renderCards(archiveDecks, "Archive")}
+        </div>
+      </section>
+
       <div class="actions">
         <a class="button" href="https://github.com/neo4j-partners/aws-starter">View project on GitHub</a>
       </div>
@@ -264,6 +306,18 @@ ${cards}
   </body>
 </html>
 `;
+}
+
+function renderCards(sectionDecks, label) {
+  return sectionDecks
+    .map(
+      (deck) => `          <a class="deck-card" href="./${deck.output}">
+            <span class="deck-order">${label} ${deck.order}</span>
+            <strong>${escapeHtml(deck.title)}</strong>
+            <span class="deck-desc">${escapeHtml(deck.description)}</span>
+          </a>`,
+    )
+    .join("\n");
 }
 
 function escapeHtml(value) {

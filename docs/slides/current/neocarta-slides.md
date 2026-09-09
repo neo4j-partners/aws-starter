@@ -156,7 +156,7 @@ queries. It gives an agent the context to write one, and a separate
 database tool executes it. That boundary is the whole design, and it
 comes back in the Rosetta SDL comparison.
 
-Deck structure: nine core slides, then seven optional modules, then a
+Deck structure: ten core slides, then seven optional modules, then a
 close. If we are short on time I drop modules from the back.
 -->
 

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Published Marp slide decks for AWS and Neo4j presentations",
   "scripts": {
-    "preview": "marp ../../slides/neocarta-slides.md ../../slides/aws-neo4j-grounded-enterprise-ai.md --server --allow-local-files",
+    "preview": "marp --input-dir current --server --allow-local-files",
     "build": "npm run build:all",
     "build:all": "node scripts/build-theme-gallery.mjs all",
     "build:pdf": "node scripts/export-current.mjs pdf",

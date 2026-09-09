@@ -11,16 +11,16 @@ if (!supportedFormats.has(format)) {
 }
 
 const decks = [
-  "../../slides/neocarta-slides.md",
-  "../../slides/aws-neo4j-grounded-enterprise-ai.md",
+  "current/neocarta-slides.md",
+  "current/aws-neo4j-grounded-enterprise-ai.md",
 ];
 
 const assets = [
-  "../../slides/aws-neo4j-layer-map.svg",
-  "../../slides/dual-data-architecture-aws.svg",
-  "../../slides/exec-knowledge-layer.svg",
-  "../../slides/neocarta.svg",
-  "../../slides/neo4j-agent-memory-diagram.svg",
+  "current/aws-neo4j-layer-map.svg",
+  "current/dual-data-architecture-aws.svg",
+  "current/exec-knowledge-layer.svg",
+  "current/neocarta.svg",
+  "current/neo4j-agent-memory-diagram.svg",
 ];
 
 rmSync("dist", { force: true, recursive: true });

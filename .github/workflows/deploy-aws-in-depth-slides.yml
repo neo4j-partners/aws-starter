@@ -7,7 +7,6 @@ on:
     paths:
       - .github/workflows/deploy-aws-in-depth-slides.yml
       - docs/slides/**
-      - slides/**
   workflow_dispatch:
 
 permissions:

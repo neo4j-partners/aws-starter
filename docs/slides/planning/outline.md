@@ -61,26 +61,26 @@ Total slide count is 20.
 ### 3. Worked example (2 slides)
 
 7. **Investigation scenario:** Use a fraud-ring question to show why both tabular activity and connected context are required. Keep this to one scenario and move on.
-   - *Artwork:* Reuse the ASCII pattern from `aws-neo4j-grounded-enterprise-ai.md`, which shows a shared device and a circular payment chain.
+   - *Artwork:* Reuse the ASCII pattern from `../current/aws-neo4j-grounded-enterprise-ai.md`, which shows a shared device and a circular payment chain.
 8. **Data model and placement in one view:** Show customers, accounts, transactions, devices, merchants, alerts, cases, and policies, and show where each lives in the same picture.
    - **AWS:** Raw transactions, time-series activity, source records, documents, tables, operational history, and large-scale analytical data stay in AWS.
    - **Neo4j:** Important entities and relationships, fraud patterns, semantic mappings, policies, investigation context, and selected graph-optimized data live in Neo4j.
-   - *Artwork:* `dual-data-architecture-aws.svg`.
+   - *Artwork:* `../current/dual-data-architecture-aws.svg`.
    - *AWS adjacency:* Athena queries the S3 tables. Cypher traverses the graph. One question uses both.
 
 ### 4. Neo4j capabilities on AWS (8 slides)
 
 9. **Enterprise Knowledge Layer, what it is:** Explain how shared business meaning connects enterprise data, policies, ontology, semantic mappings, and prior decisions into one governed layer.
-   - *Artwork:* `exec-knowledge-layer.svg`.
+   - *Artwork:* `../current/exec-knowledge-layer.svg`.
 10. **Enterprise Knowledge Layer, what it adds:** Show the layer answering the fraud question by linking an alert to the policy, typology, and prior investigation that explain it.
     - *AWS adjacency:* AWS field will ask how this relates to Amazon Bedrock Knowledge Bases. Knowledge Bases retrieve passages from documents. The Enterprise Knowledge Layer holds governed business concepts, relationships, and prior decisions that an agent queries directly.
 11. **NeoCarta, what it is:** Explain how catalog metadata, business-glossary terms, and query-usage lineage become an embedded Neo4j semantic graph exposed through MCP.
-    - *Artwork:* `neocarta.svg`.
+    - *Artwork:* `../current/neocarta.svg`.
 12. **NeoCarta, what it adds:** Show an agent using the semantic map for data discovery, query routing, and text-to-SQL.
     - *AWS adjacency:* Planned AWS catalog support will read metadata from the AWS Glue Data Catalog and SageMaker Catalog. Those catalogs remain authoritative. NeoCarta links business terms to physical data assets before an agent generates a query.
     - *Status:* NeoCarta is an experimental Neo4j Labs library. Glue Data Catalog support is planned.
 13. **Agent Memory, what it is:** Explain graph-backed short-term, long-term, and reasoning memory. The long-term POLE+O model covers Person, Object, Location, Event, and Organization, and it supports temporal validity.
-    - *Artwork:* `neo4j-agent-memory-diagram.svg`.
+    - *Artwork:* `../current/neo4j-agent-memory-diagram.svg`.
 14. **Agent Memory, what it adds:** Show entities, facts, and decision traces staying inspectable alongside the knowledge graph, so an investigation outcome becomes reusable.
     - *AWS adjacency:* AWS field will ask how this relates to AgentCore Memory. Answer it on the slide. Also note the Strands Agents SDK integration, since Strands is AWS's own agent SDK.
 15. **Grounded agent workflow, the mechanics:** Show an AWS-hosted agent selecting graph, SQL, document, or API tools and returning evidence-backed answers.
@@ -101,11 +101,11 @@ Total slide count is 20.
 
 | Asset | Used on | Status |
 | --- | --- | --- |
-| `aws-neo4j-layer-map.svg`, three states | Slides 2, 3, 17 | Built and used in the deck |
-| `dual-data-architecture-aws.svg` | Slide 8 | Used in the deck |
-| `exec-knowledge-layer.svg` | Slide 9 | Used in the deck |
-| `neocarta.svg` | Slide 11 | Used in the deck |
-| `neo4j-agent-memory-diagram.svg` | Slide 13 | Used in the deck |
+| `../current/aws-neo4j-layer-map.svg`, three states | Slides 2, 3, 17 | Built and used in the deck |
+| `../current/dual-data-architecture-aws.svg` | Slide 8 | Used in the deck |
+| `../current/exec-knowledge-layer.svg` | Slide 9 | Used in the deck |
+| `../current/neocarta.svg` | Slide 11 | Used in the deck |
+| `../current/neo4j-agent-memory-diagram.svg` | Slide 13 | Used in the deck |
 | `semantic-reference-architecture.svg` | Reference for slide 17 | Retained as a source reference |
 
 Core writing style

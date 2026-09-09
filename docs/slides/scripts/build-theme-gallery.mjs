@@ -16,28 +16,28 @@ const ARCHIVE_DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
 const activeDecks = [
   {
     file: "neocarta-slides.md",
-    source: "../../slides/neocarta-slides.md",
+    source: "current/neocarta-slides.md",
     order: "01",
     title: "Neocarta: A Semantic Map for Enterprise Data",
     output: "neocarta-slides.html",
     description:
       "How Neocarta builds and serves a semantic map in Neo4j, plus an architectural comparison with Rosetta SDL.",
-    assets: ["../../slides/neocarta.svg"],
+    assets: ["current/neocarta.svg"],
   },
   {
     file: "aws-neo4j-grounded-enterprise-ai.md",
-    source: "../../slides/aws-neo4j-grounded-enterprise-ai.md",
+    source: "current/aws-neo4j-grounded-enterprise-ai.md",
     order: "02",
     title: "AWS + Neo4j: Connected Context for Grounded Enterprise AI",
     output: "aws-neo4j-grounded-enterprise-ai.html",
     description:
       "How AWS and Neo4j combine governed data, connected context, semantic discovery, and agent memory for grounded enterprise AI.",
     assets: [
-      "../../slides/aws-neo4j-layer-map.svg",
-      "../../slides/dual-data-architecture-aws.svg",
-      "../../slides/exec-knowledge-layer.svg",
-      "../../slides/neocarta.svg",
-      "../../slides/neo4j-agent-memory-diagram.svg",
+      "current/aws-neo4j-layer-map.svg",
+      "current/dual-data-architecture-aws.svg",
+      "current/exec-knowledge-layer.svg",
+      "current/neocarta.svg",
+      "current/neo4j-agent-memory-diagram.svg",
     ],
   },
 ];

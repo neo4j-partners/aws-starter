@@ -50,16 +50,16 @@ small {
   font-size: 13px;
 }
 
-.lead {
+section.lead {
   background: linear-gradient(135deg, #f8fafc 0%, #ecfeff 100%);
 }
 
-.lead h1 {
+section.lead h1 {
   font-size: 58px;
   max-width: 1050px;
 }
 
-.lead h2 {
+section.lead h2 {
   color: #0f766e;
   font-size: 29px;
   font-weight: 500;

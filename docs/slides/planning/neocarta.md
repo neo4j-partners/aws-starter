@@ -50,7 +50,7 @@ Core is 10 slides, one of which is a section divider. Modules total 17 slides. C
 3. **What Neocarta is, in three surfaces:** Establish the shape of the project before any mechanism. The Python library holds the connectors, the CLI drives ingestion and mirrors every retrieval tool, and the MCP server serves the graph to agents.
    - *Note:* This slide replaces three separate mechanism slides in the previous outline. The mechanisms move to modules B2 and B3.
 4. **The architecture, diagram only:** Show where the semantic layer sits between the data sources and the agent. No bullets, no callout. Let the presenter narrate the picture while the audience looks at it.
-   - *Artwork:* `neocarta.svg`, or a new graph-model SVG. See the artwork inventory.
+   - *Artwork:* `../current/neocarta.svg`, or a new graph-model SVG. See the artwork inventory.
    - *Note:* This slide carries no text on purpose. The audience cannot read bullets and follow a diagram walkthrough at the same time.
 5. **How a business term resolves to a real column:** Trace one path from a business term to a column, table, schema, and database, including the foreign key that makes the join. Separate what the map is built from at ingestion time from what the traversal hands back at query time. Close on candidates versus a query plan, since embedding search ranks table names while the traversal returns the column, the join, and the reason it was chosen.
 6. **A grounded text-to-query flow, who does what:** Walk one request end to end with an actor on every step. The agent makes one retrieval call, Neocarta returns the orders and customers tables along with the foreign key between them, the agent's LLM writes the SQL, a separate query tool runs it, and the agent answers with its sources cited.
@@ -127,7 +127,7 @@ Each module is self-contained and carries its own divider slide naming the modul
 
 | Asset | Status | Used by |
 | --- | --- | --- |
-| `neocarta.svg` | Exists. Shows the knowledge-layer architecture from data sources through the semantic layer to the agent and retrieval layers. | Core slide 4, which is diagram only |
+| `../current/neocarta.svg` | Exists. Shows the knowledge-layer architecture from data sources through the semantic layer to the agent and retrieval layers. | Core slide 4, which is diagram only |
 | Graph model diagram | Needed. Core model with one highlighted path from business term to column to table to schema to database. | Core slide 4, module B1 slide 11 |
 | Glossary extension diagram | Needed. Can be a second state of the graph model diagram. | Module B1 slide 12 |
 | Query log and OSI diagram | Needed. Can be a third state of the graph model diagram. | Module B1 slide 13 |
@@ -135,7 +135,7 @@ Each module is self-contained and carries its own divider slide naming the modul
 | Text-to-query flow | ASCII in a `text` fence is sufficient. | Core slide 6 |
 | Plan and execute flow | ASCII in a `text` fence. Derivable from the plan-mode diagram in the Rosetta SDL README. | Core slide 10 |
 
-**Reusable diagram states:** Build the graph model as one SVG with three states, the way `aws-neo4j-layer-map.svg` carries the AWS layer map. Core slide 4 shows the core model on its own, and core slide 5 highlights one path across it. Module B1 adds the glossary, then the query logs and OSI subgraph. Reusing one skeleton is what makes the extensions land, and it keeps module B1 cheap to drop.
+**Reusable diagram states:** Build the graph model as one SVG with three states, the way `../current/aws-neo4j-layer-map.svg` carries the AWS layer map. Core slide 4 shows the core model on its own, and core slide 5 highlights one path across it. Module B1 adds the glossary, then the query logs and OSI subgraph. Reusing one skeleton is what makes the extensions land, and it keeps module B1 cheap to drop.
 
 ### Source repositories
 

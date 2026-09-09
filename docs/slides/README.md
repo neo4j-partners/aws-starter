@@ -4,16 +4,16 @@ This directory builds the Marp presentation gallery published through GitHub Pag
 
 ## Current decks
 
-The gallery builds these editable sources from the repository-level `slides/` directory:
+The gallery builds these editable sources from `docs/slides/current/`:
 
-- `slides/neocarta-slides.md`
-- `slides/aws-neo4j-grounded-enterprise-ai.md`
+- `docs/slides/current/neocarta-slides.md`
+- `docs/slides/current/aws-neo4j-grounded-enterprise-ai.md`
 
-The supporting SVG files remain beside the Markdown sources in `slides/` so local Marp preview continues to work.
+The supporting SVG files remain beside the Markdown sources so local Marp preview continues to work. Presentation outlines and supporting notes live in `docs/slides/planning/`.
 
 ## Archived decks
 
-The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`. The build publishes those decks under `/archive/` and lists them in a separate Archive section on the gallery page.
+The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`, while earlier working drafts live in `docs/slides/archive/drafts/`. The build publishes the in-depth decks under `/archive/` and lists them in a separate Archive section on the gallery page.
 
 ## Quick start
 
@@ -59,4 +59,4 @@ Build output is written to `docs/slides/build/` or `docs/slides/dist/`; both dir
 
 ## Publishing
 
-The workflow `.github/workflows/deploy-aws-in-depth-slides.yml` runs when `docs/slides/**`, `slides/**`, or the workflow itself changes on `main`. It installs dependencies, audits them, builds the gallery, and deploys `docs/slides/build/` to GitHub Pages.
+The workflow `.github/workflows/deploy-aws-in-depth-slides.yml` runs when `docs/slides/**` or the workflow itself changes on `main`. It installs dependencies, audits them, builds the gallery, and deploys `docs/slides/build/` to GitHub Pages.

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title description">
+  <title id="title">Adopt a Knowledge Layer through independent extensions</title>
+  <desc id="description">Start with an ontology-based semantic layer for meaning, source mappings, policy, and tools. Query AWS data in place, then independently choose either or both optional paths: virtualize or materialize selected domain graphs, and capture decisions to add memory. The paths reconverge as a broader Knowledge Layer.</desc>
+
+  <defs>
+    <filter id="shadow" x="-18%" y="-24%" width="136%" height="158%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0L10 5L0 10Z" fill="#0f766e"/>
+    </marker>
+    <style>
+      text { font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+      .eyebrow { fill: #0f766e; font-size: 13px; font-weight: 800; letter-spacing: 1.3px; }
+      .title { fill: #0f172a; font-size: 25px; font-weight: 780; }
+      .copy { fill: #475569; font-size: 16px; }
+      .chip { fill: #0f172a; font-size: 13px; font-weight: 700; text-anchor: middle; }
+      .branch-title { fill: #0f172a; font-size: 21px; font-weight: 760; text-anchor: middle; }
+      .branch-copy { fill: #475569; font-size: 15px; text-anchor: middle; }
+      .optional { fill: #0f766e; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-anchor: middle; }
+      .flow { fill: none; stroke: #0f766e; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="700" height="760" fill="#ffffff"/>
+
+  <!-- Starting core. -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="22" width="560" height="178" rx="23" fill="#ecfeff" stroke="#14b8a6" stroke-width="3"/>
+  </g>
+  <text class="eyebrow" x="100" y="57">START WITH THE CORE</text>
+  <text class="title" x="100" y="91">Ontology-Based Semantic Layer</text>
+  <text class="copy" x="100" y="119">Business context that agents can resolve at runtime</text>
+  <g>
+    <rect x="100" y="140" width="104" height="34" rx="17" fill="#ffffff" stroke="#99f6e4"/>
+    <rect x="215" y="140" width="145" height="34" rx="17" fill="#ffffff" stroke="#99f6e4"/>
+    <rect x="371" y="140" width="92" height="34" rx="17" fill="#ffffff" stroke="#99f6e4"/>
+    <rect x="474" y="140" width="94" height="34" rx="17" fill="#ffffff" stroke="#99f6e4"/>
+    <text class="chip" x="152" y="162">Meaning</text>
+    <text class="chip" x="287.5" y="162">Source mappings</text>
+    <text class="chip" x="417" y="162">Policy</text>
+    <text class="chip" x="521" y="162">Tools</text>
+  </g>
+
+  <path class="flow" d="M350 200V233"/>
+
+  <!-- Immediate value without moving data. -->
+  <g filter="url(#shadow)">
+    <rect x="135" y="246" width="430" height="91" rx="19" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+  <g fill="#ccfbf1" stroke="#0f766e" stroke-width="2.5">
+    <ellipse cx="184" cy="279" rx="20" ry="7"/>
+    <path d="M164 279v25c0 4 9 8 20 8s20-4 20-8v-25"/>
+    <path d="M164 291c0 4 9 8 20 8s20-4 20-8" fill="none"/>
+  </g>
+  <text class="title" x="224" y="282">Query AWS data in place</text>
+  <text class="copy" x="224" y="310">Connect governed sources without copying everything</text>
+
+  <!-- Split into two independent options. -->
+  <path d="M350 337V374M350 355H182V388M350 355H518V388" fill="none" stroke="#0f766e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow)"/>
+  <rect x="292" y="345" width="116" height="25" rx="12.5" fill="#ffffff" stroke="#5eead4"/>
+  <text class="optional" x="350" y="362">EITHER OR BOTH</text>
+
+  <g filter="url(#shadow)">
+    <rect x="24" y="397" width="316" height="183" rx="21" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="360" y="397" width="316" height="183" rx="21" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+
+  <rect x="45" y="418" width="117" height="25" rx="12.5" fill="#ccfbf1"/>
+  <text class="optional" x="103.5" y="435">OPTIONAL PATH A</text>
+  <circle cx="182" cy="477" r="23" fill="#ccfbf1"/>
+  <circle cx="174" cy="477" r="5" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <circle cx="190" cy="468" r="5" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <circle cx="191" cy="487" r="5" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+  <path d="M178 474l8-4M178 480l8 5" stroke="#0f766e" stroke-width="2"/>
+  <text class="branch-title" x="182" y="523">Virtualize or materialize</text>
+  <text class="branch-copy" x="182" y="549">Selected domain graphs</text>
+  <text class="optional" x="182" y="570">INDEPENDENT EXTENSION</text>
+
+  <rect x="381" y="418" width="117" height="25" rx="12.5" fill="#ccfbf1"/>
+  <text class="optional" x="439.5" y="435">OPTIONAL PATH B</text>
+  <circle cx="518" cy="477" r="23" fill="#ccfbf1"/>
+  <path d="M510 477a12 12 0 1 1 2 9M510 477v9h9" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="branch-title" x="518" y="523">Capture decisions</text>
+  <text class="branch-copy" x="518" y="549">Add memory from actions + outcomes</text>
+  <text class="optional" x="518" y="570">INDEPENDENT EXTENSION</text>
+
+  <!-- Either path contributes to the broader layer. -->
+  <path class="flow" d="M182 580V610Q182 626 198 626H318Q336 626 336 645V661"/>
+  <path class="flow" d="M518 580V610Q518 626 502 626H382Q364 626 364 645V661"/>
+
+  <g filter="url(#shadow)">
+    <rect x="105" y="669" width="490" height="70" rx="22" fill="#0f766e"/>
+  </g>
+  <text x="350" y="700" text-anchor="middle" fill="#ccfbf1" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="800" letter-spacing="1.4">BROADER</text>
+  <text x="350" y="727" text-anchor="middle" fill="#ffffff" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="27" font-weight="780">Enterprise Knowledge Layer</text>
+</svg>

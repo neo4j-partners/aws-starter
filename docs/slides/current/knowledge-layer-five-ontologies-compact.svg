@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title description">
+  <title id="title">Five connected ontologies form shared enterprise meaning</title>
+  <desc id="description">Domain, technical, process, policy, and organization ontologies connect as peer parts of one ontology. A highlighted data-product mapping links a domain business concept to its authoritative technical data asset.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-25%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0L10 5L0 10Z" fill="#0f766e"/>
+    </marker>
+    <style>
+      text { font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+      .eyebrow { fill: #0f766e; font-size: 14px; font-weight: 800; letter-spacing: 1.4px; }
+      .card-title { fill: #0f172a; font-size: 24px; font-weight: 750; }
+      .card-copy { fill: #475569; font-size: 16px; }
+      .mapping { fill: #0f766e; font-size: 9.5px; font-weight: 800; letter-spacing: 0.25px; text-anchor: middle; }
+      .hub-title { fill: #ffffff; font-size: 27px; font-weight: 780; text-anchor: middle; }
+      .hub-copy { fill: #ccfbf1; font-size: 16px; font-weight: 600; text-anchor: middle; }
+      .connection { fill: none; stroke: #64748b; stroke-width: 3; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <rect width="700" height="760" fill="#ffffff"/>
+
+  <!-- Connections behind the cards make all five ontologies peer parts. -->
+  <g class="connection">
+    <path d="M170 193C185 230 245 249 292 276"/>
+    <path d="M530 193C515 230 455 249 408 276"/>
+    <path d="M125 548C145 450 220 388 282 350"/>
+    <path d="M350 548V378"/>
+    <path d="M575 548C555 450 480 388 418 350"/>
+  </g>
+
+  <!-- Explicit domain-to-technical data-product mapping. -->
+  <path d="M302 111H390" fill="none" stroke="#0f766e" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <rect x="304" y="72" width="84" height="31" rx="15" fill="#ecfeff" stroke="#5eead4"/>
+  <text class="mapping" x="346" y="85">DATA-PRODUCT</text>
+  <text class="mapping" x="346" y="98">MAPPING</text>
+
+  <!-- Domain ontology. -->
+  <g filter="url(#shadow)">
+    <rect x="24" y="28" width="278" height="165" rx="19" fill="#f8fafc" stroke="#14b8a6" stroke-width="3"/>
+  </g>
+  <circle cx="62" cy="68" r="18" fill="#ccfbf1"/>
+  <circle cx="55" cy="68" r="4" fill="#0f766e"/>
+  <circle cx="69" cy="59" r="4" fill="#0f766e"/>
+  <circle cx="70" cy="77" r="4" fill="#0f766e"/>
+  <path d="M58 66L66 61M59 70L66 75" stroke="#0f766e" stroke-width="2.5"/>
+  <text class="eyebrow" x="90" y="61">DOMAIN</text>
+  <text class="card-title" x="50" y="116">Business concept</text>
+  <text class="card-copy" x="50" y="146">Customer, product, account</text>
+  <rect x="50" y="158" width="170" height="22" rx="11" fill="#ccfbf1"/>
+  <text x="135" y="174" text-anchor="middle" font-size="12" font-weight="750" fill="#0f766e">SHARED BUSINESS MEANING</text>
+
+  <!-- Technical ontology. -->
+  <g filter="url(#shadow)">
+    <rect x="390" y="28" width="286" height="165" rx="19" fill="#f8fafc" stroke="#14b8a6" stroke-width="3"/>
+  </g>
+  <g fill="#ccfbf1" stroke="#0f766e" stroke-width="2.5">
+    <ellipse cx="430" cy="60" rx="18" ry="7"/>
+    <path d="M412 60v23c0 4 8 7 18 7s18-3 18-7V60"/>
+    <path d="M412 72c0 4 8 7 18 7s18-3 18-7" fill="none"/>
+  </g>
+  <text class="eyebrow" x="462" y="66">TECHNICAL</text>
+  <text class="card-title" x="416" y="116">Asset description</text>
+  <text class="card-copy" x="416" y="146">System, table, API, or model</text>
+  <rect x="416" y="158" width="179" height="22" rx="11" fill="#ccfbf1"/>
+  <text x="505.5" y="174" text-anchor="middle" font-size="12" font-weight="750" fill="#0f766e">GOVERNED DATA PRODUCT</text>
+
+  <!-- Shared connected center. -->
+  <g filter="url(#shadow)">
+    <rect x="174" y="270" width="352" height="108" rx="24" fill="#0f766e"/>
+  </g>
+  <text class="hub-title" x="350" y="316">One connected ontology</text>
+  <text class="hub-copy" x="350" y="347">Relationships carry context across every part</text>
+
+  <!-- Three additional connected peer ontologies. -->
+  <g filter="url(#shadow)">
+    <rect x="24" y="548" width="202" height="174" rx="19" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="249" y="548" width="202" height="174" rx="19" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+    <rect x="474" y="548" width="202" height="174" rx="19" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+
+  <circle cx="125" cy="588" r="19" fill="#ccfbf1"/>
+  <path d="M113 588h24M119 579l-6 9 6 9M131 579l6 9-6 9" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="eyebrow" x="125" y="627" text-anchor="middle">PROCESS</text>
+  <text class="card-title" x="125" y="657" text-anchor="middle">How work flows</text>
+  <text class="card-copy" x="125" y="686" text-anchor="middle">Steps + handoffs</text>
+
+  <circle cx="350" cy="588" r="19" fill="#ccfbf1"/>
+  <path d="M342 588l6 6 11-14" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <text class="eyebrow" x="350" y="627" text-anchor="middle">POLICY</text>
+  <text class="card-title" x="350" y="657" text-anchor="middle">What is allowed</text>
+  <text class="card-copy" x="350" y="686" text-anchor="middle">Rules + controls</text>
+
+  <circle cx="575" cy="588" r="19" fill="#ccfbf1"/>
+  <circle cx="575" cy="581" r="6" fill="none" stroke="#0f766e" stroke-width="2.5"/>
+  <path d="M563 598c2-8 7-11 12-11s10 3 12 11" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round"/>
+  <text class="eyebrow" x="575" y="627" text-anchor="middle">ORGANIZATION</text>
+  <text class="card-title" x="575" y="657" text-anchor="middle">Who owns it</text>
+  <text class="card-copy" x="575" y="686" text-anchor="middle">Teams + roles</text>
+</svg>

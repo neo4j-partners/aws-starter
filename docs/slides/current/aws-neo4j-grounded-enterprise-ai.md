@@ -150,6 +150,10 @@ section.knowledge-slide pre {
   padding: 18px;
 }
 
+section.knowledge-slide .callout {
+  font-size: 18px;
+}
+
 li {
   opacity: 1 !important;
   visibility: visible !important;
@@ -213,17 +217,53 @@ li {
 
 <!-- _class: knowledge-slide -->
 
-## A shared Knowledge Layer makes connected context reusable
+## Ten agents should not create ten versions of the business
 
-<p class="overview">Keep meaning in one governed layer so every agent uses consistent definitions and rules.</p>
+<p class="overview">Definitions copied into prompts, tools, and retrieval pipelines drift independently.</p>
 
 <div class="cols">
 <div>
 
-- **Knowledge Layer:** Provides one governed place for enterprise knowledge.
-- **Business meaning:** Defines shared terms, relationships, and rules.
-- **Connected context:** Links concepts to data, policies, owners, and processes.
-- **Lighter agents:** Query the shared layer when they need context.
+- **Private meaning:** Each agent carries its own interpretation of the business.
+- **Private routing:** Each agent decides which source or tool is authoritative.
+- **Private policy:** Rules are repeated across prompts and integrations.
+- **Silent drift:** Every answer can sound reasonable while the enterprise loses a consistent view.
+
+</div>
+<div>
+
+### Same term, different meanings
+
+```text
+"active customer"
+
+Agent A → signed in within 30 days
+Agent B → current paid contract
+Agent C → open account balance
+```
+
+<div class="callout"><strong>The problem:</strong> Copies change separately, so inconsistency grows with every new agent.</div>
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## A shared Knowledge Layer makes connected context reusable
+
+<p class="overview">Keep meaning in one governed layer so every agent uses consistent definitions, relationships, and rules.</p>
+
+<div class="cols">
+<div>
+
+- **One shared layer:** Maintain enterprise knowledge once and reuse it across consumers.
+- **Connected context:** Link concepts to data, policies, owners, and processes.
+- **Current by design:** Query the layer while work is happening instead of copying it into prompts.
+- **Lighter agents:** Keep task logic in the agent and enterprise meaning in the shared layer.
 
 </div>
 <div>
@@ -239,17 +279,44 @@ li {
 
 <!-- _class: knowledge-slide -->
 
-## Three parts ground every answer
+## Enterprise knowledge becomes queryable and actionable
 
-<p class="overview">Combine business meaning, enterprise data, and past experience.</p>
+<p class="overview">It is shared, governed, executable software between enterprise systems and their consumers.</p>
 
 <div class="cols">
 <div>
 
-- **Knowledge Layer ontology:** Connects business concepts to systems, processes, policies, and owners.
-- **Enterprise data:** Supplies governed facts from authoritative systems.
-- **Memory:** Stores previous actions, decisions, and results.
-- **Decision trace:** Records the evidence and reasoning behind each result.
+- **Shared:** Reuse business meaning and operating knowledge across consumers.
+- **Governed:** Keep sources, policies, ownership, and accountability explicit.
+- **Queryable:** Retrieve the exact context required for each request.
+- **Actionable:** Map intent to authoritative sources, permitted tools, and executable queries.
+
+</div>
+<div>
+
+![h:430](./exec-knowledge-layer-v2.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## Three components ground every request
+
+<p class="overview">Combine a governed model of the business, authoritative facts, and experience from previous work.</p>
+
+<div class="cols">
+<div>
+
+- **Knowledge Layer ontology:** Defines what things mean, how they connect, where their data lives, what rules apply, and who is accountable.
+- **Enterprise data:** Supplies authoritative facts about what is true now.
+- **Memory:** Captures previous actions, decisions, outcomes, and reasoning.
+
+<div class="callout"><strong>Ontology holds what is possible; memory holds what is proven.</strong></div>
 
 </div>
 <div>
@@ -263,9 +330,101 @@ li {
 
 ---
 
+![bg contain](./exec-knowledge-layer.svg)
+
+---
+
 <!-- _class: knowledge-slide -->
 
-## The Knowledge Layer turns each request into a governed action plan
+## “Ontology” has a narrow and a broad meaning
+
+<p class="overview">The difference is scope: business meaning alone, or the larger connected model that makes that meaning operational.</p>
+
+<div class="cols">
+<div>
+
+### Narrow: Conceptual Map
+
+- Defines what business concepts mean and how they relate.
+- Includes concepts such as **Customer**, **Purchase**, and **Product**.
+- Does not refer to Salesforce, tables, APIs, or other physical systems.
+
+</div>
+<div>
+
+### Broad: Knowledge Layer ontology
+
+- Connects five sub-ontologies: domain, technical, process, policy, and organization.
+- Includes descriptions of technical assets and mappings from business concepts to them.
+- Does not require the actual enterprise records to be stored in the ontology.
+
+</div>
+</div>
+
+<div class="callout"><strong>Both uses are valid:</strong> the Conceptual Map is the meaning; the broader Knowledge Layer ontology also connects that meaning to where the data lives.</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## The ontology is the map, not the operational system
+
+<p class="overview">It describes business meaning, technical destinations, and the routes between them; live records can stay in their source systems.</p>
+
+<div class="cols">
+<div>
+
+- **Domain ontology:** Defines what “Customer,” “Purchase,” and “Product” mean.
+- **Technical ontology:** Records that systems and assets exist, such as Salesforce and its **Opportunity table**.
+- **Semantic mapping:** Draws the route: **PURCHASE → Salesforce.Opportunity**.
+- **Enterprise data:** The actual opportunity records remain in Salesforce.
+
+<div class="callout"><strong>The ontology holds descriptions and pointers. The operational system holds the records.</strong></div>
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-city-map-compact.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## The ontology connects meaning to systems and accountability
+
+<p class="overview">Five connected sub-ontologies describe how the business operates.</p>
+
+<div class="cols">
+<div>
+
+- **Domain:** Business concepts and relationships.
+- **Technical:** Descriptions of systems, sources, and data assets, plus mappings from business concepts to those assets.
+- **Process:** Tasks, decisions, workflows, and actions.
+- **Policy:** Access rules, conditions, constraints, and permitted actions.
+- **Organization:** Roles, ownership, responsibilities, and accountability.
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-five-ontologies-compact.svg)
+
+</div>
+</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
+<!-- _class: knowledge-slide -->
+
+## Every request becomes a governed action plan
 
 <p class="overview">The layer grounds the request. The agent or application executes the plan.</p>
 
@@ -273,10 +432,10 @@ li {
 <div>
 
 - **Interpret intent:** Resolve the business meaning of the request.
-- **Select sources and tools:** Choose authoritative systems and generate their queries.
-- **Apply policy:** Limit the plan to permitted data and actions.
-- **Explain result:** Return the sources, evidence, and decision path.
-- **Update memory:** Store useful outcomes for future requests.
+- **Assemble context:** Select authoritative sources and relationships.
+- **Route queries and tools:** Translate concepts into calls against AWS systems.
+- **Enforce policy:** Apply access and action rules during resolution.
+- **Explain and learn:** Return evidence and lineage, then retain useful outcomes.
 
 </div>
 <div>
@@ -292,33 +451,22 @@ li {
 
 <!-- _class: knowledge-slide -->
 
-## Start with meaning, then add data and memory
+## Start with the core; extend it where the use case benefits
 
-<p class="overview">Begin with shared meaning and mappings. Add graph data and memory when the use case needs them.</p>
+<p class="overview">Query authoritative AWS data in place, then add connected data, memory, or both where they create value.</p>
 
 <div class="cols">
 <div>
 
-- **Ontology-Based Semantic Layer:** Defines concepts, maps sources, and routes tools.
-- **Query in place:** Keeps AWS data in its source system.
-- **Materialized data:** Stores repeated or graph-heavy data in Neo4j when speed matters.
-- **Memory:** Uses prior decisions to improve future actions.
+- **Ontology-Based Semantic Layer:** Start with shared meaning, source mappings, policy, reference data, and tools.
+- **Connected data:** Virtualize or materialize selected domain graphs for graph reasoning, repeated queries, or lower latency.
+- **Memory:** Capture decisions, outcomes, reasoning, and feedback for future work.
+- **Independent choices:** Add either extension first; neither requires the other.
 
 </div>
 <div>
 
-```text
-Ontology-Based Semantic Layer
-  meaning + mappings + tools
-              ↓
-   query external data in place
-              ↓
-   add graph data when useful
-              ↓
-     add memory over time
-              ↓
-    full Knowledge Layer
-```
+![h:430](./knowledge-layer-adoption-compact.svg)
 
 </div>
 </div>
@@ -327,15 +475,33 @@ Ontology-Based Semantic Layer
 
 ---
 
-## Policy and prior decisions make each result explainable
+<!-- _class: knowledge-slide -->
 
-```text
-Finding → business meaning → policy → prior decision → evidence
-```
+## Every governed action leaves an inspectable decision trace
 
-- **Explain the result:** Link each finding to its meaning, policy, and evidence.
-- **Reuse prior work:** Find similar decisions, evidence, and outcomes.
-- **Keep the path inspectable:** Let reviewers trace each answer back to governed sources.
+<p class="overview">The trace links a result to the context that produced it.</p>
+
+<div class="cols">
+<div>
+
+- **Meaning:** Concepts resolved for the request.
+- **Sources:** Authoritative systems, queries, and lineage.
+- **Policy:** Access and action checks applied.
+- **Evidence:** Facts supporting the current result.
+- **Precedent:** Prior decisions, only when they influenced the result.
+- **Outcome:** The result or action, observed outcome, and feedback.
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-decision-trace-compact.svg)
+
+</div>
+</div>
+
+<div class="callout"><strong>Decision traces explain the current result.</strong> Agent Memory makes useful traces available to future requests.</div>
+
+<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
 
 ---
 

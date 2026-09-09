@@ -82,7 +82,7 @@ definitions, relationships, and rules.
 **Visual:** Reuse `knowledge-layer-lighter-agents-compact.svg`. Preserve its central
 message: a smarter shared substrate supports multiple lighter agents.
 
-### 3. The Knowledge Layer makes enterprise knowledge queryable and actionable
+### 3. Enterprise knowledge becomes queryable and actionable
 
 **Purpose:** Define the Knowledge Layer before describing its internal parts.
 
@@ -153,7 +153,7 @@ Business concept ↔ data-product mapping ↔ authoritative data asset
 This is the most important definition missing from the current deck. Keep detailed
 RDF, OWL, schema, and ontology-engineering material out of the main presentation.
 
-### 6. The Knowledge Layer turns each request into a governed action plan
+### 6. Every request becomes a governed action plan
 
 **Purpose:** Show how the layer works at runtime.
 

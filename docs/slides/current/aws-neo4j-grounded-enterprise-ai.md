@@ -330,6 +330,33 @@ Agent C → open account balance
 
 ---
 
+<!-- _class: knowledge-slide -->
+
+## A Context Graph turns enterprise knowledge into the right context now
+
+<p class="overview">For a specific user, task, workflow, or decision, it connects governed knowledge with current state and relevant experience.</p>
+
+<div class="cols">
+<div>
+
+- **Knowledge graph:** Business meaning, entities, relationships, source mappings, and policy.
+- **Situational context:** The request, user, permissions, workflow state, and current facts.
+- **Memory and traces:** Prior interactions, evidence, decisions, outcomes, and feedback.
+
+<div class="callout"><strong>Knowledge Graph:</strong> What do these connections mean?<br><strong>Context Graph:</strong> What matters right now?</div>
+
+</div>
+<div>
+
+![h:430](./knowledge-layer-three-parts-compact.svg)
+
+</div>
+</div>
+
+<!-- Sources: https://neo4j.com/blog/graph-database/1-of-3-the-difference-between-a-graph-a-knowledge-graph-and-a-context-graph/ and /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
+
+---
+
 ![bg contain](./exec-knowledge-layer.svg)
 
 ---
@@ -369,19 +396,19 @@ Agent C → open account balance
 
 <!-- _class: knowledge-slide -->
 
-## The ontology is the map, not the operational system
+## The semantic map bridges business meaning and enterprise data
 
-<p class="overview">It describes business meaning, technical destinations, and the routes between them; live records can stay in their source systems.</p>
+<p class="overview">It uses ontology concepts, technical asset descriptions, and mappings to route requests to authoritative source systems.</p>
 
 <div class="cols">
 <div>
 
-- **Domain ontology:** Defines what “Customer,” “Purchase,” and “Product” mean.
-- **Technical ontology:** Records that systems and assets exist, such as Salesforce and its **Opportunity table**.
-- **Semantic mapping:** Draws the route: **PURCHASE → Salesforce.Opportunity**.
-- **Enterprise data:** The actual opportunity records remain in Salesforce.
+- **Domain ontology:** Provides concepts such as “Customer,” “Purchase,” and “Product.”
+- **Technical ontology:** Describes systems and assets such as Salesforce and its **Opportunity table**.
+- **Semantic map:** Connects the two: **PURCHASE → Salesforce.Opportunity**.
+- **Enterprise data:** Supplies the actual opportunity records from Salesforce.
 
-<div class="callout"><strong>The ontology holds descriptions and pointers. The operational system holds the records.</strong></div>
+<div class="callout"><strong>The semantic map tells agents what a request means, where to find the data, and how the two connect.</strong></div>
 
 </div>
 <div>
@@ -451,32 +478,6 @@ Agent C → open account balance
 
 <!-- _class: knowledge-slide -->
 
-## Start with the core; extend it where the use case benefits
-
-<p class="overview">Query authoritative AWS data in place, then add connected data, memory, or both where they create value.</p>
-
-<div class="cols">
-<div>
-
-- **Ontology-Based Semantic Layer:** Start with shared meaning, source mappings, policy, reference data, and tools.
-- **Connected data:** Virtualize or materialize selected domain graphs for graph reasoning, repeated queries, or lower latency.
-- **Memory:** Capture decisions, outcomes, reasoning, and feedback for future work.
-- **Independent choices:** Add either extension first; neither requires the other.
-
-</div>
-<div>
-
-![h:430](./knowledge-layer-adoption-compact.svg)
-
-</div>
-</div>
-
-<!-- Source: /Users/ryanknight/projects/cloud-integration/knowledge-layer/reference/knowledge-layer-official.md -->
-
----
-
-<!-- _class: knowledge-slide -->
-
 ## Every governed action leaves an inspectable decision trace
 
 <p class="overview">The trace links a result to the context that produced it.</p>
@@ -509,7 +510,7 @@ Agent C → open account balance
 
 # Neo4j Agent Memory
 
-## Open-source, graph-native memory for conversations, durable knowledge, and agent reasoning
+## Agent Memory supplies the historical and reasoning dimension of a Context Graph
 
 <div class="promise"><a href="https://neo4j.com/labs/agent-memory/">Library documentation</a> · <a href="https://github.com/neo4j-labs/agent-memory">GitHub project</a></div>
 

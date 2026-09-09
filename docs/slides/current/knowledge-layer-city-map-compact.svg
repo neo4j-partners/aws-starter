@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title description">
-  <title id="title">The ontology is a map to operational data</title>
-  <desc id="description">Inside the Knowledge Layer ontology, the PURCHASE business concept maps to a description of the Salesforce Opportunity table. Outside the ontology boundary, a pointer leads to the actual opportunity records that remain in Salesforce.</desc>
+  <title id="title">The semantic map bridges business meaning and enterprise data</title>
+  <desc id="description">Inside the semantic map, the PURCHASE business concept maps to a description of the Salesforce Opportunity table. The map routes a query to the actual opportunity records in Salesforce.</desc>
 
   <defs>
     <filter id="shadow" x="-20%" y="-25%" width="140%" height="160%">
@@ -24,10 +24,10 @@
 
   <rect width="700" height="760" fill="#ffffff"/>
 
-  <!-- The dashed line makes the ontology boundary explicit. -->
+  <!-- The dashed line makes the semantic map boundary explicit. -->
   <rect x="24" y="38" width="652" height="462" rx="28" fill="#f8fafc" stroke="#14b8a6" stroke-width="3" stroke-dasharray="11 9"/>
-  <rect x="54" y="21" width="302" height="36" rx="18" fill="#ccfbf1"/>
-  <text class="boundary-label" x="72" y="45">KNOWLEDGE LAYER ONTOLOGY</text>
+  <rect x="54" y="21" width="191" height="36" rx="18" fill="#ccfbf1"/>
+  <text class="boundary-label" x="72" y="45">SEMANTIC MAP</text>
 
   <!-- Semantic mapping route behind the two descriptions. -->
   <path d="M265 255C329 255 371 255 435 255" fill="none" stroke="#0f766e" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow-teal)"/>
@@ -63,12 +63,12 @@
   <rect x="461" y="351" width="151" height="28" rx="14" fill="#ccfbf1"/>
   <text class="small" x="536.5" y="370" text-anchor="middle" fill="#0f766e">MAP DESTINATION</text>
 
-  <!-- Pointer crosses the ontology boundary to the actual operational system. -->
+  <!-- The map routes the query to the operational system. -->
   <path d="M542 398V528" fill="none" stroke="#0f766e" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow-teal)"/>
   <rect x="397" y="456" width="122" height="29" rx="14.5" fill="#ffffff" stroke="#5eead4"/>
   <text class="route" x="458" y="476">QUERY IN PLACE</text>
 
-  <!-- Live data stays outside the ontology. -->
+  <!-- Enterprise data supplies the live records. -->
   <g filter="url(#shadow)">
     <rect x="58" y="538" width="584" height="180" rx="24" fill="#0f766e"/>
   </g>
@@ -80,5 +80,5 @@
   <text class="eyebrow" x="180" y="575" fill="#99f6e4">ENTERPRISE DATA</text>
   <text class="data-label" x="180" y="615">Actual opportunity records</text>
   <text class="data-copy" x="180" y="648">Live rows remain in the Salesforce operational system.</text>
-  <text class="data-copy" x="180" y="676">The ontology describes where to find and how to use them.</text>
+  <text class="data-copy" x="180" y="676">The semantic map tells the agent where and how to query them.</text>
 </svg>

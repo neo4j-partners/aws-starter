@@ -9,7 +9,6 @@ where needed, never from this ``__init__``:
 
 - :mod:`core.transport` — MCP transport factory (depends on ``mcp``)
 - :mod:`core.factory`  — Bedrock model + MCP client factories (Strands)
-- :mod:`core.memory`    — user-scoped Context Graph tools (Strands)
 """
 
 from core.config import AWS_REGION, MODEL_ID, SYSTEM_PROMPT

@@ -4,8 +4,7 @@
 # This script does ONE thing: deploy/manage the agent on AgentCore Runtime.
 # It is a thin wrapper over the `agentcore` CLI; the only reason it exists
 # (rather than documenting raw `agentcore` commands) is that `deploy` sources
-# NEO4J_URI/NEO4J_PASSWORD from .env and injects them into the runtime env
-# for Context Graph memory.
+# MEMORY_API_KEY from .env and injects it into the runtime for NAMS memory.
 #
 # It does NOT run the agent locally and it does NOT run the clients. The
 # server runs in the foreground of its own terminal; the clients are uv
@@ -42,12 +41,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Neo4j credentials for Context Graph memory. The memory tools open a direct
-# Neo4j connection (not via the MCP Gateway), so the runtime needs NEO4J_URI
-# and NEO4J_PASSWORD. Source them from finance-agent/.env if present, else
-# fall back to the Neo4j MCP server's .env (same database as the finance
-# graph). Read the first matching value only; split on the first '=' so
-# passwords containing '=' survive.
+# NAMS configuration. Source it from finance-agent/.env. Read the first
+# matching value only; split on the first '=' so keys containing '=' survive.
 read_env_var() {
     # $1=file  $2=key. Takes the first match, strips CR and one layer of
     # surrounding single/double quotes (common .env style).
@@ -56,14 +51,12 @@ read_env_var() {
         | sed -E 's/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/'
 }
 
-load_neo4j_env() {
-    local src
-    for src in "$ROOT_DIR/.env" "$ROOT_DIR/../../neo4j-agentcore-mcp-server/.env"; do
-        if [ -f "$src" ]; then
-            : "${NEO4J_URI:=$(read_env_var "$src" NEO4J_URI)}"
-            : "${NEO4J_PASSWORD:=$(read_env_var "$src" NEO4J_PASSWORD)}"
-        fi
-    done
+load_nams_env() {
+    local src="$ROOT_DIR/.env"
+    [ -f "$src" ] || return 0
+    : "${MEMORY_API_KEY:=$(read_env_var "$src" MEMORY_API_KEY)}"
+    : "${MEMORY_ENDPOINT:=$(read_env_var "$src" MEMORY_ENDPOINT)}"
+    : "${MEMORY_WORKSPACE_ID:=$(read_env_var "$src" MEMORY_WORKSPACE_ID)}"
 }
 
 print_usage() {
@@ -108,19 +101,17 @@ case "${1:-help}" in
         echo -e "${GREEN}Deploying to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
-        load_neo4j_env
-        # Context Graph memory is a core capability: the runtime aborts at
-        # startup without NEO4J_URI/NEO4J_PASSWORD. Refuse to deploy a
-        # runtime that would crash-loop rather than deploy it memory-less.
-        if [ -z "$NEO4J_URI" ] || [ -z "$NEO4J_PASSWORD" ]; then
-            echo -e "${RED}ERROR: NEO4J_URI/NEO4J_PASSWORD not found.${NC}"
-            echo "Context Graph memory is required. Provide them in"
-            echo "finance-agent/.env (or the Neo4j MCP server's .env) and"
-            echo "re-run './agent.sh deploy'."
+        load_nams_env
+        if [ -z "$MEMORY_API_KEY" ]; then
+            echo -e "${RED}ERROR: MEMORY_API_KEY not found.${NC}"
+            echo "NAMS memory is required. Provide it in finance-agent/.env"
+            echo "and re-run './agent.sh deploy'."
             exit 1
         fi
-        DEPLOY_ARGS=(--env "NEO4J_URI=$NEO4J_URI" --env "NEO4J_PASSWORD=$NEO4J_PASSWORD")
-        echo -e "${GREEN}Context Graph memory: injecting NEO4J_URI/NEO4J_PASSWORD into runtime env${NC}"
+        DEPLOY_ARGS=(--env "MEMORY_API_KEY=$MEMORY_API_KEY")
+        [ -z "$MEMORY_ENDPOINT" ] || DEPLOY_ARGS+=(--env "MEMORY_ENDPOINT=$MEMORY_ENDPOINT")
+        [ -z "$MEMORY_WORKSPACE_ID" ] || DEPLOY_ARGS+=(--env "MEMORY_WORKSPACE_ID=$MEMORY_WORKSPACE_ID")
+        echo -e "${GREEN}NAMS memory: injecting MEMORY_API_KEY into runtime env${NC}"
         echo ""
         uv run agentcore deploy "${DEPLOY_ARGS[@]}"
         echo ""

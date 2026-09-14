@@ -16,11 +16,12 @@ dependencies = [
     # Observability — ADOT auto-instrumentation for AgentCore CloudWatch traces
     "aws-opentelemetry-distro>=0.17.0",
     # Agent framework
-    "strands-agents>=1.40.0",
-    # Context Graph semantic memory (Strands tools). Not on PyPI; resolved
-    # from a wheel vendored under vendor/ so it ships inside the
-    # direct_code_deploy bundle. Rebuild with scripts/vendor-memory.sh.
-    "neo4j-agent-memory[strands]",
+    # NAMS-backed memory capture for the Strands runtime. NAMS captures
+    # every agent turn without a direct Neo4j driver or embedding setup.
+    "strands-agents>=1.52,<2",
+    "neo4j-agent-memory[nams,strands]>=0.5.0",
+    # Used only by the optional finance graph seed and GDS enrichment commands.
+    "neo4j>=6.0",
     "python-dotenv>=1.2.2",
 ]
 
@@ -32,12 +33,6 @@ constraint-dependencies = [
     "python-multipart<=0.0.28",
 ]
 
-# neo4j-agent-memory is not on PyPI. The vendored wheel lives inside the
-# project so it is included in the direct_code_deploy upload (CodeBuild has
-# no access to the local labs checkout). Refresh: scripts/vendor-memory.sh
-[tool.uv.sources]
-neo4j-agent-memory = { path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" }
-
 # Console entry points. The server runs in the foreground of its own
 # terminal (Ctrl+C to stop) — it is never backgrounded by a script. The
 # clients are thin wire callers. `finance-server` defaults to port 7020 for
@@ -47,6 +42,9 @@ finance-server = "server.runtime_app:main"
 finance-cli = "client.cli:main"
 finance-demo = "client.demo:main"
 finance-invoke = "client.invoke:main"
+finance-traffic = "client.traffic:main"
+finance-graph-load = "finance_graph.load_neo4j:main"
+finance-graph-enrich = "finance_graph.enrich_gds:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -56,4 +54,4 @@ build-backend = "hatchling.build"
 # console scripts resolve `client.*`/`server.*` and `from core import ...`
 # works without any sys.path manipulation.
 [tool.hatch.build.targets.wheel]
-packages = ["core", "client", "server"]
+packages = ["core", "client", "server", "finance_graph"]

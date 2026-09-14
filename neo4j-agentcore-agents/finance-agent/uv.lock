@@ -641,7 +641,8 @@ dependencies = [
     { name = "boto3" },
     { name = "httpx" },
     { name = "mcp" },
-    { name = "neo4j-agent-memory", extra = ["strands"] },
+    { name = "neo4j" },
+    { name = "neo4j-agent-memory", extra = ["nams", "strands"] },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "strands-agents" },
@@ -655,10 +656,11 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.9" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mcp", specifier = ">=1.27.1" },
-    { name = "neo4j-agent-memory", extras = ["strands"], path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" },
+    { name = "neo4j", specifier = ">=6.0" },
+    { name = "neo4j-agent-memory", extras = ["nams", "strands"], specifier = ">=0.5.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "strands-agents", specifier = ">=1.40.0" },
+    { name = "strands-agents", specifier = ">=1.52,<2" },
 ]
 
 [[package]]
@@ -1053,84 +1055,26 @@ wheels = [
 
 [[package]]
 name = "neo4j-agent-memory"
-version = "0.2.1"
-source = { path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" }
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "neo4j" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/51/7f5a7d707a710154ce27175ce53a7694531d231c13a4eb50dba78d688731/neo4j_agent_memory-0.5.0.tar.gz", hash = "sha256:5244840e9d50899439b01029ad1c2859cfb23186014f64140098902ead5c62d3", size = 330594, upload-time = "2026-05-30T23:23:13.005Z" }
 wheels = [
-    { filename = "neo4j_agent_memory-0.2.1-py3-none-any.whl", hash = "sha256:74fdfdc01e663e42d7dfbb2dbab109d4787a4fffb6de0fd960c48402a41fd07d" },
+    { url = "https://files.pythonhosted.org/packages/d1/ce/7d4c146c925027291cdc95f6342ceecb6a0836954541eebba60a1e982112/neo4j_agent_memory-0.5.0-py3-none-any.whl", hash = "sha256:d054fcdc34fbbe70d0e405e9349f1ad0fd57159d45a87e2624b5fb54a1761384", size = 418145, upload-time = "2026-05-30T23:23:11.162Z" },
 ]
 
 [package.optional-dependencies]
+nams = [
+    { name = "httpx" },
+]
 strands = [
     { name = "boto3" },
     { name = "strands-agents" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "agent-framework", marker = "extra == 'all'", specifier = ">=1.0.0b260212" },
-    { name = "agent-framework", marker = "extra == 'full'", specifier = ">=1.0.0b260212" },
-    { name = "agent-framework", marker = "extra == 'microsoft-agent'", specifier = ">=1.0.0b260212" },
-    { name = "anthropic", marker = "extra == 'all'", specifier = ">=0.20.0" },
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.20.0" },
-    { name = "anthropic", marker = "extra == 'full'", specifier = ">=0.20.0" },
-    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.26.0" },
-    { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.26.0" },
-    { name = "boto3", marker = "extra == 'strands'", specifier = ">=1.26.0" },
-    { name = "click", marker = "extra == 'cli'", specifier = ">=8.0.0" },
-    { name = "crewai", marker = "extra == 'all'", specifier = ">=0.50.0" },
-    { name = "crewai", marker = "extra == 'crewai'", specifier = ">=0.50.0" },
-    { name = "crewai", marker = "extra == 'full'", specifier = ">=0.50.0" },
-    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=2.0.0,<3" },
-    { name = "gliner", marker = "extra == 'extraction'", specifier = ">=0.2.0" },
-    { name = "gliner", marker = "extra == 'full'", specifier = ">=0.2.0" },
-    { name = "gliner", marker = "extra == 'gliner'", specifier = ">=0.2.0" },
-    { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=0.1.0" },
-    { name = "google-cloud-aiplatform", marker = "extra == 'google'", specifier = ">=1.38.0" },
-    { name = "google-cloud-aiplatform", marker = "extra == 'vertex-ai'", specifier = ">=1.38.0" },
-    { name = "instructor", marker = "extra == 'full'", specifier = ">=1.7.0" },
-    { name = "instructor", marker = "extra == 'instructor'", specifier = ">=1.7.0" },
-    { name = "langchain-core", marker = "extra == 'all'", specifier = ">=0.2.0" },
-    { name = "langchain-core", marker = "extra == 'full'", specifier = ">=0.2.0" },
-    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.2.0" },
-    { name = "litellm", marker = "extra == 'all'", specifier = ">=1.50.0,<2.0" },
-    { name = "litellm", marker = "extra == 'full'", specifier = ">=1.50.0,<2.0" },
-    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.50.0,<2.0" },
-    { name = "llama-index-core", marker = "extra == 'all'", specifier = ">=0.10.0" },
-    { name = "llama-index-core", marker = "extra == 'full'", specifier = ">=0.10.0" },
-    { name = "llama-index-core", marker = "extra == 'llamaindex'", specifier = ">=0.10.0" },
-    { name = "neo4j", specifier = ">=5.20.0" },
-    { name = "openai", marker = "extra == 'all'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'full'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'openai-agents'", specifier = ">=1.0.0" },
-    { name = "opentelemetry-api", marker = "extra == 'observability'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-exporter-otlp", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'observability'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
-    { name = "opik", marker = "extra == 'opik'", specifier = ">=1.0.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pydantic-ai", marker = "extra == 'all'", specifier = ">=0.1.0" },
-    { name = "pydantic-ai", marker = "extra == 'full'", specifier = ">=0.1.0" },
-    { name = "pydantic-ai", marker = "extra == 'pydantic-ai'", specifier = ">=0.1.0" },
-    { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "rapidfuzz", marker = "extra == 'all'", specifier = ">=3.0.0" },
-    { name = "rapidfuzz", marker = "extra == 'full'", specifier = ">=3.0.0" },
-    { name = "rapidfuzz", marker = "extra == 'fuzzy'", specifier = ">=3.0.0" },
-    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0.0" },
-    { name = "sentence-transformers", marker = "extra == 'full'", specifier = ">=2.2.0" },
-    { name = "sentence-transformers", marker = "extra == 'sentence-transformers'", specifier = ">=2.2.0" },
-    { name = "spacy", marker = "extra == 'extraction'", specifier = ">=3.7.0" },
-    { name = "spacy", marker = "extra == 'full'", specifier = ">=3.7.0" },
-    { name = "spacy", marker = "extra == 'spacy'", specifier = ">=3.7.0" },
-    { name = "strands-agents", marker = "extra == 'strands'", specifier = ">=0.1.0" },
-]
-provides-extras = ["all", "anthropic", "aws", "bedrock", "cli", "crewai", "extraction", "full", "fuzzy", "gliner", "google", "google-adk", "instructor", "langchain", "litellm", "llamaindex", "mcp", "microsoft-agent", "observability", "openai", "openai-agents", "opentelemetry", "opik", "pydantic-ai", "sentence-transformers", "spacy", "strands", "vertex-ai"]
 
 [[package]]
 name = "openapi-schema-validator"
@@ -2744,12 +2688,13 @@ wheels = [
 
 [[package]]
 name = "strands-agents"
-version = "1.40.0"
+version = "1.55.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "docstring-parser" },
+    { name = "httpx" },
     { name = "jsonschema" },
     { name = "mcp" },
     { name = "opentelemetry-api" },
@@ -2760,9 +2705,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/fa/b5fdfa099b122fea98fc64b9923237077ed6b7c2a90f2c3a65cba00d7202/strands_agents-1.40.0.tar.gz", hash = "sha256:5d867c1255f8449f0030a9a9c085106c15b1704e871d0fea56d3c20b2309a4d3", size = 878176, upload-time = "2026-05-14T13:48:28.812Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/80/f65af6df0300f1d09e5c0d0cc7ebb1e8183d3922829cec2c255c91188ec9/strands_agents-1.55.1.tar.gz", hash = "sha256:55dc609a9d7c75d61842304180456a815e60b34d00ce089c29362cedd274cd2a", size = 1622097, upload-time = "2026-09-09T21:24:37.159Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/ca/ce4c061d0fa007738f0ce4ebdb234969d9343322a089c24d5986620faa66/strands_agents-1.40.0-py3-none-any.whl", hash = "sha256:40c04f411e4082a6eb78b22d5b421757b27aac1f9a42e8198ff3db7fd4fcc13f", size = 432744, upload-time = "2026-05-14T13:48:26.639Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/a0/5d7dc1c6df4b4717d7be516c32e5c9383ef0676166fb06260b6d88c4c9ab/strands_agents-1.55.1-py3-none-any.whl", hash = "sha256:3b62a8ca6f34d14140789900e35205c0032fa4a92f6147c7f69a7fda149da7ab", size = 821393, upload-time = "2026-09-09T21:24:35.259Z" },
 ]
 
 [[package]]

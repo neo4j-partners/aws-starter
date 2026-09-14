@@ -48,6 +48,11 @@ Run this against a Neo4j deployment with Graph Data Science installed:
 uv run finance-graph-enrich
 ```
 
+When using Aura Graph Analytics, this command creates a temporary GDS session.
+It defaults to the smallest supported tier, `GDS_SESSION_MEMORY=2GB`; increase
+that value in `.env` if Neo4j reports that the graph or algorithms need more
+memory. The session is released when enrichment drops its projected graphs.
+
 The agent can query the base graph after `finance-graph-load`. Run enrichment
 before asking about risk scores, communities, betweenness, or behavioral
 similarity.

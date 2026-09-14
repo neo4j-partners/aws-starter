@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from neo4j import GraphDatabase
 
 from finance_graph.load_neo4j import _connection_settings
@@ -16,6 +18,33 @@ def _drop_graph(session, name: str) -> None:
             raise
 
 
+def _project_graph(
+    session,
+    name: str,
+    node_labels: str | list[str],
+    relationship_types: str | list[str],
+    *,
+    undirected_relationship_types: list[str] | None = None,
+) -> None:
+    """Project a graph using the Aura Graph Analytics native projection API."""
+    configuration: dict[str, object] = {
+        # Aura Graph Analytics creates an implicit session for this projection.
+        # A session size is mandatory; 2GB is the smallest supported tier and
+        # is sufficient for the bundled demonstration graph.
+        "memory": os.environ.get("GDS_SESSION_MEMORY", "2GB"),
+    }
+    if undirected_relationship_types:
+        configuration["undirectedRelationshipTypes"] = undirected_relationship_types
+    session.run(
+        "CALL gds.graph.project($name, $node_labels, $relationship_types, "
+        "$configuration)",
+        name=name,
+        node_labels=node_labels,
+        relationship_types=relationship_types,
+        configuration=configuration,
+    ).consume()
+
+
 def main() -> None:
     uri, username, password, database = _connection_settings()
     driver = GraphDatabase.driver(uri, auth=(username, password))
@@ -25,11 +54,13 @@ def main() -> None:
             _drop_graph(session, "finance_account_transfers")
             _drop_graph(session, "finance_account_merchants")
 
-            session.run(
-                "CALL gds.graph.project($name, 'Account', "
-                "{TRANSFERRED_TO: {orientation: 'UNDIRECTED'}})",
+            _project_graph(
+                session,
                 name="finance_account_transfers",
-            ).consume()
+                node_labels="Account",
+                relationship_types="TRANSFERRED_TO",
+                undirected_relationship_types=["TRANSFERRED_TO"],
+            )
             session.run(
                 "CALL gds.pageRank.write($name, {maxIterations: 20, "
                 "dampingFactor: 0.85, writeProperty: 'risk_score'})",
@@ -46,11 +77,12 @@ def main() -> None:
             ).consume()
             _drop_graph(session, "finance_account_transfers")
 
-            session.run(
-                "CALL gds.graph.project($name, ['Account', 'Merchant'], "
-                "{TRANSACTED_WITH: {orientation: 'NATURAL'}})",
+            _project_graph(
+                session,
                 name="finance_account_merchants",
-            ).consume()
+                node_labels=["Account", "Merchant"],
+                relationship_types="TRANSACTED_WITH",
+            )
             session.run("MATCH ()-[r:SIMILAR_TO]->() DELETE r").consume()
             session.run(
                 "CALL gds.nodeSimilarity.write($name, {similarityMetric: 'JACCARD', "

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -27,6 +28,17 @@ class TrafficRequest:
     user_id: str
     session_id: str
     prompt: str
+
+
+class ProgressReporter:
+    """Serialize progress lines emitted by concurrent session workers."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+
+    def log(self, message: str) -> None:
+        with self._lock:
+            print(message, flush=True)
 
 
 _PORTFOLIOS = (
@@ -99,10 +111,59 @@ def _invoke(request: TrafficRequest, target: Target) -> tuple[TrafficRequest, di
 
 
 def _invoke_session(
-    requests: list[TrafficRequest], target: Target
+    session_number: int,
+    total_sessions: int,
+    requests: list[TrafficRequest],
+    total_requests: int,
+    target: Target,
+    reporter: ProgressReporter,
 ) -> list[tuple[TrafficRequest, dict, float]]:
     """Run one session in order so its captured turns remain correlated."""
-    return [_invoke(request, target) for request in requests]
+    first_request = requests[0]
+    reporter.log(
+        f"Session [{session_number}/{total_sessions}] START | "
+        f"user={first_request.user_id} | session={first_request.session_id} | "
+        f"{len(requests)} turns"
+    )
+
+    outcomes: list[tuple[TrafficRequest, dict, float]] = []
+    successes = 0
+    for turn_number, request in enumerate(requests, start=1):
+        reporter.log(
+            f"  [{request.number}/{total_requests}] START | "
+            f"session {session_number}/{total_sessions}, turn {turn_number}/{len(requests)}"
+        )
+        turn_started = time.monotonic()
+        try:
+            outcome = _invoke(request, target)
+        except Exception as error:  # noqa: BLE001 - keep the load run alive
+            duration = time.monotonic() - turn_started
+            outcome = (
+                request,
+                {"status": "error", "errors": [f"{type(error).__name__}: {error}"]},
+                duration,
+            )
+        outcomes.append(outcome)
+
+        _, result, duration = outcome
+        if result.get("status") == "success":
+            successes += 1
+            reporter.log(
+                f"  [{request.number}/{total_requests}] OK | {duration:.1f}s | "
+                f"session {session_number}/{total_sessions}, turn {turn_number}/{len(requests)}"
+            )
+        else:
+            reporter.log(
+                f"  [{request.number}/{total_requests}] ERROR | {duration:.1f}s | "
+                f"session {session_number}/{total_sessions}, turn {turn_number}/{len(requests)} | "
+                f"{result.get('errors', ['unknown error'])}"
+            )
+
+    reporter.log(
+        f"Session [{session_number}/{total_sessions}] COMPLETE | "
+        f"{successes}/{len(requests)} turns succeeded | session={first_request.session_id}"
+    )
+    return outcomes
 
 
 def main() -> None:
@@ -177,13 +238,23 @@ def main() -> None:
     sessions: dict[str, list[TrafficRequest]] = {}
     for request in requests:
         sessions.setdefault(request.session_id, []).append(request)
+    total_sessions = len(sessions)
+    reporter = ProgressReporter()
 
     # Sessions run concurrently, while turns inside each session remain in
     # order and retain a shared client session ID in NAMS metadata.
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         futures = [
-            pool.submit(_invoke_session, session_requests, target)
-            for session_requests in sessions.values()
+            pool.submit(
+                _invoke_session,
+                session_number,
+                total_sessions,
+                session_requests,
+                len(requests),
+                target,
+                reporter,
+            )
+            for session_number, session_requests in enumerate(sessions.values(), start=1)
         ]
         for future in concurrent.futures.as_completed(futures):
             try:
@@ -196,13 +267,8 @@ def main() -> None:
                 elapsed.append(duration)
                 if result.get("status") == "success":
                     successes += 1
-                    print(f"[{request.number}/{len(requests)}] OK {duration:.1f}s")
                 else:
                     failures += 1
-                    print(
-                        f"[{request.number}/{len(requests)}] ERROR "
-                        f"{result.get('errors', ['unknown error'])}"
-                    )
 
     total_seconds = time.monotonic() - started
     average = sum(elapsed) / len(elapsed) if elapsed else 0.0

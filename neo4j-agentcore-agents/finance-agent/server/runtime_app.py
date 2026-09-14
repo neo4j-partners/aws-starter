@@ -40,6 +40,17 @@ model = build_model()
 _SCOPE_ID_RE = re.compile(r"[^A-Za-z0-9._:@-]")
 
 
+def _log_startup(port: int, *, local: bool) -> None:
+    """Log enough status to confirm the runtime is ready without exposing secrets."""
+    logger.info(
+        "Finance server starting | port=%s mode=%s model=%s NAMS_API_key=%s",
+        port,
+        "local" if local else "agentcore",
+        MODEL_ID,
+        "configured" if os.environ.get("MEMORY_API_KEY", "").strip() else "missing",
+    )
+
+
 def _safe_scope_id(value: object) -> str | None:
     """Return a conservative identifier safe to place in logs and metadata."""
     if value is None:
@@ -164,8 +175,12 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
 
 def main() -> None:
     """Run the local server on port 7020 unless PORT is supplied."""
-    app.run(port=int(os.environ.get("PORT", "7020")))
+    port = int(os.environ.get("PORT", "7020"))
+    _log_startup(port, local=True)
+    app.run(port=port)
 
 
 if __name__ == "__main__":
-    app.run(port=int(os.environ.get("PORT", "8080")))
+    port = int(os.environ.get("PORT", "8080"))
+    _log_startup(port, local=False)
+    app.run(port=port)

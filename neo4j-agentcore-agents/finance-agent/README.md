@@ -139,8 +139,10 @@ uv run python -m client.traffic --remote --users 100 \
 
 The last command generates 2,000 agent turns. Start at modest concurrency and
 increase it only after checking Bedrock, AgentCore, and NAMS limits. A
-nonzero exit code means one or more requests failed; each request result is
-printed with its synthetic scope so failed traffic can be rerun by `--run-id`.
+nonzero exit code means one or more requests failed. The generator logs each
+session and turn as it starts and completes, including its session number,
+turn number, duration, and any error, so active concurrent work is visible
+while a run is in progress. Failed traffic can be rerun by `--run-id`.
 
 For a continuous low-rate stream in one conversation:
 

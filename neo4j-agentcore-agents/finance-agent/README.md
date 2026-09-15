@@ -152,16 +152,18 @@ Or send it to the deployed runtime:
 
 ```bash
 uv run python -m client.traffic --remote --users 100 \
-  --sessions-per-user 5 --turns-per-session 4 --concurrency 8 \
-  --run-id sept-demo
+  --sessions-per-user 5 --turns-per-session 4 --concurrency 4 \
+  --timeout 600 --retry-attempts 1 --run-id sept-demo-retry
 ```
 
-The last command generates 2,000 agent turns. Start at modest concurrency and
-increase it only after checking Bedrock, AgentCore, and NAMS limits. A
-nonzero exit code means one or more requests failed. The generator logs each
-session and turn as it starts and completes, including its session number,
-turn number, duration, and any error, so active concurrent work is visible
-while a run is in progress. Failed traffic can be rerun by `--run-id`.
+The last command generates 2,000 agent turns. It uses four concurrent sessions
+and a ten-minute read timeout, which provides headroom for multi-step model,
+graph, and NAMS work. Start at this level and increase concurrency only after
+checking Bedrock, AgentCore, and NAMS limits. A nonzero exit code means one or
+more requests failed. The generator logs each session and turn as it starts and
+completes, including its session number, turn number, duration, and any error,
+so active concurrent work is visible while a run is in progress. Failed traffic
+can be rerun by `--run-id`.
 
 Remote turns have a five-minute read timeout by default because model, graph,
 and NAMS work can exceed botocore's 60-second default. The generator makes one

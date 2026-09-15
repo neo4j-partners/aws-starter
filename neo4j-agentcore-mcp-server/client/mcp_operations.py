@@ -40,10 +40,10 @@ See: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-tool-
 """
 
 import json
-from datetime import timedelta
 
+import httpx2
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 
 
 # =============================================================================
@@ -61,15 +61,13 @@ async def connect_and_run(mcp_url: str, operation, *args, headers: dict = None):
         *args: Additional arguments to pass to the operation
         headers: Optional HTTP headers (e.g., for JWT auth)
     """
-    if headers is None:
-        headers = {}
-
-    async with streamablehttp_client(
-        mcp_url, headers, timeout=timedelta(seconds=120), terminate_on_close=False
-    ) as (read_stream, write_stream, _):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            await operation(session, *args)
+    async with httpx2.AsyncClient(headers=headers or {}, timeout=120.0) as http_client:
+        async with streamable_http_client(
+            mcp_url, http_client=http_client, terminate_on_close=False
+        ) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                await operation(session, *args)
 
 
 # =============================================================================

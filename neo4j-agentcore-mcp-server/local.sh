@@ -9,7 +9,7 @@
 #   delegates to client/mcp_local_client.py for all functionality.
 #
 # TARGET:
-#   Local Docker container at http://localhost:8000/mcp
+#   Local Docker container at http://localhost:${MCP_LOCAL_PORT:-8000}/mcp
 #
 # AUTHENTICATION:
 #   None required - server uses NEO4J_* credentials from environment variables
@@ -35,7 +35,8 @@
 #   ./local.sh --env fleet start
 #
 # ENVIRONMENT:
-#   MCP_SERVER_URL - Override server URL (default: http://localhost:8000/mcp)
+#   MCP_LOCAL_PORT - Host port for the local container (default: 8000)
+#   MCP_SERVER_URL - Override server URL for test, tools, and call commands
 #   NEO4J_URI      - Neo4j connection URI (from .env)
 #   NEO4J_USERNAME - Neo4j username (from .env)
 #   NEO4J_PASSWORD - Neo4j password (from .env)

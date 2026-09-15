@@ -14,7 +14,8 @@ Usage:
     python mcp_client.py help                            # Show help
 
 Environment:
-    MCP_SERVER_URL - Server URL (default: http://localhost:8000/mcp)
+    MCP_LOCAL_PORT - Host port for the local container (default: 8000).
+    MCP_SERVER_URL - Override the URL used by test, tools, and call commands.
     MCP_ENV        - Deployment suffix; reads .env.NAME instead of .env.
                      Set for you by './local.sh --env NAME'.
 """
@@ -35,7 +36,7 @@ from mcp_operations import (
 
 # Configuration
 CONTAINER_NAME = "neo4j-mcp-server"
-DEFAULT_SERVER_URL = "http://localhost:8000/mcp"
+CONTAINER_PORT = 8000
 SCRIPT_DIR = Path(__file__).parent.parent  # neo4j-agentcore-mcp-server directory
 
 # MCP_ENV carries the --env suffix chosen on the command line.
@@ -58,6 +59,23 @@ def _resolve_env_file() -> Path:
 ENV_FILE = _resolve_env_file()
 
 
+def local_port() -> int:
+    """Return the validated host port for the local Docker container."""
+    raw_port = os.getenv("MCP_LOCAL_PORT", "8000")
+    try:
+        port = int(raw_port)
+    except ValueError as error:
+        raise ValueError("MCP_LOCAL_PORT must be an integer from 1 through 65535") from error
+    if not 1 <= port <= 65535:
+        raise ValueError("MCP_LOCAL_PORT must be an integer from 1 through 65535")
+    return port
+
+
+def default_server_url() -> str:
+    """Return the local MCP endpoint derived from the selected host port."""
+    return f"http://localhost:{local_port()}/mcp"
+
+
 def load_env() -> dict:
     """Load environment variables from .env file."""
     env_vars = {}
@@ -73,21 +91,31 @@ def load_env() -> dict:
     return env_vars
 
 
-def check_server(url: str = DEFAULT_SERVER_URL, timeout: int = 2) -> bool:
+def check_server(url: str, timeout: int = 2) -> bool:
     """Check if the server is responding."""
     import urllib.request
     import urllib.error
 
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = urllib.request.Request(url, method="GET", headers={"Accept": "text/event-stream"})
         urllib.request.urlopen(req, timeout=timeout)
         return True
+    except urllib.error.HTTPError as error:
+        # An uninitialized Streamable HTTP MCP endpoint correctly responds
+        # 405 or 406. A 404 still means this is not the configured MCP route.
+        return error.code in {405, 406}
     except (urllib.error.URLError, TimeoutError, ConnectionRefusedError):
         return False
 
 
 def start_server() -> bool:
     """Start the local Docker server with env auth mode."""
+    try:
+        host_port = local_port()
+    except ValueError as error:
+        print(f"Error: {error}")
+        return False
+    server_url = default_server_url()
     env_vars = load_env()
 
     # Check required env vars
@@ -111,15 +139,15 @@ def start_server() -> bool:
     docker_cmd = [
         "docker", "run", "-d",
         "--name", CONTAINER_NAME,
-        "-p", "8000:8000",
+        "-p", f"{host_port}:{CONTAINER_PORT}",
         "-e", f"NEO4J_URI={env_vars['NEO4J_URI']}",
         "-e", f"NEO4J_DATABASE={env_vars.get('NEO4J_DATABASE', 'neo4j')}",
         "-e", f"NEO4J_USERNAME={env_vars['NEO4J_USERNAME']}",
         "-e", f"NEO4J_PASSWORD={env_vars['NEO4J_PASSWORD']}",
-        "-e", "NEO4J_MCP_TRANSPORT=http",
-        "-e", "NEO4J_MCP_HTTP_HOST=0.0.0.0",
-        "-e", "NEO4J_MCP_HTTP_PORT=8000",
-        "-e", "NEO4J_MCP_HTTP_AUTH_MODE=env",
+        "-e", "NEO4J_TRANSPORT=http",
+        "-e", "NEO4J_MCP_SERVER_HOST=0.0.0.0",
+        "-e", f"NEO4J_MCP_SERVER_PORT={CONTAINER_PORT}",
+        "-e", "NEO4J_MCP_SERVER_PATH=/mcp",
         "-e", "NEO4J_LOG_LEVEL=debug",
         "-e", "NEO4J_READ_ONLY=true",
         "neo4j-mcp-server:latest",
@@ -131,14 +159,14 @@ def start_server() -> bool:
         return False
 
     print(f"Container started: {CONTAINER_NAME}")
-    print(f"Server URL: {DEFAULT_SERVER_URL}")
+    print(f"Server URL: {server_url}")
     print()
     print("Waiting for server to be ready...")
 
     # Wait for server to be ready
     for i in range(10):
         time.sleep(2)
-        if check_server():
+        if check_server(server_url):
             print("Server is ready!")
             return True
         print(f"  Attempt {i + 1}/10...")
@@ -182,7 +210,8 @@ Examples:
   python mcp_client.py call read-cypher '{{"query": "MATCH (n) RETURN count(n)"}}'
 
 Environment:
-  MCP_SERVER_URL - Server URL (default: {DEFAULT_SERVER_URL})
+  MCP_LOCAL_PORT - Host port for the local container (default: 8000)
+  MCP_SERVER_URL - Override the URL for test, tools, and call commands
 
 See also:
   ./cloud.sh      - Cloud AgentCore testing (Cognito auth)
@@ -191,7 +220,11 @@ See also:
 
 async def run_mcp_command(command: str, args: list) -> int:
     """Run an MCP command that requires server connection."""
-    mcp_url = os.getenv("MCP_SERVER_URL", DEFAULT_SERVER_URL)
+    try:
+        mcp_url = os.getenv("MCP_SERVER_URL", default_server_url())
+    except ValueError as error:
+        print(f"Error: {error}")
+        return 1
 
     # Check if server is running
     if not check_server(mcp_url):
@@ -224,7 +257,11 @@ async def run_mcp_command(command: str, args: list) -> int:
 
 def main() -> int:
     """Main entry point."""
-    mcp_url = os.getenv("MCP_SERVER_URL", DEFAULT_SERVER_URL)
+    try:
+        mcp_url = os.getenv("MCP_SERVER_URL", default_server_url())
+    except ValueError as error:
+        print(f"Error: {error}")
+        return 1
 
     if len(sys.argv) < 2:
         show_help(mcp_url)

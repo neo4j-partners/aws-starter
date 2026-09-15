@@ -23,107 +23,28 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from dataclasses import dataclass
-from pathlib import Path
 
 import boto3
-import pyarrow as pa
-import pyarrow.csv as csv
 from botocore.exceptions import ClientError
 from pyiceberg.catalog import Catalog, load_catalog
-from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchNamespaceError, NoSuchTableError
+from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchNamespaceError
+
+from finance_iceberg import (
+    DATA_DIR,
+    DEFAULT_NAMESPACE,
+    TABLES,
+    aws_region,
+    selected_tables,
+    validate_sources,
+    write_source_table,
+)
 
 
 DEFAULT_BUCKET = "data-agent-neo4j-euw1"
-DEFAULT_NAMESPACE = "finance"
-DATA_DIR = Path(__file__).parents[1] / "data"
 DEFAULT_WRITER_ROLE_ARN = (
     "arn:aws:iam::159878781974:role/aws-reserved/sso.amazonaws.com/us-west-2/"
     "AWSReservedSSO_AdministratorAccess_3e15a1219bf2da5b"
 )
-
-
-@dataclass(frozen=True)
-class SourceTable:
-    csv_file: str
-    arrow_schema: pa.Schema
-
-
-TABLES: dict[str, SourceTable] = {
-    "accounts": SourceTable(
-        "accounts.csv",
-        pa.schema(
-            [
-                pa.field("account_id", pa.int64()),
-                pa.field("account_hash", pa.string()),
-                pa.field("account_name", pa.string()),
-                pa.field("account_type", pa.string()),
-                pa.field("region", pa.string()),
-                pa.field("balance", pa.float64()),
-                pa.field("opened_date", pa.date32()),
-                pa.field("holder_age", pa.int32()),
-            ]
-        ),
-    ),
-    "customers": SourceTable(
-        "customers.csv",
-        pa.schema(
-            [
-                pa.field("customer_id", pa.int64()),
-                pa.field("account_id", pa.int64()),
-                pa.field("customer_name", pa.string()),
-                pa.field("phone", pa.string()),
-                pa.field("email", pa.string()),
-                pa.field("address", pa.string()),
-            ]
-        ),
-    ),
-    "merchants": SourceTable(
-        "merchants.csv",
-        pa.schema(
-            [
-                pa.field("merchant_id", pa.int64()),
-                pa.field("merchant_name", pa.string()),
-                pa.field("category", pa.string()),
-                pa.field("region", pa.string()),
-            ]
-        ),
-    ),
-    "transactions": SourceTable(
-        "transactions.csv",
-        pa.schema(
-            [
-                pa.field("txn_id", pa.int64()),
-                pa.field("account_id", pa.int64()),
-                pa.field("merchant_id", pa.int64()),
-                pa.field("amount", pa.float64()),
-                pa.field("txn_timestamp", pa.timestamp("us")),
-                pa.field("txn_hour", pa.int32()),
-            ]
-        ),
-    ),
-    "account_links": SourceTable(
-        "account_links.csv",
-        pa.schema(
-            [
-                pa.field("link_id", pa.int64()),
-                pa.field("src_account_id", pa.int64()),
-                pa.field("dst_account_id", pa.int64()),
-                pa.field("amount", pa.float64()),
-                pa.field("transfer_timestamp", pa.timestamp("us")),
-            ]
-        ),
-    ),
-    "account_labels": SourceTable(
-        "account_labels.csv",
-        pa.schema(
-            [
-                pa.field("account_id", pa.int64()),
-                pa.field("is_fraud", pa.bool_()),
-            ]
-        ),
-    ),
-}
 
 
 def arguments() -> argparse.Namespace:
@@ -149,6 +70,13 @@ def arguments() -> argparse.Namespace:
         help="Replace the current contents of tables that already exist.",
     )
     parser.add_argument(
+        "--table",
+        dest="tables",
+        action="append",
+        choices=TABLES,
+        help="Load only this table. Specify multiple times to load several tables.",
+    )
+    parser.add_argument(
         "--force-delete",
         action="store_true",
         help=(
@@ -171,10 +99,6 @@ def arguments() -> argparse.Namespace:
         help="Validate and report the source tables without calling AWS.",
     )
     return parser.parse_args()
-
-
-def aws_region(requested_region: str | None) -> str:
-    return requested_region or boto3.Session().region_name or "us-east-1"
 
 
 def ensure_bucket(bucket: str, region: str) -> str:
@@ -296,17 +220,6 @@ def drop_bucket_tables(catalog: Catalog, namespace: str, bucket: str) -> None:
             print(f"Dropped Glue table: {'.'.join(identifier)}")
 
 
-def read_source(source: SourceTable) -> pa.Table:
-    # Parse each CSV into an explicitly typed Arrow table before writing it.
-    return csv.read_csv(
-        DATA_DIR / source.csv_file,
-        convert_options=csv.ConvertOptions(
-            column_types=source.arrow_schema,
-            timestamp_parsers=["%Y-%m-%d %H:%M:%S"],
-        ),
-    )
-
-
 def ensure_namespace(catalog: Catalog, namespace: str, bucket: str) -> None:
     try:
         catalog.create_namespace(
@@ -318,52 +231,15 @@ def ensure_namespace(catalog: Catalog, namespace: str, bucket: str) -> None:
         pass
 
 
-def write_table(
-    catalog: Catalog,
-    namespace: str,
-    bucket: str,
-    name: str,
-    source: SourceTable,
-    replace: bool,
-) -> None:
-    identifier = f"{namespace}.{name}"
-    data = read_source(source)
-    try:
-        # Glue stores the Iceberg table pointer; it tells PyIceberg where the
-        # table's metadata and Parquet files live in S3.
-        table = catalog.load_table(identifier)
-    except NoSuchTableError:
-        # The initial commit writes Iceberg metadata to S3 and registers the
-        # table in Glue. append() then writes Parquet data and a new snapshot.
-        table = catalog.create_table(
-            identifier=identifier,
-            schema=source.arrow_schema,
-            location=f"s3://{bucket}/warehouse/{namespace}/{name}",
-            properties={"format-version": "2", "write.parquet.compression-codec": "zstd"},
-        )
-        table.append(data)
-        print(f"Created and loaded {identifier}: {data.num_rows:,} rows")
-        return
-
-    if not replace:
-        raise SystemExit(
-            f"{identifier} already exists. Re-run with --replace to overwrite its contents."
-        )
-    # An overwrite creates a new Iceberg snapshot rather than editing files in place.
-    table.overwrite(data)
-    print(f"Replaced {identifier}: {data.num_rows:,} rows")
-
-
 def main() -> None:
     args = arguments()
-    if not DATA_DIR.is_dir():
-        raise SystemExit(f"Bundled data directory is missing: {DATA_DIR}")
 
     if args.dry_run:
-        for name, source in TABLES.items():
-            data = read_source(source)
-            print(f"{name}: {data.num_rows:,} rows; {data.schema}")
+        validate_sources(args.tables)
         return
+
+    if not DATA_DIR.is_dir():
+        raise SystemExit(f"Bundled data directory is missing: {DATA_DIR}")
 
     requested_region = aws_region(args.region)
     region = ensure_bucket(args.bucket, requested_region)
@@ -374,8 +250,15 @@ def main() -> None:
         drop_bucket_tables(catalog, args.namespace, args.bucket)
         clear_bucket(boto3.client("s3", region_name=region), args.bucket)
     ensure_namespace(catalog, args.namespace, args.bucket)
-    for name, source in TABLES.items():
-        write_table(catalog, args.namespace, args.bucket, name, source, args.replace)
+    for name, source in selected_tables(args.tables):
+        write_source_table(
+            catalog,
+            args.namespace,
+            name,
+            source,
+            args.replace,
+            location=f"s3://{args.bucket}/warehouse/{args.namespace}/{name}",
+        )
 
 
 if __name__ == "__main__":

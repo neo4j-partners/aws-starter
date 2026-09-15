@@ -14,27 +14,6 @@ Iceberg tables.
 - **Athena queries:** The [sample Athena script](./scripts/query_finance_athena.py)
   shows how to explore the loaded tables with SQL.
 
-## Parquet and Iceberg
-
-Parquet and Iceberg operate at different layers. Parquet is the columnar file
-format that stores the actual rows. Iceberg is the table format that turns a
-set of data files into a versioned, queryable table: it records the schema,
-snapshots, and the exact files included in each snapshot.
-
-The normal S3 loader uses Parquet as its Iceberg tables' data-file format.
-Each `finance.<table>` table has this S3 layout:
-
-```text
-warehouse/finance/<table>/
-├── data/*.parquet       # the actual records
-└── metadata/*           # Iceberg schemas, manifests, and snapshots
-```
-
-Iceberg can manage Parquet, ORC, or Avro data files. A direct Parquet URL 
-downloads one raw data file. Querying an Iceberg table through Athena,
-Spark, or PyIceberg reads the Glue catalog and Iceberg metadata to 
-assemble the files for the selected table snapshot.
-
 ## Overview of Data Set
 
 The dataset was generated with hidden fraud rings. The graph should find the
@@ -55,6 +34,8 @@ an address.
 - **Anchor merchants:** Four merchants are assigned to each ring.
 - **Ground truth:** `ground_truth.json` records ring membership, anchor
   merchants, whale accounts, and the KYC story.
+
+## Data tables
 
 ### Source tables
 
@@ -82,7 +63,7 @@ analysis.
 `account_labels` provides a fast account-level check. The `fraud_*` tables
 explain the rings and their supporting evidence.
 
-### Graph inputs
+## Graph inputs
 
 Load these five Iceberg tables into the graph:
 
@@ -95,7 +76,7 @@ Load these five Iceberg tables into the graph:
 
 Use the ground-truth tables only after graph analysis. They are the answer key.
 
-### Fraud encoding, graph loading, and evaluation
+## Fraud encoding, graph loading, and evaluation
 
 - **Fraud signal:** The graph exposes transfer clusters, transfer cycles,
   shared merchants, and shared KYC identifiers.
@@ -112,7 +93,7 @@ Use the ground-truth tables only after graph analysis. They are the answer key.
   `finance.whale_accounts` tables for ring membership, anchor merchants, whale
   accounts, and the KYC story.
 
-### Sample Graph algorithms
+## Sample Graph algorithms
 
 Once the Iceberg graph inputs have been loaded into Neo4j, an analyst can use
 Cypher to investigate fraud patterns rather than query the ground-truth answer
@@ -165,6 +146,13 @@ FROM detector_results AS d
 LEFT JOIN finance.account_labels AS l ON l.account_id = d.account_id;
 ```
 
+## Parquet and Iceberg
+
+- **Parquet:** Stores table rows in compressed column files.
+- **Iceberg:** Tracks a table's schema, data files, and versions.
+- **Together:** Parquet stores the data. Iceberg makes the data a queryable
+  table.
+
 ## Load into a normal S3 bucket with Glue
 
 Authenticate through your usual AWS profile, environment credentials, or an
@@ -176,6 +164,17 @@ uv run scripts/write_finance_iceberg.py
 
 # Bucket names are global. Supply a unique name when the default is taken.
 uv run scripts/write_finance_iceberg.py my-company-data-agent-neo4j
+```
+
+The normal S3 loader uses Parquet for each Iceberg table's data files. It
+writes those files and Iceberg metadata to the bucket. AWS Glue records each
+table and its current metadata location. Each `finance.<table>` table uses this
+S3 layout:
+
+```text
+warehouse/finance/<table>/
+├── data/*.parquet       # table rows
+└── metadata/*           # schemas, manifests, and snapshots
 ```
 
 The script creates a new bucket with public access blocked and SSE-S3 default
@@ -231,10 +230,9 @@ and can be overridden by `--writer-role-arn` or `DATA_AGENT_WRITER_ROLE_ARN`.
 
 ## Load into Amazon S3 Tables
 
-Amazon S3 Tables is a separate AWS storage service, not a conventional S3
-bucket. It manages the table data and maintenance operations itself. To create
-an S3 Tables table bucket, its `finance` namespace, and load the same CSVs
-through the S3 Tables Iceberg REST catalog, run:
+Amazon S3 Tables manages Iceberg table data and table maintenance. This loader
+creates an S3 Tables table bucket and its `finance` namespace. It loads the
+same CSVs through the S3 Tables Iceberg REST catalog.
 
 ```bash
 uv run scripts/write_finance_s3_tables.py

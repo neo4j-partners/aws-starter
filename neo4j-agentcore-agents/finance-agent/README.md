@@ -101,12 +101,31 @@ and reasoning traces produced by these real agent invocations.
 ```bash
 ./agent.sh configure
 ./agent.sh deploy
-uv run finance-demo --remote
+./agent.sh verify
 ```
 
 `agent.sh deploy` reads `MEMORY_API_KEY` from `.env` and injects it into the
 runtime. It also forwards optional `MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`
-values when present.
+values when present. A deploy is only reported as verified after the runtime is
+`READY` and a one-turn graph smoke test succeeds. That request intentionally
+uses the real NAMS, model, and Neo4j MCP integration. To upload without this
+check, use `./agent.sh deploy --skip-smoke`, then run `./agent.sh verify`
+before directing traffic to it.
+
+Useful recovery and diagnostics commands:
+
+```bash
+./agent.sh status                 # control-plane deployment state
+./agent.sh verify                 # READY state plus the end-to-end graph smoke test
+./agent.sh logs --errors          # recent failed AgentCore observability traces
+./agent.sh reset-config           # archive only local config; AWS resources stay intact
+./agent.sh configure              # create fresh local config after reset-config
+```
+
+`deploy` also clears a runtime binding only when it is cross-region or AWS
+confirms the configured runtime no longer exists. It records a local dependency
+fingerprint and forces an AgentCore dependency rebuild when `pyproject.toml` or
+`uv.lock` changes.
 
 ## Generate NAMS traffic
 
@@ -143,6 +162,15 @@ nonzero exit code means one or more requests failed. The generator logs each
 session and turn as it starts and completes, including its session number,
 turn number, duration, and any error, so active concurrent work is visible
 while a run is in progress. Failed traffic can be rerun by `--run-id`.
+
+Remote turns have a five-minute read timeout by default because model, graph,
+and NAMS work can exceed botocore's 60-second default. The generator makes one
+attempt by default: retrying an invocation after a read timeout can duplicate
+a completed turn in NAMS. Use `--retry-attempts 2` only when that duplication
+is acceptable. After a turn fails, later dependent turns in that session are
+not sent unless `--continue-after-error` is supplied. Ctrl+C prevents unsent
+sessions from starting and exits the load client immediately; at most the
+current `--concurrency` invocations can still complete server-side.
 
 For a continuous low-rate stream in one conversation:
 

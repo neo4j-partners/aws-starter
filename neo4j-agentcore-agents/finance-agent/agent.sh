@@ -17,8 +17,11 @@
 #
 # Usage:
 #   ./agent.sh configure          Configure for AWS deployment
-#   ./agent.sh deploy             Deploy to AgentCore Runtime
+#   ./agent.sh deploy             Deploy and verify AgentCore Runtime
 #   ./agent.sh status             Check deployment status
+#   ./agent.sh verify             Check READY state and run an end-to-end smoke test
+#   ./agent.sh logs [options]     Inspect AgentCore observability traces
+#   ./agent.sh reset-config       Archive local AgentCore config and start fresh
 #   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent
 #   ./agent.sh destroy            Remove from AgentCore
 #
@@ -34,6 +37,10 @@ set -e
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
 AGENT_NAME="finance_agent"
+CONFIG_FILE="$ROOT_DIR/.bedrock_agentcore.yaml"
+# Keep wrapper state beside the toolkit's per-agent dependency cache.  The
+# parent directory is already ignored and is safe to remove at any time.
+DEPENDENCY_FINGERPRINT_FILE="$ROOT_DIR/.bedrock_agentcore/$AGENT_NAME/wrapper-dependency-fingerprint"
 cd "$ROOT_DIR"
 
 RED='\033[0;31m'
@@ -59,6 +66,64 @@ load_nams_env() {
     : "${MEMORY_WORKSPACE_ID:=$(read_env_var "$src" MEMORY_WORKSPACE_ID)}"
 }
 
+clear_stale_runtime_binding() {
+    # `agentcore configure` intentionally preserves the previous deployment
+    # identifier. Clear it only when it cannot refer to the configured region
+    # or AWS confirms that the runtime was deleted. This lets deploy create a
+    # replacement instead of attempting UpdateAgentRuntime on a stale ID.
+    .venv/bin/python scripts/clear_stale_agentcore_runtime.py \
+        --config "$ROOT_DIR/.bedrock_agentcore.yaml" \
+        --agent "$AGENT_NAME"
+}
+
+dependency_fingerprint() {
+    # Include both the declared constraints and the resolved lockfile.  The
+    # legacy toolkit cache is lockfile-oriented, so this catches a constraint
+    # edit even if the lockfile happens to resolve to the same versions.
+    shasum pyproject.toml uv.lock | shasum | awk '{print $1}'
+}
+
+deployment_needs_dependency_rebuild() {
+    local current_fingerprint
+    current_fingerprint="$(dependency_fingerprint)"
+    DEPENDENCY_FINGERPRINT="$current_fingerprint"
+
+    if [ ! -f "$DEPENDENCY_FINGERPRINT_FILE" ]; then
+        echo "Dependency fingerprint not found; rebuilding deployment dependencies."
+        return 0
+    fi
+
+    if [ "$(<"$DEPENDENCY_FINGERPRINT_FILE")" != "$current_fingerprint" ]; then
+        echo "Dependency inputs changed; rebuilding deployment dependencies."
+        return 0
+    fi
+    return 1
+}
+
+record_dependency_fingerprint() {
+    mkdir -p "$(dirname "$DEPENDENCY_FINGERPRINT_FILE")"
+    printf '%s\n' "$DEPENDENCY_FINGERPRINT" > "$DEPENDENCY_FINGERPRINT_FILE"
+}
+
+verify_deployment() {
+    .venv/bin/python scripts/verify_agentcore_runtime.py \
+        --config "$CONFIG_FILE" \
+        --agent "$AGENT_NAME"
+}
+
+archive_local_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "No local AgentCore config exists at $CONFIG_FILE."
+        return 0
+    fi
+
+    local backup="$ROOT_DIR/.bedrock_agentcore.yaml.backup-$(date +%Y%m%d-%H%M%S)"
+    mv "$CONFIG_FILE" "$backup"
+    rm -f "$DEPENDENCY_FINGERPRINT_FILE"
+    echo "Archived local AgentCore config to: $backup"
+    echo "No AWS resources were changed. Run './agent.sh configure' to create a new config."
+}
+
 print_usage() {
     echo "Finance Agent - AgentCore deployment helper"
     echo ""
@@ -70,9 +135,13 @@ print_usage() {
     echo ""
     echo "Deployment (this script):"
     echo "  ./agent.sh configure          Configure for AWS deployment"
-    echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
+    echo "  ./agent.sh deploy             Deploy, then verify the runtime with a graph smoke test"
+    echo "  ./agent.sh deploy --skip-smoke  Deploy without health verification (not recommended)"
     echo "  ./agent.sh status             Check deployment status"
+    echo "  ./agent.sh verify             Check READY state and run the graph smoke test"
+    echo "  ./agent.sh logs [--errors]    List recent AgentCore observability traces"
     echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed agent"
+    echo "  ./agent.sh reset-config       Archive local config; does not delete AWS resources"
     echo "  ./agent.sh destroy            Remove from AgentCore"
     echo "  ./agent.sh help               Show this help message"
 }
@@ -98,6 +167,21 @@ case "${1:-help}" in
 
     deploy)
         ensure_deps
+        SKIP_SMOKE=false
+        FORCE_REBUILD=false
+        shift
+        for arg in "$@"; do
+            case "$arg" in
+                --skip-smoke) SKIP_SMOKE=true ;;
+                --force-rebuild-deps) FORCE_REBUILD=true ;;
+                *)
+                    echo -e "${RED}Unknown deploy option: $arg${NC}"
+                    echo "Supported options: --skip-smoke, --force-rebuild-deps"
+                    exit 2
+                    ;;
+            esac
+        done
+        clear_stale_runtime_binding
         echo -e "${GREEN}Deploying to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
@@ -111,11 +195,37 @@ case "${1:-help}" in
         DEPLOY_ARGS=(--env "MEMORY_API_KEY=$MEMORY_API_KEY")
         [ -z "$MEMORY_ENDPOINT" ] || DEPLOY_ARGS+=(--env "MEMORY_ENDPOINT=$MEMORY_ENDPOINT")
         [ -z "$MEMORY_WORKSPACE_ID" ] || DEPLOY_ARGS+=(--env "MEMORY_WORKSPACE_ID=$MEMORY_WORKSPACE_ID")
+        REBUILD_DEPENDENCIES=false
+        if deployment_needs_dependency_rebuild; then
+            REBUILD_DEPENDENCIES=true
+        fi
+        if [ "$FORCE_REBUILD" = true ]; then
+            echo "Dependency rebuild explicitly requested."
+            REBUILD_DEPENDENCIES=true
+        fi
+        if [ "$REBUILD_DEPENDENCIES" = true ]; then
+            DEPLOY_ARGS+=(--force-rebuild-deps)
+        fi
         echo -e "${GREEN}NAMS memory: injecting MEMORY_API_KEY into runtime env${NC}"
         echo ""
         uv run agentcore deploy "${DEPLOY_ARGS[@]}"
         echo ""
-        echo -e "${GREEN}Deployment complete!${NC}"
+        if [ "$SKIP_SMOKE" = true ]; then
+            record_dependency_fingerprint
+            echo -e "${YELLOW}Deployment upload completed, but health verification was skipped.${NC}"
+            echo "Run './agent.sh verify' before sending production traffic."
+            exit 0
+        fi
+
+        echo "Validating READY state and executing an end-to-end graph smoke test..."
+        if ! verify_deployment; then
+            echo -e "${RED}Deployment was uploaded, but it was not verified as healthy.${NC}"
+            echo "Inspect recent failures with: ./agent.sh logs --errors"
+            echo "Re-run the check with: ./agent.sh verify"
+            exit 1
+        fi
+        record_dependency_fingerprint
+        echo -e "${GREEN}Deployment verified and ready for traffic.${NC}"
         ;;
 
     status)
@@ -123,6 +233,26 @@ case "${1:-help}" in
         echo -e "${GREEN}Checking deployment status...${NC}"
         echo ""
         uv run agentcore status
+        ;;
+
+    verify)
+        ensure_deps
+        echo -e "${GREEN}Verifying deployed runtime...${NC}"
+        echo ""
+        verify_deployment
+        ;;
+
+    logs)
+        ensure_deps
+        shift
+        echo -e "${GREEN}Listing recent AgentCore observability traces...${NC}"
+        echo "Use './agent.sh logs --errors' to show failed traces only."
+        echo ""
+        uv run agentcore obs list --agent "$AGENT_NAME" "$@"
+        ;;
+
+    reset-config)
+        archive_local_config
         ;;
 
     invoke|invoke-cloud)

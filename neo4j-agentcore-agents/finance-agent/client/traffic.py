@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import os
 import sys
 import threading
 import time
@@ -96,7 +97,12 @@ def build_requests(
     return requests
 
 
-def _invoke(request: TrafficRequest, target: Target) -> tuple[TrafficRequest, dict, float]:
+def _invoke(
+    request: TrafficRequest,
+    target: Target,
+    timeout: float,
+    retry_attempts: int,
+) -> tuple[TrafficRequest, dict, float]:
     started = time.monotonic()
     result = invoke(
         {
@@ -106,6 +112,8 @@ def _invoke(request: TrafficRequest, target: Target) -> tuple[TrafficRequest, di
         },
         target=target,
         stream=False,
+        timeout=timeout,
+        max_attempts=retry_attempts,
     )
     return request, result, time.monotonic() - started
 
@@ -117,6 +125,10 @@ def _invoke_session(
     total_requests: int,
     target: Target,
     reporter: ProgressReporter,
+    timeout: float,
+    retry_attempts: int,
+    stop_event: threading.Event,
+    continue_after_error: bool,
 ) -> list[tuple[TrafficRequest, dict, float]]:
     """Run one session in order so its captured turns remain correlated."""
     first_request = requests[0]
@@ -129,13 +141,20 @@ def _invoke_session(
     outcomes: list[tuple[TrafficRequest, dict, float]] = []
     successes = 0
     for turn_number, request in enumerate(requests, start=1):
+        if stop_event.is_set():
+            reporter.log(
+                f"Session [{session_number}/{total_sessions}] CANCELLED | "
+                f"{len(requests) - turn_number + 1} turn(s) not sent | "
+                f"session={first_request.session_id}"
+            )
+            break
         reporter.log(
             f"  [{request.number}/{total_requests}] START | "
             f"session {session_number}/{total_sessions}, turn {turn_number}/{len(requests)}"
         )
         turn_started = time.monotonic()
         try:
-            outcome = _invoke(request, target)
+            outcome = _invoke(request, target, timeout, retry_attempts)
         except Exception as error:  # noqa: BLE001 - keep the load run alive
             duration = time.monotonic() - turn_started
             outcome = (
@@ -158,10 +177,18 @@ def _invoke_session(
                 f"session {session_number}/{total_sessions}, turn {turn_number}/{len(requests)} | "
                 f"{result.get('errors', ['unknown error'])}"
             )
+            if not continue_after_error:
+                reporter.log(
+                    f"Session [{session_number}/{total_sessions}] STOPPING | "
+                    f"{len(requests) - turn_number} dependent turn(s) not sent after error | "
+                    f"session={first_request.session_id}"
+                )
+                break
 
     reporter.log(
         f"Session [{session_number}/{total_sessions}] COMPLETE | "
-        f"{successes}/{len(requests)} turns succeeded | session={first_request.session_id}"
+        f"{successes}/{len(outcomes)} attempted turns succeeded | "
+        f"session={first_request.session_id}"
     )
     return outcomes
 
@@ -195,6 +222,30 @@ def main() -> None:
         help="Maximum concurrent invocations (default: 4).",
     )
     parser.add_argument(
+        "--timeout",
+        type=float,
+        default=300.0,
+        help=(
+            "Per-invocation read timeout in seconds (default: 300). "
+            "AgentCore's SDK default is only 60 seconds."
+        ),
+    )
+    parser.add_argument(
+        "--retry-attempts",
+        type=int,
+        default=1,
+        help=(
+            "Maximum AgentCore SDK attempts including the initial request "
+            "(default: 1). Values above 1 use bounded exponential backoff "
+            "but can duplicate a turn after a read timeout."
+        ),
+    )
+    parser.add_argument(
+        "--continue-after-error",
+        action="store_true",
+        help="Send later turns in a session after an error (disabled by default).",
+    )
+    parser.add_argument(
         "--run-id",
         default=None,
         help="Optional identifier added to synthetic user and session IDs.",
@@ -208,6 +259,10 @@ def main() -> None:
 
     if min(args.users, args.sessions_per_user, args.turns_per_session, args.concurrency) < 1:
         parser.error("users, sessions-per-user, turns-per-session, and concurrency must be positive")
+    if args.timeout <= 0:
+        parser.error("--timeout must be positive")
+    if args.retry_attempts < 1:
+        parser.error("--retry-attempts must be at least 1")
 
     run_id = args.run_id or uuid.uuid4().hex[:8]
     target: Target = "deployed" if args.remote else "local"
@@ -221,7 +276,10 @@ def main() -> None:
         f"Plan: {len(requests)} agent turns | {args.users} users | "
         f"{args.sessions_per_user} sessions/user | {args.turns_per_session} turns/session"
     )
-    print(f"Target: {target} | concurrency: {args.concurrency} | run ID: {run_id}")
+    print(
+        f"Target: {target} | concurrency: {args.concurrency} | "
+        f"timeout: {args.timeout:g}s | retry attempts: {args.retry_attempts} | run ID: {run_id}"
+    )
     print("All profile facts are synthetic. Each completed turn is captured in NAMS.")
 
     if args.dry_run:
@@ -240,11 +298,22 @@ def main() -> None:
         sessions.setdefault(request.session_id, []).append(request)
     total_sessions = len(sessions)
     reporter = ProgressReporter()
+    stop_event = threading.Event()
 
     # Sessions run concurrently, while turns inside each session remain in
-    # order and retain a shared client session ID in NAMS metadata.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = [
+    # order and retain a shared client session ID in NAMS metadata.  Submit
+    # only the active window, rather than queueing every session.  That makes
+    # Ctrl+C useful: no unsent sessions will start after cancellation.
+    session_iterator = iter(enumerate(sessions.values(), start=1))
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency)
+    futures: set[concurrent.futures.Future[list[tuple[TrafficRequest, dict, float]]]] = set()
+
+    def submit_next_session() -> bool:
+        try:
+            session_number, session_requests = next(session_iterator)
+        except StopIteration:
+            return False
+        futures.add(
             pool.submit(
                 _invoke_session,
                 session_number,
@@ -253,22 +322,54 @@ def main() -> None:
                 len(requests),
                 target,
                 reporter,
+                args.timeout,
+                args.retry_attempts,
+                stop_event,
+                args.continue_after_error,
             )
-            for session_number, session_requests in enumerate(sessions.values(), start=1)
-        ]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                outcomes = future.result()
-            except Exception as error:  # noqa: BLE001 - keep the load run alive
-                failures += 1
-                print(f"Session ERROR {error}")
-                continue
-            for request, result, duration in outcomes:
-                elapsed.append(duration)
-                if result.get("status") == "success":
-                    successes += 1
-                else:
+        )
+        return True
+
+    for _ in range(min(args.concurrency, total_sessions)):
+        submit_next_session()
+
+    interrupted = False
+    try:
+        while futures:
+            done, _ = concurrent.futures.wait(
+                futures,
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
+            for future in done:
+                futures.remove(future)
+                try:
+                    outcomes = future.result()
+                except Exception as error:  # noqa: BLE001 - keep the load run alive
                     failures += 1
+                    print(f"Session ERROR {error}")
+                else:
+                    for request, result, duration in outcomes:
+                        elapsed.append(duration)
+                        if result.get("status") == "success":
+                            successes += 1
+                        else:
+                            failures += 1
+                if not stop_event.is_set():
+                    submit_next_session()
+    except KeyboardInterrupt:
+        interrupted = True
+        stop_event.set()
+        cancelled = sum(future.cancel() for future in futures)
+        print(
+            f"Cancellation requested: {cancelled} queued session(s) cancelled. "
+            f"Up to {len(futures) - cancelled} active invocation(s) may take up to "
+            f"{args.timeout:g}s to finish server-side; exiting the load client now."
+        )
+    finally:
+        # On Ctrl+C avoid waiting for queued work. Running boto3 requests
+        # cannot be safely interrupted from another thread, but the bounded
+        # scheduler guarantees that only the current concurrency window remains.
+        pool.shutdown(wait=not interrupted, cancel_futures=interrupted)
 
     total_seconds = time.monotonic() - started
     average = sum(elapsed) / len(elapsed) if elapsed else 0.0
@@ -276,6 +377,14 @@ def main() -> None:
         f"Complete: {successes} succeeded, {failures} failed, "
         f"{total_seconds:.1f}s total, {average:.1f}s average request time."
     )
+    if interrupted:
+        # ThreadPoolExecutor joins worker threads during normal interpreter
+        # shutdown, even after ``shutdown(wait=False)``.  Exit the load
+        # client immediately so Ctrl+C does not leave it draining a long
+        # AgentCore read timeout.  AWS may still complete the in-flight calls
+        # noted above, but this process will submit nothing else.
+        sys.stdout.flush()
+        os._exit(130)
     if failures:
         sys.exit(1)
 

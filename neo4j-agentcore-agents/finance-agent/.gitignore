@@ -1,0 +1,2 @@
+# Recovery copies created by ./agent.sh reset-config contain local deployment metadata.
+.bedrock_agentcore.yaml.backup-*

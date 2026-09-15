@@ -190,6 +190,9 @@ logs/
 .envrc
 .inference-profile*.env
 
+# Locally generated public object URLs
+data-agent/.public-urls.txt
+
 # Secrets (never commit these)
 *.pem
 *.key

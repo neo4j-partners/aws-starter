@@ -6,6 +6,19 @@ Apache Iceberg tables. One targets an ordinary S3 bucket with AWS Glue as the
 catalog; the other uses the Amazon S3 Tables service and its Iceberg REST
 catalog.
 
+## Load the data
+
+You can load the dataset in either of these ways:
+
+- [Normal S3 bucket with Glue](#load-into-a-normal-s3-bucket-with-glue): stores
+  the tables in an S3 bucket and uses AWS Glue as the catalog.
+- [Amazon S3 Tables](#load-into-amazon-s3-tables): uses Amazon's managed S3
+  Tables storage and Iceberg REST catalog.
+
+Both loaders convert the CSV files into Iceberg tables: the records are stored
+as Parquet files, while Iceberg tracks their schema and table snapshots for
+reliable queries.
+
 ## Parquet and Iceberg
 
 Parquet and Iceberg operate at different layers. Parquet is the columnar file
@@ -22,10 +35,10 @@ warehouse/finance/<table>/
 └── metadata/*           # Iceberg schemas, manifests, and snapshots
 ```
 
-Iceberg is not a single data-file format; it can manage Parquet, ORC, or Avro
-data files. A direct Parquet URL downloads one raw data file. Querying an
-Iceberg table through Athena, Spark, or PyIceberg reads the Glue catalog and
-Iceberg metadata to assemble the files for the selected table snapshot.
+Iceberg can manage Parquet, ORC, or Avro data files. A direct Parquet URL 
+downloads one raw data file. Querying an Iceberg table through Athena,
+Spark, or PyIceberg reads the Glue catalog and Iceberg metadata to 
+assemble the files for the selected table snapshot.
 
 ## Overview of Data Set
 
@@ -251,7 +264,8 @@ loader, it does not configure an S3 bucket policy or public access controls.
 
 ## Explore the Glue/S3 dataset with Athena
 
-The Athena script runs four sample queries against the `finance` Glue database:
+The Athena script first summarizes the five source tables, then samples one
+customer with their profile and ten most recent transactions. It also runs
 fraud-ring membership counts, anchor merchants, shared KYC identifiers, and
 whale accounts with ring membership. It prints each result in a formatted
 console section.

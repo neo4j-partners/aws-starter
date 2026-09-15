@@ -5,7 +5,7 @@
 #   "boto3>=1.43.0",
 # ]
 # ///
-"""Run formatted sample fraud-ring queries against the finance Athena catalog.
+"""Run formatted source-data and fraud-ring queries against the Athena catalog.
 
 Examples:
 
@@ -38,6 +38,69 @@ class SampleQuery:
 
 
 SAMPLE_QUERIES = (
+    SampleQuery(
+        "Source-table summaries",
+        """
+        SELECT 'accounts' AS source_table, 'Account details' AS description, COUNT(*) AS row_count
+        FROM accounts
+        UNION ALL
+        SELECT 'customers', 'Customer profile and KYC details', COUNT(*)
+        FROM customers
+        UNION ALL
+        SELECT 'merchants', 'Merchant details', COUNT(*)
+        FROM merchants
+        UNION ALL
+        SELECT 'transactions', 'Account payments to merchants', COUNT(*)
+        FROM transactions
+        UNION ALL
+        SELECT 'account_links', 'Account-to-account transfers', COUNT(*)
+        FROM account_links
+        ORDER BY source_table
+        """,
+    ),
+    SampleQuery(
+        "Random customer profile and recent transactions",
+        """
+        WITH sampled_customer AS (
+            SELECT
+                c.customer_id,
+                c.account_id,
+                c.customer_name,
+                c.phone,
+                c.email,
+                c.address,
+                a.account_type,
+                a.region,
+                a.balance,
+                a.opened_date
+            FROM customers AS c
+            JOIN accounts AS a ON c.account_id = a.account_id
+            ORDER BY rand()
+            LIMIT 1
+        )
+        SELECT
+            c.customer_id,
+            c.account_id,
+            c.customer_name,
+            c.phone,
+            c.email,
+            c.address,
+            c.account_type,
+            c.region,
+            c.balance,
+            c.opened_date,
+            t.txn_id,
+            t.txn_timestamp,
+            t.amount,
+            m.merchant_name,
+            m.category AS merchant_category
+        FROM sampled_customer AS c
+        LEFT JOIN transactions AS t ON c.account_id = t.account_id
+        LEFT JOIN merchants AS m ON t.merchant_id = m.merchant_id
+        ORDER BY t.txn_timestamp DESC
+        LIMIT 10
+        """,
+    ),
     SampleQuery(
         "Fraud-ring overview",
         """

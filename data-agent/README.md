@@ -6,6 +6,9 @@ Apache Iceberg tables in Amazon S3. The Iceberg catalog is AWS Glue, which
 makes the tables discoverable from Athena, Glue, Spark, and other Iceberg
 clients.
 
+This is a standard S3 bucket with an AWS Glue Iceberg catalog. It does **not**
+use the separate Amazon S3 Tables service.
+
 ## Load the data
 
 Authenticate through your usual AWS profile, environment credentials, or an
@@ -92,3 +95,20 @@ so it is not a drop-in replacement for the requested ordinary S3 bucket.
 - [AWS: PyIceberg with Glue Data Catalog](https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/iceberg-pyiceberg.html)
 - [PyIceberg: configuration and AWS credentials](https://py.iceberg.apache.org/configuration/)
 - [PyIceberg: PyArrow write API and type mapping](https://py.iceberg.apache.org/api/)
+
+## How it works
+
+1. The script creates or finds the S3 bucket and uses the bucket's Region.
+2. It applies the policy-controlled public-read and SSO-writer bucket access.
+3. It creates the `finance` Glue database when needed.
+4. It parses each CSV from [data](./data/) into a typed PyArrow table.
+5. For a table that does not yet exist, PyIceberg creates the initial Iceberg
+   metadata file in `s3://<bucket>/warehouse/finance/<table>/metadata/` and
+   registers its metadata location in AWS Glue. Glue is the catalog: it stores
+   the table definition and current metadata pointer, not the table data.
+6. PyIceberg appends the Arrow table by writing Zstandard-compressed Parquet
+   data files to S3, then commits Iceberg manifests and a snapshot that
+   atomically makes those files the table's current version.
+7. A later `--replace` run commits a new snapshot instead of editing Parquet
+   files in place. `--force-delete` first drops the Glue tables and removes all
+   bucket objects and versions, then rebuilds the tables from the bundled CSVs.

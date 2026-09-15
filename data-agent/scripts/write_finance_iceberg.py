@@ -30,7 +30,7 @@ import boto3
 import pyarrow as pa
 import pyarrow.csv as csv
 from botocore.exceptions import ClientError
-from pyiceberg.catalog import load_catalog
+from pyiceberg.catalog import Catalog, load_catalog
 from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchNamespaceError, NoSuchTableError
 
 
@@ -282,7 +282,7 @@ def clear_bucket(s3, bucket: str) -> None:
     print(f"Deleted {deleted:,} object versions and delete markers from s3://{bucket}")
 
 
-def drop_bucket_tables(catalog, namespace: str, bucket: str) -> None:
+def drop_bucket_tables(catalog: Catalog, namespace: str, bucket: str) -> None:
     """Remove catalog entries whose metadata would be invalid after a bucket reset."""
     try:
         identifiers = catalog.list_tables(namespace)
@@ -297,6 +297,7 @@ def drop_bucket_tables(catalog, namespace: str, bucket: str) -> None:
 
 
 def read_source(source: SourceTable) -> pa.Table:
+    # Parse each CSV into an explicitly typed Arrow table before writing it.
     return csv.read_csv(
         DATA_DIR / source.csv_file,
         convert_options=csv.ConvertOptions(
@@ -306,7 +307,7 @@ def read_source(source: SourceTable) -> pa.Table:
     )
 
 
-def ensure_namespace(catalog, namespace: str, bucket: str) -> None:
+def ensure_namespace(catalog: Catalog, namespace: str, bucket: str) -> None:
     try:
         catalog.create_namespace(
             namespace,
@@ -317,12 +318,23 @@ def ensure_namespace(catalog, namespace: str, bucket: str) -> None:
         pass
 
 
-def write_table(catalog, namespace: str, bucket: str, name: str, source: SourceTable, replace: bool) -> None:
+def write_table(
+    catalog: Catalog,
+    namespace: str,
+    bucket: str,
+    name: str,
+    source: SourceTable,
+    replace: bool,
+) -> None:
     identifier = f"{namespace}.{name}"
     data = read_source(source)
     try:
+        # Glue stores the Iceberg table pointer; it tells PyIceberg where the
+        # table's metadata and Parquet files live in S3.
         table = catalog.load_table(identifier)
     except NoSuchTableError:
+        # The initial commit writes Iceberg metadata to S3 and registers the
+        # table in Glue. append() then writes Parquet data and a new snapshot.
         table = catalog.create_table(
             identifier=identifier,
             schema=source.arrow_schema,
@@ -337,6 +349,7 @@ def write_table(catalog, namespace: str, bucket: str, name: str, source: SourceT
         raise SystemExit(
             f"{identifier} already exists. Re-run with --replace to overwrite its contents."
         )
+    # An overwrite creates a new Iceberg snapshot rather than editing files in place.
     table.overwrite(data)
     print(f"Replaced {identifier}: {data.num_rows:,} rows")
 
@@ -355,6 +368,7 @@ def main() -> None:
     requested_region = aws_region(args.region)
     region = ensure_bucket(args.bucket, requested_region)
     configure_bucket_access(args.bucket, region, args.writer_role_arn)
+    # Glue is the shared Iceberg catalog. It is not Amazon S3 Tables.
     catalog = load_catalog("glue", type="glue", **{"client.region": region})
     if args.force_delete:
         drop_bucket_tables(catalog, args.namespace, args.bucket)

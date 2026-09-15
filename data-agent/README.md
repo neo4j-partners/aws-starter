@@ -1,23 +1,18 @@
 # Finance data agent
 
-This directory contains a self-contained copy of the Finance Genie synthetic
-dataset and two executable `uv` scripts that store its tabular CSV data as
-Apache Iceberg tables. One targets an ordinary S3 bucket with AWS Glue as the
-catalog; the other uses the Amazon S3 Tables service and its Iceberg REST
-catalog.
+## Project overview
 
-## Load the data
+This sample project loads a dataset with hidden fraud rings into Apache
+Iceberg tables.
 
-You can load the dataset in either of these ways:
-
-- [Normal S3 bucket with Glue](#load-into-a-normal-s3-bucket-with-glue): stores
-  the tables in an S3 bucket and uses AWS Glue as the catalog.
-- [Amazon S3 Tables](#load-into-amazon-s3-tables): uses Amazon's managed S3
-  Tables storage and Iceberg REST catalog.
-
-Both loaders convert the CSV files into Iceberg tables: the records are stored
-as Parquet files, while Iceberg tracks their schema and table snapshots for
-reliable queries.
+- **Load options:** [Normal S3 bucket with Glue](#load-into-a-normal-s3-bucket-with-glue)
+  stores tables in an S3 bucket with AWS Glue. [Amazon S3 Tables](#load-into-amazon-s3-tables)
+  uses managed S3 Tables storage and its Iceberg REST catalog.
+- **Graph analysis:** [Sample graph queries](./analyze_graph.py) look for
+  patterns that can identify potential fraud rings. Ground-truth labels stay
+  out of the graph.
+- **Athena queries:** The [sample Athena script](./scripts/query_finance_athena.py)
+  shows how to explore the loaded tables with SQL.
 
 ## Parquet and Iceberg
 

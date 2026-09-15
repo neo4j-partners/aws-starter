@@ -43,16 +43,19 @@ assemble the files for the selected table snapshot.
 ## Overview of Data Set
 
 The dataset was generated with hidden fraud rings. The graph should find the
-rings from transfer, merchant, and KYC data. `ground_truth.json` identifies
+rings from transfer, merchant, and KYC data. Ground truth tables identify
 the generated fraud accounts and rings. Use it after graph analysis to check
 whether the graph found them.
 
-Fraud is represented as ten account rings. Each ring contains 100 labelled
-fraud accounts. Ring accounts transfer money between each other and use shared
-anchor merchants. One ring also shares customer phone numbers and an address.
+Fraud is represented as ten account rings. Each ring contains 100 accounts
+labelled as fraudulent only in the ground-truth tables; the graph input does
+not include those labels. Ring accounts transfer money between each other and
+use shared anchor merchants. One ring also shares customer phone numbers and
+an address.
 
 - **Accounts:** 25,000 accounts.
-- **Fraud accounts:** 1,000 accounts have `is_fraud = true`.
+- **Fraud labels:** The ground-truth `account_labels` table marks 1,000
+  accounts with `is_fraud = true`; this table is not a graph input.
 - **Fraud rings:** Ten rings with 100 fraud accounts each.
 - **Anchor merchants:** Four merchants are assigned to each ring.
 - **Ground truth:** `ground_truth.json` records ring membership, anchor
@@ -102,8 +105,8 @@ Use the ground-truth tables only after graph analysis. They are the answer key.
 - **Fraud signal:** The graph exposes transfer clusters, transfer cycles,
   shared merchants, and shared KYC identifiers.
 - **Graph result:** A signal marks an account for review.
-- **Iceberg load:** Both loaders create the six base data tables and seven
-  normalized ground-truth tables. One base table is `finance.account_labels`.
+- **Iceberg load:** Both loaders create five graph-input tables and eight
+  ground-truth tables. `finance.account_labels` is ground truth only.
 - **Account-level truth:** Join graph results to `finance.account_labels` by
   `account_id`.
 - **Result table:** Store `account_id`, `detector_name`, `score`, and evidence

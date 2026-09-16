@@ -4,7 +4,8 @@ requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14'",
     "python_full_version == '3.13.*'",
-    "python_full_version >= '3.11' and python_full_version < '3.13'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+    "(python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform != 'emscripten') or (python_full_version == '3.11.*' and sys_platform == 'emscripten')",
     "python_full_version < '3.11'",
 ]
 
@@ -641,7 +642,8 @@ dependencies = [
     { name = "boto3" },
     { name = "httpx" },
     { name = "mcp" },
-    { name = "neo4j-agent-memory", extra = ["strands"] },
+    { name = "neo4j" },
+    { name = "neo4j-agent-memory", extra = ["nams", "strands"] },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "strands-agents" },
@@ -654,11 +656,12 @@ requires-dist = [
     { name = "bedrock-agentcore-starter-toolkit", specifier = ">=0.3.9" },
     { name = "boto3", specifier = ">=1.43.9" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "mcp", specifier = ">=1.27.1" },
-    { name = "neo4j-agent-memory", extras = ["strands"], path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" },
+    { name = "mcp", specifier = "==2.1.1" },
+    { name = "neo4j", specifier = ">=6.0" },
+    { name = "neo4j-agent-memory", extras = ["nams", "strands"], specifier = ">=0.5.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "strands-agents", specifier = ">=1.40.0" },
+    { name = "strands-agents", specifier = ">=1.52,<2" },
 ]
 
 [[package]]
@@ -757,6 +760,19 @@ wheels = [
 ]
 
 [[package]]
+name = "httpcore2"
+version = "2.13.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "h11", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'" },
+    { name = "truststore", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/15/8c/e925b1c92018abb3a1863ce1549d76d2381e334d21d65d4ac8f65dabd78a/httpcore2-2.13.0.tar.gz", hash = "sha256:2adc8be4fb285fbcd6d894298db3b52c177e74b6674eda3a76bd36be3292a3db", size = 67740, upload-time = "2026-09-14T14:18:04.717Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/0d/117a771a2bb91df334b66bf4da14cd02f21aefbcfe53180f336ce55e8f90/httpcore2-2.13.0-py3-none-any.whl", hash = "sha256:35ae5be347aa40467b4a5dc032ac67ebb6d27189fc97e8cebcf99616f6a1bb9e", size = 83162, upload-time = "2026-09-14T14:18:02.529Z" },
+]
+
+[[package]]
 name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
@@ -772,21 +788,38 @@ wheels = [
 ]
 
 [[package]]
-name = "httpx-sse"
-version = "0.4.3"
+name = "httpx2"
+version = "2.13.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/0f/4c/751061ffa58615a32c31b2d82e8482be8dd4a89154f003147acee90f2be9/httpx_sse-0.4.3.tar.gz", hash = "sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d", size = 15943, upload-time = "2025-10-10T21:48:22.271Z" }
+dependencies = [
+    { name = "anyio", marker = "sys_platform != 'emscripten'" },
+    { name = "httpcore2", marker = "sys_platform != 'emscripten'" },
+    { name = "httpx2-jsfetch", marker = "python_full_version >= '3.12' and sys_platform == 'emscripten'" },
+    { name = "idna" },
+    { name = "truststore", marker = "sys_platform != 'emscripten'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b9/a0/e9deef4654132857b5a5dbe4eddd0ac59c2814500e11f2f5044cd81103ee/httpx2-2.13.0.tar.gz", hash = "sha256:81bd07dc67a3701729ef1f777a3c00c915d4539604fdb5afd327f8682f6b7b44", size = 100290, upload-time = "2026-09-14T14:18:05.486Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/fd/6668e5aec43ab844de6fc74927e155a3b37bf40d7c3790e49fc0406b6578/httpx_sse-0.4.3-py3-none-any.whl", hash = "sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc", size = 8960, upload-time = "2025-10-10T21:48:21.158Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/d1/a0c72b0e006df654709fbc366cc5bcb53e5aee13e1e3395152c6dd293376/httpx2-2.13.0-py3-none-any.whl", hash = "sha256:fc12720cedf72faa26cca6b4ca394e05c894e7d7933fc45cafe767960804e49a", size = 95565, upload-time = "2026-09-14T14:18:03.553Z" },
+]
+
+[[package]]
+name = "httpx2-jsfetch"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/c4/0e5636363151a2a1795e0a77617168b9ca438e1748ec05fc9b5687f93d64/httpx2_jsfetch-1.0.tar.gz", hash = "sha256:70a0e3eabfef7cce5ad9c629f7d01ca05e418f586646f4ddf14782e4c1454c60", size = 6872, upload-time = "2026-08-07T00:13:07.492Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9b/43/832f631d32e4f1211caa2ba368317739fe71f0b8530e4c9d15dc454bac2a/httpx2_jsfetch-1.0-py3-none-any.whl", hash = "sha256:cb916b707601e69a07721aabc8f3f6659be3a6893bc1ff5c6f9e02241df2da32", size = 6382, upload-time = "2026-08-07T00:13:06.567Z" },
 ]
 
 [[package]]
 name = "idna"
-version = "3.15"
+version = "3.19"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/82/77/7b3966d0b9d1d31a36ddf1746926a11dface89a83409bf1483f0237aa758/idna-3.15.tar.gz", hash = "sha256:ca962446ea538f7092a95e057da437618e886f4d349216d2b1e294abfdb65fdc", size = 199245, upload-time = "2026-05-12T22:45:57.011Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/f7/abb373e5757eaec4b922b92f97ec8d6d7e057cf06778247604fbc4e7c3f3/idna-3.19.tar.gz", hash = "sha256:5e0811a4383b21dc5838069f801c4fb62113b7447663d2530d2bd6e77b49bf15", size = 215237, upload-time = "2026-08-18T05:14:24.27Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/23/408243171aa9aaba178d3e2559159c24c1171a641aa83b67bdd3394ead8e/idna-3.15-py3-none-any.whl", hash = "sha256:048adeaf8c2d788c40fee287673ccaa74c24ffd8dcf09ffa555a2fbb59f10ac8", size = 72340, upload-time = "2026-05-12T22:45:55.733Z" },
+    { url = "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl", hash = "sha256:815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4", size = 68550, upload-time = "2026-08-18T05:14:22.343Z" },
 ]
 
 [[package]]
@@ -1007,15 +1040,15 @@ wheels = [
 
 [[package]]
 name = "mcp"
-version = "1.27.1"
+version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "httpx" },
-    { name = "httpx-sse" },
+    { name = "httpx2" },
     { name = "jsonschema" },
+    { name = "mcp-types" },
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
-    { name = "pydantic-settings" },
     { name = "pyjwt", extra = ["crypto"] },
     { name = "python-multipart" },
     { name = "pywin32", marker = "sys_platform == 'win32'" },
@@ -1025,9 +1058,22 @@ dependencies = [
     { name = "typing-inspection" },
     { name = "uvicorn", marker = "sys_platform != 'emscripten'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/83/d1efe7c2980d8a3afa476f4e3d42d53dd54c0ab94c27bee5d755b45c8b73/mcp-1.27.1.tar.gz", hash = "sha256:0f47e1820f8f8f941466b39749eb1d1839a04caddca2bc60e9d46e8a99914924", size = 608458, upload-time = "2026-05-08T16:50:12.601Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/6e/21fb8e5d579dbe21d96ea4d5034200d46d8bdf2261053b5bd041f3c2f612/mcp-2.1.1.tar.gz", hash = "sha256:50b7ba1ebbe117008ea7bdd288234043e69c20b403d6851d19661e6d431a75ef", size = 3984589, upload-time = "2026-08-25T16:14:02.376Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/73/42d9596facebdb533b7f0b86c1b0364ef350d1f8ba78b1052e8a58b48b65/mcp-1.27.1-py3-none-any.whl", hash = "sha256:1af3c4203b329430fde7a87b4fcb6392a041f5cb851fd68fc674016ab4e7c06f", size = 216260, upload-time = "2026-05-08T16:50:10.547Z" },
+    { url = "https://files.pythonhosted.org/packages/50/af/8644cc5fa26a59afd2df2e98eeb19e72926887fa4b7441aba4ff661140db/mcp-2.1.1-py3-none-any.whl", hash = "sha256:1c6c31c5d6471c58db76af3af8af67f46d11d01f0a59077d0a308cbdb3d3e915", size = 357912, upload-time = "2026-08-25T16:13:59.024Z" },
+]
+
+[[package]]
+name = "mcp-types"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6a/dd/1c4417dc0b722c23a1669032d5f044e41170fe5d4773b488a50fcce98c32/mcp_types-2.1.1.tar.gz", hash = "sha256:77dcbe48fba73cca71a673f2646a5f037a017b7a0a07ac89cec1113028890eda", size = 66674, upload-time = "2026-08-25T16:14:03.861Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/d0/242e63c510f4a17381f55b1549a3f94f5687a0595984febd2b6f87a687a0/mcp_types-2.1.1-py3-none-any.whl", hash = "sha256:26f9f7f03f2a5730717a5b98e2ab7eb640ac352d05a00cdc725c311864778295", size = 69656, upload-time = "2026-08-25T16:14:00.667Z" },
 ]
 
 [[package]]
@@ -1053,84 +1099,26 @@ wheels = [
 
 [[package]]
 name = "neo4j-agent-memory"
-version = "0.2.1"
-source = { path = "vendor/neo4j_agent_memory-0.2.1-py3-none-any.whl" }
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "neo4j" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/0b/51/7f5a7d707a710154ce27175ce53a7694531d231c13a4eb50dba78d688731/neo4j_agent_memory-0.5.0.tar.gz", hash = "sha256:5244840e9d50899439b01029ad1c2859cfb23186014f64140098902ead5c62d3", size = 330594, upload-time = "2026-05-30T23:23:13.005Z" }
 wheels = [
-    { filename = "neo4j_agent_memory-0.2.1-py3-none-any.whl", hash = "sha256:74fdfdc01e663e42d7dfbb2dbab109d4787a4fffb6de0fd960c48402a41fd07d" },
+    { url = "https://files.pythonhosted.org/packages/d1/ce/7d4c146c925027291cdc95f6342ceecb6a0836954541eebba60a1e982112/neo4j_agent_memory-0.5.0-py3-none-any.whl", hash = "sha256:d054fcdc34fbbe70d0e405e9349f1ad0fd57159d45a87e2624b5fb54a1761384", size = 418145, upload-time = "2026-05-30T23:23:11.162Z" },
 ]
 
 [package.optional-dependencies]
+nams = [
+    { name = "httpx" },
+]
 strands = [
     { name = "boto3" },
     { name = "strands-agents" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "agent-framework", marker = "extra == 'all'", specifier = ">=1.0.0b260212" },
-    { name = "agent-framework", marker = "extra == 'full'", specifier = ">=1.0.0b260212" },
-    { name = "agent-framework", marker = "extra == 'microsoft-agent'", specifier = ">=1.0.0b260212" },
-    { name = "anthropic", marker = "extra == 'all'", specifier = ">=0.20.0" },
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.20.0" },
-    { name = "anthropic", marker = "extra == 'full'", specifier = ">=0.20.0" },
-    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.26.0" },
-    { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.26.0" },
-    { name = "boto3", marker = "extra == 'strands'", specifier = ">=1.26.0" },
-    { name = "click", marker = "extra == 'cli'", specifier = ">=8.0.0" },
-    { name = "crewai", marker = "extra == 'all'", specifier = ">=0.50.0" },
-    { name = "crewai", marker = "extra == 'crewai'", specifier = ">=0.50.0" },
-    { name = "crewai", marker = "extra == 'full'", specifier = ">=0.50.0" },
-    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=2.0.0,<3" },
-    { name = "gliner", marker = "extra == 'extraction'", specifier = ">=0.2.0" },
-    { name = "gliner", marker = "extra == 'full'", specifier = ">=0.2.0" },
-    { name = "gliner", marker = "extra == 'gliner'", specifier = ">=0.2.0" },
-    { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=0.1.0" },
-    { name = "google-cloud-aiplatform", marker = "extra == 'google'", specifier = ">=1.38.0" },
-    { name = "google-cloud-aiplatform", marker = "extra == 'vertex-ai'", specifier = ">=1.38.0" },
-    { name = "instructor", marker = "extra == 'full'", specifier = ">=1.7.0" },
-    { name = "instructor", marker = "extra == 'instructor'", specifier = ">=1.7.0" },
-    { name = "langchain-core", marker = "extra == 'all'", specifier = ">=0.2.0" },
-    { name = "langchain-core", marker = "extra == 'full'", specifier = ">=0.2.0" },
-    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.2.0" },
-    { name = "litellm", marker = "extra == 'all'", specifier = ">=1.50.0,<2.0" },
-    { name = "litellm", marker = "extra == 'full'", specifier = ">=1.50.0,<2.0" },
-    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.50.0,<2.0" },
-    { name = "llama-index-core", marker = "extra == 'all'", specifier = ">=0.10.0" },
-    { name = "llama-index-core", marker = "extra == 'full'", specifier = ">=0.10.0" },
-    { name = "llama-index-core", marker = "extra == 'llamaindex'", specifier = ">=0.10.0" },
-    { name = "neo4j", specifier = ">=5.20.0" },
-    { name = "openai", marker = "extra == 'all'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'full'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'openai-agents'", specifier = ">=1.0.0" },
-    { name = "opentelemetry-api", marker = "extra == 'observability'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-exporter-otlp", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'observability'", specifier = ">=1.20.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
-    { name = "opik", marker = "extra == 'opik'", specifier = ">=1.0.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pydantic-ai", marker = "extra == 'all'", specifier = ">=0.1.0" },
-    { name = "pydantic-ai", marker = "extra == 'full'", specifier = ">=0.1.0" },
-    { name = "pydantic-ai", marker = "extra == 'pydantic-ai'", specifier = ">=0.1.0" },
-    { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "rapidfuzz", marker = "extra == 'all'", specifier = ">=3.0.0" },
-    { name = "rapidfuzz", marker = "extra == 'full'", specifier = ">=3.0.0" },
-    { name = "rapidfuzz", marker = "extra == 'fuzzy'", specifier = ">=3.0.0" },
-    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0.0" },
-    { name = "sentence-transformers", marker = "extra == 'full'", specifier = ">=2.2.0" },
-    { name = "sentence-transformers", marker = "extra == 'sentence-transformers'", specifier = ">=2.2.0" },
-    { name = "spacy", marker = "extra == 'extraction'", specifier = ">=3.7.0" },
-    { name = "spacy", marker = "extra == 'full'", specifier = ">=3.7.0" },
-    { name = "spacy", marker = "extra == 'spacy'", specifier = ">=3.7.0" },
-    { name = "strands-agents", marker = "extra == 'strands'", specifier = ">=0.1.0" },
-]
-provides-extras = ["all", "anthropic", "aws", "bedrock", "cli", "crewai", "extraction", "full", "fuzzy", "gliner", "google", "google-adk", "instructor", "langchain", "litellm", "llamaindex", "mcp", "microsoft-agent", "observability", "openai", "openai-agents", "opentelemetry", "opik", "pydantic-ai", "sentence-transformers", "spacy", "strands", "vertex-ai"]
 
 [[package]]
 name = "openapi-schema-validator"
@@ -2744,12 +2732,13 @@ wheels = [
 
 [[package]]
 name = "strands-agents"
-version = "1.40.0"
+version = "1.55.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "docstring-parser" },
+    { name = "httpx" },
     { name = "jsonschema" },
     { name = "mcp" },
     { name = "opentelemetry-api" },
@@ -2760,9 +2749,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/fa/b5fdfa099b122fea98fc64b9923237077ed6b7c2a90f2c3a65cba00d7202/strands_agents-1.40.0.tar.gz", hash = "sha256:5d867c1255f8449f0030a9a9c085106c15b1704e871d0fea56d3c20b2309a4d3", size = 878176, upload-time = "2026-05-14T13:48:28.812Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/80/f65af6df0300f1d09e5c0d0cc7ebb1e8183d3922829cec2c255c91188ec9/strands_agents-1.55.1.tar.gz", hash = "sha256:55dc609a9d7c75d61842304180456a815e60b34d00ce089c29362cedd274cd2a", size = 1622097, upload-time = "2026-09-09T21:24:37.159Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/ca/ce4c061d0fa007738f0ce4ebdb234969d9343322a089c24d5986620faa66/strands_agents-1.40.0-py3-none-any.whl", hash = "sha256:40c04f411e4082a6eb78b22d5b421757b27aac1f9a42e8198ff3db7fd4fcc13f", size = 432744, upload-time = "2026-05-14T13:48:26.639Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/a0/5d7dc1c6df4b4717d7be516c32e5c9383ef0676166fb06260b6d88c4c9ab/strands_agents-1.55.1-py3-none-any.whl", hash = "sha256:3b62a8ca6f34d14140789900e35205c0032fa4a92f6147c7f69a7fda149da7ab", size = 821393, upload-time = "2026-09-09T21:24:35.259Z" },
 ]
 
 [[package]]
@@ -2826,6 +2815,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/12/64/da524626d3b9cc40c168a13da8335fe1c51be12c0a63685cc6db7308daae/tomli-2.4.1-cp314-cp314t-win_amd64.whl", hash = "sha256:2c1c351919aca02858f740c6d33adea0c5deea37f9ecca1cc1ef9e884a619d26", size = 121196, upload-time = "2026-03-25T20:22:01.169Z" },
     { url = "https://files.pythonhosted.org/packages/5a/cd/e80b62269fc78fc36c9af5a6b89c835baa8af28ff5ad28c7028d60860320/tomli-2.4.1-cp314-cp314t-win_arm64.whl", hash = "sha256:eab21f45c7f66c13f2a9e0e1535309cee140182a9cdae1e041d02e47291e8396", size = 100393, upload-time = "2026-03-25T20:22:02.137Z" },
     { url = "https://files.pythonhosted.org/packages/7b/61/cceae43728b7de99d9b847560c262873a1f6c98202171fd5ed62640b494b/tomli-2.4.1-py3-none-any.whl", hash = "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe", size = 14583, upload-time = "2026-03-25T20:22:03.012Z" },
+]
+
+[[package]]
+name = "truststore"
+version = "0.10.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/a3/1585216310e344e8102c22482f6060c7a6ea0322b63e026372e6dcefcfd6/truststore-0.10.4.tar.gz", hash = "sha256:9d91bd436463ad5e4ee4aba766628dd6cd7010cf3e2461756b3303710eebc301", size = 26169, upload-time = "2025-08-12T18:49:02.73Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/97/56608b2249fe206a67cd573bc93cd9896e1efb9e98bce9c163bcdc704b88/truststore-0.10.4-py3-none-any.whl", hash = "sha256:adaeaecf1cbb5f4de3b1959b42d41f6fab57b2b1666adb59e89cb0b53361d981", size = 18660, upload-time = "2025-08-12T18:49:01.46Z" },
 ]
 
 [[package]]

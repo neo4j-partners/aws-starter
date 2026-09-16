@@ -21,15 +21,18 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import uuid
 from collections.abc import Iterable
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
 import boto3
 import httpx
 import yaml
+from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,111 @@ AGENT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_URL = "http://localhost:7020/invocations"
 
 Target = Literal["local", "deployed"]
+
+# Agent turns can include a model response, MCP calls, and NAMS writes.  The
+# botocore default read timeout is 60 seconds, which is too short for that
+# work, especially while several sessions are active.  Do not silently retry
+# an invocation by default: after a read timeout the runtime may have already
+# completed the turn and a retry would create duplicate memory records.
+DEFAULT_DEPLOYED_CONNECT_TIMEOUT = 10.0
+DEFAULT_DEPLOYED_READ_TIMEOUT = 300.0
+DEFAULT_DEPLOYED_MAX_ATTEMPTS = 1
+DEFAULT_DEPLOYED_MAX_POOL_CONNECTIONS = 16
+
+
+def _positive_setting(
+    name: str,
+    default: float | int,
+    *,
+    minimum: float = 0.0,
+    as_int: bool = False,
+) -> float | int:
+    """Read a positive numeric environment setting with a clear error."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        parsed = int(value) if as_int else float(value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be a number, got {value!r}") from error
+    if parsed <= minimum:
+        qualifier = "positive" if minimum == 0 else f"greater than {minimum}"
+        raise ValueError(f"{name} must be {qualifier}, got {value!r}")
+    return parsed
+
+
+def _deployed_settings(
+    *,
+    read_timeout: float | None = None,
+    connect_timeout: float | None = None,
+    max_attempts: int | None = None,
+) -> tuple[float, float, int, int]:
+    """Resolve deployed-client settings, allowing safe operational overrides."""
+    resolved_read_timeout = (
+        read_timeout
+        if read_timeout is not None
+        else _positive_setting(
+            "FINANCE_AGENTCORE_READ_TIMEOUT", DEFAULT_DEPLOYED_READ_TIMEOUT
+        )
+    )
+    resolved_connect_timeout = (
+        connect_timeout
+        if connect_timeout is not None
+        else _positive_setting(
+            "FINANCE_AGENTCORE_CONNECT_TIMEOUT", DEFAULT_DEPLOYED_CONNECT_TIMEOUT
+        )
+    )
+    resolved_max_attempts = (
+        max_attempts
+        if max_attempts is not None
+        else _positive_setting(
+            "FINANCE_AGENTCORE_MAX_ATTEMPTS",
+            DEFAULT_DEPLOYED_MAX_ATTEMPTS,
+            as_int=True,
+        )
+    )
+    max_pool_connections = _positive_setting(
+        "FINANCE_AGENTCORE_MAX_POOL_CONNECTIONS",
+        DEFAULT_DEPLOYED_MAX_POOL_CONNECTIONS,
+        as_int=True,
+    )
+    if resolved_read_timeout <= 0:
+        raise ValueError("read_timeout must be positive")
+    if resolved_connect_timeout <= 0:
+        raise ValueError("connect_timeout must be positive")
+    if resolved_max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+    return (
+        float(resolved_read_timeout),
+        float(resolved_connect_timeout),
+        int(resolved_max_attempts),
+        int(max_pool_connections),
+    )
+
+
+@lru_cache(maxsize=16)
+def _deployed_client(
+    region: str,
+    read_timeout: float,
+    connect_timeout: float,
+    max_attempts: int,
+    max_pool_connections: int,
+):
+    """Create one thread-safe, pooled AgentCore data-plane client per config."""
+    return boto3.client(
+        "bedrock-agentcore",
+        region_name=region,
+        config=Config(
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            max_pool_connections=max_pool_connections,
+            # Standard retry mode uses bounded exponential backoff.  The
+            # default is one total attempt to prevent duplicate agent turns;
+            # callers may opt in to retries for an explicitly idempotent run.
+            retries={"mode": "standard", "total_max_attempts": max_attempts},
+            tcp_keepalive=True,
+        ),
+    )
 
 
 def get_agent_config() -> tuple[str, str]:
@@ -134,7 +242,14 @@ def _result(content_parts: list[str], errors: list[str]) -> dict:
     return {"status": "success", "response": "".join(content_parts)}
 
 
-def invoke_deployed(payload: dict, stream: bool = True) -> dict:
+def invoke_deployed(
+    payload: dict,
+    stream: bool = True,
+    *,
+    read_timeout: float | None = None,
+    connect_timeout: float | None = None,
+    max_attempts: int | None = None,
+) -> dict:
     """Invoke the deployed runtime via the boto3 ``bedrock-agentcore`` data plane.
 
     ``payload`` is sent as-is. The boto3 ``runtimeSessionId`` is a separate
@@ -144,7 +259,23 @@ def invoke_deployed(payload: dict, stream: bool = True) -> dict:
     agent_arn, region = get_agent_config()
     logger.info("Agent ARN: %s | region: %s | payload: %s", agent_arn, region, payload)
 
-    client = boto3.client("bedrock-agentcore", region_name=region)
+    (
+        resolved_read_timeout,
+        resolved_connect_timeout,
+        resolved_max_attempts,
+        max_pool_connections,
+    ) = _deployed_settings(
+        read_timeout=read_timeout,
+        connect_timeout=connect_timeout,
+        max_attempts=max_attempts,
+    )
+    client = _deployed_client(
+        region,
+        resolved_read_timeout,
+        resolved_connect_timeout,
+        resolved_max_attempts,
+        max_pool_connections,
+    )
     response = client.invoke_agent_runtime(
         agentRuntimeArn=agent_arn,
         runtimeSessionId=str(uuid.uuid4()),
@@ -189,8 +320,24 @@ def invoke(
     *,
     target: Target = "local",
     stream: bool = True,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
 ) -> dict:
-    """Invoke the runtime, choosing the transport by ``target``."""
+    """Invoke the runtime, choosing the transport by ``target``.
+
+    ``timeout`` is the HTTP read timeout for either target.  ``max_attempts``
+    applies only to AgentCore and includes the initial attempt.  Keep it at
+    one unless duplicate agent turns are acceptable.
+    """
     if target == "deployed":
-        return invoke_deployed(payload, stream=stream)
-    return invoke_local(payload, stream=stream)
+        return invoke_deployed(
+            payload,
+            stream=stream,
+            read_timeout=timeout,
+            max_attempts=max_attempts,
+        )
+    return invoke_local(
+        payload,
+        stream=stream,
+        timeout=int(timeout) if timeout is not None else 180,
+    )

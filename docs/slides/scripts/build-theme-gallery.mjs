@@ -42,6 +42,15 @@ const activeDecks = [
     description:
       "How Neocarta connects metadata in Neo4j and turns it into context for agents, with a query example and optional technical detail.",
   },
+  {
+    file: "neosemantics.md",
+    source: "current/neosemantics.md",
+    order: "04",
+    title: "Neosemantics: Bringing RDF Semantics Into Neo4j",
+    output: "neosemantics.html",
+    description:
+      "How Neosemantics imports, maps, validates, reasons over, and exports RDF with Neo4j, with concrete graph examples in the technical appendix.",
+  },
 ];
 
 const archiveDescriptions = {

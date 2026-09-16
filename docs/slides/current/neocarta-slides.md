@@ -130,11 +130,6 @@ section.section h2 {
   max-width: 940px;
 }
 
-.timing {
-  color: #94a3b8;
-  font-size: 20px;
-  margin-top: 56px;
-}
 </style>
 
 <!-- _class: lead -->
@@ -143,7 +138,7 @@ section.section h2 {
 
 ## Build the map in Neo4j, serve it to agents over MCP, keep the data where it lives
 
-<div class="promise">An overview, a comparison with Rosetta SDL, and a deep dive into the mechanisms</div>
+<div class="promise">An overview with optional technical details</div>
 
 <!--
 Neocarta is an experimental Neo4j Labs Python library. It builds a
@@ -153,94 +148,329 @@ through an MCP server.
 Two things to set up front. First, only metadata crosses into Neo4j.
 Source data stays in its platform. Second, Neocarta does not run your
 queries. It gives an agent the context to write one, and a separate
-database tool executes it. That boundary is the whole design, and it
-comes back in the Rosetta SDL comparison.
+database tool executes it. That boundary is the whole design.
 
-Deck structure: eleven core slides, then five optional modules, then a
-close. If we are short on time I drop modules from the back.
+Deck structure: a core overview, three technical sections, and a close.
 -->
 
 ---
 
-## Agents See Fragments, Not a Data Landscape
+## Agents See Metadata in Pieces, Not as a Connected Map
 
-- **Distributed metadata:** schemas, glossaries, metrics, query history
-- **Technical names:** `cust_ord_amt` is not "revenue"
-- **Missing relationships:** no joins, no lineage, no location
-- **Large prompts:** every schema, every prompt, low relevance
+- **Schemas:** Show which tables and columns exist
+- **Business terms:** Explain what the data means
+- **Relationships:** Show joins, lineage, and source locations
+- **Query history:** Shows how people use the data
 
-<div class="callout"><strong>The gap:</strong> Schema access tells an agent what columns exist. It does not tell the agent what they mean or how they connect.</div>
+<div class="callout"><strong>The problem:</strong> These facts live in separate systems. An agent must connect them before it can answer a business question.</div>
 
 <!--
 Give an agent raw schema access and it still cannot answer a business
 question reliably.
 
-The metadata it needs is split across systems. The names in the database
-do not match the language in the question. Foreign keys, lineage, and
-source location are missing, so the agent guesses at joins. And the usual
-workaround, dumping every schema into the prompt, costs money and buries
-the relevant tables in noise.
+The metadata it needs is split across systems. Schemas show structure.
+Glossaries explain business language. Relationships show joins and
+lineage. Query history shows how people use the data. An agent needs all
+four kinds of context, connected around the same assets.
 
 This is a retrieval problem, not a context-window problem.
 -->
 
 ---
 
-## Neocarta Ships as Three Surfaces
+## Neocarta Builds a Connected Map of Enterprise Metadata
 
-| Surface | Install | What it does |
-| --- | --- | --- |
-| **Python library** | `pip install neocarta` | Connector classes that extract, transform, and load metadata |
-| **CLI** | `neocarta[cli]` | One command per source and action, plus every retrieval tool mirrored for the shell |
-| **MCP server** | `neocarta[mcp]` | Serves the graph to agents over stdio |
+Neocarta prepares metadata in four steps:
 
-<div class="callout"><strong>Division of labor:</strong> The library and CLI build the map. The MCP server serves it. Your agent's own query tool executes against the source.</div>
+- **Collect:** Connectors read schemas, glossaries, semantic models, and query history
+- **Normalize:** Each source becomes a shared set of databases, schemas, tables, and columns
+- **Connect:** Neo4j links technical assets to business terms, joins, metrics, and usage
+- **Enrich:** Text indexes and embeddings make the graph searchable
+
+<div class="callout"><strong>Data boundary:</strong> Only metadata enters Neo4j. Source data stays in its original system.</div>
 
 <small>Neocarta is a Neo4j Labs project supported by the Neo4j field team. It is not a Neo4j product. Apache 2.0, Python 3.10 or higher.</small>
 
 <!--
-Three surfaces, one graph model underneath.
+Neocarta first builds the map that agents will use.
 
-The library is where the connectors live. You write a few lines of Python
-to point a connector at BigQuery, Snowflake, Databricks, whatever, and it
-loads the metadata into Neo4j.
+Connectors collect metadata from source systems. Neocarta normalizes each
+source into a shared model, connects related facts in Neo4j, and adds the
+indexes and embeddings needed for search.
 
-The CLI does the same ingestion without writing Python. It also mirrors
-every MCP retrieval tool as a shell command, which matters for debugging
-and for agents that do not speak MCP.
-
-The MCP server is the runtime surface. Your agent connects to it and gets
-retrieval tools over the graph.
-
-Note what is not on this list: a query executor. That is deliberate.
+Only metadata enters Neo4j. The source data remains in its original system.
 -->
 
 ---
 
-## The Semantic Layer Sits Between Sources and Agents
+## Neocarta Turns Metadata Into Context for Agents
+
+At run time, Neocarta helps the agent understand where the answer lives.
+
+- **Ask:** The user asks a business question
+- **Search:** The agent calls Neocarta through MCP
+- **Resolve:** Neocarta follows business terms, schemas, and relationships
+- **Return:** Neocarta provides the relevant tables, columns, values, and joins
+
+<div class="callout"><strong>Neocarta's job:</strong> Return focused, connected context that grounds the next step.</div>
+
+<!--
+The first run-time step is finding the right data.
+
+The user asks a business question. The agent calls Neocarta through MCP.
+Neocarta searches the graph and follows the relationships between business
+terms, tables, columns, and joins.
+
+The result is a focused set of context that tells the agent where the answer
+lives and how the relevant assets connect.
+-->
+
+---
+
+## Agents Query the Data Through a Governed Tool
+
+The agent uses Neocarta's context to build and run the query.
+
+- **Write:** The agent uses the returned context to write a query
+- **Check:** The query tool applies access controls and validation
+- **Execute:** The query tool runs the query against the source system
+- **Answer:** The agent returns the result with the tables and query it used
+
+<div class="callout"><strong>Clear ownership:</strong> Neocarta supplies context. The agent writes the query. The query tool controls and runs it.</div>
+
+<!--
+The next step is querying the source data.
+
+The agent uses the tables, columns, values, and joins returned by Neocarta to
+write a query. A separate governed tool checks access and validates the query
+before running it against the source system.
+
+The agent then returns the answer with the tables and query it used. Neocarta
+never enters the execution path.
+-->
+
+---
+
+## Neocarta Is the Context Layer in the Full Agent System
 
 ![w:1150](./neocarta.svg)
 
 <!--
-This is the shape of the thing, and I want to let it sit for a moment
-before I put words on it.
+This diagram places Neocarta inside the larger agent system.
 
-Data sources on the left. Ontologies, documents, query logs, data
-catalogs, and the lakes, databases, and warehouses themselves.
+Data sources are on the left. They include ontologies, documents, query
+logs, catalogs, databases, lakes, and warehouses.
 
 They feed a semantic layer in Neo4j, in the middle. That is the map.
 
-The retrieval layer exposes it as two kinds of MCP service. Context MCP
-answers "what data matters and what does it mean." Query MCP is the path
-to the data itself.
+The context MCP service retrieves metadata from the map. A separate query
+service provides the path to the source data.
 
 Then the agent layer, the consumption layer, and the user.
 
 And the arc across the top: feedback and memory returning to the semantic
 layer, so what an investigation learns is not thrown away.
 
-Two things to notice. Neocarta builds and serves the middle box. And the
-source systems on the left are never copied, they are only described.
+Neocarta owns metadata ingestion, the semantic map, and context retrieval.
+The agent, query service, and user interface are parts of the larger system.
+-->
+
+---
+
+<!-- _class: section -->
+
+# How Neocarta Works
+
+## Connect metadata, find the right assets, and serve trusted context
+
+<!--
+The next six slides give the core overview.
+
+First, seven connectors bring schemas and curated structural metadata into
+the graph. Six more add usage, governance, and semantic context. Embeddings
+then enrich selected graph descriptions for semantic search. Retrieval tools
+find the right assets, the MCP server exposes only the tools the graph can
+support, and governance keeps the returned context current and trusted.
+-->
+
+---
+
+## Seven Connectors Map Schemas and Structure
+
+| Connector | Metadata source |
+| --- | --- |
+| **BigQuery Schema** | BigQuery information schema |
+| **Dataplex Schema** | BigQuery assets cataloged in Dataplex |
+| **Snowflake Schema** | Snowflake information schema |
+| **Databricks Schema** | Managed Unity Catalog information schema |
+| **Unity Catalog Schema** | Open Unity Catalog REST API |
+| **JDBC Schema** | SchemaCrawler across JDBC databases |
+| **CSV** | Curated metadata files |
+
+<div class="callout"><strong>One structural model:</strong> Each path produces databases, schemas, tables, columns, values, and known references where the source provides them.</div>
+
+<!--
+The first seven connectors bring technical structure into the graph.
+
+Five read platform catalogs directly: BigQuery, Dataplex, Snowflake,
+managed Databricks Unity Catalog, and the open Unity Catalog API.
+
+JDBC uses SchemaCrawler to cover databases with a JDBC driver. CSV is the
+portable path for curated or exported metadata when there is no direct API.
+
+They all normalize what they find into the same structural model. The exact
+detail depends on the source: some expose keys, sample values, and references;
+others expose only the catalog hierarchy.
+-->
+
+---
+
+## Six Connectors Add Context Beyond the Schema
+
+| Context | Connectors | What they add |
+| --- | --- | --- |
+| **Usage** | BigQuery Logs, Snowflake Logs, Query Log | Queries, CTEs, and table or column usage |
+| **Governance** | Dataplex Glossary, Databricks Tags | Business terms, asset mappings, and tag definitions |
+| **Semantics** | OSI | Datasets, fields, metrics, joins, and AI context |
+
+<div class="callout"><strong>Thirteen source connectors, one graph:</strong> OSI is bidirectional; the other source connectors ingest metadata into Neo4j.</div>
+
+<!--
+These six connectors add the context that makes a schema useful to an agent.
+
+The three usage connectors capture query history and record which tables and
+columns real queries use. Dataplex Glossary links governed business terms to
+assets. Databricks Tags brings governed-tag definitions into the graph.
+
+OSI contributes a governed semantic model: datasets, fields, metrics,
+expressions, joins, and AI context. It is the only bidirectional source
+connector, so it can also export a model from Neo4j back to OSI YAML.
+
+Together with the seven structural connectors, that makes thirteen source
+connectors. All thirteen bring source metadata into the shared graph model.
+-->
+
+---
+
+## Embeddings Add Semantic Search After Ingestion
+
+```text
+graph descriptions  ->  embedding provider  ->  vector properties + indexes
+```
+
+| Enrichment path | Best fit |
+| --- | --- |
+| **LiteLLM** | Multiple providers, including Bedrock, OpenAI, Azure OpenAI, Gemini, Cohere, and Vertex AI |
+| **OpenAI SDK** | Direct client control, custom endpoints, retries, proxies, and explicit dimensions |
+
+- **Targets:** Database, Schema, Table, Column, and BusinessTerm descriptions
+- **Incremental:** Processes only nodes that do not already have an embedding
+- **Result:** Enables vector and hybrid retrieval over the metadata graph
+
+<div class="callout"><strong>Enrichment, not ingestion:</strong> Run embeddings after the source connectors have populated Neo4j.</div>
+
+<!--
+Embeddings are a separate step after source ingestion.
+
+The enrichment reads descriptions already stored on graph nodes, sends them
+to an embedding provider, writes the vectors back to Neo4j, and creates a
+cosine-similarity vector index for each selected label.
+
+LiteLLM is the flexible path across providers such as Bedrock, OpenAI, Azure
+OpenAI, Gemini, Cohere, and Vertex AI. The direct OpenAI implementation is for
+applications that already own an OpenAI client or need explicit control over
+dimensions, endpoints, retries, or proxies.
+
+The process is incremental. Nodes that already have an embedding are skipped.
+This enrichment enables vector and hybrid retrieval; it does not ingest a new
+data source or change the shared metadata model.
+-->
+
+---
+
+## Agents Can Find a Table in Five Ways
+
+The MCP server supports simple browsing and several kinds of search.
+
+- **Catalog browsing:** Lists schemas and tables so the agent can see what exists
+- **Full-text search:** Finds exact names and words in descriptions
+- **Vector search:** Finds similar meaning when the words differ
+- **Hybrid search:** Combines full-text and vector results
+- **Glossary bridge:** Connects governed business terms to the assets that implement them
+
+<div class="callout"><strong>Table and column search:</strong> Each method can find a table or a specific column.</div>
+
+<!--
+Agents can find data in five ways.
+
+Catalog browsing provides orientation. Full-text search matches exact
+names and description terms. Vector search matches similar meaning.
+Hybrid search combines both signals. The glossary bridge connects governed
+business language to the physical tables and columns that implement it.
+
+The methods work at table and column level. This lets the agent use the
+method that fits the question and the indexes available in the graph.
+-->
+
+---
+
+## The MCP Server Offers Only Tools the Graph Can Support
+
+```text
+Server starts
+      |
+      v
+Checks the graph for indexes and business terms
+      |
+      v
+Selects the best available search method
+      |
+      v
+Shows the agent only tools that will work
+```
+
+- **With business terms:** Offer glossary-based hybrid search
+- **With text and vector indexes:** Offer hybrid search
+- **With one index:** Offer full-text or vector search
+- **With no search index:** Offer catalog browsing
+
+<div class="callout"><strong>Result:</strong> The agent sees a smaller tool list and avoids calls the graph cannot support.</div>
+
+<!--
+The MCP server checks the graph when it starts.
+
+It looks for search indexes and business terms. It then registers the best
+search tool each label can support. Business-term hybrid search has the
+highest priority, followed by hybrid search, then one search method on its
+own. Catalog browsing remains available without search indexes.
+
+The agent sees only tools that will work against the current graph. This
+removes a common source of failed tool calls.
+-->
+
+---
+
+## Governance Keeps Retrieved Context Trustworthy
+
+Trusted retrieval requires clear checks and clear owners.
+
+- **Automated checks:** Test retrieval quality and query validity
+- **User feedback:** Record approvals, corrections, and outcomes
+- **Expert review:** Confirm mappings, metrics, and query paths
+- **Traceability:** Keep context, queries, and evidence
+- **Authority:** Use approved definitions for high-risk decisions
+
+<div class="callout"><strong>Why it matters:</strong> Metadata changes. Named owners keep the map current.</div>
+
+<!--
+Governance keeps the semantic map useful over time.
+
+Automated evaluation measures retrieval quality, query validity, and
+performance. User feedback records approvals and corrections. Data
+stewards review important mappings, metric definitions, and query paths.
+
+Traceability preserves the evidence behind each answer. Expert-approved
+definitions provide the final authority for high-risk decisions.
 -->
 
 ---
@@ -344,188 +574,15 @@ composes, a governed tool executes.
 
 ---
 
-## Extending Neocarta to AWS
-
-| Step | Planned expansion |
-| --- | --- |
-| **Connect** | Add a Glue Data Catalog connector using Neocarta's existing connector contract |
-| **Normalize** | Map AWS databases, tables, columns, and catalog metadata into the shared Neo4j model |
-| **Enrich** | Link AWS assets to business terms, known join paths, and usage evidence |
-| **Serve** | Expose AWS metadata through the same CLI and MCP retrieval tools used across platforms |
-| **Validate** | Prove semantic discovery through governed Athena queries over S3 Tables |
-
-<div class="callout"><strong>Same pattern, new source:</strong> Read S3 Tables metadata through the Glue federated catalog; keep S3 Tables authoritative and Athena as the query engine. <span class="status-roadmap">Planned:</span> Glue Data Catalog connector.</div>
-
-<!--
-The AWS expansion starts with a Glue Data Catalog connector. That
-closes the current gap in Neocarta's AWS source coverage without creating
-a separate AWS-specific graph model.
-
-The connector will extract Glue metadata and normalize it into Neocarta's
-shared Database, Schema, Table, and Column model. It can then enrich those
-AWS assets with business terms, known joins, and usage evidence.
-
-Once the metadata is in the shared model, the CLI, MCP tools, glossary
-bridge, and retrieval strategies already used for other platforms can
-serve it to agents.
-
-The boundary stays explicit: Glue exposes the federated catalog, Athena
-executes the query, S3 Tables remains authoritative for its tables, and
-Neocarta adds the semantic context and cross-source relationships.
--->
-
-<!-- AWS sources: https://docs.aws.amazon.com/glue/latest/dg/enable-s3-tables-catalog-integration.html and https://docs.aws.amazon.com/athena/latest/ug/gdc-register-s3-table-bucket-cat.html -->
-
----
-
 <!-- _class: section -->
 
-# Neocarta and Rosetta SDL
+# Metadata Model and Connectors
 
-## Where they align, where they differ, and when each fits
-
-<!--
-The AWS target and Glue roadmap establish Neocarta's direction. Rosetta
-SDL is the useful comparison because it implements a deeper AWS-specific
-application around the same semantic-map idea.
-
-There is another Neo4j-based project solving this problem, and it is
-worth knowing about: Rosetta SDL. It is an AWS reference application that
-maps business language onto Glue and Athena metadata in Neo4j and serves
-it to agents. Same core idea, built from the other end.
-
-Neocarta is a cross-platform library and context service. Rosetta SDL is
-a complete AWS reference application. They share a semantic-map
-foundation, then differ in platform scope, execution, and deployment.
-
-Three slides: the shared foundation, the primary responsibility
-boundary, then the remaining implementation differences.
--->
-
----
-
-## What Neocarta and Rosetta SDL Share
-
-**Rosetta SDL** is an AWS reference application. It maps business language onto Glue and Athena metadata in Neo4j, then serves it to agents over MCP.
-
-| Shared functionality | How |
-| --- | --- |
-| **Semantic map in Neo4j** | Technical metadata linked to business meaning |
-| **Catalog discovery** | Search and browse tables, columns, joins, metrics |
-| **MCP server** | Retrieval tools for AI agents |
-| **Hybrid search** | Graph traversal, full-text, and embeddings together |
-| **Data stays put** | Only metadata enters the graph |
+## How metadata is represented, extended, and brought into the graph
 
 <!--
-Building the semantic map is not a side capability in either project. It
-is the core feature of both, which is why the comparison is worth making
-at all.
-
-Five pieces of shared functionality.
-
-Both build a semantic map in Neo4j that links technical metadata to
-business meaning. Both let you search and browse the catalog: tables,
-columns, joins, metrics. Both expose retrieval tools to agents over MCP.
-Both combine graph traversal with full-text and embedding search rather
-than picking one. And both leave the source data alone, so only metadata
-crosses into the graph.
-
-Neocarta ships all five today. The core model carries REFERENCES for
-joins, the Dataplex connector brings BusinessTerm and TAGGED_WITH, the
-query log connector brings Query with USES_TABLE and USES_COLUMN, and the
-MCP server serves business-term-bridged hybrid search.
-
-The differences are real and they are on the next slide. They are
-differences of scope, not of what the two projects set out to do.
--->
-
----
-
-## Where Their Scope and Responsibilities Differ
-
-| | Rosetta SDL | Neocarta |
-| --- | --- | --- |
-| **Product shape** | Complete application: API, admin UI, deployment | Library, CLI, graph model, MCP server |
-| **Platform scope** | AWS: AWS Glue, Amazon Athena, S3 Vectors, Amazon Bedrock | Eleven connectors across clouds and open formats |
-| **Query execution** | Plans, validates, and runs Athena queries | Supplies context, relies on a separate tool |
-| **Safety controls** | sqlglot SQL firewall, fail-closed | Not the execution firewall |
-
-<div class="callout"><strong>Choose on scope, not features:</strong> One AWS data lake with an admin experience points to Rosetta SDL. Metadata from several platforms behind your own agent points to Neocarta.</div>
-
-<!--
-These four dimensions usually decide the fit. The next slide covers the
-remaining implementation differences.
-
-Product shape. Rosetta SDL is something you deploy: FastAPI service,
-React admin interface, Cognito auth, CDK stack. Neocarta is something you
-import.
-
-Platform scope. Rosetta SDL goes deep on AWS. Neocarta goes wide across
-BigQuery, Dataplex, Snowflake, Databricks, Unity Catalog, JDBC, CSV, query
-logs, and OSI.
-
-Query execution. Rosetta SDL can take a question all the way to results in
-Athena. Neocarta stops at context.
-
-Safety. Rosetta SDL parses every query with sqlglot before execution and
-fails closed on a parse error. Neocarta parses SQL during query log
-ingestion, but it is not in the execution path, so it cannot be your
-firewall.
-
-That last row is not a hidden product weakness. It is the consequence of
-Neocarta stopping at context while a separately governed tool owns
-execution.
--->
-
----
-
-## Other Differences
-
-| | Rosetta SDL | Neocarta |
-| --- | --- | --- |
-| **Metric safety** | Compiles approved metrics to SQL with no LLM, so SQL is reproducible | Stores and retrieves metric definitions for the agent to use |
-| **SQL controls** | sqlglot AST firewall, fails closed, limits allowed tables | Parses SQL at ingestion, not in the execution path |
-| **Documents** | Document metadata and chunk search in S3 Vectors | Structured metadata, glossary, semantic models, query history |
-| **Interfaces** | FastAPI service, React admin UI, Cognito auth, CDK stack | Python package, CLI, MCP server |
-
-<!--
-These differences matter when the first four dimensions do not settle
-the choice.
-
-Metric safety is the strongest thing Rosetta SDL has. A governed metric
-compiles to SQL deterministically, with no LLM in the path, so the same
-question produces the same SQL every time. Neocarta stores metric
-definitions, including OSI metrics with dialect-specific expressions, but
-generation is the agent's job. If reproducible numbers for approved
-business measures are your requirement, that is a real difference.
-
-SQL controls follow from execution. Rosetta SDL is in the execution path
-so it can be a firewall. Neocarta is not, so it cannot.
-
-Rosetta SDL indexes document chunks in S3 Vectors and can route an
-unstructured question there. Neocarta is structured metadata only.
-
-Rosetta SDL also provides an application UI and deployment stack, while
-Neocarta provides a package, CLI, and MCP server.
--->
-
----
-
-<!-- MODULE:B1 graph-model ~5min -->
-<!-- _class: section -->
-
-# Module B1: The Graph Model
-
-## Core model, glossary extension, query logs and semantic models
-
-<div class="timing">Three slides, about five minutes</div>
-
-<!--
-MODULE B1. Three slides, about five minutes. Drop this if under 30 minutes.
-
-This module opens the hood on the graph. If the audience is going to build
-a connector or write Cypher against the map, they need this. If they are
-evaluating fit, they do not.
+This section opens the hood on the graph, then connects the shared model to
+the contract every source connector implements.
 -->
 
 ---
@@ -658,25 +715,6 @@ semantic model that other tools consume.
 -->
 
 ---
-<!-- /MODULE:B1 -->
-
-<!-- MODULE:B2 connectors ~5min -->
-<!-- _class: section -->
-
-# Module B2: Connectors and the Contract
-
-## How metadata enters the graph, and how to add a platform
-
-<div class="timing">Three slides, about five minutes</div>
-
-<!--
-MODULE B2. Three slides, about five minutes.
-
-Keep this if the audience might write a connector or has a platform that
-is not on the list. Drop it for an evaluation audience.
--->
-
----
 
 ## Every Connector Decomposes the Same Way
 
@@ -711,41 +749,6 @@ one object and call ingest.
 If you are loading a large schema, the performance extra is worth it. It
 replaces the pure-Python serialization layer in the Neo4j driver with a
 compiled Rust extension.
--->
-
----
-
-## Eleven Connectors Today
-
-| Source | Connectors |
-| --- | --- |
-| **Google Cloud** | BigQuery schema, BigQuery logs, Dataplex schema, Dataplex glossary |
-| **Other platforms** | Snowflake, Databricks, Unity Catalog, JDBC |
-| **Files and formats** | CSV, query logs, OSI semantic models |
-| **Enrichment** | Embeddings via LiteLLM or the OpenAI SDK |
-
-<div class="callout"><strong>Before you present this:</strong> Snowflake, Databricks, Unity Catalog, and JDBC packages exist in the tree but are not documented at the depth of the others. Confirm maturity before naming all eleven to a customer.</div>
-
-<!--
-The inventory as it stands.
-
-Google Cloud is the deepest. BigQuery has separate schema and logs
-connectors, and Dataplex has separate schema and glossary connectors.
-
-Snowflake, Databricks, Unity Catalog, and JDBC broaden the reach. JDBC in
-particular means anything with a JDBC driver is reachable without a
-bespoke connector.
-
-CSV matters more than it looks. It is how you load curated metadata from a
-system with no API, which covers a lot of real enterprise glossaries.
-
-Embeddings are an enrichment step rather than a source. Run it after
-ingestion to turn on vector and hybrid search. Dimension is auto-detected
-from the model.
-
-Honesty note for whoever presents this: check the state of the four in the
-middle row before claiming them. They are in the codebase. They are not
-documented like the others.
 -->
 
 ---
@@ -787,103 +790,16 @@ That is the argument for the shared model paying for itself.
 -->
 
 ---
-<!-- /MODULE:B2 -->
-
-<!-- MODULE:B3 retrieval ~5min -->
 <!-- _class: section -->
 
-# Module B3: Retrieval in Depth
+# Retrieval, Reuse, and Adoption
 
-## Five ways to find a table, and how the server adapts
-
-<div class="timing">Three slides, about five minutes</div>
+## What the agent receives, what the system can retain, and how to start
 
 <!--
-MODULE B3. Three slides, about five minutes.
-
-This is the highest-value module for an agent-building audience, because
-retrieval quality is what decides whether the map is useful. Keep it
-whenever you have more than 15 minutes.
--->
-
----
-
-## Five Ways to Find a Table
-
-| Method | When it wins |
-| --- | --- |
-| **Catalog browsing** | The agent needs orientation, not search |
-| **Full-text** | Exact names and description terms, no embeddings required |
-| **Vector** | Business phrasing that shares no words with the schema |
-| **Hybrid** | Both signals, which is the usual production answer |
-| **Glossary bridge** | Governed vocabulary reaches the asset that implements it |
-
-<div class="callout"><strong>Table level and column level:</strong> Each search method runs against table embeddings and descriptions, or column ones. A question about "amount" is a column-level question.</div>
-
-<!--
-Five retrieval strategies, and they are not interchangeable.
-
-Catalog browsing is list_schemas and list_tables_by_schema. No search, no
-indexes, no embedding key. When an agent needs to know what exists, this
-is cheaper and more reliable than search.
-
-Full-text matches names and descriptions. It needs no embeddings, so it
-works on a graph you just loaded.
-
-Vector search matches meaning. This handles the case where the question
-says revenue and the column says total_amount.
-
-Hybrid combines both, and it is what you want in production.
-
-The glossary bridge is the one that is hard to replicate elsewhere. The
-full-text branch runs through BusinessTerm nodes, so governed vocabulary
-routes to the physical asset.
-
-And each of these exists at table level and column level, because
-sometimes the question is about a table and sometimes it is about a field.
--->
-
----
-
-## The MCP Server Adapts to the Graph It Finds
-
-```text
-Server startup
-      |
-      v
-Probe database for indexes
-      |
-      v
-Register highest-priority tool per label:
-
-  business-term hybrid  >  hybrid  >  vector or full-text alone
-      |
-      v
-Agent sees only tools the graph can actually serve
-```
-
-<div class="callout"><strong>Why this matters:</strong> An agent cannot call a vector search tool against a graph with no vector index. The server removes the failure mode instead of documenting it.</div>
-
-<!--
-This is a small design decision with a large effect on agent reliability.
-
-At startup the MCP server probes the target database to see which indexes
-exist. Then, per label, Table and Column, it registers the single
-highest-priority retrieval tool the graph can support.
-
-Priority order: business-term-bridged hybrid, then plain hybrid, then
-vector or full-text on their own.
-
-Schema-level vector retrieval and the catalog tools register independently.
-
-The effect is that the tool list an agent sees is always a list of tools
-that work. If you loaded a schema without embeddings, the agent gets
-full-text and catalog tools, and it never tries a vector search that
-would fail.
-
-The same tools are reachable from the CLI as `neocarta tool <name>`, which
-is how you debug retrieval without an agent in the loop. A search command
-run against a graph missing its index exits with code 3.
+This section follows retrieved context into a concrete result, shows how
+query history can become reusable process knowledge, and closes with a
+practical adoption path.
 -->
 
 ---
@@ -920,23 +836,6 @@ determined.
 
 Compare this to what a vector search over table descriptions returns: a
 ranked list of table names. That is a starting point. This is a query plan.
--->
-
----
-<!-- /MODULE:B3 -->
-
-<!-- MODULE:B4 process-knowledge ~4min -->
-<!-- _class: section -->
-
-# Module B4: Reusable Query and Process Knowledge
-
-## From query logs to paths an agent can start from
-
-<div class="timing">Two slides, about four minutes</div>
-
-<!--
-MODULE B4. Two slides, about four minutes. This is direction, not shipped
-behavior. Be clear about that when you present it.
 -->
 
 ---
@@ -1024,57 +923,6 @@ does not remove the need to be right.
 -->
 
 ---
-<!-- /MODULE:B4 -->
-
-<!-- MODULE:B5 governance ~4min -->
-<!-- _class: section -->
-
-# Module B5: Governance
-
-## How trusted context stays trustworthy
-
-<div class="timing">One slide, about two minutes</div>
-
-<!--
-MODULE B5. One slide, about two minutes. Keep this when the audience needs
-the operating model behind trusted retrieval.
--->
-
----
-
-## Governance Turns Retrieval Into Trusted Context
-
-- **Automated evaluation:** retrieval quality, query validity, performance
-- **User feedback:** approval, correction, task outcome
-- **Expert review:** stewards validate mappings, metrics, and query paths
-- **Traceability:** context, tool calls, queries, and evidence retained
-- **Authority:** expert-approved definitions for high-risk decisions
-
-<div class="callout"><strong>The point:</strong> A semantic map is only as trustworthy as the process that maintains it. Mappings decay when nobody owns them.</div>
-
-<!--
-A map that nobody maintains stops being true, and an agent grounded in a
-stale map is worse than one that admits it does not know.
-
-Automated evaluation is the first line. Does retrieval return the right
-assets, does generated SQL parse and run, how fast, how expensive.
-
-User feedback is the second. Approvals, corrections, and whether the task
-actually completed.
-
-Expert review is the third and it is the one that needs a named owner.
-Data stewards validate that a business term maps to the right column and
-that a metric definition is current.
-
-Traceability makes all of that reviewable after the fact.
-
-And authority. For a high-risk decision you want an expert-approved
-definition, not whatever the embedding search ranked first.
--->
-
----
-<!-- /MODULE:B5 -->
-
 ## Start With One Governed Question
 
 1. **Choose** one business question that spans several related tables

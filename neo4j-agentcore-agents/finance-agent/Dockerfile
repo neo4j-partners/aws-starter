@@ -19,11 +19,9 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # The local project builds the `core` package, so it must be present
-# before `uv sync` installs the project into the venv. `vendor/` holds the
-# neo4j-agent-memory wheel the lockfile pins by relative path.
+# before `uv sync` installs the project into the venv.
 COPY pyproject.toml uv.lock ./
 COPY core ./core
-COPY vendor ./vendor
 RUN uv sync --frozen --no-dev
 
 # Only the deployed runtime ships in the image; client/ is local-only tooling.

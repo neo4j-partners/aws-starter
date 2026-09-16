@@ -15,6 +15,7 @@ const decks = [
   "current/fraud-data-architecture.md",
   "current/neocarta-slides.md",
   "current/neocarta-slides-v2.md",
+  "current/neosemantics.md",
 ];
 
 const assets = [

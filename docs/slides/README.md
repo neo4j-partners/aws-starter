@@ -11,6 +11,7 @@ The gallery builds these editable sources from `docs/slides/current/`:
 - `docs/slides/current/neocarta-aws-appendix.md`
 - `docs/slides/current/neocarta-slides.md`
 - `docs/slides/current/neocarta-slides-v2.md` — revised order and titles, with 14 main slides and five appendix slides
+- `docs/slides/current/neosemantics.md` — Neosemantics 4.0 overview with a technical appendix showing graph representations, URI linking, mappings, and SHACL validation
 
 The supporting SVG files remain beside the Markdown sources so local Marp preview continues to work. Presentation outlines and supporting notes live in `docs/slides/planning/`.
 

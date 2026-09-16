@@ -48,6 +48,16 @@ section.lead .note { margin-top: 60px; }
 section.config table { font-size: 20px; }
 section.config td, section.config th { padding: 7px 10px; }
 section.close { background: linear-gradient(135deg, #f8fafc 0%, #dff5f2 100%); }
+section.appendix { background: linear-gradient(135deg, #0f172a 0%, #134e4a 100%); }
+section.appendix h1 { color: #f8fafc; font-size: 48px; max-width: 980px; }
+section.appendix h2 { color: #5eead4; font-size: 27px; font-weight: 500; max-width: 940px; }
+section.examples table { font-size: 18px; }
+section.examples td, section.examples th { padding: 6px 9px; }
+section.examples code { font-size: 17px; }
+section.code-pair pre { padding: 14px 18px; margin: 8px 0 14px; }
+section.code-pair pre code { font-size: 18px; line-height: 1.35; }
+.example-label { color: #0f766e; font-size: 20px; font-weight: 700; margin: 8px 0; }
+.graph-code { background: #ffffff; border: 1px solid #b9d8d5; border-left: 5px solid #0d9488; font-family: monospace; font-size: 19px; margin: 12px 0; padding: 13px 16px; }
 </style>
 
 <!-- _class: lead -->
@@ -387,4 +397,231 @@ Sources used for this deck:
 https://neo4j.com/labs/neosemantics/4.0/
 https://neo4j.com/labs/neosemantics/4.0/introduction/
 https://neo4j.com/labs/neosemantics/4.0/import/
+-->
+
+---
+
+<!-- footer: 'Neosemantics · Technical appendix' -->
+<!-- _class: appendix -->
+
+# Appendix: What the Semantic Choices Look Like in the Graph
+
+## Concrete examples of configuration, URI linking, vocabulary mapping, and SHACL validation
+
+<!--
+The main deck explains the lifecycle. This appendix makes four parts of
+that lifecycle concrete by showing simplified RDF inputs, Neo4j graph
+representations, and validation output.
+
+The examples follow Neosemantics 4.0 behavior. Names can vary when a graph
+uses different namespace prefixes or mapping definitions.
+-->
+
+---
+
+<!-- _class: examples -->
+
+## URI Handling Changes the Names Stored in the Graph
+
+<div class="question"><code>ex:alice a ex:Person ; ex:given-name "Alice" .</code></div>
+
+| `handleVocabUris` | Label and property in Neo4j | What it preserves |
+| --- | --- | --- |
+| **KEEP** | ``:`http://example.org/vocab#Person` ``<br>``n.`http://example.org/vocab#given-name` `` | Complete vocabulary URIs |
+| **SHORTEN** | `:ex__Person`<br>`n.ex__given-name` | Namespace meaning through a prefix |
+| **IGNORE** | `:Person`<br>`n.given-name` | Only each URI's local name |
+| **MAP** | `:Person`<br>`n.givenName` | Explicit application-friendly names |
+
+<div class="callout"><strong>Same RDF, different graph vocabulary:</strong> The configuration sets the balance between semantic fidelity and readable Cypher.</div>
+
+<!--
+KEEP retains the full vocabulary URI in labels, relationship types, and
+property names. SHORTEN replaces namespaces with registered prefixes.
+IGNORE keeps only local names. MAP applies explicit one-to-one mappings.
+
+The example names are simplified and use an ex prefix registered for
+http://example.org/vocab#.
+
+Source: https://neo4j.com/labs/neosemantics/4.0/config/
+-->
+
+---
+
+<!-- _class: examples -->
+
+## Value and Type Settings Change Properties and Relationships
+
+| RDF pattern | Setting | Resulting graph representation |
+| --- | --- | --- |
+| `ex:alice ex:altName "Al", "Ace"` | Default single value | `(:Resource {altName: "Ace"})` |
+| Same repeated property | `handleMultival: "ARRAY"` | `(:Resource {altName: ["Al", "Ace"]})` |
+| `ex:alice rdf:type ex:Person` | `typesToLabels: true` | `(:Resource:Person {uri: "...alice"})` |
+| Same type statement | `typesToLabels: false` | `(:Resource {uri: "...alice"})-[:rdf__type]->(:Resource {uri: "...Person"})` |
+
+<div class="callout"><strong>Structural choice:</strong> Labels make type checks concise. Type nodes make the RDF statement explicit and allow direct links to an ontology.</div>
+
+<!--
+Neosemantics keeps one literal value by default when an RDF property occurs
+multiple times. ARRAY preserves every value in a Neo4j list.
+
+RDF types become labels by default. Setting typesToLabels to false keeps the
+type as a relationship between URI-identified resources. The displayed
+rdf__type relationship assumes shortened namespace handling.
+
+Source: https://neo4j.com/labs/neosemantics/4.0/import/
+-->
+
+---
+
+<!-- _class: code-pair -->
+
+## The Same URI Connects Instance Data to Its Ontology Class
+
+<div class="example-label">1. Ontology import creates class nodes and hierarchy links</div>
+
+```text
+(:Class {name: "Employee", uri: "...#Employee"})
+    -[:SCO]->
+(:Class {name: "Person", uri: "...#Person"})
+```
+
+<div class="example-label">2. Instance import keeps <code>rdf:type</code> as a relationship</div>
+
+```text
+(:Resource {name: "Alice", uri: ".../alice"})
+    -[:rdf__type]->
+(:Class {name: "Employee", uri: "...#Employee"})
+```
+
+<div class="callout"><strong>URI identity does the linking:</strong> The instance points to the existing class node because both imports use the same <code>...#Employee</code> identifier.</div>
+
+<!--
+The ontology loader stores named classes as Class nodes with URI and name
+properties. It stores rdfs:subClassOf as SCO relationships by default.
+
+When instance data is imported with typesToLabels false, the rdf:type object
+is resolved by URI. If the ontology class already has that URI, the instance
+connects to the existing class node rather than creating a disconnected copy.
+
+Sources:
+https://neo4j.com/labs/neosemantics/4.0/importing-ontologies/
+https://neo4j.com/labs/neosemantics/4.0/import/
+-->
+
+---
+
+<!-- _class: code-pair -->
+
+## One Mapping Gives RDF and Neo4j Different Names for the Same Link
+
+```cypher
+CALL n10s.nsprefixes.add(
+  "skos", "http://www.w3.org/2004/02/skos/core#"
+);
+CALL n10s.mapping.add(
+  "http://www.w3.org/2004/02/skos/core#narrower",
+  "CHILD_CATEGORY"
+);
+```
+
+<div class="flow">
+  <div class="step"><strong>External RDF</strong><code>categoryA skos:narrower categoryB</code></div>
+  <div class="arrow">↔</div>
+  <div class="step"><strong>Mapping</strong><code>skos:narrower</code><br>is equivalent to<br><code>CHILD_CATEGORY</code></div>
+  <div class="arrow">↔</div>
+  <div class="step"><strong>Neo4j graph</strong><code>(categoryA)-[:CHILD_CATEGORY]->(categoryB)</code></div>
+</div>
+
+<!--
+This is the mapping example from the Neosemantics guide. A relationship
+named CHILD_CATEGORY in Neo4j is equivalent to skos:narrower in RDF.
+
+Mappings are one-to-one pairs of equivalent vocabulary elements. The same
+definition is used on import and export, so internal Cypher conventions do
+not have to become the external semantic contract.
+
+Source: https://neo4j.com/labs/neosemantics/4.0/mapping/
+-->
+
+---
+
+<!-- _class: code-pair -->
+
+## A SHACL Shape Makes the Expected Person Model Explicit
+
+<div class="cols">
+<div>
+
+### Shape
+
+```turtle
+neo4j:PersonShape
+  a sh:NodeShape ;
+  sh:targetClass neo4j:Person ;
+  sh:property [
+    sh:path neo4j:name ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1
+  ] .
+```
+
+</div>
+<div>
+
+### Graph data
+
+```text
+(:Person {
+  name: 42
+})
+```
+
+- The node targets the `Person` shape.
+- `name` exists, but its value is not a string.
+- Validation reports the node and offending value.
+
+</div>
+</div>
+
+<div class="callout"><strong>The shape is executable documentation:</strong> It states the rule in a standard form and gives validation a precise test.</div>
+
+<!--
+This simplified shape is based on the Person example in the guide. It says
+that a Person name must be a string and may appear no more than once.
+
+The example graph violates the datatype constraint because its name value
+is numeric. Neosemantics loads SHACL from a URL or inline Turtle.
+
+Source: https://neo4j.com/labs/neosemantics/4.0/validation/
+-->
+
+---
+
+<!-- _class: examples -->
+
+## Validation Returns a Specific Violation and Can Enforce It Three Ways
+
+| focus node | node type | failed constraint | offending value | path | severity |
+| --- | --- | --- | --- | --- | --- |
+| `17` | `Person` | `DatatypeConstraintComponent` | `42` | `name` | `Violation` |
+
+<div class="flow">
+  <div class="step"><strong>Whole graph</strong>Find every violation in the current database.</div>
+  <div class="arrow">·</div>
+  <div class="step"><strong>Selected nodes</strong>Check only the resources involved in a workflow.</div>
+  <div class="arrow">·</div>
+  <div class="step"><strong>Transaction</strong>Reject a write when it introduces a violation.</div>
+</div>
+
+<div class="graph-code">CALL n10s.validation.shacl.validate()</div>
+
+<!--
+The validation report identifies the failing node, its type, the constraint
+component, the offending value, the property path, and severity.
+
+Neosemantics 4.0 supports validation of the whole graph, a selected node set,
+or changes inside a transaction. The guide notes that version 4 implements a
+significant portion of SHACL, but not the entire language.
+
+Source: https://neo4j.com/labs/neosemantics/4.0/validation/
 -->

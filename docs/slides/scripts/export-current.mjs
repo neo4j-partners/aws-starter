@@ -14,6 +14,7 @@ const decks = [
   "current/aws-neo4j-grounded-enterprise-ai.md",
   "current/fraud-data-architecture.md",
   "current/neocarta-slides.md",
+  "current/neocarta-slides-v2.md",
 ];
 
 const assets = [
@@ -22,6 +23,7 @@ const assets = [
   "current/exec-knowledge-layer.svg",
   "current/fraud-ring-property-graph-detailed.svg",
   "current/neocarta.svg",
+  "current/neocarta-v2-business-term-graph.svg",
   "current/neo4j-agent-memory-diagram.svg",
 ];
 

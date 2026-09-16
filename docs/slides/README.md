@@ -8,7 +8,9 @@ The gallery builds these editable sources from `docs/slides/current/`:
 
 - `docs/slides/current/aws-neo4j-grounded-enterprise-ai.md`
 - `docs/slides/current/fraud-data-architecture.md`
+- `docs/slides/current/neocarta-aws-appendix.md`
 - `docs/slides/current/neocarta-slides.md`
+- `docs/slides/current/neocarta-slides-v2.md` — revised order and titles, with 14 main slides and five appendix slides
 
 The supporting SVG files remain beside the Markdown sources so local Marp preview continues to work. Presentation outlines and supporting notes live in `docs/slides/planning/`.
 

@@ -4,7 +4,9 @@ This folder contains the current AWS and Neo4j presentations in [Marp](https://m
 
 - `aws-neo4j-grounded-enterprise-ai.md`
 - `fraud-data-architecture.md`
+- `neocarta-aws-appendix.md`
 - `neocarta-slides.md`
+- `neocarta-slides-v2.md` — revised order and titles, with 14 main slides and five appendix slides
 
 ## Quick Start
 

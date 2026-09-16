@@ -42,6 +42,15 @@ const activeDecks = [
     description:
       "How Neocarta builds and serves a semantic map in Neo4j, plus an architectural comparison with Rosetta SDL.",
   },
+  {
+    file: "neocarta-slides-v2.md",
+    source: "current/neocarta-slides-v2.md",
+    order: "04",
+    title: "Neocarta: A Semantic Map for Enterprise Data (v2)",
+    output: "neocarta-slides-v2.html",
+    description:
+      "How Neocarta connects metadata in Neo4j and turns it into context for agents, with a query example and optional technical detail.",
+  },
 ];
 
 const archiveDescriptions = {

@@ -602,7 +602,7 @@ Agent C → open account balance
 
 <div class="callout"><strong>Store deliberately:</strong> Entity extraction identifies what a turn is about. Policy or confirmation decides what becomes durable memory.</div>
 
-<!-- Source: /Users/ryanknight/projects/aws/neo4j-aws-graphrag-workshop/site/content/06-neo4j-memory/index.en.md -->
+<!-- Source: /Users/ryanknight/projects/aws/neo4j-hotel-booking-agent-workshop/site/content/06-neo4j-memory/index.en.md -->
 
 ---
 

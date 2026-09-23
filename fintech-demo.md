@@ -77,7 +77,7 @@ Assign each chunk a deterministic ID such as `<cik>-<position>`.
 ## Corpus
 
 Copy two PDFs from
-`neo4j-bedrock-graphrag-workshop/financial_data_load/financial-data/form10k-sample/`:
+`neo4j-sec-filings-graphrag-workshop/financial_data_load/financial-data/form10k-sample/`:
 
 | PDF | Company | Why it is included |
 |---|---|---|

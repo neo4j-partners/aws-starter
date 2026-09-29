@@ -232,6 +232,91 @@ flow the graph-fundamentals and data-architecture slides were building toward.
 
 ---
 
+## Amazon Quick + Neo4j
+
+Bringing graph context to the enterprise AI assistant through MCP.
+
+---
+
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+## What Amazon Quick Is
+
+Amazon Quick is the AI assistant for work, on web and desktop.
+
+- **Chat and Spaces:** Answers are grounded in connected data such as S3, SharePoint, Slack, and Salesforce.
+- **Research:** Quick builds cited reports from business data, the web, and third-party datasets.
+- **Quick Sight:** Dashboards and natural-language Q&A run over sources such as Athena and Redshift.
+- **Flows and automation:** Quick handles repetitive tasks and multi-step processes across apps.
+- **Actions:** Quick acts on connected systems through built-in connectors and MCP servers.
+
+<small>Sources: [Amazon Quick](https://aws.amazon.com/quick/) and [Amazon Quick features](https://aws.amazon.com/quick/features/)</small>
+
+<!--
+Amazon Quick is the rebrand of the Amazon Q Business enterprise assistant.
+Amazon QuickSight is now Quick Sight, the BI part of Quick. Amazon Q Developer
+is a separate product and is unaffected. The point for this audience: Quick is
+where business users already ask questions, so it is the natural front door
+for graph context. MCP is the door Neo4j comes through.
+-->
+
+---
+
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+## Connecting Amazon Quick to Neo4j with MCP
+
+- **Register the server:** An admin adds the Neo4j MCP endpoint as a Quick connector.
+- **Tools become actions:** Quick discovers each Neo4j tool, such as schema lookup and read-only Cypher.
+- **Authenticate as a service:** The Cognito client ID, secret, and token URL fit Quick's service-to-service option.
+- **Reach it privately:** A Quick VPC connection reaches MCP servers that are not on the public internet.
+- **Share the connector:** Analysts on the team use the same governed graph tools.
+
+<small>Source: [MCP integration with Amazon Quick](https://docs.aws.amazon.com/quick/latest/userguide/mcp-integration.html)</small>
+
+<!--
+The Neo4j MCP server from the AgentCore section works here unchanged. Point
+Quick at the AgentCore Gateway URL. The credentials file from
+./deploy.py credentials already holds the client ID, client secret, and token
+URL that Quick's service authentication asks for. The Quick setup is done in
+the console. This repository does not script it.
+
+Limits to plan for:
+- MCP integration needs a Quick Enterprise subscription.
+- Quick supports remote servers only. Streamable HTTP is preferred over SSE.
+- Each MCP operation has a fixed 60-second timeout. Keep Cypher tools bounded.
+- Quick registers at most 100 tools per MCP server.
+- Custom HTTP headers are not sent. Auth must go through OAuth.
+- Custom connectors do not pick up new tools automatically. The owner chooses
+  Sync after the server changes.
+-->
+
+---
+
+## One Fraud Investigation in Amazon Quick
+
+1. **Spot the anomaly:** A Quick Sight dashboard over the Athena Iceberg tables shows an alert spike.
+2. **Ask in chat:** The analyst asks Quick who is connected to the flagged accounts.
+3. **Traverse the graph:** Quick calls the Neo4j MCP tools and traces the ACC-1001 ⇄ ACC-2047 ring.
+4. **Explain the finding:** Graph context links the ring to typologies, KYC documents, and prior cases.
+5. **Share the result:** Quick turns the answer into a case summary for the team.
+
+**One assistant, both data paths:** Quick Sight counts the activity. Neo4j explains how it connects.
+
+<!--
+This closes the loop with the dual-architecture slides. Athena and Quick Sight
+cover the "counting things" side. The Neo4j MCP tools cover the "following
+connections" side. The analyst never leaves Quick, and never needs Neo4j
+credentials, because the Gateway and MCP server own database access.
+Source: demos/fraud-amazon-quick/README.md.
+-->
+
+---
+
 ## Building GraphRAG Agents on AWS
 
 ---
@@ -379,88 +464,3 @@ server/runtime_app.py.
 - **GraphRAG counters context rot:** Vector search finds the starting point. A reviewed traversal returns only the connected facts.
 - **GraphRAG is an agent tool:** Strands agents on Bedrock call it directly or through Neo4j MCP on AgentCore Gateway.
 - **Graph memory persists:** Conversations, entities, and reasoning traces stay connected and inspectable across sessions.
-
----
-
-## Amazon Quick + Neo4j
-
-Bringing graph context to the enterprise AI assistant through MCP.
-
----
-
-<style scoped>
-small { font-size: 16px; }
-</style>
-
-## What Amazon Quick Is
-
-Amazon Quick is the AI assistant for work, on web and desktop.
-
-- **Chat and Spaces:** Answers are grounded in connected data such as S3, SharePoint, Slack, and Salesforce.
-- **Research:** Quick builds cited reports from business data, the web, and third-party datasets.
-- **Quick Sight:** Dashboards and natural-language Q&A run over sources such as Athena and Redshift.
-- **Flows and automation:** Quick handles repetitive tasks and multi-step processes across apps.
-- **Actions:** Quick acts on connected systems through built-in connectors and MCP servers.
-
-<small>Sources: [Amazon Quick](https://aws.amazon.com/quick/) and [Amazon Quick features](https://aws.amazon.com/quick/features/)</small>
-
-<!--
-Amazon Quick is the rebrand of the Amazon Q Business enterprise assistant.
-Amazon QuickSight is now Quick Sight, the BI part of Quick. Amazon Q Developer
-is a separate product and is unaffected. The point for this audience: Quick is
-where business users already ask questions, so it is the natural front door
-for graph context. MCP is the door Neo4j comes through.
--->
-
----
-
-<style scoped>
-small { font-size: 16px; }
-</style>
-
-## Connecting Amazon Quick to Neo4j with MCP
-
-- **Register the server:** An admin adds the Neo4j MCP endpoint as a Quick connector.
-- **Tools become actions:** Quick discovers each Neo4j tool, such as schema lookup and read-only Cypher.
-- **Authenticate as a service:** The Cognito client ID, secret, and token URL fit Quick's service-to-service option.
-- **Reach it privately:** A Quick VPC connection reaches MCP servers that are not on the public internet.
-- **Share the connector:** Analysts on the team use the same governed graph tools.
-
-<small>Source: [MCP integration with Amazon Quick](https://docs.aws.amazon.com/quick/latest/userguide/mcp-integration.html)</small>
-
-<!--
-The Neo4j MCP server from the AgentCore section works here unchanged. Point
-Quick at the AgentCore Gateway URL. The credentials file from
-./deploy.py credentials already holds the client ID, client secret, and token
-URL that Quick's service authentication asks for. The Quick setup is done in
-the console. This repository does not script it.
-
-Limits to plan for:
-- MCP integration needs a Quick Enterprise subscription.
-- Quick supports remote servers only. Streamable HTTP is preferred over SSE.
-- Each MCP operation has a fixed 60-second timeout. Keep Cypher tools bounded.
-- Quick registers at most 100 tools per MCP server.
-- Custom HTTP headers are not sent. Auth must go through OAuth.
-- Custom connectors do not pick up new tools automatically. The owner chooses
-  Sync after the server changes.
--->
-
----
-
-## One Fraud Investigation in Amazon Quick
-
-1. **Spot the anomaly:** A Quick Sight dashboard over the Athena Iceberg tables shows an alert spike.
-2. **Ask in chat:** The analyst asks Quick who is connected to the flagged accounts.
-3. **Traverse the graph:** Quick calls the Neo4j MCP tools and traces the ACC-1001 ⇄ ACC-2047 ring.
-4. **Explain the finding:** Graph context links the ring to typologies, KYC documents, and prior cases.
-5. **Share the result:** Quick turns the answer into a case summary for the team.
-
-**One assistant, both data paths:** Quick Sight counts the activity. Neo4j explains how it connects.
-
-<!--
-This closes the loop with the dual-architecture slides. Athena and Quick Sight
-cover the "counting things" side. The Neo4j MCP tools cover the "following
-connections" side. The analyst never leaves Quick, and never needs Neo4j
-credentials, because the Gateway and MCP server own database access.
-Source: demos/fraud-amazon-quick/README.md.
--->

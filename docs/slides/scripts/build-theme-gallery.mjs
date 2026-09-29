@@ -51,6 +51,15 @@ const activeDecks = [
     description:
       "How Neosemantics imports, maps, validates, reasons over, and exports RDF with Neo4j, with concrete graph examples in the technical appendix.",
   },
+  {
+    file: "aws-neo4j-finance-overview.md",
+    source: "current/aws-neo4j-finance-overview.md",
+    order: "05",
+    title: "Neo4j + AWS: Grounding Generative AI in Graph Data",
+    output: "aws-neo4j-finance-overview.html",
+    description:
+      "A fraud-investigation overview of Neo4j on AWS: connected context, Amazon Quick over MCP, GraphRAG agents, and agent memory.",
+  },
 ];
 
 const archiveDescriptions = {
@@ -246,7 +255,7 @@ function renderIndex() {
 
       .eyebrow {
         color: var(--accent);
-        font-size: 14px;
+        font-size: 24px;
         font-weight: 800;
         letter-spacing: 0.08em;
         margin-bottom: 14px;

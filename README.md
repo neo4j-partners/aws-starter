@@ -21,7 +21,7 @@ For a detailed explanation of how all the pieces fit together, see the **[Archit
 | Sample | Domain and dataset | How the data is loaded | How it reaches Neo4j | Needs the MCP server | MCP `--env` | Deploys to Runtime | Main AWS services |
 |--------|--------------------|------------------------|----------------------|----------------------|-------------|--------------------|-------------------|
 | [`neo4j-mcp-server/`](./neo4j-mcp-server/) | Any graph | Not applicable | It is the MCP server | Not applicable | Any | Yes, the MCP server | AgentCore Runtime, Gateway, Cognito, Secrets Manager |
-| [`quickstart/`](./quickstart/) | Any graph the MCP server points at | Not applicable | MCP Gateway | Yes | Default | No | AgentCore Gateway, Bedrock, SageMaker Unified Studio |
+| [`quickstart/`](./quickstart/) | Any graph the MCP server points at. The demo questions assume the aviation fleet graph | Not applicable | MCP Gateway | Yes | Default | No | AgentCore Gateway, Bedrock, SageMaker Unified Studio |
 | [`demos/aircraft-fleet/pipeline/`](./demos/aircraft-fleet/pipeline/) | Aviation fleet digital twin | `pipeline/setup.sh` | Neo4j Python driver | No | Not applicable | No | Bedrock Titan embeddings, Bedrock Claude |
 | [`demos/aircraft-fleet/graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/) | Aviation fleet digital twin | `pipeline/` | Neo4j Python driver | No | Not applicable | Yes | AgentCore Runtime, Bedrock |
 | [`demos/aircraft-fleet/supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/) | Aviation fleet digital twin | `pipeline/` | MCP Gateway | Yes | `fleet` | Yes | AgentCore Runtime, Gateway, Bedrock, CloudWatch |

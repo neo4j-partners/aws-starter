@@ -19,6 +19,7 @@ This client library provides:
 1. **Neo4j Aura Account** with an AuraDB instance
 2. **An Aura Agent** with external endpoint enabled
 3. **API Credentials** (Client ID and Secret) from your Neo4j profile
+4. **Python 3.13+** and the `uv` package manager
 
 ## Setting Up Your Aura Agent
 

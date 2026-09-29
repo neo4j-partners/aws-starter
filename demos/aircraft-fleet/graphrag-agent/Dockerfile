@@ -10,7 +10,8 @@
 # AgentCore Requirements: ARM64 (aarch64), port 8080, HTTP server on 8080.
 # runtime_app.py defaults to 8080; AGENT_PORT overrides it for local runs.
 
-FROM python:3.12-slim
+# AgentCore requires arm64, so pin the platform like the other agent images.
+FROM --platform=linux/arm64 python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

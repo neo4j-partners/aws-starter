@@ -256,6 +256,8 @@ This pattern applies to any MCP server built with Go, Rust, C++, or other compil
 | [neo4j_mcp_agent.py](./neo4j_mcp_agent.py) | LangGraph agent that connects to Neo4j via external MCP HTTP connection |
 | [neo4j-mcp-agent-deploy.ipynb](./neo4j-mcp-agent-deploy.ipynb) | Test, evaluate, and deploy the Neo4j MCP agent |
 | [setup_databricks_secrets.sh](./setup_databricks_secrets.sh) | Setup script to configure OAuth2 secrets from AgentCore credentials |
+| [MANUAL-SETUP.md](./MANUAL-SETUP.md) | Create the HTTP connection by hand in the Databricks UI instead of the notebook |
+| [databricks-mcp-setup.md](./databricks-mcp-setup.md) | Register the Gateway as a Unity Catalog MCP Service for AI Playground and Databricks agents |
 
 ## Available MCP Tools
 

@@ -28,6 +28,8 @@ cp ../neo4j-mcp-server/.mcp-credentials.json .
 
 That is it. The agent loads credentials, refreshes the token if needed, connects to the Gateway, and answers.
 
+The agent works against any graph the MCP server points at. The example question and the built-in demo questions assume the aircraft fleet graph that [`../demos/aircraft-fleet/pipeline/`](../demos/aircraft-fleet/pipeline/) loads. Against another graph, the schema question still works, and the others come back empty, so ask about your own labels instead.
+
 ## High-Level Architecture
 
 ```

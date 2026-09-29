@@ -116,7 +116,7 @@ uv sync
 uv run fraud-server              # Terminal 1 (port 7020)
 uv run fraud-cli "Find circular transfer chains"   # Terminal 2
 ./agent.sh deploy
-# (configure/deploy/status/verify/logs/reset-config/destroy)
+# (start/stop/test/configure/deploy/status/verify/logs/reset-config/destroy)
 ```
 
 ### Integrations and Patterns

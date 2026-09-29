@@ -111,6 +111,24 @@ A graph lets you ask three kinds of questions directly against connected data.
 
 ---
 
+![bg contain](./images/aws-neo4j-finance-overview/neo4j-five-roles.svg)
+
+---
+
+## Why Use a Graph Database?
+
+Traditional databases struggle with **connected data**:
+
+| Scenario | Relational DB | Graph DB |
+|----------|---------------|----------|
+| "Find friends of friends" | Complex JOINs, slow | Natural traversal, fast |
+| "What impacts what?" | Multiple queries | Single query |
+| "How are these connected?" | Hard to express | Native pattern matching |
+
+**Graphs excel at relationship-heavy queries** that would require dozens of JOINs in SQL.
+
+---
+
 ## AWS + Neo4j
 
 From Models to Knowledge
@@ -120,6 +138,25 @@ From Models to Knowledge
 ## Select Neo4j and AWS Customers
 
 Companies that use Neo4j and AWS together include Adobe, Financial Times, Meredith, AstraZeneca, Novo Nordisk, Volvo, Lyft, Verizon, Novartis, LendingClub, Lockheed Martin, Comcast, Cisco, Airbus, DB, Levi Strauss & Co., Caterpillar, and TAG IMF.
+
+---
+
+## Neo4j and AWS: What Each Platform Brings
+
+| Component | What it provides |
+|---|---|
+| **Neo4j Aura** | Stores connected facts, source documents, business rules, and results as one graph |
+| **Amazon Bedrock** | Provides foundation models for extraction, reasoning, and embeddings |
+| **An agent framework, such as Strands Agents** | Gives the model its tools and runs the agent's decision loop |
+| **Amazon Bedrock AgentCore** | Publishes tools through Gateway, and runs the deployed agent on Runtime |
+
+A graph can hold more than a search index. Business rules and results can live there too, which is what makes an agent's actions checkable, not just its answers.
+
+<!--
+Give the two platforms parallel treatment. Neo4j holds connected facts and
+rules. Bedrock provides reasoning and embeddings. Each platform owns a clear
+part of the request path.
+-->
 
 ---
 
@@ -158,25 +195,6 @@ Neo4j Aura sits at the center of the AWS cloud, with data flowing in and out thr
 
 ---
 
-## Neo4j and AWS: What Each Platform Brings
-
-| Component | What it provides |
-|---|---|
-| **Neo4j Aura** | Stores connected facts, source documents, business rules, and results as one graph |
-| **Amazon Bedrock** | Provides foundation models for extraction, reasoning, and embeddings |
-| **An agent framework, such as Strands Agents** | Gives the model its tools and runs the agent's decision loop |
-| **Amazon Bedrock AgentCore** | Publishes tools through Gateway, and runs the deployed agent on Runtime |
-
-A graph can hold more than a search index. Business rules and results can live there too, which is what makes an agent's actions checkable, not just its answers.
-
-<!--
-Give the two platforms parallel treatment. Neo4j holds connected facts and
-rules. Bedrock provides reasoning and embeddings. Each platform owns a clear
-part of the request path.
--->
-
----
-
 ![bg contain](./images/aws-neo4j-finance-overview/aws-finance-dual-database-architecture.svg)
 
 ---
@@ -196,13 +214,17 @@ well: relationships, rules, and provenance.
 
 ---
 
-## Connecting Enterprise Agents to Context-Enriched Data
+## Decision Table: SQL vs. Cypher
 
-Three goals for the AWS and Neo4j partnership.
+| Signal | Stay in SQL | Move to Cypher |
+|--------|-------------|----------------|
+| Number of hops | 1 to 2 fixed joins | 3+ or variable depth |
+| Query shape | Known at design time | Depends on the data encountered |
+| Result type | Aggregated numbers | Paths, subgraphs, connected components |
+| Latency requirement | Batch is fine | Sub-second for interactive investigation |
+| Data volume per query | Millions of rows scanned | Thousands of entities traversed |
 
-- **Bi-directional, scalable data pipelines:** data can move both into and out of Neo4j at scale.
-- **Effortless AgentCore and Neo4j integration:** AWS agents can reach graph data with little setup.
-- **Accelerate innovation with GraphRAG:** graph-enriched retrieval helps AI agents give better answers faster.
+**The rule of thumb:** if you are counting things, stay in SQL. If you are following connections, move to the graph.
 
 ---
 
@@ -235,8 +257,6 @@ Workflow defines fixed task dependencies, for cases that need less freedom.
 
 ---
 
-![bg contain](./images/aws-neo4j-finance-overview/strands-agents-graphrag-fraud-principles.svg)
-
 ## How Strands, Bedrock, and Neo4j Work Together
 
 - **Grounded retrieval:** the tool matches the question to real facts stored in the graph.
@@ -247,6 +267,10 @@ Workflow defines fixed task dependencies, for cases that need less freedom.
 Strands runs the agent loop. Amazon Bedrock provides the model. Neo4j gives
 that agent verified facts and connected context through a retrieval tool.
 -->
+
+---
+
+![bg contain](./images/aws-neo4j-finance-overview/strands-agents-graphrag-fraud-principles.svg)
 
 ---
 
@@ -268,8 +292,8 @@ def search_passages(query: str) -> dict:
 
 - **`@tool`** turns this function into a specification the model can choose, with `query` as its one input.
 - **`VectorCypherRetriever`** runs the vector search, then a reviewed Cypher traversal, in one call.
-- **The function returns plain JSON.** The model never sees a Neo4j driver, a connection string, or write access.
-- **Same shape as any other Strands tool.** Only the body changes. The agent loop and tool-selection logic from the earlier slide stay the same.
+- **Returns plain JSON.** The model never sees a driver, a connection string, or write access.
+- **Same shape as any other Strands tool.** Only the body changes.
 
 <!--
 This is the piece that ties the last two slides together: the abstract
@@ -279,25 +303,58 @@ right-sized context principles. Here is what actually runs inside the tool.
 
 ---
 
-## Three Layers of Agent Memory
+## How the Gateway Request Flow Works
 
-- **Short-term memory:** conversation history, session state, and the entities mentioned in each turn. This is what lets an agent resolve "what's the current balance?" after an account was already named.
-- **Long-term memory:** durable facts and preferences that should outlive one conversation, plus a record of what changed and when.
-- **Reasoning memory:** the tool calls, decisions, and outcomes an agent produced. This is evidence for debugging and review.
+A read tool can also reach Neo4j through a managed, authenticated MCP server instead of an embedded driver.
 
-Most agents are stateless until memory is designed on purpose.
+1. **Agent gets an M2M JWT from Cognito** with `client_credentials`.
+2. **Agent calls the Gateway with the JWT.**
+3. **Gateway validates the JWT**, then exchanges it for a Runtime token through an OAuth2 credential provider.
+4. **Gateway forwards to the Runtime**, which invokes the Neo4j MCP server against Neo4j Aura.
+
+Tool names come back target-prefixed, such as `neo4j-mcp-server-target___read-cypher`. M2M only: no user accounts, no interactive login, no passwords to rotate.
+
+<!--
+This is the Gateway-mediated alternative to the previous slide's embedded
+driver: same agent-side shape (a tool the model calls), but the graph access
+runs through Cognito, the Gateway, and the Runtime instead of a local driver.
+-->
 
 ---
 
-## Why Graphs for Agent Memory
+![bg contain](./images/aws-neo4j-finance-overview/aws-fraud-gateway-request-flow.svg)
 
-- **Relationships are first-class.** A conversation, a preference, and a transaction can all point to the same real-world record.
-- **Multi-hop queries combine memory with domain facts** without joining separate data stores in application code.
-- **Provenance stays traversable.** A stored memory can point back to the exact source that produced it.
-- **Graph identity prevents copies.** One canonical record accumulates facts, conversations, preferences, and actions instead of scattering them.
-- **History stays visible.** A new memory can replace an old one while both remain inspectable.
+---
 
-Graph memory earns its place when the relationship between a conversation and the underlying data matters as much as the text itself.
+## Context Rot: More Context, Worse Answers
+
+Too much irrelevant context **degrades** LLM performance.
+
+- RAG retrieves chunks that are *similar*, not *relevant*.
+- The context window fills with tangential noise.
+- The model gets distracted or misled.
+
+"Context rot": retrieval of tangents that rots response quality. This is the problem GraphRAG's traversal step is built to avoid.
+
+<!--
+A surprising finding. When RAG retrieves chunks that are similar but not truly
+relevant, the context window fills with tangentially related information and
+the model gets confused or misled. The retrieved context actively rots the
+quality of the answer. This motivates the shift to GraphRAG on the next slide:
+traversal reaches connected facts instead of just more similar-looking text.
+-->
+
+---
+
+![bg right:55% contain](./images/aws-neo4j-finance-overview/context-rot-hero-plot.png)
+
+## Context Rot: The Research
+
+As irrelevant context grows, accuracy **drops sharply**.
+
+Quality of context beats quantity.
+
+[Chroma Research: Context Rot](https://research.trychroma.com/context-rot)
 
 ---
 
@@ -327,8 +384,6 @@ GraphRAG improves standard AI retrieval by adding graph traversal on top of sear
 
 ---
 
-![bg contain](./images/aws-neo4j-finance-overview/aws-fraud-vector-cypher-retrieval-flow.svg)
-
 ## How Graph-Enriched Retrieval Works
 
 - **Step 1, search:** the question is matched against stored text to find the closest starting point.
@@ -343,6 +398,10 @@ what proves a fact is actually connected to the record in question.
 
 ---
 
+![bg contain](./images/aws-neo4j-finance-overview/aws-fraud-vector-cypher-retrieval-flow.svg)
+
+---
+
 ## GraphRAG Patterns
 
 Five patterns for building GraphRAG, all built around one graph.
@@ -352,6 +411,28 @@ Five patterns for building GraphRAG, all built around one graph.
 - **Query generation:** the system writes Cypher queries dynamically, also called text-to-Cypher.
 - **Graph enrichment:** adds community summaries, graph embeddings, and PageRank scores to improve results.
 - **Query-optimized graphs:** graphs built for direct querying, using hypothetical question-and-answer pairs and a parent-child retriever structure.
+
+---
+
+## Three Layers of Agent Memory
+
+- **Short-term memory:** conversation history, session state, and the entities mentioned in each turn. This is what lets an agent resolve "what's the current balance?" after an account was already named.
+- **Long-term memory:** durable facts and preferences that should outlive one conversation, plus a record of what changed and when.
+- **Reasoning memory:** the tool calls, decisions, and outcomes an agent produced. This is evidence for debugging and review.
+
+Most agents are stateless until memory is designed on purpose.
+
+---
+
+## Why Graphs for Agent Memory
+
+- **Relationships are first-class.** A conversation, a preference, and a transaction can all point to the same real-world record.
+- **Multi-hop queries combine memory with domain facts** without joining separate data stores in application code.
+- **Provenance stays traversable.** A stored memory can point back to the exact source that produced it.
+- **Graph identity prevents copies.** One canonical record accumulates facts, conversations, preferences, and actions instead of scattering them.
+- **History stays visible.** A new memory can replace an old one while both remain inspectable.
+
+Graph memory earns its place when the relationship between a conversation and the underlying data matters as much as the text itself.
 
 ---
 

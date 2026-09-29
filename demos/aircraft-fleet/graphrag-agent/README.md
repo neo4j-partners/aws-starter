@@ -105,14 +105,15 @@ uv sync
 ```bash
 # terminal 1: leave this running, Ctrl+C to stop
 uv run fleet-server                                 # serves http://localhost:7070
+./agent.sh start                                    # same server, through the wrapper
 uv run opentelemetry-instrument fleet-server        # same, with OTEL tracing
 ```
 
 - Auto-loads the shared aircraft-fleet root `.env`, which the `agent` package loads on import,
   and runs `runtime_app.py` on port 7070. The deployed runtime serves 8080;
   local defaults to 7070 to avoid a clash, and `AGENT_PORT` still overrides.
-- Runs in the foreground of its own terminal; Ctrl+C stops it. Nothing
-  backgrounds it, so there is no PID or port to manage.
+- Runs in the foreground of its own terminal; Ctrl+C or `./agent.sh stop`
+  stops it. `./agent.sh test` sends one question to it.
 - The clients below are thin clients that talk to it over HTTP in a second
   terminal and hold no Neo4j credentials of their own.
 
@@ -197,13 +198,13 @@ and no `mode` runs the full agent. Only the transport differs:
 | `agent/` | Packaged core (installed into the venv): `config.py` (model id, region, embedder/index, system prompt), `retrieval.py` (direct-to-Neo4j driver + GraphRAG `graph_query` / `vector_search` / `get_graph_schema`), `tools.py` (Strands tool wrappers) |
 | `client/` | Thin clients (`fleet-cli`/`fleet-demo`/`fleet-invoke` console scripts): `transport.py` (the only network layer: local HTTP port 7070 + boto3 deployed), `cli.py` (terminal client), `demo.py` (functionality showcase), `invoke.py` (deployed single call + load test) |
 | `runtime_app.py` | AgentCore Runtime entrypoint; `main()` is `fleet-server` (7070 local), the cloud container uses `__main__` (fixed 8080); `mode`-dispatched surfaces |
-| `agent.sh` | Deployment helper only: `configure`, `deploy`, `status`, `invoke-cloud`, `destroy` |
+| `agent.sh` | Local `start`, `stop`, `test`, plus deployment: `configure`, `deploy`, `status`, `invoke-cloud`, `destroy` |
 | `queries.txt` | Sample queries across discovery, fleet, maintenance, delays |
 
 ## Commands
 
-The server and clients run as `uv` console scripts (no wrapper script).
-Run the server in its own terminal; Ctrl+C stops it:
+The server and clients run as `uv` console scripts. Run the server in its
+own terminal; Ctrl+C stops it:
 
 | Command | Description |
 |---------|-------------|
@@ -212,11 +213,13 @@ Run the server in its own terminal; Ctrl+C stops it:
 | `uv run fleet-demo` | Run the functionality showcase against the local server (`--remote` for deployed) |
 | `uv run fleet-invoke "prompt"` | One prompt against the deployed agent; `load-test [N]` replays `queries.txt` every N seconds |
 
-`./agent.sh` is the deployment helper (it injects the Neo4j connection into
-the runtime env on `deploy`):
+`./agent.sh` wraps the local server and the deployment (it injects the
+Neo4j connection into the runtime env on `deploy`):
 
 | Command | Description |
 |---------|-------------|
+| `start` / `stop` | Run or stop the local server on port 7070 |
+| `test` | Ask the local server one question |
 | `configure` | Generate AWS deployment config |
 | `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
 | `status` | Check deployment status |

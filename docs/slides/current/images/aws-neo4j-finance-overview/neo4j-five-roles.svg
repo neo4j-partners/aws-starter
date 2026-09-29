@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>The Five Roles of Neo4j in Enterprise AI Agents</title>
+  <desc>Neo4j plays five complementary roles for an agent: a knowledge layer for GraphRAG, an agent-brain layer for goals and decisions, a context layer for memory, a semantic layer bridging natural language to enterprise data, and a reasoning layer for real-time graph analytics.</desc>
+
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="7" flood-color="#101828" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="#F7F8FA"/>
+
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">The Five Roles of Neo4j in Enterprise AI Agents</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">One graph stack, running on Bedrock and AgentCore, playing five complementary roles.</text>
+
+  <!-- Row 1 -->
+  <rect x="76" y="140" width="1448" height="126" rx="18" fill="#EEF4FB" stroke="#B8CDE4" filter="url(#shadow)"/>
+  <rect x="76" y="140" width="10" height="126" rx="5" fill="#2E6DB4"/>
+  <text x="112" y="182" font-size="21" font-weight="700" fill="#1F4E86">Knowledge Layer — GraphRAG and Beyond</text>
+  <text x="112" y="212" font-size="15" fill="#354052">A native graph knowledge store: schema-enforced entity extraction and</text>
+  <text x="112" y="236" font-size="15" fill="#354052">multi-hop reasoning for agents running on Bedrock and AgentCore.</text>
+
+  <!-- Row 2 -->
+  <rect x="76" y="278" width="1448" height="126" rx="18" fill="#ECFDF3" stroke="#A8DCCF" filter="url(#shadow)"/>
+  <rect x="76" y="278" width="10" height="126" rx="5" fill="#19A974"/>
+  <text x="112" y="320" font-size="21" font-weight="700" fill="#166534">Agent Brain — Goal, State, and Decision Graph</text>
+  <text x="112" y="350" font-size="15" fill="#354052">Persistent cognitive architecture: a graph of goals, sub-goals, actions,</text>
+  <text x="112" y="374" font-size="15" fill="#354052">dependencies, and outcomes.</text>
+
+  <!-- Row 3 -->
+  <rect x="76" y="416" width="1448" height="126" rx="18" fill="#FFF7ED" stroke="#F0C48A" filter="url(#shadow)"/>
+  <rect x="76" y="416" width="10" height="126" rx="5" fill="#D97706"/>
+  <text x="112" y="458" font-size="21" font-weight="700" fill="#8A4B08">Context Layer — Session and Cross-Session Memory</text>
+  <text x="112" y="488" font-size="15" fill="#354052">A relational context graph in place of a flat memory store, so entities</text>
+  <text x="112" y="512" font-size="15" fill="#354052">resolve and connect instead of piling up as isolated chunks.</text>
+
+  <!-- Row 4 -->
+  <rect x="76" y="554" width="1448" height="126" rx="18" fill="#EEF4FB" stroke="#B8CDE4" filter="url(#shadow)"/>
+  <rect x="76" y="554" width="10" height="126" rx="5" fill="#2E6DB4"/>
+  <text x="112" y="596" font-size="21" font-weight="700" fill="#1F4E86">Semantic Layer — Natural Language to Enterprise Data</text>
+  <text x="112" y="626" font-size="15" fill="#354052">Neo4j as the semantic bridge between LLMs and enterprise systems such</text>
+  <text x="112" y="650" font-size="15" fill="#354052">as Amazon Redshift, Amazon S3, SAP, and Salesforce.</text>
+
+  <!-- Row 5 -->
+  <rect x="76" y="692" width="1448" height="126" rx="18" fill="#ECFDF3" stroke="#A8DCCF" filter="url(#shadow)"/>
+  <rect x="76" y="692" width="10" height="126" rx="5" fill="#19A974"/>
+  <text x="112" y="734" font-size="21" font-weight="700" fill="#166534">Reasoning and Data Layer — Real-Time Graph Analytics</text>
+  <text x="112" y="764" font-size="15" fill="#354052">Neo4j Graph Data Science algorithms, exposed as first-class agent tools</text>
+  <text x="112" y="788" font-size="15" fill="#354052">for centrality, community, and similarity questions.</text>
+
+  <!-- Footer -->
+  <rect x="176" y="838" width="1248" height="40" rx="20" fill="#17233A"/>
+  <text x="800" y="864" text-anchor="middle" font-size="16" font-weight="700" fill="#FFFFFF">Five roles, one graph: knowledge, memory, decisions, semantics, and analytics.</text>
+</svg>

@@ -166,7 +166,7 @@ def main() -> None:
         action="store_true",
         help=(
             "Drive the deployed AgentCore runtime instead of the local "
-            "server on port 8080."
+            "server on port 7070."
         ),
     )
     TARGET = "deployed" if parser.parse_args().remote else "local"
@@ -174,7 +174,7 @@ def main() -> None:
     mode_line = (
         "DEPLOYED: AgentCore runtime"
         if TARGET == "deployed"
-        else "LOCAL: runtime_app.py on port 8080"
+        else "LOCAL: runtime_app.py on port 7070"
     )
     print()
     print("#" * WIDTH)

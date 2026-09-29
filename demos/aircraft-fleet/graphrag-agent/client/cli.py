@@ -68,7 +68,7 @@ def main() -> None:
     parser.add_argument(
         "--remote",
         action="store_true",
-        help="Target the deployed AgentCore runtime instead of localhost:8080.",
+        help="Target the deployed AgentCore runtime instead of localhost:7070.",
     )
     parser.add_argument(
         "question",

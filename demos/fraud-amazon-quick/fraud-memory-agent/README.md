@@ -86,11 +86,12 @@ cp .env.sample .env
 uv sync
 
 # Terminal 1
-uv run fraud-server
+uv run fraud-server              # or ./agent.sh start; ./agent.sh stop stops it
 
 # Terminal 2
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"
 uv run fraud-demo
+./agent.sh test                  # one default question to the local server
 ```
 
 Open your NAMS workspace to inspect the conversations, extracted entities,

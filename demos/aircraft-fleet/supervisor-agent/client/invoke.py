@@ -9,7 +9,7 @@ Usage:
     uv run fleet-supervisor-invoke                          # Uses default prompt
     uv run fleet-supervisor-invoke "What is the schema?"    # Custom prompt
     uv run fleet-supervisor-invoke load-test                # Load test mode (random queries every 5s)
-    uv run fleet-supervisor-invoke load-test --interval 10  # Custom interval in seconds
+    uv run fleet-supervisor-invoke load-test 10             # Custom interval in seconds
 
 Prerequisites:
     - Supervisor deployed to AgentCore Runtime (./agent.sh deploy)
@@ -271,14 +271,16 @@ def run_load_test(interval: int = 5):
 def main():
     # Check for load-test mode
     if len(sys.argv) > 1 and sys.argv[1] == "load-test":
-        # Check for custom interval
+        # Optional custom interval in seconds
         interval = 5
-        if "--interval" in sys.argv:
+        if len(sys.argv) > 2:
             try:
-                idx = sys.argv.index("--interval")
-                interval = int(sys.argv[idx + 1])
-            except (IndexError, ValueError):
-                print("ERROR: --interval requires a number")
+                interval = int(sys.argv[2])
+            except ValueError:
+                print(
+                    f"ERROR: Invalid interval '{sys.argv[2]}'. "
+                    f"Must be a number."
+                )
                 sys.exit(1)
 
         run_load_test(interval)

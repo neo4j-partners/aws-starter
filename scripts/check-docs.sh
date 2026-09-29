@@ -97,16 +97,55 @@ check_links() {
     fi
 
     local files=()
+    local notebooks=()
     local file
     while IFS= read -r file; do
-        [ -f "$file" ] && files+=("$file")
+        [ -f "$file" ] || continue
+        case "$file" in
+            *.ipynb) notebooks+=("$file") ;;
+            *) files+=("$file") ;;
+        esac
     done < <(
         git ls-files --cached --others --exclude-standard -- \
             '*.md' '*.ipynb' $(git_pathspec_excludes)
     )
 
+    local status=0
     echo "Checking relative links in ${#files[@]} files..."
-    lychee --offline --no-progress "${files[@]}"
+    lychee --offline --no-progress "${files[@]}" || status=1
+
+    # lychee reads .ipynb as plain text and finds no relative links, so
+    # check each notebook's markdown cells as Markdown, resolved from the
+    # notebook's own folder.
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+    echo "Checking relative links in ${#notebooks[@]} notebooks..."
+    for file in "${notebooks[@]}"; do
+        if ! python3 - "$file" > "$tmp_dir/cells.md" <<'EOF'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    cells = json.load(f)["cells"]
+for cell in cells:
+    if cell["cell_type"] == "markdown":
+        print("".join(cell["source"]), end="\n\n")
+EOF
+        then
+            echo -e "${RED}Could not read markdown cells from $file${NC}"
+            status=1
+            continue
+        fi
+        if ! lychee --offline --no-progress \
+            --base-url "file://$ROOT_DIR/$(dirname "$file")/" \
+            "$tmp_dir/cells.md" >"$tmp_dir/out.txt" 2>&1; then
+            echo -e "${RED}Broken links in $file:${NC}"
+            cat "$tmp_dir/out.txt"
+            status=1
+        fi
+    done
+    rm -rf "$tmp_dir"
+    return "$status"
 }
 
 grep_names() {

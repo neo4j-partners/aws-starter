@@ -1,21 +1,23 @@
 #!/bin/bash
 # Fraud Memory Agent - AgentCore deployment helper
 #
-# This script does ONE thing: deploy/manage the agent on AgentCore Runtime.
-# It is a thin wrapper over the `agentcore` CLI; the only reason it exists
-# (rather than documenting raw `agentcore` commands) is that `deploy` sources
-# MEMORY_API_KEY from .env and injects it into the runtime for NAMS memory.
+# A thin wrapper over the `agentcore` CLI plus local start/stop/test
+# shortcuts. `deploy` sources MEMORY_API_KEY from .env and injects it into
+# the runtime for NAMS memory.
 #
-# It does NOT run the agent locally and it does NOT run the clients. The
-# server runs in the foreground of its own terminal; the clients are uv
-# console scripts. See the README "Quick Start: Local". In short:
+# `start` runs the local server in the foreground (port 7020). The same
+# server and the clients are also uv console scripts. See the README
+# "Local run". In short:
 #
-#   Terminal 1:  uv run fraud-server          # Ctrl+C to stop
+#   Terminal 1:  uv run fraud-server          # or ./agent.sh start
 #   Terminal 2:  uv run fraud-cli "question"
 #                uv run fraud-demo
 #                uv run fraud-invoke memory-demo
 #
 # Usage:
+#   ./agent.sh start              Start the agent locally (port 7020)
+#   ./agent.sh stop               Stop the local agent
+#   ./agent.sh test               Test the local agent
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy and verify AgentCore Runtime
 #   ./agent.sh status             Check deployment status
@@ -125,15 +127,20 @@ archive_local_config() {
 }
 
 print_usage() {
-    echo "Fraud Memory Agent - AgentCore deployment helper"
+    echo "Fraud Memory Agent - AgentCore helper"
     echo ""
-    echo "Run the agent locally without this script:"
+    echo "Local:"
+    echo "  ./agent.sh start              Start the agent locally (port 7020)"
+    echo "  ./agent.sh stop               Stop the local agent"
+    echo "  ./agent.sh test               Test the local agent"
+    echo ""
+    echo "Or run the server and clients directly:"
     echo "  Terminal 1:  uv run fraud-server          # Ctrl+C to stop"
     echo "  Terminal 2:  uv run fraud-cli \"question\""
     echo "               uv run fraud-demo"
     echo "               uv run fraud-invoke memory-demo"
     echo ""
-    echo "Deployment (this script):"
+    echo "Deployment:"
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy, then verify the runtime with a graph smoke test"
     echo "  ./agent.sh deploy --skip-smoke  Deploy without health verification (not recommended)"
@@ -155,6 +162,27 @@ ensure_deps() {
 }
 
 case "${1:-help}" in
+    start)
+        ensure_deps
+        echo -e "${GREEN}Starting Fraud Memory Agent on port 7020...${NC}"
+        echo "Test with: ./agent.sh test"
+        echo ""
+        uv run fraud-server
+        ;;
+
+    stop)
+        echo -e "${YELLOW}Stopping local agent...${NC}"
+        pkill -f "fraud-server" 2>/dev/null || echo "No agent process found"
+        echo -e "${GREEN}Stopped.${NC}"
+        ;;
+
+    test)
+        ensure_deps
+        echo -e "${GREEN}Testing local agent...${NC}"
+        echo ""
+        uv run fraud-cli "Find circular transfer chains"
+        ;;
+
     configure)
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"

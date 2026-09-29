@@ -21,7 +21,7 @@ This document provides a comprehensive architecture overview of the Neo4j MCP ec
 
 The system consists of three main components:
 
-1. **Neo4j MCP Server** (`/Users/ryanknight/projects/mcp`) - Official Neo4j Model Context Protocol server written in Go
+1. **Neo4j MCP Server** ([github.com/neo4j/mcp](https://github.com/neo4j/mcp), a local clone set by `NEO4J_MCP_REPO`) - Official Neo4j Model Context Protocol server written in Go
 2. **MCP Server Deployment** (`neo4j-mcp-server/`) - AWS CDK infrastructure to deploy the MCP server on AgentCore
 3. **AI Agents** (`quickstart/` and `demos/`) - Agents that query Neo4j. Most reach it through the MCP server and Gateway. The fleet GraphRAG agent uses a direct Neo4j driver
 
@@ -216,7 +216,7 @@ The `deploy.py` script orchestrates the entire deployment process:
 flowchart LR
     subgraph Local["Local Machine"]
         ENV[.env Config<br/>Neo4j Credentials]
-        MCPREPO[Neo4j MCP Repo<br/>/Users/ryanknight/projects/mcp]
+        MCPREPO[Neo4j MCP Repo<br/>path set by NEO4J_MCP_REPO]
     end
 
     subgraph Build["Build Phase"]

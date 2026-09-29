@@ -5,22 +5,24 @@
 # Gateway) and answers natural language questions using AWS Bedrock Claude +
 # the neo4j-graphrag vector and Text2Cypher retrievers.
 #
-# This script does ONE thing: deploy/manage the agent on AgentCore Runtime.
-# It is a thin wrapper over the `agentcore` CLI; the only reason it exists
-# (rather than documenting raw `agentcore` commands) is that `deploy` loads
-# the Neo4j connection from .env and injects it into the runtime env.
+# A thin wrapper over the `agentcore` CLI plus local start/stop/test
+# shortcuts. `deploy` loads the Neo4j connection from .env and injects it
+# into the runtime env.
 #
-# It does NOT run the agent locally and it does NOT run the clients. The
-# server runs in the foreground of its own terminal; the clients are uv
-# console scripts. See the README "Quick Start: Local". In short:
+# `start` runs the local server in the foreground (port 7070). The same
+# server and the clients are also uv console scripts. See the README
+# "Quick Start: Local". In short:
 #
-#   Terminal 1:  uv run fleet-server           # Ctrl+C to stop
+#   Terminal 1:  uv run fleet-server           # or ./agent.sh start
 #                uv run opentelemetry-instrument fleet-server   # + tracing
 #   Terminal 2:  uv run fleet-cli "question"
 #                uv run fleet-demo
 #                uv run fleet-invoke load-test
 #
 # Usage:
+#   ./agent.sh start              Start the agent locally (port 7070)
+#   ./agent.sh stop               Stop the local agent
+#   ./agent.sh test               Test the local agent
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
@@ -46,16 +48,21 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_usage() {
-    echo "Aircraft Fleet GraphRAG Agent - AgentCore deployment helper"
+    echo "Aircraft Fleet GraphRAG Agent - AgentCore helper"
     echo ""
-    echo "Run the agent locally without this script:"
+    echo "Local:"
+    echo "  ./agent.sh start              Start the agent locally (port 7070)"
+    echo "  ./agent.sh stop               Stop the local agent"
+    echo "  ./agent.sh test               Test the local agent"
+    echo ""
+    echo "Or run the server and clients directly:"
     echo "  Terminal 1:  uv run fleet-server           # Ctrl+C to stop"
     echo "               uv run opentelemetry-instrument fleet-server  # + tracing"
     echo "  Terminal 2:  uv run fleet-cli \"question\""
     echo "               uv run fleet-demo"
     echo "               uv run fleet-invoke load-test"
     echo ""
-    echo "Deployment (this script):"
+    echo "Deployment:"
     echo "  ./agent.sh configure          Configure for AWS deployment"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
@@ -115,6 +122,27 @@ deploy_env_args() {
 }
 
 case "${1:-help}" in
+    start)
+        ensure_deps
+        echo -e "${GREEN}Starting Aircraft Fleet GraphRAG Agent on port 7070...${NC}"
+        echo "Test with: ./agent.sh test"
+        echo ""
+        uv run fleet-server
+        ;;
+
+    stop)
+        echo -e "${YELLOW}Stopping local agent...${NC}"
+        pkill -f "fleet-server" 2>/dev/null || echo "No agent process found"
+        echo -e "${GREEN}Stopped.${NC}"
+        ;;
+
+    test)
+        ensure_deps
+        echo -e "${GREEN}Testing local agent...${NC}"
+        echo ""
+        uv run fleet-cli "How many aircraft are in the database?"
+        ;;
+
     configure)
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"

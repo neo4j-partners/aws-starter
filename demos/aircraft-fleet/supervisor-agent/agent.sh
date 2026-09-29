@@ -132,7 +132,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${GREEN}Configuring supervisor for AWS deployment...${NC}"
         echo ""
-        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" -r "$REGION"
+        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" -r "$REGION" "${@:2}"
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"
@@ -176,18 +176,14 @@ case "${1:-help}" in
         echo -e "${GREEN}Starting cloud load test...${NC}"
         echo -e "${BLUE}Tests routing to Maintenance and Operations agents${NC}"
         echo ""
-        if [ -n "$2" ]; then
-            uv run fleet-supervisor-invoke load-test --interval "$2"
-        else
-            uv run fleet-supervisor-invoke load-test
-        fi
+        uv run fleet-supervisor-invoke load-test "${@:2}"
         ;;
 
     destroy)
         ensure_deps
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
-        uv run agentcore destroy
+        uv run agentcore destroy "${@:2}"
         echo ""
         echo -e "${GREEN}Cleanup complete!${NC}"
         ;;

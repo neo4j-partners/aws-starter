@@ -147,7 +147,8 @@ Notes on the payload:
 - `source_connection.name` is `connections/<name>` for a metastore-level connection, and
   `connections/<catalog>.<schema>.<name>` for a schema-level one.
 - `include_tool_selectors: []` exposes every tool the server advertises. To narrow it, use prefix
-  or exact-match patterns, for example `["get_*"]`. Exclusion patterns such as `!delete_*` are not
+  or exact-match patterns. They match the Gateway's target-prefixed names, for example
+  `["neo4j-mcp-server-target___get-*"]`. Exclusion patterns such as `!delete_*` are not
   supported. Restricting to the read tools is a reasonable hardening step, since the Neo4j MCP
   server exposes `get-schema` and `read-cypher` only.
 - The service name is immutable after creation, but the connection it points at is not. To repoint

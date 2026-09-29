@@ -21,7 +21,7 @@ if [ ! -f "$SCRIPT_DIR/.mcp-credentials.json" ]; then
     echo "ERROR: Credentials file not found: .mcp-credentials.json"
     echo ""
     echo "Copy credentials from your neo4j-mcp-server deployment:"
-    echo "  cp ../neo4j-mcp-server/.mcp-credentials.json ."
+    echo "  cp \"$SCRIPT_DIR/../neo4j-mcp-server/.mcp-credentials.json\" \"$SCRIPT_DIR/\""
     echo ""
     echo "Required fields: gateway_url, token_url, client_id, client_secret, scope"
     exit 1

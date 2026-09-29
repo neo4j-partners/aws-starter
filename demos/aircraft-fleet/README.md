@@ -23,7 +23,7 @@ no code changes.
 - A reachable Neo4j instance (Neo4j Aura works well).
 - AWS credentials configured with Bedrock model access enabled (an LLM plus
   Titan embeddings).
-- The [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.10+.
+- The [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.11+.
 
 ## Configure
 

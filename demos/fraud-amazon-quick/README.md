@@ -17,7 +17,7 @@ agent investigates it as a Neo4j graph. Amazon Quick presents the results.
   needed for the enrichment step.
 - AWS credentials with Bedrock model access.
 - A NAMS API key from [NAMS](https://memory.neo4jlabs.com/).
-- The [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.10+.
+- The [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.11+.
 
 ## Step 1: Load the graph
 

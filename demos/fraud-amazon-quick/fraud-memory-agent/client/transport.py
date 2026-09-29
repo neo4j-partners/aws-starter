@@ -310,7 +310,7 @@ def invoke_local(
             "status": "error",
             "errors": [
                 f"Could not connect to {url}. Start the agent first: "
-                f"./agent.sh start"
+                f"uv run fraud-server"
             ],
         }
 

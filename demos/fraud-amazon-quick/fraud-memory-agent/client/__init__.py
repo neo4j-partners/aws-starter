@@ -5,7 +5,7 @@ builder; everything in this package talks to that one running server over the
 wire, distinguished only by a ``target``:
 
 - ``"local"``    — HTTP+SSE to a locally running ``runtime_app.py``
-  (``./agent.sh start``, port 7020).
+  (``uv run fraud-server``, port 7020).
 - ``"deployed"`` — the boto3 ``bedrock-agentcore`` data plane
   (``./agent.sh deploy``).
 

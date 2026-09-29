@@ -149,7 +149,7 @@ Notes on the payload:
 - `include_tool_selectors: []` exposes every tool the server advertises. To narrow it, use prefix
   or exact-match patterns, for example `["get_*"]`. Exclusion patterns such as `!delete_*` are not
   supported. Restricting to the read tools is a reasonable hardening step, since the Neo4j MCP
-  server exposes `get_neo4j_schema` and `read_neo4j_cypher` only.
+  server exposes `get-schema` and `read-cypher` only.
 - The service name is immutable after creation, but the connection it points at is not. To repoint
   an existing service, `PATCH` with `update_mask=config` and send the whole `config` object.
   A narrower `update_mask=config.source_connection` is rejected with
@@ -206,7 +206,7 @@ curl -s -X POST \
 ```
 
 Both should list the Gateway's tools. Names carry the Gateway target prefix, so they come back as
-`neo4j-mcp-server-target___get_neo4j_schema` and `neo4j-mcp-server-target___read_neo4j_cypher`
+`neo4j-mcp-server-target___get-schema` and `neo4j-mcp-server-target___read-cypher`
 rather than the bare tool names. Anything that pattern-matches on tool names, including
 `include_tool_selectors`, has to account for that prefix.
 
@@ -261,7 +261,7 @@ administer the deployment.
 
 The connection holds a copy of the Cognito client secret, so it goes stale if the stack is
 redeployed with new credentials, and the `host` goes stale if the Gateway URL changes. After any
-`./deploy.py --env <name> deploy` that recreates the Gateway or the Cognito client, regenerate
+full `./deploy.py --env <name>` run that recreates the Gateway or the Cognito client, regenerate
 credentials and update the connection options rather than recreating it, so the MCP Service keeps
 pointing at the same object.
 

@@ -2,6 +2,7 @@
 
 This folder contains the current AWS and Neo4j presentations in [Marp](https://marp.app/) format:
 
+- `aws-neo4j-finance-overview.md`
 - `aws-neo4j-grounded-enterprise-ai.md`
 - `fraud-data-architecture.md`
 - `neocarta-aws-appendix.md`

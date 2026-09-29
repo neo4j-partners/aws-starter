@@ -487,7 +487,7 @@ stateDiagram-v2
         Domain expertise:
         - Aircraft health monitoring
         - Component reliability
-        - Fault code analysis
+        - Fault analysis
         - Sensor data interpretation
     end note
 

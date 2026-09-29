@@ -108,13 +108,15 @@ uv run fraud-graph-load          # --reset deletes all graph data first
 uv run fraud-graph-enrich        # GDS risk, community, and similarity signals
 uv run fraud-graph-analyze       # read-only investigation queries
 
-# Fraud memory agent: Strands agent over its own core/. agent.sh,
-# runtime_app.py, and Dockerfile live at the agent root.
+# Fraud memory agent: Strands agent over its own core/. agent.sh and
+# Dockerfile live at the agent root; runtime_app.py is in server/.
 # Needs ./deploy.py --env finance.
 cd ../fraud-memory-agent
 uv sync
-./agent.sh start
-# (start/test/configure/deploy/status/invoke-cloud/destroy)
+uv run fraud-server              # Terminal 1 (port 7020)
+uv run fraud-cli "Find circular transfer chains"   # Terminal 2
+./agent.sh deploy
+# (configure/deploy/status/verify/logs/reset-config/destroy)
 ```
 
 ### Integrations and Patterns

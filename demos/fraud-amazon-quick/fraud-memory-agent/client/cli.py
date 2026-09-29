@@ -14,7 +14,7 @@ Usage:
 
 For the full demo question set use ``client.demo``. Local use needs the
 server running in another terminal:
-    ./agent.sh start
+    uv run fraud-server
 """
 
 from __future__ import annotations

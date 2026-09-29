@@ -55,7 +55,7 @@ def get_default_region() -> str:
     if session.region_name:
         return session.region_name
 
-    return "us-west-2"
+    return "us-east-1"
 
 
 # =============================================================================

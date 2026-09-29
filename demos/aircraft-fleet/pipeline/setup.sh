@@ -20,7 +20,7 @@ cd "$SCRIPT_DIR"
 
 ENV_FILE="$SCRIPT_DIR/../.env"
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "ERROR: $ENV_FILE not found. Run: cp ../.env.sample ../.env  then edit it." >&2
+  echo "ERROR: $ENV_FILE not found. Run: cp \"$SCRIPT_DIR/../.env.sample\" \"$ENV_FILE\"  then edit it." >&2
   exit 1
 fi
 
@@ -59,7 +59,7 @@ export DOCUMENT_DIR="$SCRIPT_DIR/manuals"
 mkdir -p "$DATA_DIR"
 
 UV_SYNC_EXTRA=""
-if [[ "${LLM_PROVIDER:-openai}" == "anthropic" ]]; then
+if [[ "${LLM_PROVIDER:-bedrock}" == "anthropic" ]]; then
   UV_SYNC_EXTRA="--extra anthropic"
 fi
 

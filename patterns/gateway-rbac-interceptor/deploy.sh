@@ -6,7 +6,7 @@
 #   ./deploy.sh [OPTIONS]
 #
 # Options:
-#   --region REGION     AWS region (default: us-west-2)
+#   --region REGION     AWS region (default: us-east-1)
 #   --skip-build        Skip Docker image build (use existing image)
 #   --destroy           Destroy the stack instead of deploying
 #   --help              Show this help message
@@ -22,7 +22,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKIP_BUILD=false
 DESTROY=false
-REGION="us-west-2"
+REGION="us-east-1"
 STACK_NAME="SimpleOAuthDemo"
 
 # Colors for output

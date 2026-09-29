@@ -119,7 +119,10 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
             conversation = await memory.short_term.create_conversation(
                 session_id,
                 user_identifier=user_id,
-                metadata={"client_session_id": session_id, "source": "fraud-memory-agent"},
+                metadata={
+                    "client_session_id": session_id,
+                    "source": "fraud-memory-agent",
+                },
             )
             conversation_id = str(conversation.id)
             await memory.short_term.add_message(conversation_id, "user", prompt_text)

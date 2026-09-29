@@ -40,7 +40,7 @@ All paths below are relative to `demos/aircraft-fleet/`.
 
 Tick each box only after the step's result is recorded below.
 
-- [x] **0.** Prerequisites verified (uv, Python 3.10+, AWS creds, Bedrock
+- [x] **0.** Prerequisites verified (uv, Python 3.11+, AWS creds, Bedrock
       model access, reachable Neo4j)
 - [x] **1.** Shared `.env` created and filled in
 - [x] **2.** Pipeline deps synced (`cd pipeline && uv sync`)
@@ -73,7 +73,7 @@ Tick each box only after the step's result is recorded below.
 
 Confirm before starting:
 
-- `uv --version` and Python 3.10+ available.
+- `uv --version` and Python 3.11+ available.
 - AWS credentials configured (`aws sts get-caller-identity` succeeds). If
   using SSO: `aws sso login --sso-session <your-sso-session>`.
 - Bedrock model access enabled in the target region for the extraction LLM
@@ -258,7 +258,7 @@ exit code 0, "All samples complete."
 ## Step 6: Sync agent dependencies
 
 ```bash
-cd ../agent
+cd ../graphrag-agent
 uv sync
 ```
 
@@ -503,7 +503,7 @@ The supervisor reaches Neo4j through the MCP Gateway, not a direct driver.
 Point a `fleet` MCP deployment at the same `NEO4J_URI` the pipeline loaded.
 
 ```bash
-cd ../../neo4j-mcp-server
+cd ../../../neo4j-mcp-server
 cp .env.sample .env.fleet   # skip if present. Set the same NEO4J_* values
 ./deploy.py --env fleet
 ./deploy.py --env fleet credentials   # writes .mcp-credentials.fleet.json
@@ -514,7 +514,8 @@ cp .env.sample .env.fleet   # skip if present. Set the same NEO4J_* values
 ## Step 18: Sync supervisor credentials
 
 ```bash
-../../scripts/sync-credentials.sh
+# from neo4j-mcp-server
+../scripts/sync-credentials.sh
 ```
 
 The script copies `.mcp-credentials.fleet.json` to
@@ -525,7 +526,7 @@ The script copies `.mcp-credentials.fleet.json` to
 ## Step 19: Start the supervisor locally
 
 ```bash
-cd supervisor-agent
+cd ../demos/aircraft-fleet/supervisor-agent
 uv sync
 ./agent.sh start                   # serves http://localhost:8080
 ```
@@ -575,10 +576,12 @@ Fill this in at the end (or when stopping early).
   90 days, 40 airports, seed 42 (345,600 readings).
 - **Neo4j target:** Aura `neo4j+s://e8e7cca9.databases.neo4j.io`,
   database `neo4j`.
-- **Overall status:** PASS — all 16 steps completed.
+- **Overall status:** PASS for Steps 0–16. Steps 17–22 (the supervisor
+  path) were added after this run and have not been run.
 - **Steps passed:** 0–16 (full local GraphRAG path + AWS deploy /
   remote invoke / remote showcase + teardown + summary).
-- **Steps failed or skipped (with reason):** none skipped. Two steps
+- **Steps failed or skipped (with reason):** Steps 17–22 not run yet.
+  None of Steps 0–16 were skipped. Two steps
   needed a non-interactive workaround (no TTY in the automation shell):
   Step 10 `agentcore configure -ni` and Step 15 `agentcore destroy
   --force` instead of the interactive `./agent.sh` wrappers — same
@@ -615,7 +618,7 @@ Fill this in at the end (or when stopping early).
   3. ✅ FIXED — `./agent.sh configure` and `destroy` now forward extra
      args to the underlying `agentcore` command (`"${@:2}"`), so
      `./agent.sh configure -ni ...` and `./agent.sh destroy --force`
-     work non-interactively. Noted in `agent/README.md`.
+     work non-interactively. Noted in `graphrag-agent/README.md`.
 - **Cloud resources confirmed destroyed:** yes — 7 resources removed,
   0 errors (runtime, 2 S3 artifacts, memory, IAM role, config + yaml).
   Neo4j Aura data intentionally left intact (operator's instance).

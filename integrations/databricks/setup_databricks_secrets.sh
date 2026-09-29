@@ -155,7 +155,7 @@ if [[ ${#missing[@]} -gt 0 ]]; then
     log_error "Missing required values in .mcp-credentials.json: ${missing[*]}"
     echo ""
     echo "Ensure the credentials file contains all required OAuth2 values."
-    echo "Re-run: cd ../../neo4j-mcp-server && ./deploy.py credentials"
+    echo "Re-run: cd \"$PROJECT_ROOT/neo4j-mcp-server\" && ./deploy.py credentials"
     exit 1
 fi
 

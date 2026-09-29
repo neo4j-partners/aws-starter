@@ -26,13 +26,13 @@ ENV PATH="/root/.local/bin:$PATH"
 
 WORKDIR /app
 
-# The local project builds the `agent` package, so it must be present
-# before `uv sync` installs the project into the venv.
+# The local project builds the `agent` package and force-includes
+# runtime_app.py, so both must be present before `uv sync` installs the
+# project into the venv.
 COPY pyproject.toml uv.lock ./
 COPY agent ./agent
-RUN uv sync --frozen --no-dev
-
 COPY runtime_app.py ./
+RUN uv sync --frozen --no-dev
 
 # Neo4j connection (NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD) and AWS
 # credentials are supplied as Runtime environment variables, not baked in.

@@ -77,7 +77,7 @@ ensure_credentials() {
         echo -e "${RED}ERROR: .mcp-credentials.json not found${NC}"
         echo ""
         echo "Copy it from the MCP server deployment:"
-        echo "  cp ../../../neo4j-mcp-server/.mcp-credentials.fleet.json .mcp-credentials.json"
+        echo "  cp \"$ROOT_DIR/../../../neo4j-mcp-server/.mcp-credentials.fleet.json\" \"$ROOT_DIR/.mcp-credentials.json\""
         exit 1
     fi
 }
@@ -98,7 +98,7 @@ case "${1:-help}" in
 
     stop)
         echo -e "${YELLOW}Stopping local supervisor...${NC}"
-        pkill -f "$ENTRYPOINT" 2>/dev/null || echo "No supervisor process found"
+        pkill -f "fleet-supervisor-server" 2>/dev/null || echo "No supervisor process found"
         echo -e "${GREEN}Stopped.${NC}"
         ;;
 

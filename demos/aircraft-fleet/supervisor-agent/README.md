@@ -26,14 +26,14 @@ agents. This agent is the reference for multi-agent routing and observability.
 
 ## Unique Features
 
-- **Intent routing.** The supervisor classifies each query and dispatches to
-  one worker, or to both for cross-domain questions, then synthesizes a single
-  answer.
+- **Intent routing.** The supervisor classifies each query and dispatches it
+  to exactly one worker. Ambiguous or general questions go to the Operations
+  Agent.
 - **Domain specialists.** The Maintenance Agent handles faults, components,
   sensors, and reliability. The Operations Agent handles flights, delays,
   routes, and airports. Each is a focused ReAct agent over the same MCP tools.
 - **Multi-agent traces.** With three agents, CloudWatch traces show the
-  routing decision, the chosen worker, its tool calls, and the synthesized
+  routing decision, the chosen worker, its tool calls, and the final
   response in one session.
 
 ### Routing
@@ -42,7 +42,7 @@ agents. This agent is the reference for multi-agent routing and observability.
 |----------------|-----------|
 | maintenance, fault, repair, failure, component, sensor, reliability | Maintenance Agent |
 | flight, delay, schedule, on-time, airport, route, departure, arrival | Operations Agent |
-| Both domains | Both workers, then synthesize |
+| Neither, or general (schema, counts) | Operations Agent |
 
 ## Layout
 
@@ -66,7 +66,10 @@ the Docker image, and `client/` is local-only tooling.
 
 1. Python 3.10+ and the `uv` package manager.
 2. AWS CLI configured, with Bedrock model access enabled.
-3. A deployed Neo4j MCP server with an AgentCore Gateway.
+3. The fleet graph loaded into Neo4j by [../pipeline/](../pipeline/).
+4. A `fleet` Neo4j MCP server deployment pointed at that same Neo4j instance.
+   From `neo4j-mcp-server/`, run `./deploy.py --env fleet` and then
+   `./deploy.py --env fleet credentials`.
 
 ## Quick Start: Local
 
@@ -118,7 +121,7 @@ uv sync
 **Operations:** "What are the most common delay causes?",
 "Compare on-time performance by airline", "Which airports have the highest traffic?"
 
-**Cross-domain:** "How do maintenance issues affect flight delays?"
+**General:** "What is the database schema?" routes to the Operations Agent.
 
 See `client/queries.txt` for the full set of 20.
 

@@ -36,7 +36,7 @@ for entry in "${TARGETS[@]}"; do
         env_flag="${env_name:+ --env $env_name}"
         echo -e "${YELLOW}WARNING: Skipping $target. Source not found: $source_file${NC}"
         echo "  Deploy the Neo4j MCP server first:"
-        echo "  cd neo4j-mcp-server && ./deploy.py$env_flag && ./deploy.py$env_flag credentials"
+        echo "  cd \"$(cd "$MCP_SERVER_DIR" && pwd)\" && ./deploy.py$env_flag && ./deploy.py$env_flag credentials"
         continue
     fi
 

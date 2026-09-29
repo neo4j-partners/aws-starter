@@ -10,11 +10,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolved once at import time — stable regardless of cwd.
 _PKG_DIR = Path(__file__).resolve().parent
-_LAB_SETUP_DIR = _PKG_DIR.parent.parent.parent
+_PIPELINE_DIR = _PKG_DIR.parent.parent
+_LAB_SETUP_DIR = _PIPELINE_DIR.parent
 # Shared aircraft-fleet root .env, read by both pipeline/ and graphrag-agent/.
 _ENV_FILE = _LAB_SETUP_DIR / ".env"
-_DATA_DIR = _LAB_SETUP_DIR / "aircraft_digital_twin_data_v2"
-_DOCUMENT_DIR = _LAB_SETUP_DIR / "aircraft_digital_twin_data"
+# Same defaults setup.sh exports as DATA_DIR and DOCUMENT_DIR.
+_DATA_DIR = _PIPELINE_DIR / "generated"
+_DOCUMENT_DIR = _PIPELINE_DIR / "manuals"
 
 
 class Settings(BaseSettings):

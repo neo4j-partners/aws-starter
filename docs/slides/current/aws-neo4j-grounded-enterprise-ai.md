@@ -616,7 +616,7 @@ Agent C → open account balance
 
 ---
 
-## Example: The Finance Agent remembers across sessions
+## Example: The Fraud Memory Agent remembers across sessions
 
 `demos/fraud-amazon-quick/fraud-memory-agent` adds four Strands tools: `search_context`, `add_memory`, `get_user_preferences`, and `get_entity_graph`.
 
@@ -625,7 +625,7 @@ Agent C → open account balance
 3. **Recall:** A fresh session for the same user retrieves the preference without it being restated.
 4. **Isolate:** A second user asks the same question and cannot see the first user's memory.
 
-<div class="callout"><strong>One graph stack:</strong> The memory wrapper uses the library's user-scoped core API against the same Neo4j instance as the finance graph. Domain graph tools remain behind AgentCore Gateway and MCP.</div>
+<div class="callout"><strong>One graph stack:</strong> The memory wrapper uses the library's user-scoped core API against the same Neo4j instance as the fraud graph. Domain graph tools remain behind AgentCore Gateway and MCP.</div>
 
 <!-- Sources: demos/fraud-amazon-quick/fraud-memory-agent/README.md and demos/fraud-amazon-quick/fraud-memory-agent/server/runtime_app.py -->
 

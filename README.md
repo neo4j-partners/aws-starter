@@ -83,7 +83,7 @@ Each step needs only what earlier steps set up.
 ### 🕵️ **Fraud Investigation with Amazon Quick** (`demos/fraud-amazon-quick/`)
 
 *   **[`graph-loader/`](./demos/fraud-amazon-quick/graph-loader/)**: loads the shared fraud dataset into Neo4j with a direct driver, then adds GDS fraud signals.
-*   **[`fraud-memory-agent/`](./demos/fraud-amazon-quick/fraud-memory-agent/)**: Strands fraud-investigation agent over a synthetic finance graph, with `core/`, `client/`, and `server/` folders. It captures every turn in the Neo4j Agent Memory Service.
+*   **[`fraud-memory-agent/`](./demos/fraud-amazon-quick/fraud-memory-agent/)**: Strands fraud-investigation agent over a synthetic fraud graph, with `core/`, `client/`, and `server/` folders. It captures every turn in the Neo4j Agent Memory Service.
 *   **[`fraud-iceberg/`](./demos/fraud-amazon-quick/fraud-iceberg/)**: loads the same fraud dataset into Iceberg tables and S3 Tables for Athena.
 
 ---

@@ -335,3 +335,16 @@ The empty `.bedrock_agentcore/` folders were removed. `fraud-memory-agent/script
 - `py_compile` passes on `deploy.py` and `cdk/app.py`.
 
 **Phase 5 result:** The code changes are complete. The AWS steps did not run: deploy under the new names, `invoke-cloud`, and delete the old Runtimes.
+
+**Decisions from the user after Phase 5:**
+
+- **Credential files:** The user chose to delete them. All nine gitignored `.mcp-credentials*.json` files were deleted. Four were in `neo4j-mcp-server/`. The rest were in `quickstart/`, `supervisor-agent/`, `graphrag-agent/`, and `fraud-memory-agent/`, which had two. After the next deploy, `./deploy.py --env NAME credentials` and `scripts/sync-credentials.sh` recreate them.
+- **Fraud agent README wording:** The user chose to rename it. In `fraud-memory-agent/README.md`, the title is now `# Fraud Memory Agent`. The headings now say "Fraud graph dataset" and "Connect the agent to the fraud graph". The body text and the architecture diagram now say "fraud graph" and "fraud memory agent". Some names stay: "financial-crime" names the domain, "Finance Genie" names the source project, and `--env finance` is the deployment name. `scripts/check-docs.sh` still passes.
+- **Remaining "Finance Agent" wording:** The user chose to rename every remaining instance, including the NAMS trace title and the slide deck. "Finance Agent" became "Fraud Memory Agent", and "finance graph" became "fraud graph". Twenty-one lines changed in fourteen files:
+  - The root `README.md` fraud agent bullet.
+  - In `fraud-memory-agent/`, the `Dockerfile` header, the `agent.sh` header and usage text, and the docstrings in `client/`, `core/`, and `server/`.
+  - The `client/cli.py` banner and the argparse descriptions in `cli.py` and `invoke.py`.
+  - The NAMS reasoning trace title in `server/runtime_app.py`, which is now `"Fraud Memory Agent investigation"`. New traces use this title. Traces recorded before this change keep the old title.
+  - The `graph-loader/graph_loader/analyze_graph.py` docstring and `graph-loader/ontology.md`.
+  - A slide heading and a callout in `docs/slides/current/aws-neo4j-grounded-enterprise-ai.md`.
+- **Validation:** `py_compile` passes on the edited Python files. `bash -n` passes on `agent.sh`. `scripts/check-docs.sh` passes. No other "finance agent" or "finance graph" wording remains outside the archive, proposals, and organize files. No edited line exceeds 88 characters.

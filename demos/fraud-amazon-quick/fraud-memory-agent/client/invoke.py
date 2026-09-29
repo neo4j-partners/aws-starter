@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin invocation client for the NAMS-enabled Finance Agent."""
+"""Thin invocation client for the NAMS-enabled Fraud Memory Agent."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def run_load_test(interval: int, user_id: str, target: Target) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Invoke the NAMS-enabled Finance Agent.",
+        description="Invoke the NAMS-enabled Fraud Memory Agent.",
     )
     parser.add_argument(
         "command",

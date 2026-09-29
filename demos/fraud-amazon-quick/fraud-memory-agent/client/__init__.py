@@ -1,4 +1,4 @@
-"""Thin clients for the Neo4j finance agent.
+"""Thin clients for the Neo4j fraud memory agent.
 
 Nothing here builds an agent. ``server/runtime_app.py`` is the only agent
 builder; everything in this package talks to that one running server over the

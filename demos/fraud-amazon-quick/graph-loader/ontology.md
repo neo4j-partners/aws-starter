@@ -5,7 +5,7 @@
 This project should add a small graph-native business-meaning layer beside the
 finance instance graph. It is deliberately an **informal ontology**: ordinary
 Neo4j nodes and relationships that define the business vocabulary, rules,
-metrics, policies, and thresholds used by the finance agent.
+metrics, policies, and thresholds used by the fraud memory agent.
 
 It is not RDF, RDFS, OWL, SHACL, or TTL. No generic reasoner will infer results
 from it. The definitions are explicit, versionable, queryable, and traceable in

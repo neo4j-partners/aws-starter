@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Finance Agent deployed on Amazon Bedrock AgentCore Runtime.
+"""Fraud Memory Agent deployed on Amazon Bedrock AgentCore Runtime.
 
-The finance graph is reached through the Neo4j MCP Gateway. Each real agent
+The fraud graph is reached through the Neo4j MCP Gateway. Each real agent
 invocation is captured in the hosted Neo4j Agent Memory Service (NAMS): the
 user prompt and assistant response become conversation messages, and every
 MCP tool call becomes a reasoning step and tool call. NAMS needs only
@@ -124,7 +124,7 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
             conversation_id = str(conversation.id)
             await memory.short_term.add_message(conversation_id, "user", prompt_text)
             trace = await memory.reasoning.start_trace(
-                conversation_id, "Finance Agent investigation"
+                conversation_id, "Fraud Memory Agent investigation"
             )
 
             answer_parts: list[str] = []

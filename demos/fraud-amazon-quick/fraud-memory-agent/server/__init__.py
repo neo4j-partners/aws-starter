@@ -1,4 +1,4 @@
-"""Finance Agent runtime server.
+"""Fraud Memory Agent runtime server.
 
 ``runtime_app.py`` is the only place an Agent is built. It runs as a
 standalone HTTP server: in the cloud under AgentCore Runtime (fixed port

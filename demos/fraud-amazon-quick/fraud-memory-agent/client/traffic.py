@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate bounded, synthetic traffic through the deployed Finance Agent.
+"""Generate bounded, synthetic traffic through the deployed Fraud Memory Agent.
 
 Each request goes through the actual AgentCore or local runtime. The runtime
 records user/assistant text and any MCP tool calls in NAMS, so this is useful

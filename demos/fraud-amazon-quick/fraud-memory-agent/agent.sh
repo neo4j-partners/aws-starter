@@ -1,5 +1,5 @@
 #!/bin/bash
-# Finance Agent - AgentCore deployment helper
+# Fraud Memory Agent - AgentCore deployment helper
 #
 # This script does ONE thing: deploy/manage the agent on AgentCore Runtime.
 # It is a thin wrapper over the `agentcore` CLI; the only reason it exists
@@ -125,7 +125,7 @@ archive_local_config() {
 }
 
 print_usage() {
-    echo "Finance Agent - AgentCore deployment helper"
+    echo "Fraud Memory Agent - AgentCore deployment helper"
     echo ""
     echo "Run the agent locally without this script:"
     echo "  Terminal 1:  uv run fraud-server          # Ctrl+C to stop"

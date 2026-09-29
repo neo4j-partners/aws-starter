@@ -1,4 +1,4 @@
-"""Run read-only fraud-investigation queries against the loaded finance graph.
+"""Run read-only fraud-investigation queries against the loaded fraud graph.
 
 Set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, and optionally NEO4J_DATABASE
 before running. Run ``uv run fraud-graph-enrich`` first when using the

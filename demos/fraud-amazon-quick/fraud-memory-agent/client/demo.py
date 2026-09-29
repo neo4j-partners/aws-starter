@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run curated graph-analysis questions against the Finance Agent."""
+"""Run curated graph-analysis questions against the Fraud Memory Agent."""
 
 from __future__ import annotations
 

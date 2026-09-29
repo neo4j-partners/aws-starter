@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Finance Agent — terminal client.
+"""Fraud Memory Agent — terminal client.
 
 A thin client. It does not build an agent: it sends a prompt to a running
 ``runtime_app.py`` and streams the answer back. ``--remote`` switches the
@@ -28,7 +28,7 @@ from client.transport import Target, invoke
 
 def ask(question: str, target: Target, user_id: str) -> None:
     print("=" * 70)
-    print(f"Finance Agent (Strands) — {target}")
+    print(f"Fraud Memory Agent (Strands) — {target}")
     print("=" * 70)
     print(f"User ID:  {user_id}")
     print(f"Question: {question}")
@@ -43,7 +43,7 @@ def ask(question: str, target: Target, user_id: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Terminal client for the Finance Agent."
+        description="Terminal client for the Fraud Memory Agent."
     )
     parser.add_argument(
         "--remote",

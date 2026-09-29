@@ -1,11 +1,11 @@
-# Finance Agent
+# Fraud Memory Agent
 
 This Strands agent investigates financial-crime patterns in a Neo4j graph
 through an Amazon Bedrock AgentCore Gateway. It uses the hosted Neo4j Agent
 Memory Service (NAMS) to capture every user and assistant turn, extract
 entities, and record MCP tool calls as reasoning traces.
 
-The finance graph and agent memory are deliberately separate. The MCP server
+The fraud graph and agent memory are deliberately separate. The MCP server
 owns graph access; NAMS owns memory storage, embeddings, and its schema. The
 agent needs no direct Neo4j credentials for memory.
 
@@ -31,7 +31,7 @@ multi-user load runs.
 - AWS credentials with access to the configured Bedrock model.
 - A NAMS API key from [NAMS](https://memory.neo4jlabs.com/).
 
-## Finance graph dataset
+## Fraud graph dataset
 
 The exact synthetic fraud dataset used by this agent is committed in
 [../data/](../data/). Its 25,000 accounts, 7,500
@@ -44,7 +44,7 @@ informal, graph-native business vocabulary for the fraud domain. It documents
 the meaning and limits of investigation signals without adding a formal
 RDF/TTL ontology.
 
-### Connect the agent to the finance graph
+### Connect the agent to the fraud graph
 
 Yes: the agent needs a deployed Neo4j MCP server whose `NEO4J_*` settings
 point to the database that contains this dataset. The agent never opens a
@@ -69,7 +69,7 @@ Set up the graph and MCP server in this order:
    cp .mcp-credentials.finance.json ../demos/fraud-amazon-quick/fraud-memory-agent/.mcp-credentials.json
    ```
 
-4. Return here and start or deploy the finance agent. It reads
+4. Return here and start or deploy the fraud memory agent. It reads
    `.mcp-credentials.json`, refreshes the OAuth token in memory, and uses the
    Gateway URL in that file to discover and call the Neo4j MCP tools.
 
@@ -206,10 +206,10 @@ Bedrock AgentCore Runtime
   |                     +--> NAMS
   |                          messages, entities, reasoning traces
   v
-AgentCore Gateway --> Neo4j MCP server --> finance graph
+AgentCore Gateway --> Neo4j MCP server --> fraud graph
 ```
 
-NAMS and the finance graph do not share credentials or a database connection.
+NAMS and the fraud graph do not share credentials or a database connection.
 
 ## Published Strands session-manager limitation
 

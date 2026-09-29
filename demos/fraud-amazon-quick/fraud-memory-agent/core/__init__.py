@@ -1,4 +1,4 @@
-"""Shared building blocks for the Finance Agent.
+"""Shared building blocks for the Fraud Memory Agent.
 
 Importing the ``core`` package itself pulls only stdlib + httpx — it
 re-exports :mod:`core.config` (model id, region, system prompt) and

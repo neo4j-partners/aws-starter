@@ -11,7 +11,7 @@ The MCP server deployed on AgentCore uses **Cognito JWT authentication**. Claude
 - Claude Desktop installed ([download](https://claude.ai/download))
 - Node.js installed (for `npx`)
 - The MCP server deployed via `./deploy.py`
-- Cognito credentials configured in `.env`
+- A credentials file from `./deploy.py credentials`
 
 ## Step 1: Get Your Stack Configuration
 
@@ -25,7 +25,6 @@ aws cloudformation describe-stacks \
 ```
 
 You'll need:
-- **CognitoUserPoolClientId** - The Cognito client ID for authentication
 - **MCPServerRuntimeArn** - The ARN of your deployed MCP server
 
 ## Step 2: Build the MCP Endpoint URL
@@ -46,20 +45,16 @@ echo "https://bedrock-agentcore.<REGION>.amazonaws.com/runtimes/${ENCODED_ARN}/i
 
 ## Step 3: Get a JWT Token
 
-Generate a JWT token using the provided script:
+Generate a fresh M2M token. The script reads the credentials file from
+`./deploy.py credentials` and uses the client_credentials flow:
 
 ```bash
 cd /path/to/neo4j-mcp-server
-uv run python3 get_token.py <COGNITO_CLIENT_ID> <USERNAME> <PASSWORD> <AWS_REGION>
+uv run python client/get_token.py                 # .mcp-credentials.json
+uv run python client/get_token.py --env finance   # .mcp-credentials.finance.json
 ```
 
-Or source your `.env` and run:
-```bash
-source ../.env
-./test.sh token
-```
-
-Copy the access token from the output.
+The script prints only the token on stdout. Copy it from the output.
 
 ## Step 4: Configure Claude Desktop
 
@@ -125,15 +120,9 @@ Create a helper script to refresh your config:
 #!/bin/bash
 # refresh-claude-token.sh
 
-# Load environment
-source /path/to/.env
-
 # Get new token
-TOKEN=$(python3 /path/to/get_token.py \
-    "$COGNITO_CLIENT_ID" \
-    "$AGENT_USERNAME" \
-    "$AGENT_PASSWORD" \
-    "$AWS_REGION" 2>&1 | grep -A1 "Access Token:" | tail -n1 | tr -d '[:space:]')
+cd /path/to/neo4j-mcp-server
+TOKEN=$(uv run python client/get_token.py) || exit 1
 
 # Update Claude Desktop config (macOS)
 CONFIG_FILE="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
@@ -164,9 +153,8 @@ See: [Building a Remote MCP Server with OAuth Authorization Using Amazon API Gat
 - Ensure your network can reach `bedrock-agentcore.<region>.amazonaws.com`
 
 ### "Unauthorized" errors
-- Regenerate the JWT token
-- Verify the Cognito user has proper permissions
-- Check that `USER_PASSWORD_AUTH` is enabled on the Cognito client
+- Regenerate the JWT token with `client/get_token.py`
+- Check that the credentials file matches the deployed stack. Re-run `./deploy.py credentials` if the stack was redeployed
 
 ### MCP server not appearing in Claude Desktop
 - Ensure `npx` is available in your PATH
@@ -175,8 +163,8 @@ See: [Building a Remote MCP Server with OAuth Authorization Using Amazon API Gat
 
 ### Testing the connection manually
 ```bash
-# Test with the MCP client directly
-./test.sh tools
+# Test the direct Runtime endpoint that Claude Desktop uses
+./cloud-http.sh
 ```
 
 ## References

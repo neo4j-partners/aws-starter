@@ -68,7 +68,7 @@ Folder: [`neo4j-mcp-server/`](./neo4j-mcp-server/)
 
 - **What it does:** This sample deploys the official Neo4j MCP server to AgentCore behind an AgentCore Gateway. Agents query Neo4j through MCP tools over one HTTPS endpoint secured with OAuth2.
 - **Credentials:** Neo4j credentials live in container environment variables. This avoids a clash between the `Authorization` header that AgentCore uses and the one the Neo4j server expects.
-- **Key features:** The sample uses AgentCore Runtime, a Gateway with Cognito machine-to-machine OAuth2, CDK infrastructure as code, and ARM64 Docker images. Agents discover the Neo4j tools, such as `get-schema` and `read-cypher`, at runtime.
+- **Key features:** The sample uses AgentCore Runtime, a Gateway with Cognito machine-to-machine OAuth2, CDK infrastructure as code, and ARM64 Docker images. Agents discover the Neo4j tools, such as `get_neo4j_schema` and `read_neo4j_cypher`, at runtime.
 - **Use case:** Use it to share one Neo4j database with Bedrock-hosted agents as MCP tools.
 
 ## Quickstart: LangGraph MCP agent

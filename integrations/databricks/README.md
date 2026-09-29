@@ -153,7 +153,7 @@ a Unity Catalog HTTP connection.
 - **Gateway:** The AgentCore Gateway checks the OAuth2 token. It adds the target name to each tool name.
 - **HTTP connection:** The connection stores the Gateway URL and the OAuth2 client ID, client secret, and token endpoint. Databricks exchanges and refreshes tokens on its own.
 - **Proxy:** Databricks sends MCP calls through its proxy at `/api/2.0/mcp/external/{connection_name}`. The proxy adds the OAuth2 token and forwards the request to the Gateway.
-- **Tool calls:** The Gateway routes each call to the MCP server. For example, `neo4j-mcp-server-target___read-cypher` goes to the `read-cypher` tool. The server runs the Cypher query against Neo4j and returns the results.
+- **Tool calls:** The Gateway routes each call to the MCP server. For example, `neo4j-mcp-server-target___read_neo4j_cypher` goes to the `read_neo4j_cypher` tool. The server runs the Cypher query against Neo4j and returns the results.
 
 This setup gives you these benefits:
 
@@ -236,10 +236,10 @@ compiled language.
 │  │                           NEO4J MCP SERVER (AgentCore Runtime)                     │  │
 │  │                                                                                    │  │
 │  │   Tools (Gateway-prefixed):                                                        │  │
-│  │   - neo4j-mcp-server-target___get-schema: Returns node labels, relationships      │  │
-│  │   - neo4j-mcp-server-target___read-cypher: Executes read-only Cypher queries      │  │
+│  │   - neo4j-mcp-server-target___get_neo4j_schema: Returns node labels, relationships │  │
+│  │   - neo4j-mcp-server-target___read_neo4j_cypher: Executes read-only Cypher queries │  │
 │  │                                                                                    │  │
-│  │   Config: NEO4J_READ_ONLY=true (write-cypher disabled)                            │  │
+│  │   Config: NEO4J_READ_ONLY=true (write_neo4j_cypher disabled)                       │  │
 │  └───────────────────────────────────────────────────────────────────────────────────┘  │
 │                                        │                                                 │
 └────────────────────────────────────────┼─────────────────────────────────────────────────┘
@@ -297,8 +297,8 @@ The AgentCore Gateway adds the target name to each tool name:
 
 | Tool | Gateway name | Description |
 |------|--------------|-------------|
-| `get-schema` | `neo4j-mcp-server-target___get-schema` | Returns the database schema |
-| `read-cypher` | `neo4j-mcp-server-target___read-cypher` | Runs read-only Cypher queries |
+| `get_neo4j_schema` | `neo4j-mcp-server-target___get_neo4j_schema` | Returns the database schema |
+| `read_neo4j_cypher` | `neo4j-mcp-server-target___read_neo4j_cypher` | Runs read-only Cypher queries |
 
 ## Example usage
 
@@ -315,7 +315,7 @@ spark.sql("""
       method => 'POST',
       path => '',
       headers => map('Content-Type', 'application/json'),
-      json => '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"neo4j-mcp-server-target___get-schema","arguments":{}},"id":1}'
+      json => '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"neo4j-mcp-server-target___get_neo4j_schema","arguments":{}},"id":1}'
     )
 """)
 ```
@@ -334,7 +334,7 @@ Edit these settings in `neo4j_mcp_agent.py`:
 ## Security
 
 This integration gives **read-only access** to Neo4j. The MCP server runs with
-`NEO4J_READ_ONLY=true`. That setting turns off the `write-cypher` tool on the
+`NEO4J_READ_ONLY=true`. That setting turns off the `write_neo4j_cypher` tool on the
 server.
 
 ## Troubleshooting
@@ -345,7 +345,7 @@ server.
 | Connection already exists | Drop it with `DROP CONNECTION IF EXISTS neo4j_agentcore_mcp`. |
 | HTTP timeout | Check that the MCP server is running. From the repo root, run `cd neo4j-mcp-server && ./cloud.sh`. |
 | 401 Unauthorized | Run `./deploy.py credentials` in `neo4j-mcp-server/`. Then run `./setup_databricks_secrets.sh` again. |
-| Tool not found | Use the Gateway tool name, for example `neo4j-mcp-server-target___get-schema`. |
+| Tool not found | Use the Gateway tool name, for example `neo4j-mcp-server-target___get_neo4j_schema`. |
 
 ## Related documentation
 

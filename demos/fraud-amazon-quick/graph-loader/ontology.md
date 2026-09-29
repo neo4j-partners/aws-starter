@@ -159,7 +159,7 @@ The update can be incremental and does not require changing the instance model.
    every successful run. Do not treat PageRank output as a fraud classification.
 4. Update `core/config.py`: when explaining a signal, retrieve the relevant
    term and rule, state whether it is a fact, metric, or screening lead, and
-   cite its instance evidence separately. The agent should use `get-schema`
+   cite its instance evidence separately. The agent should use `get_neo4j_schema`
    when uncertain.
 5. Add tests proving every term resolves to a rule, evaluated entities, and any
    required metric or threshold; reject orphaned rules and unknown metric-output

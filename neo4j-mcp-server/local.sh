@@ -30,8 +30,8 @@
 #   ./local.sh start
 #   ./local.sh test
 #   ./local.sh tools
-#   ./local.sh call get-schema '{}'
-#   ./local.sh call read-cypher '{"query": "MATCH (n) RETURN count(n)"}'
+#   ./local.sh call get_neo4j_schema '{}'
+#   ./local.sh call read_neo4j_cypher '{"query": "MATCH (n) RETURN count(n)"}'
 #   ./local.sh --env fleet start
 #
 # ENVIRONMENT:

@@ -2,7 +2,7 @@
 
 One module holds all three so the routing keywords and each specialist's
 domain stay visibly in sync with each other. The specialists read the graph
-schema from the MCP ``get-schema`` tool instead of a hardcoded copy.
+schema from the MCP ``get_neo4j_schema`` tool instead of a hardcoded copy.
 
 - ``ROUTER_PROMPT``        — classifies a query as maintenance or operations
 - ``MAINTENANCE_SYSTEM_PROMPT`` — Maintenance & Reliability specialist
@@ -34,7 +34,7 @@ You are an expert in:
 
 ## CRITICAL: Get the Schema First
 
-Before writing any Cypher, call the tool whose name ends in `get-schema`.
+Before writing any Cypher, call the tool whose name ends in `get_neo4j_schema`.
 Use only the node labels, relationship types, and property names it returns.
 Do not guess names. If the schema has no data for the question, say so.
 
@@ -69,7 +69,7 @@ You are an expert in:
 
 ## CRITICAL: Get the Schema First
 
-Before writing any Cypher, call the tool whose name ends in `get-schema`.
+Before writing any Cypher, call the tool whose name ends in `get_neo4j_schema`.
 Use only the node labels, relationship types, and property names it returns.
 Do not guess names. If the schema has no data for the question, say so.
 

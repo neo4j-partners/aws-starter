@@ -196,7 +196,7 @@ SELECT http_request(
   method => 'POST',
   path => '',
   headers => map('Content-Type', 'application/json'),
-  json => '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"neo4j-mcp-server-target___get-schema","arguments":{}},"id":1}'
+  json => '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"neo4j-mcp-server-target___get_neo4j_schema","arguments":{}},"id":1}'
 );
 ```
 
@@ -204,8 +204,8 @@ Tool names are prefixed by the AgentCore Gateway:
 
 | Tool | Gateway name |
 |------|--------------|
-| `get-schema` | `neo4j-mcp-server-target___get-schema` |
-| `read-cypher` | `neo4j-mcp-server-target___read-cypher` |
+| `get_neo4j_schema` | `neo4j-mcp-server-target___get_neo4j_schema` |
+| `read_neo4j_cypher` | `neo4j-mcp-server-target___read_neo4j_cypher` |
 
 ## Troubleshooting
 
@@ -216,7 +216,7 @@ Tool names are prefixed by the AgentCore Gateway:
 | Connection not listed as MCP | Complete Step 3 and check **Is MCP connection**. If the checkbox is missing, set `is_mcp_connection` to `true` with the CLI (see [If the checkbox is missing](#if-the-is-mcp-connection-checkbox-is-missing)). |
 | `url` ends in `:443/` not `/mcp` | Set **Base path** to `/mcp`. The UI can default it to `/` on recreate, which misses the Gateway endpoint. |
 | HTTP timeout | Verify the MCP server is running: `cd neo4j-mcp-server && ./cloud.sh`. |
-| Tool not found | Use the Gateway-prefixed name, for example `neo4j-mcp-server-target___get-schema`. |
+| Tool not found | Use the Gateway-prefixed name, for example `neo4j-mcp-server-target___get_neo4j_schema`. |
 | Updated credentials not taking effect | Edit the connection and re-enter the changed values. Databricks caches connection options at creation time. |
 
 ## Comparison with the scripted path

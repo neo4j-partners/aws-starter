@@ -52,10 +52,10 @@ async def test_connection():
             base = t.name.split("___")[-1] if "___" in t.name else t.name
             tool_map[base] = t.name
 
-        # Test get-schema
+        # Test get_neo4j_schema
         print("\n" + "-" * 50)
-        print("Calling get-schema...")
-        schema_tool = tool_map.get("get-schema", "get-schema")
+        print("Calling get_neo4j_schema...")
+        schema_tool = tool_map.get("get_neo4j_schema", "get_neo4j_schema")
         result = await client.call_tool(schema_tool, {})
         print(f"Result type: {type(result).__name__}")
         if hasattr(result, "content"):
@@ -65,10 +65,10 @@ async def test_connection():
         else:
             print(result)
 
-        # Test read-cypher
+        # Test read_neo4j_cypher
         print("\n" + "-" * 50)
-        print("Calling read-cypher...")
-        cypher_tool = tool_map.get("read-cypher", "read-cypher")
+        print("Calling read_neo4j_cypher...")
+        cypher_tool = tool_map.get("read_neo4j_cypher", "read_neo4j_cypher")
         query = "MATCH (n) RETURN labels(n) AS label, count(*) AS count"
         result = await client.call_tool(cypher_tool, {"query": query})
         if hasattr(result, "content"):

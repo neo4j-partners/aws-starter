@@ -37,7 +37,7 @@
 #
 # NOTE:
 #   Tool names are prefixed with target name when accessed via Gateway.
-#   Example: neo4j-mcp-server-target___read-cypher
+#   Example: neo4j-mcp-server-target___read_neo4j_cypher
 #
 # SEE ALSO:
 #   ./local.sh      - Local Docker server testing (no auth)

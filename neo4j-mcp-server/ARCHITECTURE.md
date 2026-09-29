@@ -260,8 +260,8 @@ When MCP tools are accessed through AgentCore Gateway, tool names are automatica
 
 | Original Tool | Gateway Tool |
 |---------------|--------------|
-| `get-schema` | `neo4j-mcp-server-target___get-schema` |
-| `read-cypher` | `neo4j-mcp-server-target___read-cypher` |
+| `get_neo4j_schema` | `neo4j-mcp-server-target___get_neo4j_schema` |
+| `read_neo4j_cypher` | `neo4j-mcp-server-target___read_neo4j_cypher` |
 
 > **Note:** Write tools are disabled (`NEO4J_READ_ONLY=true`).
 
@@ -314,7 +314,7 @@ The same pattern appears in official AWS samples:
 
 This project uses **Claude Sonnet** (via AWS Bedrock) rather than Nova because:
 
-- **Claude accepts hyphenated tool names** like `get-schema`, `read-cypher`
+- **Claude accepts hyphenated tool names** like `neo4j-mcp-server-target___read_neo4j_cypher` (the Gateway target prefix has hyphens)
 - **Nova rejects hyphens** - Nova requires `[a-zA-Z][a-zA-Z0-9_]*`
 - **MCP spec allows hyphens** - The official spec permits `[a-zA-Z0-9_.-]{1,128}`
 

@@ -188,7 +188,7 @@ MCP tools accessed via Gateway are prefixed with target name:
 ```
 {target-name}___{tool-name}
 ```
-Example: `neo4j-mcp-server-target___read-cypher`
+Example: `neo4j-mcp-server-target___read_neo4j_cypher`
 
 ### Authentication Layers
 

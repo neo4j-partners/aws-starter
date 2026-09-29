@@ -10,7 +10,7 @@ configured by setup_databricks_secrets.sh.
 Features:
 - Connects to external Neo4j MCP server via Unity Catalog HTTP connection proxy
 - Uses OAuth2 M2M authentication (Databricks handles token refresh automatically)
-- Provides READ-ONLY access to Neo4j (get-schema, read-cypher tools)
+- Provides READ-ONLY access to Neo4j (get_neo4j_schema, read_neo4j_cypher tools)
 - Compatible with MLflow ResponsesAgent for deployment
 
 Prerequisites:
@@ -73,12 +73,12 @@ system_prompt = """
 You are a helpful assistant that can query a Neo4j graph database.
 
 You have access to the following tools:
-- neo4j-mcp-server-target___get-schema: Retrieve the database schema including node labels, relationship types, and properties
-- neo4j-mcp-server-target___read-cypher: Execute read-only Cypher queries against the database
+- neo4j-mcp-server-target___get_neo4j_schema: Retrieve the database schema including node labels, relationship types, and properties
+- neo4j-mcp-server-target___read_neo4j_cypher: Execute read-only Cypher queries against the database
 
 When users ask questions about the data:
-1. First use neo4j-mcp-server-target___get-schema if you need to understand the database structure
-2. Then construct and execute appropriate Cypher queries using neo4j-mcp-server-target___read-cypher
+1. First use neo4j-mcp-server-target___get_neo4j_schema if you need to understand the database structure
+2. Then construct and execute appropriate Cypher queries using neo4j-mcp-server-target___read_neo4j_cypher
 3. Explain the results clearly to the user
 
 IMPORTANT: You can only read data. Write operations are not permitted.
@@ -90,7 +90,7 @@ CYPHER QUERY GUIDELINES:
 - To get labels, use: CALL db.labels() YIELD label RETURN label
 - To get relationship types, use: CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType
 - Do NOT use YIELD with columns that don't exist in the procedure output (e.g. avoid YIELD nodeType, nodeCount)
-- Do NOT use db.schema.nodeTypeProperties() — use get-schema tool instead for schema info
+- Do NOT use db.schema.nodeTypeProperties() — use get_neo4j_schema tool instead for schema info
 - Prefer simple MATCH patterns over procedure calls for counting and aggregation
 """
 
@@ -279,7 +279,7 @@ def initialize_agent():
         LangGraphResponsesAgent: The initialized agent ready for predictions
     """
     # Get MCP tools from the configured Neo4j server
-    # Note: Tool names are prefixed by AgentCore Gateway (e.g., neo4j-mcp-server-target___get-schema)
+    # Note: Tool names are prefixed by AgentCore Gateway (e.g., neo4j-mcp-server-target___get_neo4j_schema)
     mcp_tools = asyncio.run(databricks_mcp_client.get_tools())
 
     print(f"Loaded {len(mcp_tools)} tools from Neo4j MCP server:")

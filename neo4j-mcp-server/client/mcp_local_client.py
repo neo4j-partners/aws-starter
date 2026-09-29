@@ -206,8 +206,8 @@ Examples:
   python mcp_client.py start
   python mcp_client.py test
   python mcp_client.py tools
-  python mcp_client.py call get-schema '{{}}'
-  python mcp_client.py call read-cypher '{{"query": "MATCH (n) RETURN count(n)"}}'
+  python mcp_client.py call get_neo4j_schema '{{}}'
+  python mcp_client.py call read_neo4j_cypher '{{"query": "MATCH (n) RETURN count(n)"}}'
 
 Environment:
   MCP_LOCAL_PORT - Host port for the local container (default: 8000)

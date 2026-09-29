@@ -150,7 +150,7 @@ Notes on the payload:
   or exact-match patterns. They match the Gateway's target-prefixed names, for example
   `["neo4j-mcp-server-target___get-*"]`. Exclusion patterns such as `!delete_*` are not
   supported. Restricting to the read tools is a reasonable hardening step, since the Neo4j MCP
-  server exposes `get-schema` and `read-cypher` only.
+  server exposes `get_neo4j_schema` and `read_neo4j_cypher` only.
 - The service name is immutable after creation, but the connection it points at is not. To repoint
   an existing service, `PATCH` with `update_mask=config` and send the whole `config` object.
   A narrower `update_mask=config.source_connection` is rejected with
@@ -207,7 +207,7 @@ curl -s -X POST \
 ```
 
 Both should list the Gateway's tools. Names carry the Gateway target prefix, so they come back as
-`neo4j-mcp-server-target___get-schema` and `neo4j-mcp-server-target___read-cypher`
+`neo4j-mcp-server-target___get_neo4j_schema` and `neo4j-mcp-server-target___read_neo4j_cypher`
 rather than the bare tool names. Anything that pattern-matches on tool names, including
 `include_tool_selectors`, has to account for that prefix.
 

@@ -33,7 +33,7 @@ flowchart TB
 
     subgraph MCP["Neo4j MCP Server<br/>(Go Binary)"]
         direction TB
-        TOOLS[MCP Tools<br/>get-schema, read-cypher, write-cypher]
+        TOOLS[MCP Tools<br/>get_neo4j_schema, read_neo4j_cypher, write_neo4j_cypher]
         DB_SVC[Database Service<br/>Neo4j Driver]
         TOOLS --> DB_SVC
     end
@@ -583,7 +583,7 @@ sequenceDiagram
     Note over Worker,Neo4j: Step 3: Tool Execution (ReAct Loop)
     loop ReAct: Thought → Action → Observation
         LLM-->>Worker: Thought: Need to query faults
-        Worker->>Gateway: MCP call_tool(read-cypher, query)
+        Worker->>Gateway: MCP call_tool(read_neo4j_cypher, query)
         Gateway->>Runtime: Forward with OAuth
         Runtime->>MCP: Execute tool
         MCP->>Neo4j: MATCH (m:MaintenanceEvent)...

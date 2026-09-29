@@ -6,7 +6,7 @@ Bedrock to reason.
 
 ## Overview
 
-- **Neo4j over MCP:** The Neo4j MCP server exposes `get-schema` and `read-cypher` as tools. Claude uses them to explore and query the graph.
+- **Neo4j over MCP:** The Neo4j MCP server exposes `get_neo4j_schema` and `read_neo4j_cypher` as tools. Claude uses them to explore and query the graph.
 - **AgentCore Gateway:** The agent talks to one HTTPS endpoint. The Gateway forwards tool calls to the Neo4j MCP server on AgentCore Runtime.
 - **OAuth2 machine login:** The agent logs in to the Gateway with a Cognito token. The agent renews the token before it expires.
 - **Claude on Bedrock:** The agent calls Claude through the Bedrock Converse API. It uses your normal AWS credentials, so you manage no model keys.
@@ -139,8 +139,8 @@ uv sync --extra test
 uv run python tests/test_fastmcp.py
 ```
 
-`test_fastmcp.py` lists the Gateway tools. It then calls `get-schema` and
-`read-cypher` with the FastMCP client. It uses no LLM, so it is the fastest
+`test_fastmcp.py` lists the Gateway tools. It then calls `get_neo4j_schema` and
+`read_neo4j_cypher` with the FastMCP client. It uses no LLM, so it is the fastest
 way to check that the Gateway and Neo4j are reachable.
 
 ## Troubleshooting

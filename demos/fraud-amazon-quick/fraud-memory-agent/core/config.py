@@ -26,6 +26,6 @@ SYSTEM_PROMPT = (
     "similarity.\n\n"
     "Favor multi-hop questions that use the graph: transfer chains, shared "
     "counterparties, community structure, centrality, and similarity "
-    "neighborhoods. Call get-schema when unsure of the model. Cite specific "
+    "neighborhoods. Call get_neo4j_schema when unsure of the model. Cite specific "
     "data from the graph. Be concise but thorough."
 )

@@ -191,7 +191,7 @@ Multiple deployments:
   NAME', which sets MCP_ENV for you.
 
 Note: Tool names are prefixed with the target name when accessed via Gateway.
-      For example: neo4j-mcp-server-target___read-cypher
+      For example: neo4j-mcp-server-target___read_neo4j_cypher
 
 Examples:
   ./deploy.py credentials    # Generate credentials file first

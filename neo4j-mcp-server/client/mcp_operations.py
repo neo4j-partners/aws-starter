@@ -11,8 +11,8 @@ GATEWAY TOOL NAME MAPPING
 When MCP tools are accessed through AWS AgentCore Gateway, tool names are
 automatically prefixed with the Gateway target name:
 
-    Original:  get-schema
-    Gateway:   neo4j-mcp-server-target___get-schema
+    Original:  get_neo4j_schema
+    Gateway:   neo4j-mcp-server-target___get_neo4j_schema
 
 This prefixing is INTENTIONAL and REQUIRED for Gateway operation. It enables:
 
@@ -77,7 +77,7 @@ async def connect_and_run(mcp_url: str, operation, *args, headers: dict = None):
 # AgentCore Gateway prefixes tool names with the target name:
 #   {target_name}___{tool_name}
 #
-# Example: "neo4j-mcp-server-target___get-schema"
+# Example: "neo4j-mcp-server-target___get_neo4j_schema"
 #
 # This is documented AWS behavior for multi-target routing and Cedar policies.
 # The functions below implement dynamic tool discovery following AWS best practices.
@@ -101,16 +101,16 @@ async def get_tool_map(session: ClientSession) -> dict[str, str]:
         - AWS-operations-agent/mcp-tool-handler.py:8-10
 
     Returns:
-        Dict mapping base names (e.g., 'get-schema') to actual names
-        (e.g., 'neo4j-mcp-server-target___get-schema' via Gateway,
-         or just 'get-schema' via direct Runtime access)
+        Dict mapping base names (e.g., 'get_neo4j_schema') to actual names
+        (e.g., 'neo4j-mcp-server-target___get_neo4j_schema' via Gateway,
+         or just 'get_neo4j_schema' via direct Runtime access)
 
     Example:
         >>> tool_map = await get_tool_map(session)
         >>> print(tool_map)
         {
-            'get-schema': 'neo4j-mcp-server-target___get-schema',
-            'read-cypher': 'neo4j-mcp-server-target___read-cypher'
+            'get_neo4j_schema': 'neo4j-mcp-server-target___get_neo4j_schema',
+            'read_neo4j_cypher': 'neo4j-mcp-server-target___read_neo4j_cypher'
         }
     """
     result = await session.list_tools()
@@ -121,7 +121,7 @@ async def get_tool_map(session: ClientSession) -> dict[str, str]:
         full_name = tool.name
 
         # Extract base name (after ___ prefix if present)
-        # This allows client code to use friendly names like "get-schema"
+        # This allows client code to use friendly names like "get_neo4j_schema"
         # while we handle the Gateway prefix internally
         if "___" in full_name:
             base_name = full_name.split("___", 1)[1]
@@ -139,15 +139,15 @@ def resolve_tool_name(tool_map: dict[str, str], base_name: str) -> str:
 
     This function looks up the full (possibly Gateway-prefixed) tool name
     for a given base name. It allows client code to use friendly names
-    like "get-schema" while correctly calling the Gateway-prefixed version.
+    like "get_neo4j_schema" while correctly calling the Gateway-prefixed version.
 
     Args:
         tool_map: Map from base names to actual names (from get_tool_map)
-        base_name: The base tool name (e.g., 'get-schema')
+        base_name: The base tool name (e.g., 'get_neo4j_schema')
 
     Returns:
         The actual tool name to use with session.call_tool()
-        (e.g., 'neo4j-mcp-server-target___get-schema')
+        (e.g., 'neo4j-mcp-server-target___get_neo4j_schema')
 
     Raises:
         KeyError: If the tool is not found in the map
@@ -181,7 +181,7 @@ async def run_full_tests(session: ClientSession):
     3. Use resolve_tool_name() to get the actual name for each tool call
 
     This pattern is required because Gateway prefixes tool names with the
-    target name (e.g., "neo4j-mcp-server-target___get-schema").
+    target name (e.g., "neo4j-mcp-server-target___get_neo4j_schema").
     """
     print("OK    Session initialized")
     print()
@@ -190,7 +190,7 @@ async def run_full_tests(session: ClientSession):
     # STEP 1: Discover tools and build the name mapping
     # ==========================================================================
     # Gateway prefixes tool names with target name: {target}___{tool}
-    # We build a map so client code can use friendly names like "get-schema"
+    # We build a map so client code can use friendly names like "get_neo4j_schema"
     # while calling the actual Gateway-prefixed names.
     # ==========================================================================
     print("=" * 60)
@@ -226,10 +226,10 @@ async def run_full_tests(session: ClientSession):
     print("=" * 60)
     print()
 
-    # Test 1: get-schema
-    # Note: We call resolve_tool_name("get-schema") which returns the full
-    # Gateway-prefixed name like "neo4j-mcp-server-target___get-schema"
-    print("1. Testing get-schema...")
+    # Test 1: get_neo4j_schema
+    # Note: We call resolve_tool_name("get_neo4j_schema") which returns the full
+    # Gateway-prefixed name like "neo4j-mcp-server-target___get_neo4j_schema"
+    print("1. Testing get_neo4j_schema...")
     try:
         actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
         result = await session.call_tool(actual_name, {})
@@ -246,8 +246,8 @@ async def run_full_tests(session: ClientSession):
         print(f"   FAILED: {e}")
     print()
 
-    # Test 2: read-cypher with simple query
-    print("2. Testing read-cypher (RETURN 1 as test)...")
+    # Test 2: read_neo4j_cypher with simple query
+    print("2. Testing read_neo4j_cypher (RETURN 1 as test)...")
     try:
         actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(actual_name, {"query": "RETURN 1 as test"})
@@ -260,8 +260,8 @@ async def run_full_tests(session: ClientSession):
         print(f"   FAILED: {e}")
     print()
 
-    # Test 3: read-cypher with labels query
-    print("3. Testing read-cypher (CALL db.labels())...")
+    # Test 3: read_neo4j_cypher with labels query
+    print("3. Testing read_neo4j_cypher (CALL db.labels())...")
     try:
         actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(
@@ -276,8 +276,8 @@ async def run_full_tests(session: ClientSession):
         print(f"   FAILED: {e}")
     print()
 
-    # Test 4: read-cypher with count query
-    print("4. Testing read-cypher (count nodes)...")
+    # Test 4: read_neo4j_cypher with count query
+    print("4. Testing read_neo4j_cypher (count nodes)...")
     try:
         actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(
@@ -302,7 +302,7 @@ async def list_tools(session: ClientSession):
     List available MCP tools.
 
     Displays the full tool names as returned by the server. When accessed via
-    Gateway, these will include the target prefix (e.g., "neo4j-mcp-server-target___get-schema").
+    Gateway, these will include the target prefix (e.g., "neo4j-mcp-server-target___get_neo4j_schema").
     """
     result = await session.list_tools()
     for tool in result.tools:
@@ -319,7 +319,7 @@ async def get_schema(session: ClientSession):
 
     Uses dynamic tool discovery to handle Gateway prefixing:
     1. get_tool_map() discovers the actual tool name via tools/list
-    2. resolve_tool_name() maps "get-schema" to the full prefixed name
+    2. resolve_tool_name() maps "get_neo4j_schema" to the full prefixed name
     3. session.call_tool() is called with the actual name
     """
     tool_map = await get_tool_map(session)
@@ -335,7 +335,7 @@ async def run_query(session: ClientSession):
 
     Uses dynamic tool discovery to handle Gateway prefixing:
     1. get_tool_map() discovers the actual tool name via tools/list
-    2. resolve_tool_name() maps "read-cypher" to the full prefixed name
+    2. resolve_tool_name() maps "read_neo4j_cypher" to the full prefixed name
     3. session.call_tool() is called with the actual name
     """
     tool_map = await get_tool_map(session)
@@ -358,7 +358,7 @@ async def call_tool(session: ClientSession, tool_name: str, args_json: str):
 
     Args:
         session: The MCP client session
-        tool_name: The full tool name (e.g., "neo4j-mcp-server-target___get-schema")
+        tool_name: The full tool name (e.g., "neo4j-mcp-server-target___get_neo4j_schema")
         args_json: JSON string of tool arguments
     """
     args = json.loads(args_json)

@@ -1,72 +1,86 @@
 #!/usr/bin/env python3
-"""
-Simple Cognito Authentication Script
-Matches the approach from the original tutorial
+"""Fetch a fresh M2M access token for the deployed MCP server.
+
+Reads the client ID, client secret, scope, and token URL from the credentials
+file written by ``./deploy.py credentials``, then requests a new token from
+Cognito with the client_credentials flow. The token works for both the
+Gateway and the direct Runtime endpoint.
+
+The token is printed alone on stdout, so scripts can capture it. Status
+messages go to stderr.
+
+Usage (from neo4j-mcp-server/):
+    uv run python client/get_token.py                 # .mcp-credentials.json
+    uv run python client/get_token.py --env finance   # .mcp-credentials.finance.json
+    uv run python client/get_token.py --credentials path/to/creds.json
 """
 
-import boto3
+from __future__ import annotations
+
+import argparse
+import json
 import sys
+from pathlib import Path
+
+import httpx
+
+SERVER_DIR = Path(__file__).resolve().parent.parent
 
 
-def get_token(client_id, username, password, region=None):
-    """Get authentication token from Cognito."""
-    # Use provided region or default from environment/config
-    if region:
-        cognito_client = boto3.client("cognito-idp", region_name=region)
-    else:
-        cognito_client = boto3.client("cognito-idp")
+def credentials_path(env_name: str | None) -> Path:
+    """Return the credentials file that deploy.py writes for this env."""
+    suffix = f".{env_name}" if env_name else ""
+    return SERVER_DIR / f".mcp-credentials{suffix}.json"
 
-    try:
-        auth_response = cognito_client.initiate_auth(
-            ClientId=client_id,
-            AuthFlow="USER_PASSWORD_AUTH",
-            AuthParameters={"USERNAME": username, "PASSWORD": password},
+
+def get_token(credentials: dict[str, str]) -> tuple[str, int]:
+    """Request a client_credentials token and return it with its lifetime."""
+    response = httpx.post(
+        credentials["token_url"],
+        auth=(credentials["client_id"], credentials["client_secret"]),
+        data={"grant_type": "client_credentials", "scope": credentials["scope"]},
+        timeout=30.0,
+    )
+    response.raise_for_status()
+    body = response.json()
+    return body["access_token"], body.get("expires_in", 3600)
+
+
+def arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--env",
+        help="Named deployment. Reads .mcp-credentials.NAME.json.",
+    )
+    source.add_argument(
+        "--credentials",
+        type=Path,
+        help="Path to a credentials file.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = arguments()
+    path = args.credentials or credentials_path(args.env)
+    if not path.is_file():
+        env_flag = f" --env {args.env}" if args.env else ""
+        sys.exit(
+            f"Credentials file not found: {path}\n"
+            f"Run ./deploy.py{env_flag} credentials first."
         )
 
-        return auth_response["AuthenticationResult"]["AccessToken"]
+    try:
+        credentials = json.loads(path.read_text())
+        token, expires_in = get_token(credentials)
+    except KeyError as error:
+        sys.exit(f"{path.name} is missing {error}. Re-run ./deploy.py credentials.")
+    except httpx.HTTPError as error:
+        sys.exit(f"Token request failed: {error}")
 
-    except Exception as e:
-        print(f"Error: {e}")
-        print("Troubleshooting:")
-        print("  - Verify the Client ID is correct")
-        print("  - Ensure you're using the correct region")
-        print("  - Check that the user exists and password is correct")
-        print("  - Verify USER_PASSWORD_AUTH is enabled for this client")
-        sys.exit(1)
-
-
-def main():
-    if len(sys.argv) < 4 or len(sys.argv) > 5:
-        print("Usage: python get_token.py <client_id> <username> <password> [region]")
-        print("\nExamples:")
-        print("  python get_token.py abc123xyz testuser MyPassword123!")
-        print("  python get_token.py abc123xyz testuser MyPassword123! us-east-1")
-        sys.exit(1)
-
-    client_id = sys.argv[1]
-    username = sys.argv[2]
-    password = sys.argv[3]
-    region = sys.argv[4] if len(sys.argv) == 5 else None
-
-    if region:
-        print(f"Authenticating with Cognito in region {region}...")
-    else:
-        print("Authenticating with Cognito...")
-
-    token = get_token(client_id, username, password, region)
-
-    print("\n" + "=" * 70)
-    print("Authentication Successful!")
-    print("=" * 70)
-    print("\nAccess Token:")
+    print(f"Token from {path.name} expires in {expires_in}s.", file=sys.stderr)
     print(token)
-    print("\n" + "=" * 70)
-    print("Export Command:")
-    print("=" * 70)
-    print(f'\nexport JWT_TOKEN="{token}"')
-    print("\nThen use in curl:")
-    print('curl -H "Authorization: Bearer $JWT_TOKEN" <your-api-url>')
-    print()
 
 
 if __name__ == "__main__":

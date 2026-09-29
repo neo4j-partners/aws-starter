@@ -8,11 +8,11 @@ in the design. All agent traffic must go through it.
 
 ## Overview
 
-- **MCP server:** The [Neo4j MCP server](https://github.com/neo4j-partners/neo4j-mcp-canary) runs on AgentCore Runtime. It gives agents read-only tools for a Neo4j database.
+- **MCP server:** The [Neo4j Cypher MCP server](https://github.com/neo4j-partners/mcp-neo4j/tree/main/servers/mcp-neo4j-cypher) (`mcp-neo4j-cypher`) runs on AgentCore Runtime. It gives agents read-only tools for a Neo4j database.
 - **Gateway:** The AgentCore Gateway is the only way in. It checks each request's token and forwards the request to the Runtime.
 - **Machine login:** Agents log in with a Cognito client ID and secret. There are no user accounts or passwords to manage.
 - **Token exchange:** The Gateway gets its own token to call the Runtime. Agents do not handle that step.
-- **Tools:** The Gateway exposes two read-only tools, `neo4j-mcp-server-target___get-schema` and `neo4j-mcp-server-target___read-cypher`.
+- **Tools:** The Gateway exposes two read-only tools, `neo4j-mcp-server-target___get_neo4j_schema` and `neo4j-mcp-server-target___read_neo4j_cypher`.
 - **Tool prefix:** The Gateway adds the target name to each tool name. [ARCHITECTURE.md](./ARCHITECTURE.md#gateway-tool-name-mapping) explains the prefix.
 - **Named deployments:** You can run several deployments side by side. Each one uses its own `.env.NAME` file.
 
@@ -21,7 +21,7 @@ in the design. All agent traffic must go through it.
 Run these commands from `neo4j-mcp-server/`:
 
 ```bash
-git clone https://github.com/neo4j-partners/neo4j-mcp-canary.git /path/to/neo4j-mcp-canary
+git clone https://github.com/neo4j-partners/mcp-neo4j.git /path/to/mcp-neo4j
 cp .env.sample .env         # add NEO4J_* values and NEO4J_MCP_REPO
 ./deploy.py                 # build, push, and deploy the stack (5 to 10 minutes)
 ./deploy.py credentials     # write .mcp-credentials.json
@@ -58,14 +58,16 @@ resume a paused instance before you run `./deploy.py`.
 ## Step 1: Clone the MCP server source
 
 The deploy builds the ARM64 image from a local copy of the
-[neo4j-mcp-canary](https://github.com/neo4j-partners/neo4j-mcp-canary)
-repository. Clone it anywhere:
+`mcp-neo4j-cypher` server in the
+[mcp-neo4j](https://github.com/neo4j-partners/mcp-neo4j) repository. Clone it
+anywhere:
 
 ```bash
-git clone https://github.com/neo4j-partners/neo4j-mcp-canary.git
+git clone https://github.com/neo4j-partners/mcp-neo4j.git
 ```
 
-You set `NEO4J_MCP_REPO` to this path in the next step.
+The server lives in the `servers/mcp-neo4j-cypher` subfolder. You set
+`NEO4J_MCP_REPO` to that subfolder in the next step.
 
 ## Step 2: Configure the deployment
 
@@ -84,8 +86,8 @@ NEO4J_DATABASE=neo4j
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your-neo4j-password
 
-# Path to the neo4j-mcp-canary clone from step 1
-NEO4J_MCP_REPO=/path/to/neo4j-mcp-canary
+# Path to the mcp-neo4j-cypher server in the clone from step 1
+NEO4J_MCP_REPO=/path/to/mcp-neo4j/servers/mcp-neo4j-cypher
 
 # AWS region
 AWS_REGION=us-east-1
@@ -146,8 +148,8 @@ It reads `.mcp-credentials.json` and runs these checks:
 - **Token check:** The script checks that the JWT token has not expired.
 - **MCP initialize:** The script opens an MCP session.
 - **`tools/list`:** The script lists the tools, with their Gateway prefixes.
-- **`get-schema`:** The script reads the Neo4j schema.
-- **`read-cypher`:** The script runs a test Cypher query.
+- **`get_neo4j_schema`:** The script reads the Neo4j schema.
+- **`read_neo4j_cypher`:** The script runs a test Cypher query.
 
 ## Step 6: Test the Runtime directly
 
@@ -189,7 +191,7 @@ NEO4J_DATABASE=neo4j
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=the-other-password
 
-NEO4J_MCP_REPO=/path/to/neo4j-mcp-canary
+NEO4J_MCP_REPO=/path/to/mcp-neo4j/servers/mcp-neo4j-cypher
 
 AWS_REGION=us-east-1
 ```
@@ -297,7 +299,7 @@ If the token expires, run `./deploy.py credentials` again.
 | `NEO4J_DATABASE` | Yes | Database name |
 | `NEO4J_USERNAME` | Yes | Neo4j username. The deploy passes it to the container. |
 | `NEO4J_PASSWORD` | Yes | Neo4j password. The deploy stores it in Secrets Manager as `<stack-name>/neo4j-password`. |
-| `NEO4J_MCP_REPO` | Yes | Path to your local [neo4j-mcp-canary](https://github.com/neo4j-partners/neo4j-mcp-canary) clone. The deploy builds the ARM64 image from it. |
+| `NEO4J_MCP_REPO` | Yes | Path to the `servers/mcp-neo4j-cypher` folder in your local [mcp-neo4j](https://github.com/neo4j-partners/mcp-neo4j) clone. The deploy builds the ARM64 image from it. |
 | `AWS_REGION` | No | AWS region. The default is `us-east-1`. |
 | `STACK_NAME` | No | CDK stack name. See the rules below. |
 | `ECR_REPO_NAME` | No | ECR repository name. The default is `neo4j-mcp-server`. |
@@ -378,7 +380,7 @@ neo4j-mcp-server/
 │   └── pyproject.toml                # Python dependencies (uv)
 ├── client/
 │   ├── gateway_client.py             # Gateway client used by cloud.sh
-│   ├── get_token.py                  # Cognito username and password token script
+│   ├── get_token.py                  # Fetch a fresh M2M token from a credentials file
 │   ├── mcp_local_client.py           # Local client used by local.sh
 │   └── mcp_operations.py             # MCP operation helpers
 ├── docs/
@@ -451,6 +453,6 @@ Claude Desktop.
 
 ## Resources
 
-- [Neo4j MCP Server (neo4j-mcp-canary)](https://github.com/neo4j-partners/neo4j-mcp-canary)
+- [Neo4j Cypher MCP Server (mcp-neo4j-cypher)](https://github.com/neo4j-partners/mcp-neo4j/tree/main/servers/mcp-neo4j-cypher)
 - [Amazon Bedrock AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)

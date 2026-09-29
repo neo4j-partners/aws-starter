@@ -1110,7 +1110,8 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
             "   The Cognito domain may still be propagating. Try again in a "
             "few minutes:"
         )
-        print("   ./deploy.py credentials")
+        env_flag = f" --env {cfg.env_suffix}" if cfg.env_suffix else ""
+        print(f"   ./deploy.py{env_flag} credentials")
         raise DeployError("Cognito DNS did not resolve")
 
     print("   Requesting JWT token...")
@@ -1174,7 +1175,8 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
     print("Usage:")
     print(f"  - File: {output_path.name}")
     print("  - Token expires at the time shown in token_expires_at")
-    print("  - Run './deploy.py credentials' to refresh the token")
+    env_flag = f" --env {cfg.env_suffix}" if cfg.env_suffix else ""
+    print(f"  - Run './deploy.py{env_flag} credentials' to refresh the token")
 
 
 # ============================================================================

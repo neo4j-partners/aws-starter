@@ -1,4 +1,4 @@
-"""LangGraph multi-agent orchestrator graph.
+"""LangGraph multi-agent supervisor graph.
 
 Router classifies the query, then a conditional edge dispatches to one of two
 specialist ReAct agents (maintenance or operations). Both specialists are
@@ -24,8 +24,8 @@ from core.prompts import (
 logger = logging.getLogger(__name__)
 
 
-class OrchestratorState(TypedDict):
-    """State for the orchestrator graph."""
+class SupervisorState(TypedDict):
+    """State for the supervisor graph."""
 
     messages: Annotated[list[BaseMessage], add_messages]
     next_agent: str  # Which agent to route to
@@ -34,7 +34,7 @@ class OrchestratorState(TypedDict):
 def create_router_node(llm):
     """Create the router node that classifies queries."""
 
-    async def router(state: OrchestratorState) -> dict:
+    async def router(state: SupervisorState) -> dict:
         """Route the query to the appropriate specialist."""
         logger.info("[Router] Classifying query...")
 
@@ -72,7 +72,7 @@ def make_specialist_node(name: str, llm, tools: list, prompt: str):
     """
     agent = create_react_agent(llm, tools, prompt=prompt)
 
-    async def specialist_node(state: OrchestratorState) -> dict:
+    async def specialist_node(state: SupervisorState) -> dict:
         logger.info("[%s Agent] Processing query...", name)
         result = await agent.ainvoke({"messages": state["messages"]})
         logger.info("[%s Agent] Done", name)
@@ -81,16 +81,16 @@ def make_specialist_node(name: str, llm, tools: list, prompt: str):
     return specialist_node
 
 
-def route_to_agent(state: OrchestratorState) -> Literal["maintenance", "operations"]:
+def route_to_agent(state: SupervisorState) -> Literal["maintenance", "operations"]:
     """Conditional edge function to route to the correct agent."""
     return state["next_agent"]
 
 
-async def create_orchestrator_graph(llm, tools):
-    """Create the multi-agent orchestrator graph."""
-    logger.info("Creating orchestrator graph...")
+async def create_supervisor_graph(llm, tools):
+    """Create the multi-agent supervisor graph."""
+    logger.info("Creating supervisor graph...")
 
-    graph = StateGraph(OrchestratorState)
+    graph = StateGraph(SupervisorState)
 
     graph.add_node("router", create_router_node(llm))
     graph.add_node(
@@ -114,5 +114,5 @@ async def create_orchestrator_graph(llm, tools):
     memory = MemorySaver()
     compiled = graph.compile(checkpointer=memory)
 
-    logger.info("Orchestrator graph created: Router -> [Maintenance | Operations]")
+    logger.info("Supervisor graph created: Router -> [Maintenance | Operations]")
     return compiled

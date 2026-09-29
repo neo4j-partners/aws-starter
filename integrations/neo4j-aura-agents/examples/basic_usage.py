@@ -7,7 +7,7 @@ This example shows how to:
 3. Process the response
 
 Before running:
-1. Copy .env.example to .env
+1. Copy .env.sample to .env
 2. Fill in your Neo4j Aura API credentials
 3. Run: uv run python examples/basic_usage.py
 """
@@ -41,7 +41,7 @@ def main() -> None:
         print("  - NEO4J_CLIENT_ID")
         print("  - NEO4J_CLIENT_SECRET")
         print("  - NEO4J_AGENT_ENDPOINT")
-        print("\nCopy .env.example to .env and fill in your credentials.")
+        print("\nCopy .env.sample to .env and fill in your credentials.")
         return
 
     # Example question - customize this for your agent

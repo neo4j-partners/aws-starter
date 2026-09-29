@@ -16,13 +16,13 @@ cd "$ROOT_DIR"
 EXCLUDED_PATHS=(
     "docs/slides/archive/"
     "docs/proposals/"
-    "organize.md"
-    "organize-audit-log.md"
     "scripts/check-docs.sh"
 )
 
 # Names retired by the reorganization. Each is a Perl-compatible regular
-# expression. A name joins this list in the phase that removes it.
+# expression, matched case-insensitively. A name joins this list in the phase
+# that removes it. (?-i) makes a name case-sensitive:
+# E2E-TEST-PLAN was the old file name, and e2e-test-plan.md is the current one.
 # data-agent is followed by a lookahead so the real S3 bucket names, such as
 # data-agent-neo4j-euw1, still pass. The Databricks integration has its own
 # neo4j_mcp_agent.py, so only the quickstart module paths are retired.
@@ -41,10 +41,21 @@ RETIRED_NAMES=(
     "orchestrator-(server|invoke)"
     "sec-filings-graphrag-demo"
     "finance-agent"
-    "finance-(server|cli|demo|invoke|traffic)\\b"
+    "finance-(server|cli|demo|invoke|traffic)(?![-\\w])"
     "finance_graph"
-    "(?<![-/\\w])aura-agents\\b"
+    "(?<![-\\w])aura-agents\\b"
     "simple-oauth-(gateway|mcp-server)"
+    "neo4j-agentcore-"
+    "orchestrator"
+    "finance[-_ ]agent"
+    "finance-graph-(load|enrich|analyze)"
+    "simple-neo4j-mcp-server"
+    "databrick(?!s)"
+    "fintech-demo"
+    "(?-i)E2E-TEST-PLAN"
+    "FIX_32"
+    "FINANCE_AGENTCORE"
+    "\\.env\\.example"
 )
 
 # Retired everywhere except the gateway RBAC pattern, which has its own
@@ -56,6 +67,15 @@ RETIRED_OUTSIDE_GATEWAY_PATTERN=(
 GATEWAY_PATTERN_PATHS=(
     "patterns/gateway-rbac-interceptor/"
     "CLAUDE.md"
+)
+
+# Retired everywhere except the end-to-end test plan, whose run history
+# records the old fleet_agent Runtime and the old fleet-agent/ folder.
+RETIRED_OUTSIDE_E2E_HISTORY=(
+    "fleet[-_ ]agent"
+)
+E2E_HISTORY_PATHS=(
+    "demos/aircraft-fleet/docs/e2e-test-plan.md"
 )
 
 RED='\033[0;31m'
@@ -92,27 +112,41 @@ check_links() {
 grep_names() {
     local pattern="$1"
     shift
-    git grep --untracked -n -I -P "$pattern" -- . $(git_pathspec_excludes "$@")
+    git grep --untracked -n -I -i -P "$pattern" -- . $(git_pathspec_excludes "$@")
+}
+
+# Returns 1 when the pattern is found or git grep fails, 0 when it is clean.
+check_pattern() {
+    local rc=0
+    grep_names "$@" || rc=$?
+    case "$rc" in
+        0) return 1 ;;
+        1) return 0 ;;
+        *)
+            echo -e "${RED}git grep failed (exit $rc) on pattern: $1${NC}"
+            return 1
+            ;;
+    esac
 }
 
 check_names() {
     local found=0
     local name
     if [ ${#RETIRED_NAMES[@]} -eq 0 ] \
-        && [ ${#RETIRED_OUTSIDE_GATEWAY_PATTERN[@]} -eq 0 ]; then
+        && [ ${#RETIRED_OUTSIDE_GATEWAY_PATTERN[@]} -eq 0 ] \
+        && [ ${#RETIRED_OUTSIDE_E2E_HISTORY[@]} -eq 0 ]; then
         echo "No retired names are listed yet."
         return 0
     fi
 
     for name in "${RETIRED_NAMES[@]}"; do
-        if grep_names "$name"; then
-            found=1
-        fi
+        check_pattern "$name" || found=1
     done
     for name in "${RETIRED_OUTSIDE_GATEWAY_PATTERN[@]}"; do
-        if grep_names "$name" "${GATEWAY_PATTERN_PATHS[@]}"; then
-            found=1
-        fi
+        check_pattern "$name" "${GATEWAY_PATTERN_PATHS[@]}" || found=1
+    done
+    for name in "${RETIRED_OUTSIDE_E2E_HISTORY[@]}"; do
+        check_pattern "$name" "${E2E_HISTORY_PATHS[@]}" || found=1
     done
 
     if [ "$found" -ne 0 ]; then

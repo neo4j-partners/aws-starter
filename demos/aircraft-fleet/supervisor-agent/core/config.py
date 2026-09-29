@@ -1,4 +1,4 @@
-"""Static configuration for the orchestrator agent.
+"""Static configuration for the supervisor agent.
 
 Read from the environment at import time so a local ``.env`` (loaded by the
 server before this module is imported) or an ``agentcore deploy --env`` value

@@ -22,6 +22,7 @@ from neo4j import Driver, GraphDatabase
 
 # The fraud CSVs live in fraud-amazon-quick/data/, shared with fraud-iceberg/.
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 BATCH_SIZE = 1_000
 
 
@@ -42,12 +43,14 @@ def _arguments() -> argparse.Namespace:
 
 
 def _connection_settings() -> tuple[str, str, str, str]:
-    load_dotenv()
+    load_dotenv(ENV_FILE)
     required = ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD")
     missing = [name for name in required if not os.environ.get(name)]
     if missing:
         joined = ", ".join(missing)
-        raise SystemExit(f"Missing {joined}. Set them in .env or the environment.")
+        raise SystemExit(
+            f"Missing {joined}. Set them in {ENV_FILE} or the environment."
+        )
     return (
         os.environ["NEO4J_URI"],
         os.environ["NEO4J_USERNAME"],

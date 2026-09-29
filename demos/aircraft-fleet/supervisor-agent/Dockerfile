@@ -1,4 +1,4 @@
-# Multi-Agent Orchestrator — Dockerfile for AgentCore Runtime
+# Aircraft Fleet Supervisor Agent — Dockerfile for AgentCore Runtime
 #
 # Build context is the agent root, so the shared `core/` package and the
 # root pyproject.toml/uv.lock are available:

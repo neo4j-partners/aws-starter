@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Neo4j Fleet Agent — terminal client.
+"""Aircraft Fleet GraphRAG Agent — terminal client.
 
 A thin client. It does not build an agent: it sends a prompt to a running
 ``runtime_app.py`` and streams the answer back. ``--remote`` switches the
@@ -29,7 +29,7 @@ DEMO_COUNT = 5
 
 def ask(question: str, target: Target) -> None:
     print("=" * 70)
-    print(f"Neo4j Fleet Agent (Strands) — {target}")
+    print(f"Aircraft Fleet GraphRAG Agent (Strands) — {target}")
     print("=" * 70)
     print(f"Question: {question}")
     print("-" * 70)
@@ -47,7 +47,7 @@ def run_demo(target: Target) -> None:
 
     print()
     print("#" * 76)
-    print("#" + "NEO4J FLEET AGENT DEMO (Strands)".center(74) + "#")
+    print("#" + "AIRCRAFT FLEET GRAPHRAG AGENT DEMO (Strands)".center(74) + "#")
     print("#" * 76)
     for i, question in enumerate(queries, 1):
         print()
@@ -63,7 +63,7 @@ def run_demo(target: Target) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Terminal client for the Neo4j Fleet Agent."
+        description="Terminal client for the Aircraft Fleet GraphRAG Agent."
     )
     parser.add_argument(
         "--remote",

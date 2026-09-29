@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Invoke Multi-Agent Orchestrator - Cloud Load Testing
+Invoke Aircraft Fleet Supervisor Agent - Cloud Load Testing
 
-Invokes the deployed orchestrator agent to test routing between
+Invokes the deployed supervisor agent to test routing between
 Maintenance and Operations specialist agents.
 
 Usage:
@@ -12,7 +12,7 @@ Usage:
     uv run fleet-supervisor-invoke load-test --interval 10  # Custom interval in seconds
 
 Prerequisites:
-    - Orchestrator deployed to AgentCore Runtime (./agent.sh deploy)
+    - Supervisor deployed to AgentCore Runtime (./agent.sh deploy)
     - AWS credentials configured
     - .bedrock_agentcore.yaml exists with agent ARN
 """
@@ -80,7 +80,7 @@ def get_agent_config() -> tuple[str, str]:
 
 def invoke_agent(prompt: str, session_id: str = None) -> dict:
     """
-    Invoke the deployed orchestrator with a prompt.
+    Invoke the deployed supervisor with a prompt.
 
     Args:
         prompt: The user's question
@@ -210,7 +210,7 @@ def run_load_test(interval: int = 5):
     operations_count = sum(1 for q in queries if q[2] == "Operations")
 
     print("=" * 70)
-    print("Multi-Agent Orchestrator - Cloud Load Test")
+    print("Aircraft Fleet Supervisor Agent - Cloud Load Test")
     print("=" * 70)
     print(f"Loaded {len(queries)} queries from queries.txt")
     print(f"  - Maintenance queries: {maintenance_count}")
@@ -291,7 +291,7 @@ def main():
         prompt = "What are the most common maintenance faults?"
 
     print("=" * 70)
-    print("Multi-Agent Orchestrator - Cloud Invocation")
+    print("Aircraft Fleet Supervisor Agent - Cloud Invocation")
     print("=" * 70)
     print("")
     print(f"Prompt: {prompt}")

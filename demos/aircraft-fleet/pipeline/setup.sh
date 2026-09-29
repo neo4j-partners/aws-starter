@@ -43,7 +43,7 @@ else
   # MaintenanceEvents (events only fire once sensor series cross model
   # thresholds, which takes ~45+ days). 20 aircraft x 90 days yields ~111
   # events and keeps readings ~23M — small-tier friendly, and makes the
-  # fleet-agent maintenance queries actually return data.
+  # graphrag-agent maintenance queries actually return data.
   DEFAULT_DAYS=90
 fi
 AIRCRAFT="${GEN_AIRCRAFT:-$DEFAULT_AIRCRAFT}"

@@ -1,4 +1,4 @@
-# Finance data agent
+# Fraud Iceberg loaders
 
 ## Project overview
 
@@ -299,7 +299,8 @@ tables through the SigV4-authenticated S3 Tables Iceberg REST endpoint.
 The copied CSV and JSON source data lives in the shared [data](../data/) folder. The loaders
 normalize `ground_truth.json` into relational tables so its fraud-ring evidence
 is available for SQL joins. The Neo4j-specific source scripts are intentionally
-omitted because this data agent only loads Iceberg.
+omitted because this project only loads Iceberg. [graph-loader](../graph-loader/)
+loads Neo4j.
 
 ## Current guidance
 

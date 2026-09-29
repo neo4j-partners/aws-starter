@@ -1,4 +1,4 @@
-"""Thin clients for the Neo4j fleet agent.
+"""Thin clients for the Aircraft Fleet GraphRAG Agent.
 
 Nothing here builds an agent. ``runtime_app.py`` is the only agent builder;
 everything in this package talks to it over the wire, distinguished only by a

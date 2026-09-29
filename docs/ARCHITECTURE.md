@@ -11,8 +11,8 @@ This document provides a comprehensive architecture overview of the Neo4j MCP ec
    - [CDK Stack Components](#cdk-stack-components)
    - [Authentication Architecture](#authentication-architecture)
 3. [AI Agents Architecture](#ai-agents-architecture)
-   - [Fleet Agent](#fleet-agent)
-   - [Orchestrator Agent (Multi-Agent)](#orchestrator-agent-multi-agent)
+   - [Aircraft Fleet GraphRAG Agent](#aircraft-fleet-graphrag-agent)
+   - [Supervisor Agent (Multi-Agent)](#supervisor-agent-multi-agent)
 4. [End-to-End Request Flow](#end-to-end-request-flow)
 
 ---
@@ -45,8 +45,8 @@ flowchart TB
         end
 
         subgraph Agents["AI Agents"]
-            FLEET[Fleet Agent<br/>Strands, direct driver]
-            ORCH[Orchestrator<br/>Multi-Agent Router]
+            FLEET[GraphRAG Agent<br/>Strands, direct driver]
+            ORCH[Supervisor<br/>Multi-Agent Router]
         end
 
         subgraph Auth["Authentication"]
@@ -369,7 +369,7 @@ sequenceDiagram
 
 Two agent implementations are provided in `demos/aircraft-fleet/`:
 
-### Fleet Agent
+### Aircraft Fleet GraphRAG Agent
 
 A single Strands agent in `graphrag-agent/` that answers questions over the aircraft graph. It connects to Neo4j directly with the Neo4j Python driver. It does not use the MCP server or the AgentCore Gateway.
 
@@ -379,7 +379,7 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph FleetAgent["Fleet Agent (runtime_app.py)"]
+    subgraph GraphRAGAgent["GraphRAG Agent (runtime_app.py)"]
         LLM[Claude Sonnet 4.5<br/>via Bedrock]
         AGENT[Strands Agent<br/>schema in system prompt]
         GQ[graph_query_tool<br/>Text2Cypher]
@@ -426,7 +426,7 @@ uv run fleet-cli "How many aircraft are in the database?"
 
 The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` from the shared `.env` at the `aircraft-fleet` root. See [graphrag-agent/README.md](../demos/aircraft-fleet/graphrag-agent/README.md) for the full command list.
 
-### Orchestrator Agent (Multi-Agent)
+### Supervisor Agent (Multi-Agent)
 
 A supervisor agent that routes queries to specialized domain experts using LangGraph StateGraph.
 
@@ -436,7 +436,7 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph Orchestrator["Orchestrator Agent"]
+    subgraph Supervisor["Supervisor Agent"]
         ROUTER[Router Node<br/>Query Classification]
 
         subgraph Workers["Specialist Workers"]
@@ -504,7 +504,7 @@ stateDiagram-v2
 
 ```mermaid
 flowchart LR
-    subgraph State["OrchestratorState"]
+    subgraph State["SupervisorState"]
         MSG[messages: list]
         NEXT[next_agent: str]
     end
@@ -533,7 +533,7 @@ flowchart LR
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Orchestrator | LangGraph `StateGraph` | Multi-agent coordination |
+| Supervisor | LangGraph `StateGraph` | Multi-agent coordination |
 | Router | Claude LLM + Classification Prompt | Query routing |
 | Workers | LangGraph `create_react_agent` | Domain-specific ReAct agents |
 | State | `TypedDict` with `add_messages` | Conversation history |
@@ -559,7 +559,7 @@ Complete flow from user query to Neo4j response:
 ```mermaid
 sequenceDiagram
     participant User
-    participant Agent as Orchestrator Agent
+    participant Agent as Supervisor Agent
     participant Router
     participant Worker as Specialist Agent
     participant LLM as Claude Sonnet

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Multi-Agent Orchestrator — AgentCore Runtime deployment.
+"""Aircraft Fleet Supervisor Agent — AgentCore Runtime deployment.
 
 A supervisor agent that classifies an incoming query and routes it to a
 specialized worker:
@@ -31,7 +31,7 @@ from langchain_core.messages import HumanMessage
 
 from core import AWS_REGION, MODEL_ID, get_active_credentials
 from core.factory import get_llm, get_mcp_tools
-from core.graph import create_orchestrator_graph
+from core.graph import create_supervisor_graph
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,7 +65,7 @@ def extract_prompt_from_payload(payload: dict) -> tuple[str | None, str, str]:
 async def invoke(payload: dict = None):
     """AgentCore Runtime handler — routes to Maintenance or Operations."""
     logger.info(
-        "[Orchestrator] Received request: %s",
+        "[Supervisor] Received request: %s",
         list(payload.keys()) if payload else [],
     )
 
@@ -79,7 +79,7 @@ async def invoke(payload: dict = None):
         yield {"type": "error", "error": "No prompt provided. Include 'prompt' in request."}
         return
 
-    logger.info("[Orchestrator] Query: %s...", prompt[:100])
+    logger.info("[Supervisor] Query: %s...", prompt[:100])
 
     try:
         credentials = get_active_credentials()
@@ -88,14 +88,14 @@ async def invoke(payload: dict = None):
         access_token = credentials["access_token"]
         region = credentials.get("region", AWS_REGION)
 
-        logger.info("[Orchestrator] Gateway: %s", gateway_url)
+        logger.info("[Supervisor] Gateway: %s", gateway_url)
 
         llm = get_llm(region)
         tools = await get_mcp_tools(gateway_url, access_token)
 
-        graph = await create_orchestrator_graph(llm, tools)
+        graph = await create_supervisor_graph(llm, tools)
 
-        logger.info("[Orchestrator] Running multi-agent graph...")
+        logger.info("[Supervisor] Running multi-agent graph...")
         config = {"configurable": {"thread_id": session_id}}
 
         result = await graph.ainvoke(
@@ -110,9 +110,9 @@ async def invoke(payload: dict = None):
                 response_text = last_msg.content
 
         if not response_text:
-            response_text = "No response from orchestrator"
+            response_text = "No response from supervisor"
 
-        logger.info("[Orchestrator] Request completed successfully")
+        logger.info("[Supervisor] Request completed successfully")
 
         yield {"type": "chunk", "data": response_text}
         yield {"type": "complete"}
@@ -130,7 +130,7 @@ async def invoke(payload: dict = None):
 
 def main():
     """Console-script entry point (``fleet-supervisor-server``)."""
-    logger.info("Starting Multi-Agent Orchestrator with model: %s", MODEL_ID)
+    logger.info("Starting Aircraft Fleet Supervisor Agent with model: %s", MODEL_ID)
     app.run()
 
 

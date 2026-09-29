@@ -43,7 +43,7 @@ _SCOPE_ID_RE = re.compile(r"[^A-Za-z0-9._:@-]")
 def _log_startup(port: int, *, local: bool) -> None:
     """Log enough status to confirm the runtime is ready without exposing secrets."""
     logger.info(
-        "Finance server starting | port=%s mode=%s model=%s NAMS_API_key=%s",
+        "Fraud Memory Agent server starting | port=%s mode=%s model=%s NAMS_API_key=%s",
         port,
         "local" if local else "agentcore",
         MODEL_ID,
@@ -90,7 +90,7 @@ def _memory_system_prompt(user_id: str, session_id: str) -> str:
 
 @app.entrypoint
 async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
-    """Process a finance query and capture its messages and tool use in NAMS."""
+    """Process a fraud query and capture its messages and tool use in NAMS."""
     payload = payload or {}
     prompt = (
         payload.get("prompt")

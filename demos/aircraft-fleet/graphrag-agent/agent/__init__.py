@@ -1,4 +1,4 @@
-"""Shared building blocks for the Neo4j fleet agent.
+"""Shared building blocks for the Aircraft Fleet GraphRAG Agent.
 
 The runtime entrypoint (``runtime_app.py``) and the Strands tool wrappers
 (``agent.tools``) import from here:

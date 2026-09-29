@@ -186,7 +186,6 @@ logs/
 .env
 .env.*
 !.env.sample
-!.env.example
 .envrc
 .inference-profile*.env
 

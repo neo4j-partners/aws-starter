@@ -1,4 +1,4 @@
-# FIX_32: Lambda Interceptor 500 Errors — Root Cause and Resolution
+# Lambda Interceptor 500 Errors — Root Cause and Resolution
 
 ## Status: RESOLVED
 

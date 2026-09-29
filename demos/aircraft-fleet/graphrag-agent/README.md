@@ -1,4 +1,4 @@
-# Fleet Agent
+# Aircraft Fleet GraphRAG Agent
 
 An aviation fleet carries two kinds of knowledge that rarely sit together.
 One is structured: which aircraft exist, what parts they carry, which flights
@@ -45,7 +45,7 @@ retriever over maintenance-manual chunks for topical ones. A packaged
                       v
   +-------------------------------------------+        +---------------------------+
   |  AgentCore Runtime                        |        |  Amazon Bedrock           |
-  |  Fleet Agent (runtime_app.py)             | -----> |  Claude (LLM, Text2Cypher)|
+  |  GraphRAG Agent (runtime_app.py)          | -----> |  Claude (LLM, Text2Cypher)|
   |  Strands ReAct                            | <----- |  Titan (embeddings)       |
   +-------------------------------------------+        +---------------------------+
             |                          |

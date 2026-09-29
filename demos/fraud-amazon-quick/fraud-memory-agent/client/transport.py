@@ -86,27 +86,27 @@ def _deployed_settings(
         read_timeout
         if read_timeout is not None
         else _positive_setting(
-            "FINANCE_AGENTCORE_READ_TIMEOUT", DEFAULT_DEPLOYED_READ_TIMEOUT
+            "FRAUD_AGENTCORE_READ_TIMEOUT", DEFAULT_DEPLOYED_READ_TIMEOUT
         )
     )
     resolved_connect_timeout = (
         connect_timeout
         if connect_timeout is not None
         else _positive_setting(
-            "FINANCE_AGENTCORE_CONNECT_TIMEOUT", DEFAULT_DEPLOYED_CONNECT_TIMEOUT
+            "FRAUD_AGENTCORE_CONNECT_TIMEOUT", DEFAULT_DEPLOYED_CONNECT_TIMEOUT
         )
     )
     resolved_max_attempts = (
         max_attempts
         if max_attempts is not None
         else _positive_setting(
-            "FINANCE_AGENTCORE_MAX_ATTEMPTS",
+            "FRAUD_AGENTCORE_MAX_ATTEMPTS",
             DEFAULT_DEPLOYED_MAX_ATTEMPTS,
             as_int=True,
         )
     )
     max_pool_connections = _positive_setting(
-        "FINANCE_AGENTCORE_MAX_POOL_CONNECTIONS",
+        "FRAUD_AGENTCORE_MAX_POOL_CONNECTIONS",
         DEFAULT_DEPLOYED_MAX_POOL_CONNECTIONS,
         as_int=True,
     )

@@ -63,7 +63,7 @@ def run_load_test(interval: int = 5) -> None:
         sys.exit(1)
 
     print("=" * 70)
-    print("Neo4j Fleet Agent - Load Test Mode")
+    print("Aircraft Fleet GraphRAG Agent - Load Test Mode")
     print("=" * 70)
     print(f"Loaded {len(queries)} queries from queries.txt")
     print(f"Running a random query every {interval} seconds...")
@@ -124,7 +124,7 @@ def main() -> None:
         prompt = "How many aircraft are in the database?"
 
     print("=" * 70)
-    print("Neo4j Fleet Agent - Programmatic Invocation (deployed)")
+    print("Aircraft Fleet GraphRAG Agent - Programmatic Invocation (deployed)")
     print("=" * 70)
     print("")
     print(f"Prompt: {prompt}")

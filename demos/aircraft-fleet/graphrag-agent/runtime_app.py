@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Neo4j Fleet Agent (Strands) — AgentCore Runtime.
+"""Aircraft Fleet GraphRAG Agent (Strands) — AgentCore Runtime.
 
 A Strands-native agent that connects **directly to Neo4j** (no MCP server, no
 AgentCore Gateway). Two ``neo4j-graphrag`` retrievers are exposed as Strands
@@ -266,7 +266,7 @@ def main() -> None:
     """
     port = int(os.environ.get("AGENT_PORT", "7070"))
     logger.info(
-        "Starting Neo4j Fleet Agent with model: %s on port %s",
+        "Starting Aircraft Fleet GraphRAG Agent with model: %s on port %s",
         settings.model_id,
         port,
     )
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     # (fleet-server, 7070).
     port = int(os.environ.get("AGENT_PORT", "8080"))
     logger.info(
-        "Starting Neo4j Fleet Agent with model: %s on port %s",
+        "Starting Aircraft Fleet GraphRAG Agent with model: %s on port %s",
         settings.model_id,
         port,
     )

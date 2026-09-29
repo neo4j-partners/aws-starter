@@ -23,7 +23,7 @@ agent investigates it as a Neo4j graph. Amazon Quick presents the results.
 
 ```bash
 cd graph-loader
-cp .env.example .env       # set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD
+cp .env.sample .env       # set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD
 uv sync
 uv run fraud-graph-load
 ```
@@ -63,7 +63,7 @@ cp .env.sample .env.finance  # set the same NEO4J_URI / NEO4J_USERNAME / NEO4J_P
 
 ```bash
 cd ../demos/fraud-amazon-quick/fraud-memory-agent
-cp .env.example .env         # set MEMORY_API_KEY=nams_...
+cp .env.sample .env         # set MEMORY_API_KEY=nams_...
 uv sync
 uv run fraud-server        # Terminal 1
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Terminal 2

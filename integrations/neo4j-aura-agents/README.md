@@ -67,7 +67,7 @@ uv sync
 
 1. Copy the example environment file:
    ```bash
-   cp .env.example .env
+   cp .env.sample .env
    ```
 
 2. Edit `.env` with your credentials:

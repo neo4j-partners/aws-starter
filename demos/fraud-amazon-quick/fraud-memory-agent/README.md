@@ -81,7 +81,7 @@ the agent and contains the Gateway OAuth client secret, so keep it untracked.
 ## Local run
 
 ```bash
-cp .env.example .env
+cp .env.sample .env
 # Set MEMORY_API_KEY=nams_... in .env
 uv sync
 

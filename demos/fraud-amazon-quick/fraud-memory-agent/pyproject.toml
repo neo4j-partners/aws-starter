@@ -1,7 +1,7 @@
 [project]
 name = "fraud-memory-agent"
 version = "0.1.0"
-description = "Finance ReAct agent (Strands) for Neo4j MCP via AgentCore Gateway over a shared core/ package"
+description = "Fraud Memory Agent (Strands) for Neo4j MCP via AgentCore Gateway over a shared core/ package"
 requires-python = ">=3.10"
 dependencies = [
     # Shared core

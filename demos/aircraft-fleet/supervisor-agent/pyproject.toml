@@ -1,7 +1,7 @@
 [project]
 name = "aircraft-fleet-supervisor-agent"
 version = "0.1.0"
-description = "Multi-agent orchestrator for Neo4j MCP server with Maintenance and Operations specialists"
+description = "Multi-agent supervisor for Neo4j MCP server with Maintenance and Operations specialists"
 requires-python = ">=3.10"
 dependencies = [
     "bedrock-agentcore",

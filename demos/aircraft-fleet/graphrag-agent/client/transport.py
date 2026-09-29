@@ -29,7 +29,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
-# fleet-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
+# graphrag-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
 # default local URL both anchor here regardless of the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_URL = "http://localhost:7070/invocations"

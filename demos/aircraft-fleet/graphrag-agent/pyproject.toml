@@ -1,7 +1,7 @@
 [project]
 name = "aircraft-fleet-graphrag-agent"
 version = "0.1.0"
-description = "Neo4j fleet agent — Strands, direct-to-Neo4j GraphRAG over an agent/ core"
+description = "Aircraft Fleet GraphRAG Agent — Strands, direct-to-Neo4j GraphRAG over an agent/ core"
 requires-python = ">=3.10"
 dependencies = [
     # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)

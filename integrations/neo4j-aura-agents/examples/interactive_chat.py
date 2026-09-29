@@ -7,7 +7,7 @@ This example shows how to:
 3. Gracefully handle errors
 
 Before running:
-1. Copy .env.example to .env
+1. Copy .env.sample to .env
 2. Fill in your Neo4j Aura API credentials
 3. Run: uv run python examples/interactive_chat.py
 """
@@ -38,7 +38,7 @@ def main() -> None:
         print(f"Connected to: {client.endpoint_url[:50]}...")
     except ValueError as e:
         print(f"\nError: {e}")
-        print("Copy .env.example to .env and fill in your credentials.")
+        print("Copy .env.sample to .env and fill in your credentials.")
         return
 
     debug_mode = False

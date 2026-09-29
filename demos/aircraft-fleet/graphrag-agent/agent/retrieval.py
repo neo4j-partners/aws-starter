@@ -41,7 +41,7 @@ def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         raise RuntimeError(
-            f"{name} is not set. The fleet agent connects directly to Neo4j; "
+            f"{name} is not set. The GraphRAG agent connects directly to Neo4j; "
             f"set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD (e.g. in the "
             f"shared aircraft-fleet root .env for local runs, or as Runtime "
             f"env vars when deployed)."

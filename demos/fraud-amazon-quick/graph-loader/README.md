@@ -2,8 +2,8 @@
 
 This project loads the committed synthetic fraud dataset into Neo4j. The
 dataset lives in [../data/](../data/) and was copied from
-`graph-on-databricks/finance-genie`. It is the graph described by the Finance
-Agent prompt:
+`graph-on-databricks/finance-genie`. It is the graph described by the Fraud
+Memory Agent prompt:
 
 - 25,000 `:Account` nodes and 7,500 `:Merchant` nodes
 - 250,000 `:TRANSACTED_WITH` relationships
@@ -28,7 +28,7 @@ MCP server. It does not run as part of the agent runtime.
 
 ```bash
 cd demos/fraud-amazon-quick/graph-loader
-cp .env.example .env
+cp .env.sample .env
 # Add NEO4J_* values for the database exposed by your MCP server.
 uv sync
 

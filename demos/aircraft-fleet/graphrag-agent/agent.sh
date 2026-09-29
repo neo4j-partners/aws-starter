@@ -1,5 +1,5 @@
 #!/bin/bash
-# Neo4j Fleet Agent - AgentCore deployment helper
+# Aircraft Fleet GraphRAG Agent - AgentCore deployment helper
 #
 # A Strands ReAct agent that connects directly to Neo4j (no MCP server, no
 # Gateway) and answers natural language questions using AWS Bedrock Claude +
@@ -46,7 +46,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_usage() {
-    echo "Neo4j Fleet Agent - AgentCore deployment helper"
+    echo "Aircraft Fleet GraphRAG Agent - AgentCore deployment helper"
     echo ""
     echo "Run the agent locally without this script:"
     echo "  Terminal 1:  uv run fleet-server           # Ctrl+C to stop"

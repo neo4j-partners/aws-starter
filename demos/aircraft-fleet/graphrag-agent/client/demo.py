@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fleet Agent functionality showcase — console demo.
+"""GraphRAG Agent functionality showcase — console demo.
 
 Walks the agent's full surface area, section by section, in plain English:
 
@@ -159,7 +159,7 @@ def section_agent() -> None:
 def main() -> None:
     global TARGET
     parser = argparse.ArgumentParser(
-        description="Fleet Agent functionality showcase."
+        description="GraphRAG Agent functionality showcase."
     )
     parser.add_argument(
         "--remote",
@@ -178,7 +178,7 @@ def main() -> None:
     )
     print()
     print("#" * WIDTH)
-    print("#" + "FLEET AGENT — FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
+    print("#" + "AIRCRAFT FLEET GRAPHRAG AGENT — FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
     print("#" + mode_line.center(WIDTH - 2) + "#")
     print("#" * WIDTH)
 

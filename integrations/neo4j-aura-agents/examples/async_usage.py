@@ -7,7 +7,7 @@ This example shows how to:
 3. Handle async context properly
 
 Before running:
-1. Copy .env.example to .env
+1. Copy .env.sample to .env
 2. Fill in your Neo4j Aura API credentials
 3. Run: uv run python examples/async_usage.py
 """
@@ -42,7 +42,7 @@ async def main() -> None:
         client = AuraAgentClient.from_env()
     except ValueError as e:
         print(f"\nError: {e}")
-        print("Copy .env.example to .env and fill in your credentials.")
+        print("Copy .env.sample to .env and fill in your credentials.")
         return
 
     # Example questions - customize for your agent

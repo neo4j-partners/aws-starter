@@ -1,13 +1,13 @@
 #!/bin/bash
-# Multi-Agent Orchestrator - AgentCore Runtime
+# Aircraft Fleet Supervisor Agent - AgentCore Runtime
 #
 # A supervisor agent that routes queries to specialized workers:
 # - Maintenance Agent: reliability, faults, components, sensors
 # - Operations Agent: flights, delays, routes, airports
 #
 # Usage:
-#   ./agent.sh start              Start orchestrator locally (port 8080)
-#   ./agent.sh test               Test local orchestrator
+#   ./agent.sh start              Start supervisor locally (port 8080)
+#   ./agent.sh test               Test local supervisor
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
@@ -37,14 +37,14 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 print_usage() {
-    echo "Multi-Agent Orchestrator - AgentCore Runtime"
+    echo "Aircraft Fleet Supervisor Agent - AgentCore Runtime"
     echo ""
     echo "Routes queries to Maintenance and Operations specialist agents."
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh start              Start orchestrator locally (port 8080)"
-    echo "  ./agent.sh stop               Stop local orchestrator"
-    echo "  ./agent.sh test               Test local orchestrator"
+    echo "  ./agent.sh start              Start supervisor locally (port 8080)"
+    echo "  ./agent.sh stop               Stop local supervisor"
+    echo "  ./agent.sh test               Test local supervisor"
     echo "  ./agent.sh test-maintenance   Test with maintenance query"
     echo "  ./agent.sh test-operations    Test with operations query"
     echo "  ./agent.sh configure          Configure for AWS deployment"
@@ -76,8 +76,8 @@ ensure_credentials() {
     if [ ! -f ".mcp-credentials.json" ]; then
         echo -e "${RED}ERROR: .mcp-credentials.json not found${NC}"
         echo ""
-        echo "Copy credentials from fleet-agent or MCP server deployment:"
-        echo "  cp ../fleet-agent/.mcp-credentials.json ."
+        echo "Copy it from the MCP server deployment:"
+        echo "  cp ../../../neo4j-mcp-server/.mcp-credentials.fleet.json .mcp-credentials.json"
         exit 1
     fi
 }
@@ -86,7 +86,7 @@ case "${1:-help}" in
     start)
         ensure_deps
         ensure_credentials
-        echo -e "${GREEN}Starting Multi-Agent Orchestrator on port 8080...${NC}"
+        echo -e "${GREEN}Starting Aircraft Fleet Supervisor Agent on port 8080...${NC}"
         echo -e "${BLUE}Agents: Maintenance (faults/components) + Operations (flights/delays)${NC}"
         echo ""
         echo "Test with:"
@@ -97,13 +97,13 @@ case "${1:-help}" in
         ;;
 
     stop)
-        echo -e "${YELLOW}Stopping local orchestrator...${NC}"
-        pkill -f "$ENTRYPOINT" 2>/dev/null || echo "No orchestrator process found"
+        echo -e "${YELLOW}Stopping local supervisor...${NC}"
+        pkill -f "$ENTRYPOINT" 2>/dev/null || echo "No supervisor process found"
         echo -e "${GREEN}Stopped.${NC}"
         ;;
 
     test)
-        echo -e "${GREEN}Testing orchestrator with general query...${NC}"
+        echo -e "${GREEN}Testing supervisor with general query...${NC}"
         echo ""
         curl -s -X POST http://localhost:8080/invocations \
             -H "Content-Type: application/json" \
@@ -130,7 +130,7 @@ case "${1:-help}" in
 
     configure)
         ensure_deps
-        echo -e "${GREEN}Configuring orchestrator for AWS deployment...${NC}"
+        echo -e "${GREEN}Configuring supervisor for AWS deployment...${NC}"
         echo ""
         uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" -r "$REGION"
         echo ""
@@ -140,7 +140,7 @@ case "${1:-help}" in
 
     deploy)
         ensure_deps
-        echo -e "${GREEN}Deploying Multi-Agent Orchestrator to AgentCore Runtime...${NC}"
+        echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
         uv run agentcore deploy
@@ -165,7 +165,7 @@ case "${1:-help}" in
         else
             PROMPT="$2"
         fi
-        echo -e "${GREEN}Invoking deployed orchestrator...${NC}"
+        echo -e "${GREEN}Invoking deployed supervisor...${NC}"
         echo -e "${BLUE}Prompt: $PROMPT${NC}"
         echo ""
         uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
@@ -185,7 +185,7 @@ case "${1:-help}" in
 
     destroy)
         ensure_deps
-        echo -e "${YELLOW}Removing orchestrator from AgentCore Runtime...${NC}"
+        echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
         uv run agentcore destroy
         echo ""

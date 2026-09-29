@@ -1,4 +1,4 @@
-# Neo4j Fleet Agent (Strands) — Dockerfile for AgentCore Runtime
+# Aircraft Fleet GraphRAG Agent (Strands) — Dockerfile for AgentCore Runtime
 #
 # Build context is the agent root, so the `agent/` core package and the
 # root pyproject.toml/uv.lock are available. The `client/` package is

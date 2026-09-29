@@ -1,4 +1,4 @@
-# Multi-Agent Orchestrator
+# Aircraft Fleet Supervisor Agent
 
 A supervisor agent that classifies an incoming query and routes it to a
 specialized worker, using LangGraph's Supervisor pattern. Workers query the
@@ -10,7 +10,7 @@ agents. This agent is the reference for multi-agent routing and observability.
 ```
                         User query
                             |
-                  Orchestrator (Supervisor)
+                        Supervisor
                    classifies, then routes
                             |
               +-------------+-------------+

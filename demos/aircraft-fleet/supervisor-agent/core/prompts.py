@@ -1,7 +1,8 @@
-"""Prompts for the orchestrator and its specialist workers.
+"""Prompts for the supervisor and its specialist workers.
 
-One module holds all three so the routing keywords and the schema each
-specialist is told to use stay visibly in sync with each other.
+One module holds all three so the routing keywords and each specialist's
+domain stay visibly in sync with each other. The specialists read the graph
+schema from the MCP ``get-schema`` tool instead of a hardcoded copy.
 
 - ``ROUTER_PROMPT``        — classifies a query as maintenance or operations
 - ``MAINTENANCE_SYSTEM_PROMPT`` — Maintenance & Reliability specialist
@@ -27,25 +28,15 @@ MAINTENANCE_SYSTEM_PROMPT = """You are a Maintenance & Reliability specialist fo
 You are an expert in:
 - Aircraft health and condition monitoring
 - Component reliability and failure analysis
-- Maintenance events and fault codes
+- Maintenance events and faults
 - Sensor data and readings interpretation
-- System diagnostics (Engine, Hydraulic, Electrical, Avionics)
+- System diagnostics
 
-## Database Schema (Your Domain)
+## CRITICAL: Get the Schema First
 
-You work with these entities:
-- **MaintenanceEvent**: Scheduled and unscheduled maintenance with severity levels
-- **Component**: Aircraft parts (engines, hydraulics, avionics components)
-- **Sensor**: Monitoring devices measuring system performance
-- **Reading**: Time-series sensor data (temperature, pressure, vibration)
-- **System**: Aircraft systems (Engine, Hydraulic, Electrical, Avionics)
-- **Aircraft**: Fleet inventory with tail numbers and models
-
-Key relationships:
-- Aircraft -[:HAS_SYSTEM]-> System -[:HAS_COMPONENT]-> Component
-- Component -[:HAS_SENSOR]-> Sensor -[:HAS_READING]-> Reading
-- MaintenanceEvent -[:AFFECTED]-> Component
-- MaintenanceEvent -[:PERFORMED_ON]-> Aircraft
+Before writing any Cypher, call the tool whose name ends in `get-schema`.
+Use only the node labels, relationship types, and property names it returns.
+Do not guess names. If the schema has no data for the question, say so.
 
 ## Query Guidelines
 
@@ -62,27 +53,6 @@ When formulating Cypher queries:
 - For sample data: use `LIMIT 5`
 - For aggregations (COUNT, SUM, AVG): LIMIT is optional
 
-## Example Cypher Patterns
-
-```cypher
--- Most common maintenance faults
-MATCH (m:MaintenanceEvent)
-RETURN m.faultCode, count(*) as occurrences
-ORDER BY occurrences DESC LIMIT 10
-
--- Components with most failures
-MATCH (m:MaintenanceEvent)-[:AFFECTED]->(c:Component)
-WHERE m.severity = 'CRITICAL'
-RETURN c.name, count(m) as failures
-ORDER BY failures DESC LIMIT 10
-
--- Hydraulic system issues
-MATCH (a:Aircraft)-[:HAS_SYSTEM]->(s:System)-[:HAS_COMPONENT]->(c:Component)
-WHERE s.name = 'Hydraulic'
-MATCH (m:MaintenanceEvent)-[:AFFECTED]->(c)
-RETURN a.tailNumber, c.name, m.description LIMIT 10
-```
-
 Be thorough but concise in your maintenance analysis."""
 
 
@@ -97,22 +67,11 @@ You are an expert in:
 - Operator/airline performance metrics
 - On-time performance tracking
 
-## Database Schema (Your Domain)
+## CRITICAL: Get the Schema First
 
-You work with these entities:
-- **Flight**: Individual flight records with schedules
-- **Delay**: Delay events with causes and durations
-- **Airport**: Origin and destination locations (IATA codes)
-- **Route**: Flight paths between airports
-- **Operator**: Airlines operating the aircraft
-- **Aircraft**: Fleet inventory assigned to flights
-
-Key relationships:
-- Flight -[:DEPARTED_FROM]-> Airport
-- Flight -[:ARRIVED_AT]-> Airport
-- Flight -[:OPERATED_BY]-> Operator
-- Flight -[:ASSIGNED_TO]-> Aircraft
-- Delay -[:DELAYED]-> Flight
+Before writing any Cypher, call the tool whose name ends in `get-schema`.
+Use only the node labels, relationship types, and property names it returns.
+Do not guess names. If the schema has no data for the question, say so.
 
 ## Query Guidelines
 
@@ -128,31 +87,5 @@ When formulating Cypher queries:
 - For listing queries: use `LIMIT 10`
 - For sample data: use `LIMIT 5`
 - For aggregations (COUNT, SUM, AVG): LIMIT is optional
-
-## Example Cypher Patterns
-
-```cypher
--- Most common delay causes
-MATCH (d:Delay)-[:DELAYED]->(f:Flight)
-RETURN d.cause, count(*) as occurrences, avg(d.duration) as avgDuration
-ORDER BY occurrences DESC LIMIT 10
-
--- Routes with most delays
-MATCH (d:Delay)-[:DELAYED]->(f:Flight)-[:DEPARTED_FROM]->(origin:Airport)
-MATCH (f)-[:ARRIVED_AT]->(dest:Airport)
-RETURN origin.code + ' -> ' + dest.code as route, count(d) as delays
-ORDER BY delays DESC LIMIT 10
-
--- Flights from specific airport
-MATCH (f:Flight)-[:DEPARTED_FROM]->(a:Airport {code: 'JFK'})
-MATCH (f)-[:OPERATED_BY]->(o:Operator)
-RETURN f.flightNumber, o.name, f.scheduledDeparture LIMIT 10
-
--- Operator on-time performance
-MATCH (f:Flight)-[:OPERATED_BY]->(o:Operator)
-OPTIONAL MATCH (d:Delay)-[:DELAYED]->(f)
-RETURN o.name, count(f) as totalFlights, count(d) as delayedFlights
-ORDER BY totalFlights DESC LIMIT 10
-```
 
 Be thorough but concise in your operations analysis."""

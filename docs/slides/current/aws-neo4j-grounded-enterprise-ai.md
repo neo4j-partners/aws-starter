@@ -618,7 +618,7 @@ Agent C → open account balance
 
 ## Example: The Finance Agent remembers across sessions
 
-`neo4j-agentcore-agents/finance-agent` adds four Strands tools: `search_context`, `add_memory`, `get_user_preferences`, and `get_entity_graph`.
+`demos/fraud-amazon-quick/fraud-memory-agent` adds four Strands tools: `search_context`, `add_memory`, `get_user_preferences`, and `get_entity_graph`.
 
 1. **Cold start:** A new user asks what the agent remembers; the agent reports nothing.
 2. **Teach:** The user states a durable portfolio or risk preference; the agent stores it with `add_memory`.
@@ -627,7 +627,7 @@ Agent C → open account balance
 
 <div class="callout"><strong>One graph stack:</strong> The memory wrapper uses the library's user-scoped core API against the same Neo4j instance as the finance graph. Domain graph tools remain behind AgentCore Gateway and MCP.</div>
 
-<!-- Sources: neo4j-agentcore-agents/finance-agent/README.md and neo4j-agentcore-agents/finance-agent/core/memory.py -->
+<!-- Sources: demos/fraud-amazon-quick/fraud-memory-agent/README.md and demos/fraud-amazon-quick/fraud-memory-agent/server/runtime_app.py -->
 
 ---
 

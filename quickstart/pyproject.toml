@@ -1,0 +1,25 @@
+[project]
+name = "neo4j-mcp-quickstart"
+version = "0.1.0"
+description = "LangGraph ReAct agent for Neo4j MCP server via AgentCore Gateway"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain>=1.2.0",
+    "langgraph>=1.0.6",
+    "langchain-aws>=1.2.1",
+    "langchain-mcp-adapters>=0.2.0",
+    "httpx>=0.28.0",
+    "boto3>=1.42.0",
+    "mcp>=1.25.0",
+]
+
+[project.optional-dependencies]
+# Minimal dependencies for testing just the LangGraph agent
+minimal = [
+    "langgraph>=1.0.6",
+    "langchain-aws>=1.2.1",
+]
+# Only tests/test_fastmcp.py needs the FastMCP client.
+test = [
+    "fastmcp>=2.14.3",
+]

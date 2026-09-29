@@ -17,7 +17,7 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams and com
 ### Neo4j MCP Server Deployment
 
 ```bash
-cd neo4j-agentcore-mcp-server
+cd neo4j-mcp-server
 
 ./deploy.py                  # Full deployment (build, push, CDK stack)
 ./deploy.py credentials      # Generate .mcp-credentials.json (required after deploy)
@@ -32,19 +32,26 @@ cd neo4j-agentcore-mcp-server
 ./cloud-http.sh              # Test direct Runtime (debugging)
 ./local.sh start             # Start local Docker server (no auth)
 ./local.sh test              # Test local server
+
+# Named deployments: --env NAME reads .env.NAME, writes .mcp-credentials.NAME.json
+./deploy.py --env fleet     # Aircraft fleet graph (supervisor-agent)
+./deploy.py --env finance   # Fraud graph (fraud-memory-agent)
+
+# Copy each deployment's credentials to the samples that use it
+../scripts/sync-credentials.sh
 ```
 
-### LangGraph Agent (Standalone)
+### Quickstart: LangGraph Agent (Standalone)
 
 ```bash
-cd neo4j-agentcore-agents/langgraph-mcp-agent
+cd quickstart
 
 # Copy credentials from MCP server deployment
-cp ../../neo4j-agentcore-mcp-server/.mcp-credentials.json .
+cp ../neo4j-mcp-server/.mcp-credentials.json .
 
 uv sync                      # Install dependencies
 ./agent.sh "query"           # Run production agent (auto-refresh OAuth2)
-uv run python -m neo4j_mcp_agent.simple_agent "query"  # Simple agent (static token)
+uv run python -m neo4j_mcp_quickstart.simple_agent "query"  # Simple agent (static token)
 
 # SageMaker Unified Studio inference profiles
 ./inference-profiles/setup-inference-profile.sh haiku     # Create haiku profile
@@ -53,45 +60,24 @@ uv run python -m neo4j_mcp_agent.simple_agent "query"  # Simple agent (static to
 ./inference-profiles/setup-inference-profile.sh --test haiku  # Create and test
 ```
 
-### AgentCore Agents (Cloud Deployment)
+### Aircraft Fleet Demo
+
+End-to-end GraphRAG demo. The pipeline populates Neo4j. The GraphRAG agent
+answers questions over it with a direct Neo4j driver, with no MCP and no
+Gateway. The supervisor agent queries the same graph through the MCP Gateway.
+Point everything at the same Neo4j instance with a matching embedder.
 
 ```bash
-cd neo4j-agentcore-agents
-
-# Finance Agent: Strands agent over its own common/ core. agent.sh,
-# runtime_app.py, and Dockerfile live at the agent root.
-cd finance-agent
-uv sync
-./agent.sh start
-# (start/test/configure/deploy/status/invoke-cloud/destroy)
-
-# Orchestrator Agent (multi-agent with routing)
-cd ../orchestrator-agent
-./agent.sh start
-./agent.sh test-maintenance  # Test routing to Maintenance Agent
-./agent.sh test-operations   # Test routing to Operations Agent
-./agent.sh deploy
-./agent.sh load-test         # Continuous cloud testing
-```
-
-### Fleet Agent Demo
-
-End-to-end GraphRAG demo. The pipeline populates Neo4j; the agent answers
-questions over it via a direct Neo4j driver (no MCP, no Gateway). Point both
-at the same Neo4j instance with a matching embedder.
-
-```bash
-cd fleet-agent-demo
+cd demos/aircraft-fleet
+cp .env.sample .env              # shared by pipeline/ and graphrag-agent/
 
 # Step 1: populate the graph
 cd pipeline
-cp .env.sample .env              # set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD
 uv sync
 ./setup.sh                       # five-stage ingest (LOAD_FULL_DATASET=true for full)
 
-# Step 2: run the agent locally (same NEO4J_* values)
-cd ../agent
-cp .env.sample .env
+# Step 2: run the GraphRAG agent locally
+cd ../graphrag-agent
 uv sync
 uv run fleet-server              # Terminal 1 (port 7070)
 uv run fleet-cli "How many aircraft are in the database?"   # Terminal 2
@@ -101,28 +87,57 @@ uv run fleet-demo
 ./agent.sh configure
 ./agent.sh deploy
 ./agent.sh invoke-cloud "query"
+
+# Step 4: supervisor agent over the MCP Gateway (needs ./deploy.py --env fleet)
+cd ../supervisor-agent
+./agent.sh start
+./agent.sh test-maintenance  # Test routing to Maintenance Agent
+./agent.sh test-operations   # Test routing to Operations Agent
+./agent.sh deploy
+./agent.sh load-test         # Continuous cloud testing
 ```
 
-### Infra Samples
+### Fraud Investigation Demo
 
 ```bash
-# Simple agent (Hello World)
-cd infra_samples/simple-agentcore-agent
-uv sync && uv run cdk bootstrap && uv run cdk deploy
-uv run python test_agent.py
-uv run cdk destroy
+# Graph loader: loads data/ into Neo4j with a direct driver.
+# Reads NEO4J_* from graph-loader/.env.
+cd demos/fraud-amazon-quick/graph-loader
+uv sync
+uv run fraud-graph-load          # --reset deletes all graph data first
+uv run fraud-graph-enrich        # GDS risk, community, and similarity signals
+uv run fraud-graph-analyze       # read-only investigation queries
 
-# Sample MCP server (Calculator/Greeter tools)
-cd infra_samples/sample-agentcore-mcp-server
-uv sync && uv run cdk deploy
-uv run python test_mcp_server.py
-uv run cdk destroy
+# Fraud memory agent: Strands agent over its own core/. agent.sh,
+# runtime_app.py, and Dockerfile live at the agent root.
+# Needs ./deploy.py --env finance.
+cd ../fraud-memory-agent
+uv sync
+./agent.sh start
+# (start/test/configure/deploy/status/invoke-cloud/destroy)
+```
+
+### Integrations and Patterns
+
+```bash
+# OAuth2 Gateway with RBAC Lambda interceptor
+cd patterns/gateway-rbac-interceptor
+uv sync && uv run cdk bootstrap   # bootstrap first time only
+./deploy.sh
+uv run python setup_users.py
+./test.sh
+./deploy.sh --destroy
+
+# Neo4j Aura Agents REST client
+cd integrations/neo4j-aura-agents
+uv sync
+uv run python cli.py "What's in the graph?"
 ```
 
 ### Databricks Integration
 
 ```bash
-cd databrick_samples
+cd integrations/databricks
 
 # Configure secrets from MCP server credentials
 ./setup_databricks_secrets.sh
@@ -147,12 +162,14 @@ uv run cdk deploy                    # Run CDK commands
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **Neo4j MCP Server** | `neo4j-agentcore-mcp-server/` | MCP server on AgentCore Runtime with Gateway auth |
-| **LangGraph Agent** | `neo4j-agentcore-agents/langgraph-mcp-agent/` | Standalone ReAct agent, notebooks for SageMaker |
-| **AgentCore Agents** | `neo4j-agentcore-agents/` | Gateway-based agents (finance + orchestrator) |
-| **Fleet Agent Demo** | `fleet-agent-demo/` | GraphRAG pipeline + direct-to-Neo4j fleet agent |
-| **Databricks Samples** | `databrick_samples/` | Unity Catalog HTTP connection integration |
-| **Infra Samples** | `infra_samples/` | Educational baseline examples |
+| **Neo4j MCP Server** | `neo4j-mcp-server/` | MCP server on AgentCore Runtime with Gateway auth |
+| **Quickstart** | `quickstart/` | Standalone LangGraph ReAct agent, notebooks for SageMaker |
+| **Aircraft Fleet Demo** | `demos/aircraft-fleet/` | GraphRAG pipeline, direct-to-Neo4j GraphRAG agent, and MCP supervisor agent |
+| **Fraud Investigation Demo** | `demos/fraud-amazon-quick/` | Graph loader, fraud memory agent, and Iceberg loaders for Amazon Quick |
+| **SEC Filings GraphRAG** | `demos/sec-filings-graphrag/` | Four levels of GraphRAG retrieval in one notebook |
+| **Databricks Integration** | `integrations/databricks/` | Unity Catalog HTTP connection integration |
+| **Neo4j Aura Agents** | `integrations/neo4j-aura-agents/` | REST client for Neo4j-hosted Aura Agents |
+| **Gateway RBAC Pattern** | `patterns/gateway-rbac-interceptor/` | Cognito RBAC with a Lambda interceptor at the Gateway |
 
 ### Request Flow
 
@@ -231,7 +248,7 @@ NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your-password
 
 # Stack Configuration
-STACK_NAME=neo4j-agentcore-mcp-server
+STACK_NAME=neo4j-mcp-server
 AWS_REGION=us-east-1
 ```
 

@@ -22,8 +22,8 @@ This document provides a comprehensive architecture overview of the Neo4j MCP ec
 The system consists of three main components:
 
 1. **Neo4j MCP Server** (`/Users/ryanknight/projects/mcp`) - Official Neo4j Model Context Protocol server written in Go
-2. **MCP Server Deployment** (`neo4j-agentcore-mcp-server/`) - AWS CDK infrastructure to deploy the MCP server on AgentCore
-3. **AI Agents** (`neo4j-agentcore-agents/`) - LangGraph-based agents that query Neo4j via the MCP server
+2. **MCP Server Deployment** (`neo4j-mcp-server/`) - AWS CDK infrastructure to deploy the MCP server on AgentCore
+3. **AI Agents** (`quickstart/` and `demos/`) - Agents that query Neo4j. Most reach it through the MCP server and Gateway. The fleet GraphRAG agent uses a direct Neo4j driver
 
 ```mermaid
 flowchart TB
@@ -45,7 +45,7 @@ flowchart TB
         end
 
         subgraph Agents["AI Agents"]
-            FLEET[Fleet Agent<br/>Single ReAct Loop]
+            FLEET[Fleet Agent<br/>Strands, direct driver]
             ORCH[Orchestrator<br/>Multi-Agent Router]
         end
 
@@ -57,9 +57,8 @@ flowchart TB
     RUNTIME --> MCP
     MCP --> NEO4J
     GATEWAY --> RUNTIME
-    FLEET --> GATEWAY
+    FLEET --> NEO4J
     ORCH --> GATEWAY
-    FLEET --> COGNITO
     ORCH --> COGNITO
 ```
 
@@ -69,7 +68,7 @@ flowchart TB
 
 ### High-Level Architecture
 
-The `neo4j-agentcore-mcp-server` project deploys the official Neo4j MCP server to Amazon Bedrock AgentCore Runtime with Gateway authentication.
+The `neo4j-mcp-server` project deploys the official Neo4j MCP server to Amazon Bedrock AgentCore Runtime with Gateway authentication.
 
 ```mermaid
 flowchart TB
@@ -211,7 +210,7 @@ Understanding what each piece does in plain English:
 
 ### Deployment Flow
 
-The `deploy.sh` script orchestrates the entire deployment process:
+The `deploy.py` script orchestrates the entire deployment process:
 
 ```mermaid
 flowchart LR
@@ -252,12 +251,12 @@ flowchart LR
 
 | Command | Description |
 |---------|-------------|
-| `./deploy.sh` | Full deployment (build, push, stack) |
-| `./deploy.sh redeploy` | Fast redeploy (build, push, update runtime) |
-| `./deploy.sh stack` | Deploy CDK stack only |
-| `./deploy.sh status` | Show stack status and outputs |
-| `./deploy.sh credentials` | Generate `.mcp-credentials.json` |
-| `./deploy.sh cleanup` | Delete all resources |
+| `./deploy.py` | Full deployment (build, push, stack) |
+| `./deploy.py redeploy` | Fast redeploy (build, push, update runtime) |
+| `./deploy.py stack` | Deploy CDK stack only |
+| `./deploy.py status` | Show stack status and outputs |
+| `./deploy.py credentials` | Generate `.mcp-credentials.json` |
+| `./deploy.py cleanup` | Delete all resources |
 
 ### CDK Stack Components
 
@@ -265,7 +264,7 @@ The CDK stack (`cdk/neo4j_mcp_stack.py`) creates these AWS resources:
 
 ```mermaid
 flowchart TB
-    subgraph CDK["CDK Stack: neo4j-agentcore-mcp-server"]
+    subgraph CDK["CDK Stack: neo4j-mcp-server"]
         subgraph CognitoModule["Cognito Module"]
             UP[User Pool<br/>No users - M2M only]
             DOMAIN[User Pool Domain<br/>OAuth2 Token Endpoint]
@@ -368,11 +367,11 @@ sequenceDiagram
 
 ## AI Agents Architecture
 
-Two agent implementations are provided in `neo4j-agentcore-agents/`:
+Two agent implementations are provided in `demos/aircraft-fleet/`:
 
 ### Fleet Agent
 
-A single ReAct (Reasoning + Acting) agent that handles all queries using LangChain and LangGraph.
+A single Strands agent in `graphrag-agent/` that answers questions over the aircraft graph. It connects to Neo4j directly with the Neo4j Python driver. It does not use the MCP server or the AgentCore Gateway.
 
 ```mermaid
 flowchart TB
@@ -380,49 +379,52 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph FleetAgent["Fleet Agent (local_cli.py)"]
-        LLM[Claude Sonnet 4<br/>via Bedrock Converse]
-        REACT[ReAct Loop<br/>Thought → Action → Observation]
-        TOOLS[MCP Tools<br/>get-schema, read-cypher]
-    end
-
-    subgraph MCP["MCP Server"]
-        GATEWAY[AgentCore Gateway]
-        MCPSERVER[Neo4j MCP Server]
+    subgraph FleetAgent["Fleet Agent (runtime_app.py)"]
+        LLM[Claude Sonnet 4.5<br/>via Bedrock]
+        AGENT[Strands Agent<br/>schema in system prompt]
+        GQ[graph_query_tool<br/>Text2Cypher]
+        VS[vector_search_tool<br/>semantic search]
     end
 
     subgraph External["External"]
+        TITAN[Titan Text Embeddings v2]
         NEO4J[(Neo4j Database)]
     end
 
-    USER --> REACT
-    REACT <--> LLM
-    REACT --> TOOLS
-    TOOLS --> GATEWAY
-    GATEWAY --> MCPSERVER
-    MCPSERVER --> NEO4J
+    USER --> AGENT
+    AGENT <--> LLM
+    AGENT --> GQ
+    AGENT --> VS
+    GQ --> NEO4J
+    VS --> TITAN
+    VS --> NEO4J
 
-    style REACT fill:#e1f5fe
+    style AGENT fill:#e1f5fe
 ```
+
+The agent reads the graph schema once at startup and puts it in the system prompt. `graph_query_tool` handles exact lookups, counts, aggregations, and traversals. It turns the question into read-only Cypher with the `neo4j-graphrag` Text2Cypher retriever. `vector_search_tool` handles descriptive questions. It searches maintenance-document chunks through the `maintenanceChunkEmbeddings` vector index. The embedder must match the one the pipeline used to load the chunks.
 
 **Key Components:**
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| LLM | Claude Sonnet 4 (Bedrock) | Reasoning and response generation |
-| Agent Framework | LangChain `create_agent` | ReAct agent pattern |
-| MCP Client | `langchain_mcp_adapters` | Tool discovery and invocation |
-| Transport | Streamable HTTP | Gateway communication |
+| LLM | Claude Sonnet 4.5 (Bedrock) | Reasoning and response generation |
+| Agent Framework | Strands `Agent` | Tool calling and streamed answers |
+| Retrieval | `neo4j-graphrag` retrievers | Text2Cypher and vector search |
+| Database Access | Neo4j Python driver | Direct connection, no MCP or Gateway |
+| Embeddings | Amazon Titan Text Embeddings v2 | Query embeddings for vector search |
 
 **Usage:**
 
 ```bash
-cd fleet-agent-demo/agent
+cd demos/aircraft-fleet/graphrag-agent
 uv sync                   # Install dependencies
-./agent.sh start          # Run locally (port 8080)
-./agent.sh test           # Test local agent
-python local_cli.py "What is the database schema?"
+uv run fleet-server       # Run locally (port 7070)
+uv run fleet-cli "How many aircraft are in the database?"
+./agent.sh deploy         # Deploy to AgentCore Runtime
 ```
+
+The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` from the shared `.env` at the `aircraft-fleet` root. See [graphrag-agent/README.md](../demos/aircraft-fleet/graphrag-agent/README.md) for the full command list.
 
 ### Orchestrator Agent (Multi-Agent)
 
@@ -540,7 +542,7 @@ flowchart LR
 **Usage:**
 
 ```bash
-cd orchestrator-agent
+cd demos/aircraft-fleet/supervisor-agent
 uv sync                       # Install dependencies
 ./agent.sh start              # Run locally (port 8080)
 ./agent.sh test-maintenance   # Test routing to Maintenance Agent

@@ -191,7 +191,7 @@ logs/
 .inference-profile*.env
 
 # Locally generated public object URLs
-data-agent/.public-urls.txt
+demos/fraud-amazon-quick/fraud-iceberg/.public-urls.txt
 
 # Secrets (never commit these)
 *.pem
@@ -205,6 +205,7 @@ secrets.json
 .mcp-credentials.*.json
 neo4j-sso-config.json
 *_secret*
+!integrations/databricks/setup_databricks_secrets.sh
 *.secret
 .secrets/
 token.json

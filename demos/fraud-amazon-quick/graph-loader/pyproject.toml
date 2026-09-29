@@ -1,0 +1,22 @@
+[project]
+name = "fraud-graph-loader"
+version = "0.1.0"
+description = "Load, enrich, and analyze the synthetic fraud graph in Neo4j with a direct driver"
+requires-python = ">=3.10"
+dependencies = [
+    "neo4j>=6.0",
+    "python-dotenv>=1.2.2",
+]
+
+# Console entry points. Each reads NEO4J_* from graph-loader/.env.
+[project.scripts]
+fraud-graph-load = "graph_loader.load_neo4j:main"
+fraud-graph-enrich = "graph_loader.enrich_gds:main"
+fraud-graph-analyze = "graph_loader.analyze_graph:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["graph_loader"]

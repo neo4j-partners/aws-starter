@@ -1,32 +1,47 @@
 # SEC Filings GraphRAG Demo
 
-This notebook builds a deterministic graph from NVIDIA and Amazon 10-K
-filings. It is the small, learning-focused introduction to GraphRAG in this
-repository. It currently includes graph ingestion and all four retrieval
-strategies; the compact comparison and final grounded answer are completed in
-a later implementation phase.
+This notebook builds a small graph from NVIDIA and Amazon 10-K filings. It is
+the short, beginner introduction to GraphRAG in this repository.
+
+## Overview
+
+- **Notebook:** The notebook is `4_levels_of_graphrag.ipynb`.
+- **Data:** The two 10-K filings are PDFs in [`demos/sec-filings-graphrag/data/`](./data/).
+- **Graph:** The notebook splits each filing into chunks, embeds them with Amazon Titan Text Embeddings V2, and writes them to Neo4j. The same input always builds the same graph.
+- **Retrieval:** The notebook compares four retrieval strategies: vector, vector plus graph, keyword, and vector plus keyword plus graph.
+- **Status:** The notebook has graph ingestion and all four strategies. A later phase will add the comparison tables and the final grounded answer.
+
+## Quick start
+
+Run these commands from the repo root:
+
+```bash
+cd demos/sec-filings-graphrag
+cp .env.sample .env        # add your Neo4j connection details
+uv sync
+```
+
+Then open `4_levels_of_graphrag.ipynb`, select the project's `.venv` kernel,
+and run the notebook from top to bottom.
 
 ## Requirements
 
-- Python 3.10 or later and `uv`
-- A dedicated, empty Neo4j Aura Free database
-- AWS credentials with access to Amazon Titan Text Embeddings V2 in the
-  configured region
+- **Python:** You need Python 3.10 or later and `uv`.
+- **Neo4j:** You need a dedicated, empty Neo4j Aura Free database. A local Neo4j database also works, but these docs cover Aura Free.
+- **AWS:** Your AWS credentials need access to Amazon Titan Text Embeddings V2 in the configured region.
 
-Local Neo4j can also be used, but Aura Free is the primary documented path.
+## Configure `.env`
 
-## Setup
+- **`NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`:** These values connect the notebook to Neo4j.
+- **`AWS_REGION`:** This value sets the Bedrock region. It defaults to `us-east-1`.
+- **`AWS_PROFILE`:** Set this value only to use a named local AWS profile. Otherwise the notebook uses the standard AWS credential chain.
+- **`BEDROCK_TEXT_MODEL_ID`:** The final answer cell will use this model. That cell does not exist yet.
 
-1. Copy `.env.sample` to `.env` and fill in the Neo4j connection details.
-2. Install the environment:
+## Protect your data
 
-   ```bash
-   uv sync
-   ```
+The notebook stops before it writes if the database already has any nodes. Use
+a dedicated database for this demo.
 
-3. Open `4_levels_of_graphrag.ipynb`, select the project's `.venv` kernel,
-   and run the notebook from top to bottom.
-
-The notebook refuses to ingest into a non-empty database by default. Use a
-dedicated database. Setting `RESET_DATABASE = True` explicitly deletes every
-node and relationship and drops the two demo indexes named in the notebook.
+To start over, set `RESET_DATABASE = True` in the configuration cell. The
+notebook then deletes every node and relationship in the database. It also
+drops the two demo indexes, `chunkEmbeddings` and `search_chunks`.

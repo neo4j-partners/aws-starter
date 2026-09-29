@@ -24,9 +24,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
 AGENT_NAME="aircraft_fleet_supervisor_agent"
 # AgentCore deployment region. AgentCore's primary region is us-east-1
-# (also supported in us-west-2). `configure` pins it into
-# .bedrock_agentcore.yaml, which `deploy`/`status` then read.
-REGION="us-east-1"
+# (also supported in us-west-2). Set AWS_REGION to override. `configure`
+# pins it into .bedrock_agentcore.yaml, which `deploy`/`status` then read.
+REGION="${AWS_REGION:-us-east-1}"
 cd "$ROOT_DIR"
 
 # Colors for output

@@ -1,145 +1,98 @@
-# Fraud Iceberg loaders
+# Fraud Iceberg Loaders
 
-## Project overview
+These scripts load the synthetic fraud dataset into Apache Iceberg tables.
+Athena and Amazon Quick can then query the tables with SQL.
 
-This sample project loads a dataset with hidden fraud rings into Apache
-Iceberg tables.
+## Overview
 
-- **Load options:** [Normal S3 bucket with Glue](#load-into-a-normal-s3-bucket-with-glue)
-  stores tables in an S3 bucket with AWS Glue. [Amazon S3 Tables](#load-into-amazon-s3-tables)
-  uses managed S3 Tables storage and its Iceberg REST catalog.
-- **Graph analysis:** [Sample graph queries](../graph-loader/graph_loader/analyze_graph.py) look for
-  patterns that can identify potential fraud rings. Ground-truth labels stay
-  out of the graph.
-- **Athena queries:** The [sample Athena script](./scripts/query_finance_athena.py)
-  shows how to explore the loaded tables with SQL.
+- **Normal S3 loader:** The script `write_finance_iceberg.py` writes the tables to an S3 bucket and registers them in AWS Glue. See [Load into a normal S3 bucket with Glue](#load-into-a-normal-s3-bucket-with-glue).
+- **S3 Tables loader:** The script `write_finance_s3_tables.py` writes the tables to Amazon S3 Tables through its Iceberg REST catalog. See [Load into Amazon S3 Tables](#load-into-amazon-s3-tables).
+- **Athena queries:** The script [`query_finance_athena.py`](./scripts/query_finance_athena.py) runs sample SQL against the Glue tables and prints the results.
+- **Dataset:** The data lives in [`demos/fraud-amazon-quick/data/`](../data/). It has ten hidden fraud rings.
+- **Ground truth:** Separate answer-key tables mark the fraud accounts and rings. Keep them out of the graph and use them only to check graph results.
+- **Graph analysis:** The [`demos/fraud-amazon-quick/graph-loader/`](../graph-loader/) project loads Neo4j and runs the fraud queries. This folder only loads Iceberg.
 
-## Overview of Data Set
+## Quick start
 
-The dataset was generated with hidden fraud rings. The graph should find the
-rings from transfer, merchant, and KYC data. Ground truth tables identify
-the generated fraud accounts and rings. Use it after graph analysis to check
-whether the graph found them.
+Run from `demos/fraud-amazon-quick/fraud-iceberg/`. Each script declares its
+own dependencies, so `uv run` needs no `uv sync`.
 
-Fraud is represented as ten account rings. Each ring contains 100 accounts
-labelled as fraudulent only in the ground-truth tables; the graph input does
-not include those labels. Ring accounts transfer money between each other and
-use shared anchor merchants. One ring also shares customer phone numbers and
-an address.
+```bash
+# Check the CSVs without calling AWS
+uv run scripts/write_finance_iceberg.py --dry-run
 
-- **Accounts:** 25,000 accounts.
-- **Fraud labels:** The ground-truth `account_labels` table marks 1,000
-  accounts with `is_fraud = true`; this table is not a graph input.
-- **Fraud rings:** Ten rings with 100 fraud accounts each.
-- **Anchor merchants:** Four merchants are assigned to each ring.
-- **Ground truth:** `ground_truth.json` records ring membership, anchor
-  merchants, whale accounts, and the KYC story.
+# Load into a normal S3 bucket with Glue
+uv run scripts/write_finance_iceberg.py my-company-data-agent-neo4j
+
+# Or load into Amazon S3 Tables
+uv run scripts/write_finance_s3_tables.py
+
+# Query the Glue tables with Athena
+uv run scripts/query_finance_athena.py \
+  --output-location s3://my-company-data-agent-neo4j/athena-results/
+```
+
+## The dataset
+
+The generator planted fraud rings in the data. The graph should find the rings
+from transfer, merchant, and KYC data. The ground-truth tables then show
+whether it found them.
+
+- **Accounts:** The dataset has 25,000 accounts.
+- **Fraud rings:** The dataset has ten rings. Each ring has 100 accounts.
+- **Fraud labels:** The ground-truth `account_labels` table marks 1,000 accounts with `is_fraud = true`. The graph input does not include these labels.
+- **Ring behavior:** Ring accounts transfer money to each other and use shared anchor merchants.
+- **Anchor merchants:** Each ring has four anchor merchants.
+- **KYC story:** One ring also shares customer phone numbers and an address.
+- **Ground truth file:** The file `ground_truth.json` records ring membership, anchor merchants, whale accounts, and the KYC story.
 
 ## Data tables
 
 ### Source tables
 
-- **`accounts`:** Account details.
-- **`customers`:** Customer details and KYC identifiers.
-- **`merchants`:** Merchant details.
-- **`transactions`:** Payments from accounts to merchants.
-- **`account_links`:** Transfers between accounts.
+- **`accounts`:** This table holds account details.
+- **`customers`:** This table holds customer details and KYC identifiers.
+- **`merchants`:** This table holds merchant details.
+- **`transactions`:** This table holds payments from accounts to merchants.
+- **`account_links`:** This table holds transfers between accounts.
 
-### Ground truth tables
+### Ground-truth tables
 
-Keep these tables out of graph input. They provide the answer key after graph
-analysis.
+These tables are the answer key. Keep them out of the graph input.
 
-- **`account_labels`:** Account-level fraud labels. Join this table to graph
-  results by `account_id` to evaluate each detected account.
-- **`fraud_ground_truth_summary`:** Source schema version, seed, and totals.
-- **`fraud_rings`:** One row per fraud ring.
-- **`fraud_ring_accounts`:** Ring-to-account membership.
-- **`fraud_ring_merchants`:** Ring-to-anchor-merchant membership and category.
-- **`whale_accounts`:** High-value account identifiers.
-- **`fraud_ring_shared_phones`:** Ring-scoped shared phone-to-account links.
-- **`fraud_ring_shared_addresses`:** Ring-scoped shared address-to-account links.
+- **`account_labels`:** This table holds account-level fraud labels. Join it to graph results by `account_id` to check each detected account.
+- **`fraud_ground_truth_summary`:** This table holds the source schema version, seed, and totals.
+- **`fraud_rings`:** This table has one row per fraud ring.
+- **`fraud_ring_accounts`:** This table maps rings to accounts.
+- **`fraud_ring_merchants`:** This table maps rings to anchor merchants and their categories.
+- **`whale_accounts`:** This table lists high-value account IDs.
+- **`fraud_ring_shared_phones`:** This table links shared phones to accounts within a ring.
+- **`fraud_ring_shared_addresses`:** This table links shared addresses to accounts within a ring.
 
-`account_labels` provides a fast account-level check. The `fraud_*` tables
-explain the rings and their supporting evidence.
+Use `account_labels` for a fast account-level check. Use the `fraud_*` tables
+to explain each ring and its evidence.
 
 ## Graph inputs
 
-Load these five Iceberg tables into the graph:
+The graph uses these five tables:
 
-- **Accounts:** `finance.accounts` becomes `:Account`.
-- **Customers:** `finance.customers` becomes `:Customer`, `:Phone`, and
-  `:Address` with ownership and KYC relationships.
-- **Merchants:** `finance.merchants` becomes `:Merchant`.
-- **Payments:** `finance.transactions` becomes `:TRANSACTED_WITH`.
-- **Transfers:** `finance.account_links` becomes `:TRANSFERRED_TO`.
+- **Accounts:** The `finance.accounts` table becomes `:Account` nodes.
+- **Customers:** The `finance.customers` table becomes `:Customer`, `:Phone`, and `:Address` nodes with ownership and KYC relationships.
+- **Merchants:** The `finance.merchants` table becomes `:Merchant` nodes.
+- **Payments:** The `finance.transactions` table becomes `:TRANSACTED_WITH` relationships.
+- **Transfers:** The `finance.account_links` table becomes `:TRANSFERRED_TO` relationships.
 
-Use the ground-truth tables only after graph analysis. They are the answer key.
+## Evaluate graph results
 
-## Fraud encoding, graph loading, and evaluation
+- **Fraud signals:** The graph shows transfer clusters, transfer cycles, shared merchants, and shared KYC identifiers.
+- **Graph result:** A signal marks an account for review. It does not prove fraud.
+- **Table count:** Both loaders create five graph-input tables and eight ground-truth tables.
+- **Result table:** Store `account_id`, `detector_name`, `score`, and evidence from the graph analysis.
+- **Account-level check:** Join the result table to `finance.account_labels` by `account_id`.
+- **Scoring:** The join gives you true positives, false positives, false negatives, precision, and recall.
+- **Ring-level check:** Query the `finance.fraud_*` and `finance.whale_accounts` tables for ring membership, anchor merchants, whale accounts, and the KYC story.
 
-- **Fraud signal:** The graph exposes transfer clusters, transfer cycles,
-  shared merchants, and shared KYC identifiers.
-- **Graph result:** A signal marks an account for review.
-- **Iceberg load:** Both loaders create five graph-input tables and eight
-  ground-truth tables. `finance.account_labels` is ground truth only.
-- **Account-level truth:** Join graph results to `finance.account_labels` by
-  `account_id`.
-- **Result table:** Store `account_id`, `detector_name`, `score`, and evidence
-  from the graph analysis.
-- **Evaluation:** Use the join to calculate true positives, false positives,
-  false negatives, precision, and recall.
-- **Ring-level truth:** Query the normalized `finance.fraud_*` and
-  `finance.whale_accounts` tables for ring membership, anchor merchants, whale
-  accounts, and the KYC story.
-
-## Sample Graph algorithms
-
-Once the Iceberg graph inputs have been loaded into Neo4j, an analyst can use
-Cypher to investigate fraud patterns rather than query the ground-truth answer
-tables. Useful investigations inspect:
-
-- Multi-hop `TRANSFERRED_TO` chains, especially circular flows that return to
-  their originating account.
-- Communities of accounts transferring heavily among themselves while making
-  relatively few merchant payments.
-- Shared KYC phone numbers or addresses, which can link otherwise separate
-  customer records for review.
-- Common transfer counterparties that connect accounts across chains or
-  communities.
-- Similar merchant behaviour through `SIMILAR_TO`, especially when it
-  corroborates a transfer or KYC signal.
-
-Each pattern is an investigative lead, not proof of fraud. Compare results
-with the ground-truth tables only after the analysis to evaluate the detector.
-
-After the graph is built, [enrich_gds.py](../graph-loader/graph_loader/enrich_gds.py) shows sample Aura
-Graph Data Science algorithms that can enrich those investigations:
-
-- **PageRank** writes `risk_score` to prioritize accounts with transfer-network
-  influence.
-- **Louvain** writes `community_id` to identify transfer communities.
-- **Betweenness centrality** writes `betweenness_centrality` to identify
-  potential money-flow intermediaries.
-- **Node similarity** writes `SIMILAR_TO` relationships using Jaccard similarity
-  over account-to-merchant behaviour.
-
-Run it from the graph loader, with the Neo4j settings in `graph-loader/.env`:
-
-```bash
-cd ../graph-loader
-uv run fraud-graph-enrich
-```
-
-These metrics guide analyst review. They are not fraud labels or proof of
-criminal activity.
-
-[analyze_graph.py](../graph-loader/graph_loader/analyze_graph.py) runs read-only example Cypher analyses
-for these five investigation patterns. Run it from `graph-loader/` too:
-
-```bash
-uv run fraud-graph-analyze
-```
+This query joins detector results to the labels:
 
 ```sql
 SELECT d.account_id, d.detector_name, d.score, l.is_fraud
@@ -147,30 +100,64 @@ FROM detector_results AS d
 LEFT JOIN finance.account_labels AS l ON l.account_id = d.account_id;
 ```
 
+## Graph investigations
+
+After the graph inputs are in Neo4j, an analyst uses Cypher to look for fraud
+patterns. Useful patterns are:
+
+- **Circular flows:** Money moves along `TRANSFERRED_TO` chains and returns to the starting account.
+- **Closed communities:** Accounts transfer heavily among themselves and make few merchant payments.
+- **Shared KYC:** Separate customers share a phone number or address.
+- **Common counterparties:** Several accounts send transfers to the same account.
+- **Similar behavior:** Accounts linked by `SIMILAR_TO` buy from the same merchants. This is most useful when it backs up a transfer or KYC signal.
+
+Each pattern is a lead to review. Compare results with the ground-truth
+tables only after the analysis.
+
+The script
+[`enrich_gds.py`](../graph-loader/graph_loader/enrich_gds.py) adds Graph Data
+Science metrics to the graph:
+
+- **PageRank:** PageRank writes `risk_score` to rank accounts by their influence in the transfer network.
+- **Louvain:** Louvain writes `community_id` to group accounts into transfer communities.
+- **Betweenness centrality:** This algorithm writes `betweenness_centrality` to find accounts that sit between others in money flows.
+- **Node similarity:** This algorithm writes `SIMILAR_TO` relationships. It uses Jaccard similarity over account-to-merchant payments.
+
+These metrics guide review. They are not fraud labels.
+
+The script [`analyze_graph.py`](../graph-loader/graph_loader/analyze_graph.py)
+runs read-only Cypher for the five patterns above.
+
+Run both from `demos/fraud-amazon-quick/graph-loader/`, with the Neo4j settings
+in its `.env`:
+
+```bash
+uv run fraud-graph-enrich
+uv run fraud-graph-analyze
+```
+
 ## Parquet and Iceberg
 
-- **Parquet:** Stores table rows in compressed column files.
-- **Iceberg:** Tracks a table's schema, data files, and versions.
-- **Together:** Parquet stores the data. Iceberg makes the data a queryable
-  table.
+- **Parquet:** Parquet stores table rows in compressed column files.
+- **Iceberg:** Iceberg tracks a table's schema, data files, and versions.
+- **Together:** Parquet stores the data, and Iceberg turns the files into a table you can query.
 
 ## Load into a normal S3 bucket with Glue
 
-Authenticate through your usual AWS profile, environment credentials, or an
-IAM role, then run from this directory:
+Sign in with your usual AWS profile, environment credentials, or IAM role.
+Then run from `demos/fraud-amazon-quick/fraud-iceberg/`:
 
 ```bash
 # Creates and loads s3://data-agent-neo4j-euw1 by default.
 uv run scripts/write_finance_iceberg.py
 
-# Bucket names are global. Supply a unique name when the default is taken.
+# Bucket names are global. Pass a unique name if the default is taken.
 uv run scripts/write_finance_iceberg.py my-company-data-agent-neo4j
 ```
 
-The normal S3 loader uses Parquet for each Iceberg table's data files. It
-writes those files and Iceberg metadata to the bucket. AWS Glue records each
-table and its current metadata location. Each `finance.<table>` table uses this
-S3 layout:
+The script writes Parquet data files and Iceberg metadata to the bucket. AWS
+Glue records each table and the location of its current metadata. Each
+`finance.<table>` table uses this layout:
 
 ```text
 warehouse/finance/<table>/
@@ -178,9 +165,8 @@ warehouse/finance/<table>/
 └── metadata/*           # schemas, manifests, and snapshots
 ```
 
-The script creates a new bucket with public access blocked and SSE-S3 default
-encryption. It creates the `finance` Glue database and these Iceberg v2,
-Zstandard-compressed Parquet tables:
+The script creates the `finance` Glue database and these thirteen Iceberg v2
+tables. The tables use Zstandard-compressed Parquet.
 
 - `accounts`
 - `customers`
@@ -196,142 +182,148 @@ Zstandard-compressed Parquet tables:
 - `fraud_ring_shared_phones`
 - `fraud_ring_shared_addresses`
 
-For an existing bucket, the script detects its Region and uses that Region for
-the Glue catalog. For a new bucket, pass `--region` when your usual AWS Region
-is not the intended bucket Region.
+### Flags
 
-An existing table is never silently appended to or replaced. Use `--replace`
-to replace a previously loaded table with its bundled source, or `--dry-run`
-to validate the CSVs and display their Arrow schemas without using AWS.
+- **`bucket`:** This optional first argument names the bucket. The default is `data-agent-neo4j-euw1`.
+- **`--region`:** This flag sets the Region for a new bucket. Without it, the script uses your AWS profile's Region, or `us-east-1` if none is set. For an existing bucket, the script uses the bucket's own Region.
+- **`--namespace`:** This flag sets the Glue database name. The default is `finance`.
+- **`--table`:** This flag loads only the named table. Repeat it to load several tables.
+- **`--replace`:** This flag replaces the contents of tables that already exist. Without it, the script stops when a table exists. It never appends to or replaces a table silently.
+- **`--dry-run`:** This flag checks the CSVs and prints their Arrow schemas. It does not call AWS.
+- **`--force-delete`:** This flag is destructive. It deletes every current and old object version and every delete marker in the bucket. It also drops the Glue tables whose data is in that bucket. Then it reloads the bundled data.
+- **`--writer-role-arn`:** This flag sets the IAM role that may write objects. You can also set `DATA_AGENT_WRITER_ROLE_ARN`.
 
 ```bash
 uv run scripts/write_finance_iceberg.py my-company-data-agent-neo4j --replace
 uv run scripts/write_finance_iceberg.py --dry-run
-```
-
-`--force-delete` is deliberately destructive: it deletes every current and
-noncurrent object plus every delete marker in the selected bucket, drops the
-Glue table entries whose data is in that bucket, then reloads the bundled data.
-
-```bash
 uv run scripts/write_finance_iceberg.py --force-delete
 ```
 
-Required IAM permissions are `s3:CreateBucket`, `s3:ListBucket`,
-`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:PutBucketEncryption`,
-and `s3:PutBucketPublicAccessBlock` for a new bucket, plus the Glue Data
-Catalog create/get/update actions for the `finance` database and its tables.
-Existing-bucket runs need only the applicable S3 object and Glue permissions.
+### Bucket access
 
-The script enforces the requested bucket-level access model each time it runs:
-ACL-based public access remains blocked; a bucket policy permits public
-`s3:GetObject` only, with no public listing; and only the configured SSO writer
-role can put objects. The role defaults to the current default-profile SSO role
-and can be overridden by `--writer-role-arn` or `DATA_AGENT_WRITER_ROLE_ARN`.
+A new bucket starts private with SSE-S3 default encryption. The script then
+applies this access model on every run:
+
+- **Public read:** A bucket policy lets anyone read objects with `s3:GetObject`. Nobody can list the bucket publicly.
+- **ACLs:** Public access through ACLs stays blocked.
+- **Writes:** Only the writer role can put objects.
+- **Writer role:** The default writer role is a fixed SSO role ARN in the script. Set `--writer-role-arn` or `DATA_AGENT_WRITER_ROLE_ARN` to use your own role.
+
+### Permissions
+
+A new bucket needs these S3 permissions:
+
+- `s3:CreateBucket`
+- `s3:ListBucket`
+- `s3:GetObject`
+- `s3:PutObject`
+- `s3:DeleteObject`
+- `s3:PutBucketEncryption`
+- `s3:PutBucketPublicAccessBlock`
+
+It also needs the Glue Data Catalog create, get, and update actions for the
+`finance` database and its tables. A run against an existing bucket needs only
+the S3 object and Glue permissions it uses.
 
 ## Load into Amazon S3 Tables
 
-Amazon S3 Tables manages Iceberg table data and table maintenance. This loader
-creates an S3 Tables table bucket and its `finance` namespace. It loads the
-same CSVs through the S3 Tables Iceberg REST catalog.
+Amazon S3 Tables manages Iceberg table data and maintenance. This loader
+creates an S3 Tables table bucket and a `finance` namespace. It loads the same
+CSVs through the S3 Tables Iceberg REST catalog.
+
+Run from `demos/fraud-amazon-quick/fraud-iceberg/`:
 
 ```bash
+# Uses the table bucket data-agent-finance-tables by default.
 uv run scripts/write_finance_s3_tables.py
 
-# Pick a table-bucket name and Region explicitly when needed.
+# Pick a table bucket name and Region when needed.
 uv run scripts/write_finance_s3_tables.py my-company-finance-tables --region us-west-2
-```
 
-The script creates each table bucket with SSE-S3 (`AES256`) encryption. It
-creates the thirteen Iceberg tables listed above, or refuses to replace existing
-table data unless you add `--replace`.
-
-```bash
 uv run scripts/write_finance_s3_tables.py my-company-finance-tables --replace
 uv run scripts/write_finance_s3_tables.py --dry-run
 ```
 
-The S3 Tables script needs permission to create or get the table bucket and
-namespace, plus the S3 Tables Iceberg permissions needed to create, inspect,
-read, and update table metadata and data. In IAM these are `s3tables` actions,
-including `CreateTableBucket`, `GetTableBucket`, `CreateNamespace`,
-`CreateTable`, `GetTable`, `GetTableMetadataLocation`, `GetTableData`,
-`PutTableData`, and `UpdateTableMetadataLocation`. Unlike the normal S3
-loader, it does not configure an S3 bucket policy or public access controls.
+- **Encryption:** The script creates each table bucket with SSE-S3 (`AES256`) encryption.
+- **Tables:** The script creates the same thirteen Iceberg tables as the Glue loader.
+- **Existing tables:** The script stops when a table exists. Add `--replace` to overwrite it.
+- **Other flags:** The `--region`, `--namespace`, `--table`, and `--dry-run` flags work the same as in the Glue loader.
+- **Access controls:** This loader does not set a bucket policy or public access controls.
 
-## Explore the Glue/S3 dataset with Athena
+The script needs `s3tables` IAM actions to create and read the table bucket,
+namespace, and tables. These include:
 
-The Athena script first summarizes the five source tables, then samples one
-customer with their profile and ten most recent transactions. It also runs
-fraud-ring membership counts, anchor merchants, shared KYC identifiers, and
-whale accounts with ring membership. It prints each result in a formatted
-console section.
+- `CreateTableBucket`
+- `GetTableBucket`
+- `CreateNamespace`
+- `CreateTable`
+- `GetTable`
+- `GetTableMetadataLocation`
+- `GetTableData`
+- `PutTableData`
+- `UpdateTableMetadataLocation`
+
+## Query the Glue tables with Athena
+
+The Athena script runs these queries and prints each result in its own
+section:
+
+- **Source-table summaries:** This query summarizes the five source tables.
+- **Customer profile:** This query picks one random customer and shows their profile and ten most recent transactions.
+- **Fraud-ring overview:** This query counts the accounts and anchor merchants in each ring.
+- **Anchor merchants:** This query lists anchor merchants by ring.
+- **Shared KYC identifiers:** This query lists shared phones and addresses.
+- **Whale accounts:** This query lists whale accounts with their ring membership.
+
+Run from `demos/fraud-amazon-quick/fraud-iceberg/`:
 
 ```bash
-# Shows the SQL without starting Athena queries.
+# Print the SQL without starting Athena queries.
 uv run scripts/query_finance_athena.py --dry-run
 
-# Supply a result prefix because the primary workgroup has no configured output.
-uv run scripts/query_finance_athena.py \
+# The primary workgroup has no result location, so pass one.
+uv run scripts/query_finance_athena.py --region eu-west-1 \
   --output-location s3://data-agent-neo4j-euw1/athena-results/
 ```
 
-Use `--show-sql` to print SQL before execution and `--max-rows` to change the
-per-query output limit. The caller needs Athena query permissions, Glue read
-permissions, and read/write access to the chosen Athena results prefix.
+- **`--region`:** This flag sets the Athena Region. Without it, the script uses your AWS profile's Region, then falls back to `us-east-1`. This matches the loaders. Pass `--region eu-west-1` for the default `data-agent-neo4j-euw1` bucket.
+- **`--database`:** This flag sets the Glue database. The default is `finance`.
+- **`--catalog`:** This flag sets the Athena catalog. The default is `AwsDataCatalog`.
+- **`--workgroup`:** This flag sets the Athena workgroup. The default is `primary`.
+- **`--output-location`:** This flag sets the S3 prefix for results. You can omit it only when the workgroup already has a result location.
+- **`--show-sql`:** This flag prints each query before it runs.
+- **`--max-rows`:** This flag sets the number of rows printed per query. The default is 20.
 
-## Why this implementation
+The caller needs Athena query permissions, Glue read permissions, and read and
+write access to the results prefix.
 
-For a normal S3 bucket, PyIceberg with the AWS Glue catalog is the smallest
-fully transactional approach: PyIceberg writes Parquet data and Iceberg
-metadata while Glue provides the shared catalog. The script constructs typed
-PyArrow tables directly from the committed CSVs. Pandas would only add an
-intermediate in-memory DataFrame, and Pydantic is useful for API/domain-model
-validation rather than bulk analytical-table writes, so neither is a dependency
-here.
+## Why this design
 
-Both entry-point scripts use `scripts/finance_iceberg.py` for the typed table
-definitions, CSV parsing, dry-run validation, and create-or-replace Iceberg
-writes. The S3 Tables entry point uses the service's control-plane API only to
-ensure its table bucket and namespace exist; PyIceberg creates and writes the
-tables through the SigV4-authenticated S3 Tables Iceberg REST endpoint.
+- **PyIceberg with Glue:** For a normal S3 bucket, PyIceberg with the Glue catalog is the smallest fully transactional option. PyIceberg writes the Parquet data and Iceberg metadata. Glue provides the shared catalog.
+- **PyArrow:** The script builds typed PyArrow tables directly from the CSVs.
+- **No Pandas:** Pandas would only add an extra in-memory copy of the data, so the scripts do not use it.
+- **No Pydantic:** Pydantic suits API and domain-model checks, not bulk table writes, so the scripts do not use it.
+- **Shared module:** Both loaders use `scripts/finance_iceberg.py` for table definitions, CSV parsing, dry-run checks, and create-or-replace writes.
+- **S3 Tables flow:** The S3 Tables loader uses the S3 Tables API only to create the table bucket and namespace. PyIceberg then creates and writes the tables through the SigV4-signed S3 Tables Iceberg REST endpoint.
+- **Ground truth as tables:** The loaders turn `ground_truth.json` into relational tables, so SQL can join the fraud-ring evidence.
+- **No Spark:** The dataset is a small local CSV set, so the loaders use PyIceberg instead of a Spark cluster.
 
-The copied CSV and JSON source data lives in the shared [data](../data/) folder. The loaders
-normalize `ground_truth.json` into relational tables so its fraud-ring evidence
-is available for SQL joins. The Neo4j-specific source scripts are intentionally
-omitted because this project only loads Iceberg. [graph-loader](../graph-loader/)
-loads Neo4j.
-
-## Current guidance
-
-AWS documents PyIceberg plus the Glue Data Catalog for writing Iceberg tables
-in S3, including PyArrow `append` operations. PyIceberg supports its native
-Glue catalog and direct PyArrow writes. This loader intentionally uses that
-path instead of a Spark cluster for this modest, local CSV seed dataset.
-
-For a new large-scale analytics lake, Amazon S3 Tables has a different bucket
-model and governance setup from ordinary S3. Use the dedicated S3 Tables
-script when that service is required rather than treating it as a drop-in
-replacement for a normal bucket.
+Amazon S3 Tables uses a different bucket model and governance setup from
+ordinary S3. Use the S3 Tables script when you need that service. Do not treat
+it as a drop-in swap for a normal bucket.
 
 - [AWS: PyIceberg with Glue Data Catalog](https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/iceberg-pyiceberg.html)
 - [PyIceberg: configuration and AWS credentials](https://py.iceberg.apache.org/configuration/)
 - [PyIceberg: PyArrow write API and type mapping](https://py.iceberg.apache.org/api/)
 - [AWS: S3 Tables Iceberg REST endpoint](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables-integrating-open-source.html)
 
-## How it works
+## How the Glue loader works
 
 1. The script creates or finds the S3 bucket and uses the bucket's Region.
-2. It applies the policy-controlled public-read and SSO-writer bucket access.
-3. It creates the `finance` Glue database when needed.
-4. It parses each source from [data](../data/) into a typed PyArrow table.
-5. For a table that does not yet exist, PyIceberg creates the initial Iceberg
-   metadata file in `s3://<bucket>/warehouse/finance/<table>/metadata/` and
-   registers its metadata location in AWS Glue. Glue is the catalog: it stores
-   the table definition and current metadata pointer, not the table data.
-6. PyIceberg appends the Arrow table by writing Zstandard-compressed Parquet
-   data files to S3, then commits Iceberg manifests and a snapshot that
-   atomically makes those files the table's current version.
-7. A later `--replace` run commits a new snapshot instead of editing Parquet
-   files in place. `--force-delete` first drops the Glue tables and removes all
-   bucket objects and versions, then rebuilds the tables from the bundled CSVs.
+2. It applies the public-read and writer-role bucket access.
+3. It creates the `finance` Glue database if needed.
+4. It reads each source file from [`demos/fraud-amazon-quick/data/`](../data/) into a typed PyArrow table.
+5. For a new table, PyIceberg writes the first Iceberg metadata file to `s3://<bucket>/warehouse/finance/<table>/metadata/`. It registers that location in AWS Glue. Glue stores the table definition and a pointer to the current metadata. Glue does not store the table data.
+6. PyIceberg writes the rows as Zstandard-compressed Parquet files. It then commits Iceberg manifests and a snapshot. The snapshot makes those files the table's current version in one atomic step.
+7. A later `--replace` run commits a new snapshot. It does not edit Parquet files in place.
+8. A `--force-delete` run first drops the Glue tables and removes all bucket objects and versions. Then it rebuilds the tables from the bundled CSVs.

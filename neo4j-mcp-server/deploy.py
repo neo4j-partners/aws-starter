@@ -1017,16 +1017,27 @@ def cmd_redeploy(aws: Aws, cfg: Config) -> None:
     log_info(f"New Image: {full_image_uri}")
     print()
 
-    # NOTE: faithful port of the original script - this updates only the
-    # container image, role, and network mode (UpdateAgentRuntime is a full
-    # replacement, so env vars / authorizer / protocol are NOT re-sent here).
-    aws.client("bedrock-agentcore-control").update_agent_runtime(
+    # UpdateAgentRuntime replaces the whole runtime configuration. Carry over
+    # the current settings so only the container image changes.
+    control = aws.client("bedrock-agentcore-control")
+    current = control.get_agent_runtime(agentRuntimeId=runtime_id)
+    preserved_keys = (
+        "description",
+        "authorizerConfiguration",
+        "requestHeaderConfiguration",
+        "protocolConfiguration",
+        "lifecycleConfiguration",
+        "environmentVariables",
+    )
+    preserved = {key: current[key] for key in preserved_keys if key in current}
+    control.update_agent_runtime(
         agentRuntimeId=runtime_id,
         agentRuntimeArtifact={
             "containerConfiguration": {"containerUri": full_image_uri}
         },
         roleArn=role_arn,
-        networkConfiguration={"networkMode": "PUBLIC"},
+        networkConfiguration=current["networkConfiguration"],
+        **preserved,
     )
 
     log_success("Runtime update initiated")

@@ -93,7 +93,7 @@ case "$CMD" in
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db setup
     uv run populate-aircraft-db verify --strict
-    echo "==> Done. Point neo4j-mcp-server/.env.fleet at this NEO4J_URI and redeploy."
+    echo "==> Done. Point neo4j-mcp-server/.env.fleet at this NEO4J_URI and run ./deploy.py --env fleet."
     ;;
   generate)
     sync_deps

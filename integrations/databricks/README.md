@@ -1,92 +1,129 @@
-# Databricks Samples
+# Databricks Integration
 
-Sample notebooks for integrating Neo4j MCP Server with Databricks via AWS AgentCore.
+These notebooks connect Databricks to a Neo4j graph through the Neo4j MCP
+server on AWS AgentCore. Databricks reaches the server through a Unity Catalog
+HTTP connection.
 
-## Quick Start
+## Overview
 
-### Prerequisites
+- **MCP server:** The Neo4j MCP server runs on AgentCore Runtime. The AgentCore Gateway sits in front of it and checks OAuth2 tokens.
+- **HTTP connection:** Unity Catalog stores the Gateway URL and the OAuth2 machine-to-machine credentials. Databricks gets and refreshes tokens for you.
+- **Secrets:** A setup script copies the OAuth2 credentials into a Databricks secret scope.
+- **Notebooks:** One notebook creates and tests the connection. A second notebook tests, evaluates, and deploys a LangGraph agent.
+- **Read-only access:** The MCP server only exposes read tools. Databricks cannot change the graph.
 
-- **Neo4j MCP server deployed** to AWS AgentCore (`neo4j-mcp-server/`)
-- **Databricks CLI** installed and authenticated:
-  ```bash
-  # Initial login (creates a profile in ~/.databrickscfg)
-  databricks auth login --host <workspace-url> --profile <profile-name>
+## Quick start
 
-  # Refresh expired credentials
-  databricks auth login --profile <profile-name>
+Run these commands from the repo root:
 
-  # Verify authentication
-  databricks auth describe --profile <profile-name>
-  ```
-- **Databricks cluster** running Runtime 15.4 LTS or later with [required libraries](#cluster-setup) installed
-- **Unity Catalog** enabled on your workspace
-- **jq** installed (`brew install jq` on macOS)
+```bash
+# 1. Generate the Gateway credentials (once, after deploying the MCP server)
+cd neo4j-mcp-server
+./deploy.py credentials
 
-### Step 1: Generate AgentCore Credentials
+# 2. Store the credentials in Databricks secrets
+cd ../integrations/databricks
+./setup_databricks_secrets.sh --profile <profile-name>
+```
 
-From the project root, generate the OAuth2 credentials file. This only needs to be done once after deploying the MCP server:
+Then finish in the Databricks workspace:
+
+1. Import and run `neo4j-mcp-http-connection.ipynb` to create the connection.
+2. Turn on **Is MCP connection** for the new connection.
+3. Optional: Import and run `neo4j-mcp-agent-deploy.ipynb` to deploy the agent.
+
+## Prerequisites
+
+- **Neo4j MCP server:** Deploy the server to AgentCore first. See [`neo4j-mcp-server/`](../../neo4j-mcp-server/).
+- **Databricks CLI:** Install the CLI and log in. The commands are below.
+- **Cluster:** Use Databricks Runtime 15.4 LTS or later. Install the [required libraries](#cluster-setup).
+- **Unity Catalog:** Your workspace must have Unity Catalog turned on.
+- **jq:** The setup script uses `jq` to read JSON. On macOS, install it with `brew install jq`.
+
+Log in to the Databricks CLI:
+
+```bash
+# First login. This creates a profile in ~/.databrickscfg.
+databricks auth login --host <workspace-url> --profile <profile-name>
+
+# Log in again when the credentials expire.
+databricks auth login --profile <profile-name>
+
+# Check that the login works.
+databricks auth describe --profile <profile-name>
+```
+
+## Step 1: Generate AgentCore credentials
+
+Run this from the repo root. You only need to do it once after you deploy the
+MCP server.
 
 ```bash
 cd neo4j-mcp-server
 ./deploy.py credentials
 ```
 
-This creates `.mcp-credentials.json` in the `neo4j-mcp-server/` directory. The setup script in the next step reads it automatically from there — no need to copy any files.
+This command writes `neo4j-mcp-server/.mcp-credentials.json`. The setup script
+in Step 2 reads the file from that location. You do not need to copy it.
 
-### Step 2: Configure Databricks Secrets
+## Step 2: Configure Databricks secrets
 
-From the project root:
+Run this from the repo root:
 
 ```bash
 cd integrations/databricks
-./setup_databricks_secrets.sh                              # Uses default profile
-./setup_databricks_secrets.sh --profile my-workspace       # Use a specific Databricks CLI profile
-./setup_databricks_secrets.sh my-scope --profile staging   # Custom scope + profile
+./setup_databricks_secrets.sh                              # default scope and profile
+./setup_databricks_secrets.sh --profile my-workspace       # a specific CLI profile
+./setup_databricks_secrets.sh my-scope --profile staging   # a custom scope and profile
 ```
 
-This reads the OAuth2 credentials from `neo4j-mcp-server/.mcp-credentials.json` and stores them securely in Databricks secrets. The `--profile` flag specifies which Databricks CLI profile to use (as configured in `~/.databrickscfg`).
+- **Scope name:** The first argument sets the secret scope. The default scope is `mcp-neo4j-secrets`.
+- **`--profile`:** This flag picks a Databricks CLI profile from `~/.databrickscfg`.
 
-### Step 3: Import and Run the HTTP Connection Notebook
+The script reads `neo4j-mcp-server/.mcp-credentials.json`. It stores five
+secrets in the scope: `gateway_host`, `client_id`, `client_secret`,
+`token_endpoint`, and `oauth_scope`.
 
-1. Import `neo4j-mcp-http-connection.ipynb` into your Databricks workspace
-2. Attach it to a cluster running Databricks Runtime 15.4 LTS or later
-3. Update the configuration cell with your secret scope name (default: `mcp-neo4j-secrets`)
-4. Run all cells to create the connection and test it
+## Step 3: Run the HTTP connection notebook
 
-### Step 4: Enable MCP on the Connection
+1. Import `neo4j-mcp-http-connection.ipynb` into your Databricks workspace.
+2. Attach it to a cluster that runs Databricks Runtime 15.4 LTS or later.
+3. Set your secret scope name in the configuration cell. The default is `mcp-neo4j-secrets`.
+4. Run all cells. The notebook creates the connection and tests it.
 
-The notebook creates an HTTP connection, but you must manually enable MCP:
+## Step 4: Turn on MCP for the connection
 
-1. In the Databricks sidebar, click **Catalog**
-2. Navigate to **External Data** > **Connections**
-3. Click on your connection name (e.g., `neo4j_agentcore_mcp`)
-4. Click the **three-dot menu** and select **Edit**
-5. Check the **Is MCP connection** box
-6. Click **Update** to save
+The notebook creates an HTTP connection. You must mark it as an MCP connection
+by hand:
 
-### Step 5 (Optional): Deploy the LangGraph Agent
+1. In the Databricks sidebar, click **Catalog**.
+2. Go to **External Data** > **Connections**.
+3. Click your connection name, for example `neo4j_agentcore_mcp`.
+4. Click the **three-dot menu** and select **Edit**.
+5. Check the **Is MCP connection** box.
+6. Click **Update** to save.
 
-To deploy a full LangGraph agent that queries Neo4j:
+## Step 5 (optional): Deploy the LangGraph agent
 
-1. Create Unity Catalog resources: catalog `mcp_demo_catalog` with schema `agents`
-2. Import `neo4j_mcp_agent.py` and `neo4j-mcp-agent-deploy.ipynb` into your workspace
-3. Run `neo4j-mcp-agent-deploy.ipynb` to test, evaluate, and deploy the agent
+1. Create a Unity Catalog catalog named `mcp_demo_catalog` with a schema named `agents`.
+2. Import `neo4j_mcp_agent.py` and `neo4j-mcp-agent-deploy.ipynb` into your workspace.
+3. Run `neo4j-mcp-agent-deploy.ipynb`. It tests, evaluates, and deploys the agent.
 
-## Cluster Setup
+## Cluster setup
 
-Before running the notebooks, configure your Databricks cluster with the required libraries.
+Set up the cluster before you run the notebooks.
 
-### Create or Edit a Cluster
+### Create or edit a cluster
 
-1. Navigate to **Compute** in the Databricks sidebar
-2. Create a new cluster or edit an existing one
-3. Under **Performance**, check **Machine learning** to enable ML Runtime
-4. Select **Databricks Runtime**: 17.3 LTS ML or later recommended
-5. Enable **Single node** for development/testing (optional)
+1. Go to **Compute** in the Databricks sidebar.
+2. Create a new cluster or edit an existing one.
+3. Under **Performance**, check **Machine learning** to use the ML Runtime.
+4. Select a **Databricks Runtime**. Use 17.3 LTS ML or later.
+5. Optional: Turn on **Single node** for development and testing.
 
-### Install Required Libraries
+### Install the required libraries
 
-Go to the **Libraries** tab on your cluster and install these packages from PyPI:
+Open the **Libraries** tab on your cluster. Install these packages from PyPI:
 
 | Library | Version | Notes |
 |---------|---------|-------|
@@ -94,49 +131,43 @@ Go to the **Libraries** tab on your cluster and install these packages from PyPI
 | `databricks-langchain` | `>=0.11.0` | Databricks LangChain integration |
 | `langgraph` | `==1.0.5` | LangGraph agent framework |
 | `langchain-core` | `>=1.2.0` | LangChain core |
-| `langchain-openai` | `==1.1.2` | OpenAI integration (for embeddings) |
+| `langchain-openai` | `==1.1.2` | OpenAI integration for embeddings |
 | `mcp` | latest | Model Context Protocol |
 | `databricks-mcp` | latest | Databricks MCP client |
 | `pydantic` | `==2.12.5` | Data validation |
 | `neo4j` | `==6.0.2` | Neo4j Python driver (optional) |
 | `neo4j-graphrag` | `>=1.10.0` | Neo4j GraphRAG (optional) |
 
-**To add a library:**
-1. Click **Install new** on the Libraries tab
-2. Select **PyPI** as the source
-3. Enter the package name with version (e.g., `langgraph==1.0.5`)
-4. Click **Install**
+To add a library:
 
-## Overview
+1. Click **Install new** on the Libraries tab.
+2. Select **PyPI** as the source.
+3. Enter the package name and version, for example `langgraph==1.0.5`.
+4. Click **Install**.
 
-This sample demonstrates how to connect Databricks to a Neo4j graph database through the Model Context Protocol (MCP). Instead of connecting directly to Neo4j, Databricks uses a Unity Catalog HTTP connection that acts as a secure proxy to an external MCP server running on AWS AgentCore.
+## How it works
 
-Here's how it works:
+Databricks does not connect to Neo4j directly. It calls the MCP server through
+a Unity Catalog HTTP connection.
 
-1. **MCP Server Deployment**: The Neo4j MCP server runs on AWS AgentCore Runtime, accessible via the AgentCore Gateway. The Gateway provides OAuth2 authentication and tool name prefixing.
+- **Gateway:** The AgentCore Gateway checks the OAuth2 token. It adds the target name to each tool name.
+- **HTTP connection:** The connection stores the Gateway URL and the OAuth2 client ID, client secret, and token endpoint. Databricks exchanges and refreshes tokens on its own.
+- **Proxy:** Databricks sends MCP calls through its proxy at `/api/2.0/mcp/external/{connection_name}`. The proxy adds the OAuth2 token and forwards the request to the Gateway.
+- **Tool calls:** The Gateway routes each call to the MCP server. For example, `neo4j-mcp-server-target___read-cypher` goes to the `read-cypher` tool. The server runs the Cypher query against Neo4j and returns the results.
 
-2. **Unity Catalog HTTP Connection**: Databricks creates an HTTP connection in Unity Catalog that stores the Gateway endpoint URL and OAuth2 M2M credentials (client ID, client secret, token endpoint). Databricks automatically handles token exchange and refresh.
+This setup gives you these benefits:
 
-3. **Secure Proxy**: When notebooks or SQL queries call the MCP tools, Databricks routes requests through its internal proxy (`/api/2.0/mcp/external/{connection_name}`). This proxy handles OAuth2 authentication and forwards requests to the AgentCore Gateway.
+- **Central credentials:** Databricks secrets hold all the credentials in one place.
+- **Automatic token refresh:** Databricks handles the OAuth2 token lifecycle.
+- **Governance:** Unity Catalog governs and audits access to the connection.
+- **Network isolation:** You can lock down the MCP server to accept requests only from approved sources.
+- **One interface:** Notebooks and agents both use the same MCP protocol.
 
-4. **Tool Execution**: The Gateway prefixes tool names with the target name (e.g., `neo4j-mcp-server-target___read-cypher`), then routes to the MCP Runtime. The MCP server parses JSON-RPC requests, executes Cypher queries against Neo4j, and returns results.
+## Why the server runs outside Databricks
 
-This architecture provides several benefits:
-- **Centralized credential management** via Databricks secrets
-- **Automatic token refresh** - Databricks handles OAuth2 token lifecycle
-- **Governance and auditing** through Unity Catalog
-- **Network isolation** - the MCP server can be locked down to only accept requests from authorized sources
-- **Consistent interface** - notebooks and agents use the same MCP protocol
-
-## Why External Hosting?
-
-You might wonder: "Why not just run the Neo4j MCP server directly in Databricks?" The answer lies in fundamental technology constraints.
-
-### The Problem: Technology Stack Mismatch
-
-The official Neo4j MCP server ([github.com/neo4j/mcp](https://github.com/neo4j/mcp)) is **written in Go** and distributed as a **compiled binary or Docker container**. This creates an incompatibility with Databricks Apps, which has strict runtime limitations.
-
-### Databricks Apps Limitations
+The official Neo4j MCP server ([github.com/neo4j/mcp](https://github.com/neo4j/mcp))
+is written in Go. It ships as a compiled binary or a Docker container.
+Databricks Apps cannot run it.
 
 | Capability | Databricks Apps | Neo4j MCP Server |
 |------------|-----------------|------------------|
@@ -146,16 +177,17 @@ The official Neo4j MCP server ([github.com/neo4j/mcp](https://github.com/neo4j/m
 | **File size** | Max 10 MB | Binary exceeds limit |
 | **Dependencies** | pip/npm packages only | System-level binary |
 
-### The Databricks-Recommended Solution
+Databricks recommends external hosting for MCP servers that cannot run in
+Databricks Apps. You can host the server on AWS AgentCore or Azure Container
+Apps. This gives you:
 
-This external hosting pattern is **Databricks' recommended approach** for MCP servers that cannot run natively in Databricks Apps. By deploying the MCP server to AWS AgentCore (or Azure Container Apps), you get:
+- **Full compatibility:** You can run any MCP server, in any language or runtime.
+- **Managed infrastructure:** AgentCore handles scaling, security, and availability.
+- **Secure integration:** Unity Catalog HTTP connections add governance.
+- **Automatic auth:** Databricks manages the OAuth2 token lifecycle.
 
-1. **Full compatibility** - Run any MCP server regardless of language or runtime
-2. **Managed infrastructure** - AgentCore handles scaling, security, and availability
-3. **Secure integration** - Unity Catalog HTTP connections provide governance
-4. **Automatic auth** - Databricks manages OAuth2 token lifecycle
-
-This pattern applies to any MCP server built with Go, Rust, C++, or other compiled languages, not just Neo4j.
+The same pattern works for any MCP server built in Go, Rust, C++, or another
+compiled language.
 
 ## Architecture
 
@@ -227,7 +259,7 @@ This pattern applies to any MCP server built with Go, Rust, C++, or other compil
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Request Flow
+### Request flow
 
 ```
 1. Notebook calls http_request() or agent invokes MCP tool
@@ -252,31 +284,31 @@ This pattern applies to any MCP server built with Go, Rust, C++, or other compil
 
 | File | Description |
 |------|-------------|
-| [neo4j-mcp-http-connection.ipynb](./neo4j-mcp-http-connection.ipynb) | Setup and test an HTTP connection to query Neo4j via MCP |
-| [neo4j_mcp_agent.py](./neo4j_mcp_agent.py) | LangGraph agent that connects to Neo4j via external MCP HTTP connection |
-| [neo4j-mcp-agent-deploy.ipynb](./neo4j-mcp-agent-deploy.ipynb) | Test, evaluate, and deploy the Neo4j MCP agent |
-| [setup_databricks_secrets.sh](./setup_databricks_secrets.sh) | Setup script to configure OAuth2 secrets from AgentCore credentials |
-| [MANUAL-SETUP.md](./MANUAL-SETUP.md) | Create the HTTP connection by hand in the Databricks UI instead of the notebook |
-| [databricks-mcp-setup.md](./databricks-mcp-setup.md) | Register the Gateway as a Unity Catalog MCP Service for AI Playground and Databricks agents |
+| [neo4j-mcp-http-connection.ipynb](./neo4j-mcp-http-connection.ipynb) | Creates and tests an HTTP connection that queries Neo4j through MCP |
+| [neo4j_mcp_agent.py](./neo4j_mcp_agent.py) | LangGraph agent that queries Neo4j through the MCP HTTP connection |
+| [neo4j-mcp-agent-deploy.ipynb](./neo4j-mcp-agent-deploy.ipynb) | Tests, evaluates, and deploys the Neo4j MCP agent |
+| [setup_databricks_secrets.sh](./setup_databricks_secrets.sh) | Stores the AgentCore OAuth2 credentials in Databricks secrets |
+| [MANUAL-SETUP.md](./MANUAL-SETUP.md) | Creates the HTTP connection by hand in the Databricks UI instead of the notebook |
+| [databricks-mcp-setup.md](./databricks-mcp-setup.md) | Registers the Gateway as a Unity Catalog MCP Service for AI Playground and Databricks agents |
 
-## Available MCP Tools
+## Available MCP tools
 
-Tool names are prefixed by the AgentCore Gateway:
+The AgentCore Gateway adds the target name to each tool name:
 
-| Tool | Gateway Name | Description |
+| Tool | Gateway name | Description |
 |------|--------------|-------------|
-| `get-schema` | `neo4j-mcp-server-target___get-schema` | Retrieve database schema |
-| `read-cypher` | `neo4j-mcp-server-target___read-cypher` | Execute read-only Cypher queries |
+| `get-schema` | `neo4j-mcp-server-target___get-schema` | Returns the database schema |
+| `read-cypher` | `neo4j-mcp-server-target___read-cypher` | Runs read-only Cypher queries |
 
-## Example Usage
+## Example usage
 
-After completing the Quick Start, you can query Neo4j from any notebook:
+After the quick start, you can query Neo4j from any notebook:
 
 ```python
-# Using the helper function from the HTTP connection notebook
+# Use the helper function from the HTTP connection notebook
 result = query_neo4j("MATCH (n:Person) RETURN n.name LIMIT 10")
 
-# Or directly with SQL (note the prefixed tool name)
+# Or call the tool from SQL. Use the Gateway tool name.
 spark.sql("""
     SELECT http_request(
       conn => 'neo4j_agentcore_mcp',
@@ -288,34 +320,36 @@ spark.sql("""
 """)
 ```
 
-## Agent Configuration
+## Agent configuration
 
-Edit `neo4j_mcp_agent.py` to customize:
+Edit these settings in `neo4j_mcp_agent.py`:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `LLM_ENDPOINT_NAME` | Databricks LLM endpoint | `databricks-claude-3-7-sonnet` |
 | `CONNECTION_NAME` | HTTP connection name | `neo4j_agentcore_mcp` |
-| `SECRET_SCOPE` | Secrets scope name | `mcp-neo4j-secrets` |
+| `SECRET_SCOPE` | Secret scope name | `mcp-neo4j-secrets` |
 | `system_prompt` | Agent instructions | Neo4j query assistant |
 
 ## Security
 
-This integration provides **read-only access** to Neo4j. The MCP server is deployed with `NEO4J_READ_ONLY=true`, which disables the `write-cypher` tool at the server level.
+This integration gives **read-only access** to Neo4j. The MCP server runs with
+`NEO4J_READ_ONLY=true`. That setting turns off the `write-cypher` tool on the
+server.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Secret not found | Run `./setup_databricks_secrets.sh` |
-| Connection already exists | Drop it with `DROP CONNECTION IF EXISTS neo4j_agentcore_mcp` |
-| HTTP timeout | Verify MCP server is running with `cd neo4j-mcp-server && ./cloud.sh` |
-| 401 Unauthorized | Re-run `./deploy.py credentials` then `./setup_databricks_secrets.sh` |
-| Tool not found | Use the Gateway-prefixed name: `neo4j-mcp-server-target___get-schema` |
+| Secret not found | Run `./setup_databricks_secrets.sh` from `integrations/databricks/`. |
+| Connection already exists | Drop it with `DROP CONNECTION IF EXISTS neo4j_agentcore_mcp`. |
+| HTTP timeout | Check that the MCP server is running. From the repo root, run `cd neo4j-mcp-server && ./cloud.sh`. |
+| 401 Unauthorized | Run `./deploy.py credentials` in `neo4j-mcp-server/`. Then run `./setup_databricks_secrets.sh` again. |
+| Tool not found | Use the Gateway tool name, for example `neo4j-mcp-server-target___get-schema`. |
 
-## Related Documentation
+## Related documentation
 
-- [neo4j-mcp-server](../../neo4j-mcp-server/) - MCP server deployment to AWS AgentCore
+- [`neo4j-mcp-server/`](../../neo4j-mcp-server/): Deploys the MCP server to AWS AgentCore.
 - [Databricks HTTP Connections](https://docs.databricks.com/aws/en/query-federation/http)
 - [Databricks External MCP](https://docs.databricks.com/aws/en/generative-ai/mcp/external-mcp)
 - [Neo4j Cypher Manual](https://neo4j.com/docs/cypher-manual/current/)

@@ -25,7 +25,6 @@ import boto3
 from botocore.client import BaseClient
 
 
-DEFAULT_REGION = "eu-west-1"
 DEFAULT_DATABASE = "finance"
 DEFAULT_CATALOG = "AwsDataCatalog"
 DEFAULT_WORKGROUP = "primary"
@@ -168,8 +167,10 @@ def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--region",
-        default=DEFAULT_REGION,
-        help=f"Athena Region (default: {DEFAULT_REGION}).",
+        help=(
+            "Athena Region. Defaults to the active AWS profile's Region, "
+            "then us-east-1, matching the Iceberg loaders."
+        ),
     )
     parser.add_argument(
         "--database",
@@ -321,7 +322,8 @@ def main() -> None:
             print(query.sql.strip())
         return
 
-    client = boto3.client("athena", region_name=args.region)
+    region = args.region or boto3.Session().region_name or "us-east-1"
+    client = boto3.client("athena", region_name=region)
     for query in SAMPLE_QUERIES:
         run_query(client, query, args)
 

@@ -1,63 +1,73 @@
 # Neo4j Aura Agents Python Client
 
-A Python client for calling external Neo4j Aura Agents via the REST API.
+This Python client calls an external Neo4j Aura Agent through its REST API.
 
 ## Overview
 
-[Neo4j Aura Agents](https://neo4j.com/developer/genai-ecosystem/aura-agent/) is an agent-creation platform that enables you to rapidly build, test, and deploy AI agents grounded by your enterprise data in AuraDB. Once you've created an agent and made it "external," you can call it via a REST API endpoint.
+- **Aura Agents:** [Neo4j Aura Agents](https://neo4j.com/developer/genai-ecosystem/aura-agent/) lets you build, test, and deploy AI agents that answer from your AuraDB data. An agent marked "External" gets a REST endpoint.
+- **Authentication:** The client gets an OAuth2 token, caches it, and refreshes it before it expires.
+- **Invocation:** The client can call the agent synchronously or asynchronously.
+- **Typed responses:** Pydantic models hold the response text, reasoning, tool uses, and token usage.
+- **CLI:** `cli.py` sends one question to the agent from the command line.
+- **Interactive chat:** `examples/interactive_chat.py` runs a question and answer session.
 
-This client library provides:
+## Quick start
 
-- OAuth2 authentication with automatic token caching and refresh
-- Both synchronous and asynchronous invocation methods
-- Pydantic models for type-safe responses
-- CLI tool for quick queries
-- Interactive chat mode
+Run these commands from the repo root:
+
+```bash
+cd integrations/neo4j-aura-agents
+uv sync
+cp .env.sample .env        # add NEO4J_CLIENT_ID, NEO4J_CLIENT_SECRET, NEO4J_AGENT_ENDPOINT
+
+uv run python cli.py "What's in the graph?"
+uv run python cli.py --tools
+uv run python examples/interactive_chat.py
+```
 
 ## Prerequisites
 
-1. **Neo4j Aura Account** with an AuraDB instance
-2. **An Aura Agent** with external endpoint enabled
-3. **API Credentials** (Client ID and Secret) from your Neo4j profile
-4. **Python 3.13+** and the `uv` package manager
+- **Neo4j Aura account:** You need an Aura account with an AuraDB instance.
+- **Aura Agent:** You need an agent with its external endpoint turned on.
+- **API credentials:** You need a client ID and secret from your Neo4j profile.
+- **Python and uv:** You need Python 3.13 or later and the `uv` package manager.
 
-## Setting Up Your Aura Agent
+## Set up your Aura Agent
 
-### Step 1: Create Your Aura Agent
+### Step 1: Create the agent
 
-First, create your Aura Agent by following the hands-on lab:
-**[Neo4j Aura Agents Lab](https://github.com/neo4j-partners/hands-on-lab-neo4j-and-azure/tree/main/Lab_2_Aura_Agents)**
+Follow the [Neo4j Aura Agents Lab](https://github.com/neo4j-partners/hands-on-lab-neo4j-and-azure/tree/main/Lab_2_Aura_Agents)
+to create an agent.
 
-**Important:** When creating your agent, select **"External endpoint"** to enable REST API access.
+**Important:** Select **"External endpoint"** when you create the agent. This
+turns on REST API access.
 
-### Step 2: Get Your Agent Endpoint URL
+### Step 2: Get the agent endpoint URL
 
-After creating your agent:
-1. Click on your agent in the Aura console
-2. Copy the endpoint URL (it will look like `https://api.neo4j.io/v2beta1/projects/.../agents/.../invoke`)
+1. Click your agent in the Aura console.
+2. Copy the endpoint URL. It looks like `https://api.neo4j.io/v2beta1/projects/.../agents/.../invoke`.
 
-### Step 3: Get Your API Credentials
+### Step 3: Get your API credentials
 
-To get your Client ID and Secret:
-1. Click on your **profile icon** in the top right corner
-2. Go to **Settings**
-3. Select the **API keys** tab
-4. Create a new API key to get your Client ID and Client Secret
+1. Click your **profile icon** in the top right corner.
+2. Go to **Settings**.
+3. Select the **API keys** tab.
+4. Create a new API key. Aura shows you the client ID and client secret.
 
 ![Aura API Keys Settings](images/auraagentsapikey.png)
 
-## Quick Start with Jupyter Notebook
+## Test with the Jupyter notebook
 
-If you followed the lab setup in the main README.md, you can test your agent using the Jupyter notebook:
-
-1. Open [aura_agent_demo.ipynb](aura_agent_demo.ipynb)
-2. Copy your credentials and set the values in the notebook:
-   - `CLIENT_ID` - Your API key Client ID
-   - `CLIENT_SECRET` - Your API key Client Secret
-   - `AGENT_ENDPOINT` - Your agent's endpoint URL
-3. Run the notebook cells to test your agent
+1. Open [aura_agent_demo.ipynb](aura_agent_demo.ipynb).
+2. Set these values in the notebook:
+   - **`CLIENT_ID`:** This is your API key client ID.
+   - **`CLIENT_SECRET`:** This is your API key client secret.
+   - **`AGENT_ENDPOINT`:** This is your agent's endpoint URL.
+3. Run the notebook cells to test your agent.
 
 ## Installation
+
+Run this from the repo root:
 
 ```bash
 cd integrations/neo4j-aura-agents
@@ -66,20 +76,28 @@ uv sync
 
 ## Configuration
 
-1. Copy the example environment file:
-   ```bash
-   cp .env.sample .env
-   ```
+Copy the sample environment file:
 
-2. Edit `.env` with your credentials:
-   ```bash
-   # From your Neo4j Aura user profile (API Keys)
-   NEO4J_CLIENT_ID=your-client-id
-   NEO4J_CLIENT_SECRET=your-client-secret
+```bash
+cp .env.sample .env
+```
 
-   # From the Aura Agent console (Copy endpoint button)
-   NEO4J_AGENT_ENDPOINT=https://api.neo4j.io/v2beta1/projects/.../agents/.../invoke
-   ```
+Then set these values in `.env`:
+
+- **`NEO4J_CLIENT_ID`:** This is the client ID from your Aura API key. It is required.
+- **`NEO4J_CLIENT_SECRET`:** This is the client secret from your Aura API key. It is required.
+- **`NEO4J_AGENT_ENDPOINT`:** This is the invoke URL from the Aura Agent console. It is required.
+- **`NEO4J_TOKEN_URL`:** This sets a custom OAuth2 token URL. It is optional. The default is `https://api.neo4j.io/oauth/token`.
+- **`NEO4J_TIMEOUT`:** This sets the request timeout in seconds. It is optional. The default is 60.
+
+```bash
+# From your Neo4j Aura user profile (API Keys)
+NEO4J_CLIENT_ID=your-client-id
+NEO4J_CLIENT_SECRET=your-client-secret
+
+# From the Aura Agent console (Copy endpoint button)
+NEO4J_AGENT_ENDPOINT=https://api.neo4j.io/v2beta1/projects/.../agents/.../invoke
+```
 
 ## Usage
 
@@ -88,21 +106,21 @@ uv sync
 ```python
 from src import AuraAgentClient
 
-# Create client from environment variables
+# Create a client from environment variables
 client = AuraAgentClient.from_env()
 
-# Or create with explicit credentials
+# Or create a client with explicit credentials
 client = AuraAgentClient(
     client_id="your-client-id",
     client_secret="your-client-secret",
     endpoint_url="https://api.neo4j.io/v2beta1/projects/.../agents/.../invoke"
 )
 
-# Invoke the agent (sync)
+# Call the agent (sync)
 response = client.invoke("What contracts mention Motorola?")
 print(response.text)
 
-# Invoke the agent (async)
+# Call the agent (async)
 import asyncio
 response = asyncio.run(client.invoke_async("What's in the graph?"))
 print(response.text)
@@ -110,41 +128,44 @@ print(response.text)
 
 ### CLI
 
+Run these from `integrations/neo4j-aura-agents/`:
+
 ```bash
-# No arguments - asks default question about agent capabilities
+# No arguments: ask the default question about the graph
 uv run python cli.py
 
-# Ask what tools the agent has available
+# Ask which tools the agent has
 uv run python cli.py --tools
 
-# Query a specific company
+# Ask about a specific company
 uv run python cli.py "Tell me about NVIDIA CORPORATION"
 
-# JSON output (for scripting)
+# JSON output for scripts
 uv run python cli.py --json "Give me a summary" | jq .text
 
-# Raw API response (for debugging)
+# Raw API response for debugging
 uv run python cli.py --raw "What tools do you have?"
 
-# Verbose mode with debug output
+# Debug logging
 uv run python cli.py -v "Explain the schema"
 
-# Read from stdin
+# Read the question from stdin
 echo "What's in the graph?" | uv run python cli.py -
 ```
 
-#### CLI Options
+#### CLI options
 
 | Option | Description |
 |--------|-------------|
-| `(no args)` | Ask default question about agent capabilities |
-| `--tools` | List the tools available to the agent |
-| `--json`, `-j` | Output response as formatted JSON |
-| `--raw`, `-r` | Output raw API response (for debugging) |
-| `--verbose`, `-v` | Enable debug logging |
-| `--timeout`, `-t` | Request timeout in seconds (default: 60) |
+| `(no args)` | Ask the default question about the data in the graph |
+| `-` | Read the question from stdin |
+| `--tools` | Ask the agent to list its tools |
+| `--json`, `-j` | Print the response as formatted JSON |
+| `--raw`, `-r` | Print the raw API response |
+| `--verbose`, `-v` | Turn on debug logging |
+| `--timeout`, `-t` | Accepted, but the CLI does not pass it to the client yet. Set `NEO4J_TIMEOUT` in `.env` instead. |
 
-### Interactive Chat
+### Interactive chat
 
 ```bash
 uv run python examples/interactive_chat.py
@@ -154,18 +175,19 @@ uv run python examples/interactive_chat.py
 
 | Example | Description |
 |---------|-------------|
-| `examples/basic_usage.py` | Simple synchronous invocation |
+| `examples/basic_usage.py` | Simple synchronous call |
 | `examples/async_usage.py` | Concurrent async queries |
-| `examples/interactive_chat.py` | Interactive Q&A session |
+| `examples/interactive_chat.py` | Interactive question and answer session |
 
 Run an example:
+
 ```bash
 uv run python examples/basic_usage.py
 ```
 
-## Discovering Agent Tools
+## Discover agent tools
 
-You can ask the agent what tools it has available:
+Ask the agent which tools it has:
 
 ```bash
 $ uv run python cli.py --tools
@@ -177,13 +199,14 @@ I have one tool available:
     as SEC filings, identified risk factors, and major institutional owners.
 ```
 
-The tools available depend on how the agent was configured in the Aura console. Common tools include:
+The tools depend on how you configured the agent in the Aura console. The
+agent from the lab has this tool:
 
 | Tool | Parameters | Description |
 |------|------------|-------------|
-| `get_company_overview` | `company_name: str` | Retrieves SEC filings, risk factors, and institutional owners |
+| `get_company_overview` | `company_name: str` | Returns SEC filings, risk factors, and institutional owners |
 
-## API Reference
+## API reference
 
 ### AuraAgentClient
 
@@ -211,10 +234,10 @@ class AuraAgentClient:
 ```python
 class AgentResponse:
     text: str | None           # Formatted response text
-    thinking: str | None       # Agent reasoning steps (shows agent's logic)
-    tool_uses: list[ToolUse]   # Tools used during invocation
+    thinking: str | None       # Agent reasoning steps
+    tool_uses: list[ToolUse]   # Tools used during the call
     status: str | None         # Request status (SUCCESS)
-    usage: AgentUsage | None   # Token usage metrics
+    usage: AgentUsage | None   # Token usage
     raw_response: dict | None  # Full JSON for debugging
 ```
 
@@ -227,9 +250,9 @@ class AgentUsage:
     total_tokens: int | None     # Total tokens used
 ```
 
-## Example Output
+## Example output
 
-### Text Response
+### Text response
 
 ```bash
 $ uv run python cli.py "Tell me about Apple Inc"
@@ -249,7 +272,7 @@ Major asset managers holding Apple Inc. include:
 ...
 ```
 
-### JSON Response
+### JSON response
 
 ```bash
 $ uv run python cli.py --json "What tools do you have?" | jq .
@@ -269,7 +292,7 @@ $ uv run python cli.py --json "What tools do you have?" | jq .
 }
 ```
 
-### Raw API Response
+### Raw API response
 
 ```bash
 $ uv run python cli.py --raw "Hello" | jq .
@@ -293,28 +316,24 @@ $ uv run python cli.py --raw "Hello" | jq .
 }
 ```
 
-## How Aura Agents Work
+## How Aura Agents work
 
-1. **Create an Agent** in the Neo4j Aura console:
-   - Configure your AuraDB instance as the data source
-   - Define the agent's capabilities and behavior
-   - Test with the built-in chat interface
+1. **Create an agent:** You create the agent in the Neo4j Aura console.
+   - Set your AuraDB instance as the data source.
+   - Define what the agent does and how it behaves.
+   - Test it in the built-in chat.
+2. **Make it external:** You set the agent's visibility to "External".
+   - Copy the endpoint URL.
+3. **Get API credentials:** You create an API key in your Neo4j user profile.
+   - Go to your profile, then **API Keys**.
+   - Create a new key and secret.
+4. **Call the REST API:** Your code gets a token and posts the question.
+   - Get a bearer token through OAuth2.
+   - POST `{"input": "your question"}` to the agent endpoint.
 
-2. **Make it External**:
-   - Set visibility to "External" in the agent settings
-   - Copy the endpoint URL
+## Authentication flow
 
-3. **Get API Credentials**:
-   - Go to your Neo4j user profile → API Keys
-   - Create a new API key and secret
-
-4. **Call via REST API**:
-   - Authenticate via OAuth2 to get a bearer token
-   - POST to the agent endpoint with `{"input": "your question"}`
-
-## Authentication Flow
-
-The client handles OAuth2 automatically:
+The client handles OAuth2 for you:
 
 ```
 1. POST https://api.neo4j.io/oauth/token
@@ -328,7 +347,8 @@ The client handles OAuth2 automatically:
    - Response: { text, thinking, status, usage, ... }
 ```
 
-Tokens are cached and automatically refreshed when expired.
+The client caches the token. It gets a new token 60 seconds before the old one
+expires. It also gets a new token and retries once if the API returns 401.
 
 ## Resources
 

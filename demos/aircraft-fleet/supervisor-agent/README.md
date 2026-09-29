@@ -1,9 +1,34 @@
 # Aircraft Fleet Supervisor Agent
 
-A supervisor agent that classifies an incoming query and routes it to a
-specialized worker, using LangGraph's Supervisor pattern. Workers query the
-aviation fleet graph through the same Neo4j MCP Gateway path as the other
-agents. This agent is the reference for multi-agent routing and observability.
+This LangGraph supervisor agent reads each question and sends it to one
+specialist worker. The workers query the aircraft fleet graph through the Neo4j
+MCP Gateway.
+
+## Overview
+
+- **Supervisor:** The supervisor classifies each question and sends it to exactly one worker. Unclear or general questions go to the Operations Agent.
+- **Maintenance Agent:** This worker handles faults, components, sensors, and reliability.
+- **Operations Agent:** This worker handles flights, delays, routes, and airports.
+- **Shared tools:** Each worker is a focused ReAct agent. Both use the same MCP tools.
+- **Traces:** CloudWatch traces show the routing decision, the chosen worker, its tool calls, and the final answer in one session.
+- **Purpose:** This agent is the reference example for multi-agent routing and observability.
+
+## Quick start
+
+Run these commands from `demos/aircraft-fleet/supervisor-agent/`:
+
+```bash
+uv sync
+../../../scripts/sync-credentials.sh   # copy the fleet MCP credentials here
+
+./agent.sh start                       # serves http://localhost:8080
+./agent.sh test-maintenance            # a question that goes to Maintenance
+./agent.sh test-operations             # a question that goes to Operations
+
+./agent.sh configure                   # deploy to AgentCore Runtime
+./agent.sh deploy
+./agent.sh invoke-cloud "What are the most common maintenance faults?"
+```
 
 ## Architecture
 
@@ -24,66 +49,49 @@ agents. This agent is the reference for multi-agent routing and observability.
                     Neo4j MCP Server -> Neo4j
 ```
 
-## Unique Features
-
-- **Intent routing.** The supervisor classifies each query and dispatches it
-  to exactly one worker. Ambiguous or general questions go to the Operations
-  Agent.
-- **Domain specialists.** The Maintenance Agent handles faults, components,
-  sensors, and reliability. The Operations Agent handles flights, delays,
-  routes, and airports. Each is a focused ReAct agent over the same MCP tools.
-- **Multi-agent traces.** With three agents, CloudWatch traces show the
-  routing decision, the chosen worker, its tool calls, and the final
-  response in one session.
-
 ### Routing
 
-| Query mentions | Routes to |
-|----------------|-----------|
-| maintenance, fault, repair, failure, component, sensor, reliability | Maintenance Agent |
-| flight, delay, schedule, on-time, airport, route, departure, arrival | Operations Agent |
-| Neither, or general (schema, counts) | Operations Agent |
+The supervisor asks the LLM to classify each question. The router prompt in
+`core/prompts.py` gives the LLM these keywords:
 
-## Layout
-
-The agent follows the shared `core/` + `server/` + `client/` convention.
-`core/` holds everything reusable, `server/` is the only thing that ships in
-the Docker image, and `client/` is local-only tooling.
-
-| Path | Purpose |
-|------|---------|
-| `core/config.py` | Model id and region (env-overridable) |
-| `core/prompts.py` | Router and the two specialist system prompts |
-| `core/credentials.py` | Credential loading + in-memory OAuth2 token refresh |
-| `core/factory.py` | Bedrock LLM and MCP tool factories |
-| `core/graph.py` | LangGraph router + specialist nodes + graph builder |
-| `server/runtime_app.py` | AgentCore entrypoint (`fleet-supervisor-server`) |
-| `client/invoke.py` | Cloud invocation and load testing (`fleet-supervisor-invoke`) |
-| `client/queries.txt` | 20 test queries, 10 maintenance and 10 operations |
-| `agent.sh` | CLI wrapper for local run and deployment |
+| Question mentions | Goes to |
+|-------------------|---------|
+| maintenance, fault, failure, component, system, reliability, sensor, reading, repair, hydraulic, engine, avionics, critical, severity | Maintenance Agent |
+| flight, delay, route, airport, operator, schedule, departure, arrival, on-time, airline, carrier | Operations Agent |
+| Neither, or a general topic such as schema or counts | Operations Agent |
 
 ## Prerequisites
 
-1. Python 3.10+ and the `uv` package manager.
-2. AWS CLI configured, with Bedrock model access enabled.
-3. The fleet graph loaded into Neo4j by [../pipeline/](../pipeline/).
-4. A `fleet` Neo4j MCP server deployment pointed at that same Neo4j instance.
-   From `neo4j-mcp-server/`, run `./deploy.py --env fleet` and then
-   `./deploy.py --env fleet credentials`.
+1. **Python:** You need Python 3.10 or later and the `uv` package manager.
+2. **AWS:** You need the AWS CLI configured, with Bedrock model access.
+3. **Graph:** You need the fleet graph loaded into Neo4j by [`demos/aircraft-fleet/pipeline/`](../pipeline/).
+4. **MCP server:** You need a `fleet` Neo4j MCP server deployment that points at the same Neo4j database. Run these commands from the repo root:
 
-## Quick Start: Local
+   ```bash
+   cd neo4j-mcp-server
+   ./deploy.py --env fleet
+   ./deploy.py --env fleet credentials
+   ```
+
+## Run locally
+
+Run these commands from `demos/aircraft-fleet/supervisor-agent/`:
 
 ```bash
 uv sync
-../../../scripts/sync-credentials.sh   # or: cp ../../../neo4j-mcp-server/.mcp-credentials.fleet.json .mcp-credentials.json
+../../../scripts/sync-credentials.sh
 
 ./agent.sh start                   # serves http://localhost:8080
-                                   # (equivalent: uv run fleet-supervisor-server)
-./agent.sh test-maintenance        # query that routes to Maintenance
-./agent.sh test-operations         # query that routes to Operations
+./agent.sh test-maintenance        # a question that goes to Maintenance
+./agent.sh test-operations         # a question that goes to Operations
 ```
 
-## Quick Start: Cloud
+- **Credentials:** `sync-credentials.sh` copies `neo4j-mcp-server/.mcp-credentials.fleet.json` to `.mcp-credentials.json` in this folder. You can also copy the file by hand.
+- **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server`.
+
+## Deploy to AgentCore Runtime
+
+Run these commands from `demos/aircraft-fleet/supervisor-agent/`:
 
 ```bash
 ./agent.sh configure
@@ -96,36 +104,52 @@ uv sync
 
 | Command | Description |
 |---------|-------------|
-| `./agent.sh start` / `stop` | Run or stop locally on port 8080 |
-| `./agent.sh test` | General query |
-| `./agent.sh test-maintenance` | Query that routes to the Maintenance Agent |
-| `./agent.sh test-operations` | Query that routes to the Operations Agent |
-| `./agent.sh configure` | Generate AWS deployment config |
-| `./agent.sh deploy` / `destroy` | Deploy to or remove from AgentCore |
-| `./agent.sh status` | Check deployment status |
-| `./agent.sh invoke-cloud "prompt"` | Invoke the deployed agent |
-| `./agent.sh load-test [N]` | Continuous cloud test, N-second interval |
+| `./agent.sh start` / `stop` | Start or stop the agent locally on port 8080 |
+| `./agent.sh test` | Send a general question to the local agent |
+| `./agent.sh test-maintenance` | Send a question that goes to the Maintenance Agent |
+| `./agent.sh test-operations` | Send a question that goes to the Operations Agent |
+| `./agent.sh configure` | Create the AWS deployment config in `AWS_REGION`, or `us-east-1` if it is unset |
+| `./agent.sh deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
+| `./agent.sh status` | Show the deployment status |
+| `./agent.sh invoke-cloud "prompt"` | Call the deployed agent |
+| `./agent.sh load-test [N]` | Send a random test question to the deployed agent every N seconds. The default is 5. |
 
-## Environment Variables
+## Layout
+
+The agent follows the shared `core/`, `server/`, and `client/` layout:
+
+- **`core/`:** This folder holds the reusable code.
+- **`server/`:** This folder is the only code that ships in the Docker image.
+- **`client/`:** This folder holds local tools only.
+
+| Path | Purpose |
+|------|---------|
+| `core/config.py` | The model ID and region. Environment variables can override them. |
+| `core/prompts.py` | The router prompt and the two specialist system prompts |
+| `core/credentials.py` | Credential loading and in-memory OAuth2 token refresh |
+| `core/factory.py` | The Bedrock LLM and MCP tool factories |
+| `core/graph.py` | The LangGraph router, the specialist nodes, and the graph builder |
+| `server/runtime_app.py` | The AgentCore entrypoint, run by `fleet-supervisor-server` |
+| `client/invoke.py` | Cloud calls and load testing, run by `fleet-supervisor-invoke` |
+| `client/queries.txt` | 20 test questions: 10 for maintenance and 10 for operations |
+| `agent.sh` | The command wrapper for local runs and deployment |
+
+## Environment variables
 
 | Variable | Default |
 |----------|---------|
 | `MODEL_ID` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
 | `AWS_REGION` | `us-east-1` |
 
-## Example Queries
+## Example questions
 
-**Maintenance:** "Which components have the most failures?",
-"Show hydraulic system issues", "What is the reliability history of avionics?"
+- **Maintenance:** "Which components have the most failures?", "Show hydraulic system issues", and "What is the reliability history of avionics?"
+- **Operations:** "What are the most common delay causes?", "Compare on-time performance by airline", and "Which airports have the highest traffic?"
+- **General:** "What is the database schema?" goes to the Operations Agent.
 
-**Operations:** "What are the most common delay causes?",
-"Compare on-time performance by airline", "Which airports have the highest traffic?"
+See `client/queries.txt` for all 20 questions.
 
-**General:** "What is the database schema?" routes to the Operations Agent.
+## See also
 
-See `client/queries.txt` for the full set of 20.
-
-## See Also
-
-- [../../../docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) for the full system design
-- [../graphrag-agent/](../graphrag-agent/) for the single-agent version
+- **System design:** [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) describes the full system.
+- **Single agent:** [`demos/aircraft-fleet/graphrag-agent/`](../graphrag-agent/) is the single-agent version. It connects to Neo4j directly.

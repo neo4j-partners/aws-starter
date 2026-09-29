@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test Neo4j connectivity using cypher-shell
-# Usage: ./scripts/test-neo4j-connection.sh
+# Usage: ./test-neo4j-connection.sh
 
 set -e
 

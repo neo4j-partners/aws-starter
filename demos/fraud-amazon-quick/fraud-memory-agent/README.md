@@ -1,84 +1,95 @@
 # Fraud Memory Agent
 
-This Strands agent investigates financial-crime patterns in a Neo4j graph
-through an Amazon Bedrock AgentCore Gateway. It uses the hosted Neo4j Agent
-Memory Service (NAMS) to capture every user and assistant turn, extract
-entities, and record MCP tool calls as reasoning traces.
+This Strands agent investigates financial-crime patterns in a Neo4j graph. It
+reaches the graph through an Amazon Bedrock AgentCore Gateway and records every
+turn in the hosted Neo4j Agent Memory Service.
 
-The fraud graph and agent memory are deliberately separate. The MCP server
-owns graph access; NAMS owns memory storage, embeddings, and its schema. The
-agent needs no direct Neo4j credentials for memory.
+## Overview
 
-## What NAMS captures
+- **Graph access:** The agent calls Neo4j MCP tools through the AgentCore Gateway. It never connects to Neo4j directly.
+- **NAMS:** The Neo4j Agent Memory Service, called **NAMS** below, stores each user and assistant turn. It also extracts entities and records MCP tool calls as reasoning traces.
+- **Separate stores:** The fraud graph and agent memory stay apart. The MCP server owns graph access. NAMS owns memory storage, embeddings, and its schema.
+- **Credentials:** The agent needs no `NEO4J_*` values. It needs a NAMS API key and the Gateway credentials file `.mcp-credentials.json`.
+- **Local and cloud:** You can run the agent locally on port 7020 or deploy it to AgentCore Runtime with `agent.sh`.
+- **Traffic generator:** A load client sends synthetic analyst traffic so you can inspect memory in NAMS.
 
-Each invocation is captured in a NAMS conversation tagged with the request's
-`user_id` and `session_id`.
+## Quick start
 
-- Text messages are persisted automatically when the turn completes.
-- NAMS extracts entities server-side.
-- MCP tool uses are saved as reasoning traces.
-- NAMS assigns the stored conversation UUID; `session_id` is retained as
-  metadata so load runs can be grouped in the NAMS workspace.
+This assumes the graph is loaded and the MCP server is deployed. See
+[Connect the agent to the fraud graph](#connect-the-agent-to-the-fraud-graph).
+Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
-This sample captures traffic without injecting workspace-wide search results
-into prompts. That keeps a shared NAMS workspace safe for synthetic
-multi-user load runs.
+```bash
+cp .env.sample .env              # set MEMORY_API_KEY=nams_...
+uv sync
+
+uv run fraud-server              # Terminal 1
+uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Terminal 2
+
+./agent.sh configure             # deploy to AgentCore Runtime
+./agent.sh deploy
+./agent.sh verify
+```
 
 ## Prerequisites
 
-- A deployed Neo4j MCP server and AgentCore Gateway. See
-  [../../../neo4j-mcp-server/](../../../neo4j-mcp-server/).
-- AWS credentials with access to the configured Bedrock model.
-- A NAMS API key from [NAMS](https://memory.neo4jlabs.com/).
+- **MCP server:** You need a deployed Neo4j MCP server and AgentCore Gateway. See [`neo4j-mcp-server/`](../../../neo4j-mcp-server/).
+- **AWS credentials:** Your AWS credentials need access to the configured Bedrock model.
+- **NAMS API key:** You can create a key at [NAMS](https://memory.neo4jlabs.com/).
+
+## What NAMS captures
+
+Each call to the agent creates a NAMS conversation. The conversation is
+tagged with the request's `user_id` and `session_id`.
+
+- **Messages:** NAMS saves the text messages when the turn completes.
+- **Entities:** NAMS extracts entities on the server side.
+- **Reasoning traces:** NAMS saves each MCP tool call as a reasoning trace.
+- **Conversation ID:** NAMS assigns the stored conversation UUID. The agent keeps `session_id` as metadata, so you can group load runs in the NAMS workspace.
+
+The agent does not add workspace-wide search results to its prompts. This
+keeps a shared NAMS workspace safe for synthetic multi-user load runs.
 
 ## Fraud graph dataset
 
-The exact synthetic fraud dataset used by this agent is committed in
-[../data/](../data/). Its 25,000 accounts, 7,500
-merchants, 250,000 merchant transactions, and 300,000 transfers are copied
-from Finance Genie. The direct Neo4j loader and optional GDS enrichment step
-are documented in [../graph-loader/](../graph-loader/README.md).
+The synthetic fraud dataset is committed in
+[`demos/fraud-amazon-quick/data/`](../data/). It holds 25,000 accounts, 7,500
+merchants, 250,000 merchant transactions, and 300,000 transfers.
 
-[../graph-loader/ontology.md](../graph-loader/ontology.md) defines the proposed
-informal, graph-native business vocabulary for the fraud domain. It documents
-the meaning and limits of investigation signals without adding a formal
-RDF/TTL ontology.
+- **Loader:** The direct Neo4j loader and the optional GDS enrichment step are documented in [`demos/fraud-amazon-quick/graph-loader/`](../graph-loader/README.md).
+- **Ontology:** The file [`demos/fraud-amazon-quick/graph-loader/ontology.md`](../graph-loader/ontology.md) defines the business terms for the fraud domain. It explains what each investigation signal means and where it stops. It is an informal graph vocabulary, not an RDF or TTL ontology.
 
-### Connect the agent to the fraud graph
+## Connect the agent to the fraud graph
 
-Yes: the agent needs a deployed Neo4j MCP server whose `NEO4J_*` settings
-point to the database that contains this dataset. The agent never opens a
-Bolt connection itself. It sends tool calls to the MCP server through the
-AgentCore Gateway, and that server connects to Neo4j.
+The agent needs a deployed Neo4j MCP server whose `NEO4J_*` settings point to
+the database with this dataset. The agent sends tool calls to the MCP server
+through the AgentCore Gateway. The MCP server then connects to Neo4j.
 
-Set up the graph and MCP server in this order:
+Set up the graph and MCP server in this order. All paths and commands start
+from the repo root.
 
-1. In [../../../neo4j-mcp-server/](../../../neo4j-mcp-server/),
-   configure `.env.finance` with the URI, database name, username, and password for a
-   dedicated Neo4j database.
-2. In [../graph-loader/](../graph-loader/README.md), put the same values in
-   `.env` and load the bundled graph. Run the GDS enrichment command if the investigation prompts need
-   risk scores, communities, betweenness, or account similarity.
-3. Deploy the MCP server, then create its Gateway client credentials and copy
-   them here:
+1. In [`neo4j-mcp-server/`](../../../neo4j-mcp-server/), set the URI, database name, username, and password in `.env.finance`. Use a Neo4j database set aside for this demo.
+2. In [`demos/fraud-amazon-quick/graph-loader/`](../graph-loader/README.md), put the same values in `.env` and load the graph. Run the GDS enrichment command if your questions need risk scores, communities, betweenness, or account similarity.
+3. Deploy the MCP server, create its Gateway client credentials, and copy them to this agent:
 
    ```bash
-   cd ../../../neo4j-mcp-server
+   cd neo4j-mcp-server
    ./deploy.py --env finance
    ./deploy.py --env finance credentials
-   cp .mcp-credentials.finance.json ../demos/fraud-amazon-quick/fraud-memory-agent/.mcp-credentials.json
+   ../scripts/sync-credentials.sh
    ```
 
-4. Return here and start or deploy the fraud memory agent. It reads
-   `.mcp-credentials.json`, refreshes the OAuth token in memory, and uses the
-   Gateway URL in that file to discover and call the Neo4j MCP tools.
+   `sync-credentials.sh` copies `.mcp-credentials.finance.json` to
+   `demos/fraud-amazon-quick/fraud-memory-agent/.mcp-credentials.json`.
 
-The graph loader keeps its `NEO4J_*` values in `../graph-loader/.env`. They
-must identify the same database configured for the MCP server. This agent
-needs no `NEO4J_*` values. The credentials file is required by
-the agent and contains the Gateway OAuth client secret, so keep it untracked.
+4. Go to `demos/fraud-amazon-quick/fraud-memory-agent/` and start or deploy the agent. The agent reads `.mcp-credentials.json`, refreshes the OAuth token in memory, and uses the Gateway URL in that file to find and call the Neo4j MCP tools.
+
+- **Graph loader settings:** The graph loader keeps its `NEO4J_*` values in `demos/fraud-amazon-quick/graph-loader/.env`. They must point to the same database as the MCP server.
+- **Credentials file:** The file `.mcp-credentials.json` holds the Gateway OAuth client secret. Keep it out of git.
 
 ## Local run
+
+Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
 ```bash
 cp .env.sample .env
@@ -90,30 +101,39 @@ uv run fraud-server              # or ./agent.sh start; ./agent.sh stop stops it
 
 # Terminal 2
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"
-uv run fraud-demo
+uv run fraud-demo                # runs a set of sample graph questions
+uv run fraud-invoke --local memory-demo   # two turns in one session
 ./agent.sh test                  # one default question to the local server
 ```
 
-Open your NAMS workspace to inspect the conversations, extracted entities,
-and reasoning traces produced by these real agent invocations.
+- **`MEMORY_API_KEY`:** This key is required. Without it, every request returns an error.
+- **`MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`:** These values are optional. Set them for a private or staging NAMS deployment.
+- **`MODEL_ID`:** This value is optional. The default is `global.anthropic.claude-haiku-4-5-20251001-v1:0`.
+- **`AWS_REGION`:** This value is optional. The default is `us-west-2`.
+- **`PORT`:** This value is optional. The local server uses port 7020 by default.
+- **`--remote`:** This `fraud-cli` flag sends the question to the deployed runtime instead of the local server.
+
+Open your NAMS workspace to see the conversations, extracted entities, and
+reasoning traces from these runs.
 
 ## Deploy to AgentCore
+
+Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
 ```bash
 ./agent.sh configure
 ./agent.sh deploy
 ./agent.sh verify
+./agent.sh invoke-cloud "Find circular transfer chains"
 ```
 
-`agent.sh deploy` reads `MEMORY_API_KEY` from `.env` and injects it into the
-runtime. It also forwards optional `MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`
-values when present. A deploy is only reported as verified after the runtime is
-`READY` and a one-turn graph smoke test succeeds. That request intentionally
-uses the real NAMS, model, and Neo4j MCP integration. To upload without this
-check, use `./agent.sh deploy --skip-smoke`, then run `./agent.sh verify`
-before directing traffic to it.
+- **Memory settings:** `agent.sh deploy` reads `MEMORY_API_KEY` from `.env` and injects it into the runtime. It also passes `MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID` when you set them.
+- **Smoke test:** A deploy counts as verified only after the runtime is `READY` and a one-turn graph test succeeds. This test calls the real NAMS, model, and Neo4j MCP server.
+- **`--skip-smoke`:** This flag uploads without the smoke test. Run `./agent.sh verify` before you send traffic to it.
+- **Dependency rebuild:** Deploy records a fingerprint of `pyproject.toml` and `uv.lock`. When either file changes, deploy forces AgentCore to rebuild dependencies. Add `--force-rebuild-deps` to force a rebuild yourself.
+- **Stale runtime binding:** Deploy clears the saved runtime binding only when the runtime is in another Region or AWS confirms it no longer exists.
 
-Useful recovery and diagnostics commands:
+Recovery and diagnostics commands:
 
 ```bash
 ./agent.sh status                 # control-plane deployment state
@@ -121,28 +141,28 @@ Useful recovery and diagnostics commands:
 ./agent.sh logs --errors          # recent failed AgentCore observability traces
 ./agent.sh reset-config           # archive only local config; AWS resources stay intact
 ./agent.sh configure              # create fresh local config after reset-config
+./agent.sh destroy                # remove the agent from AgentCore Runtime
 ```
-
-`deploy` also clears a runtime binding only when it is cross-region or AWS
-confirms the configured runtime no longer exists. It records a local dependency
-fingerprint and forces an AgentCore dependency rebuild when `pyproject.toml` or
-`uv.lock` changes.
 
 ## Generate NAMS traffic
 
-The load generator invokes the real agent. It uses only synthetic analyst
-profiles, shares a session ID across the turns in each synthetic conversation,
-and limits concurrent sessions. Every successful request becomes NAMS memory
-and records any MCP tool calls as reasoning traces.
+The load generator calls the real agent with synthetic analyst profiles.
+Every successful request becomes NAMS memory, and its MCP tool calls become
+reasoning traces.
 
-Preview a plan first:
+- **Sessions:** Each synthetic conversation shares one session ID across its turns.
+- **Concurrency:** The generator limits how many sessions run at once.
+- **Progress:** The generator logs each session and turn as it starts and ends. Each line shows the session number, turn number, duration, and any error.
+- **Exit code:** A nonzero exit code means at least one request failed.
+
+Run from `demos/fraud-amazon-quick/fraud-memory-agent/`. Preview a plan first:
 
 ```bash
 uv run python -m client.traffic --users 20 --sessions-per-user 3 \
   --turns-per-session 4 --concurrency 4 --dry-run
 ```
 
-That plan has 240 agent turns. Run it locally after starting `fraud-server`:
+That plan has 240 agent turns. Run it locally after you start `fraud-server`:
 
 ```bash
 uv run python -m client.traffic --users 20 --sessions-per-user 3 \
@@ -157,33 +177,29 @@ uv run python -m client.traffic --remote --users 100 \
   --timeout 600 --retry-attempts 1 --run-id sept-demo-retry
 ```
 
-The last command generates 2,000 agent turns. It uses four concurrent sessions
-and a ten-minute read timeout, which provides headroom for multi-step model,
-graph, and NAMS work. Start at this level and increase concurrency only after
-checking Bedrock, AgentCore, and NAMS limits. A nonzero exit code means one or
-more requests failed. The generator logs each session and turn as it starts and
-completes, including its session number, turn number, duration, and any error,
-so active concurrent work is visible while a run is in progress. Failed traffic
-can be rerun by `--run-id`.
+The last command sends 2,000 agent turns. It runs four sessions at once and
+waits up to ten minutes for each reply. Multi-step model, graph, and NAMS work
+needs that time. Start at this level. Raise concurrency only after you check
+your Bedrock, AgentCore, and NAMS limits.
 
-Remote turns have a five-minute read timeout by default because model, graph,
-and NAMS work can exceed botocore's 60-second default. The generator makes one
-attempt by default: retrying an invocation after a read timeout can duplicate
-a completed turn in NAMS. Use `--retry-attempts 2` only when that duplication
-is acceptable. After a turn fails, later dependent turns in that session are
-not sent unless `--continue-after-error` is supplied. Ctrl+C prevents unsent
-sessions from starting and exits the load client immediately; at most the
-current `--concurrency` invocations can still complete server-side.
+`uv run fraud-traffic` is the same command as `uv run python -m client.traffic`.
 
-For a continuous low-rate stream in one conversation:
+- **`--timeout`:** This flag sets the read timeout in seconds. The default is 300. The botocore default of 60 seconds is too short for model, graph, and NAMS work.
+- **`--retry-attempts`:** This flag sets the total number of attempts. The default is 1. A retry after a read timeout can store a completed turn twice in NAMS, so use `--retry-attempts 2` only when duplicates are acceptable.
+- **`--continue-after-error`:** This flag keeps sending later turns in a session after one fails. By default, the generator skips them.
+- **`--run-id`:** This flag adds an identifier to the synthetic user and session IDs, so you can tell runs apart.
+- **Ctrl+C:** Pressing Ctrl+C stops unsent sessions and exits right away. Up to `--concurrency` requests already in flight can still finish on the server.
+
+For a slow, steady stream in one conversation:
 
 ```bash
 uv run fraud-invoke load-test --local --user-id soak-test --interval 5
 ```
 
-## Request contract
+## Request format
 
-The local `/invocations` endpoint and AgentCore runtime accept:
+The local `/invocations` endpoint and the AgentCore runtime accept this
+payload:
 
 ```json
 {
@@ -193,8 +209,8 @@ The local `/invocations` endpoint and AgentCore runtime accept:
 }
 ```
 
-`session_id` is optional. If omitted, the runtime derives a stable correlation
-ID from the user (`fraud-<user_id>`), which is stored in conversation metadata.
+`session_id` is optional. Without it, the runtime uses `fraud-<user_id>` as
+the ID and stores it in the conversation metadata.
 
 ## Architecture
 
@@ -210,19 +226,15 @@ Bedrock AgentCore Runtime
 AgentCore Gateway --> Neo4j MCP server --> fraud graph
 ```
 
-NAMS and the fraud graph do not share credentials or a database connection.
+NAMS and the fraud graph share no credentials and no database connection.
 
-## Published Strands session-manager limitation
+## Limitation: no session recall yet
 
-The newer Neo4j Agent Memory documentation describes a Strands
-`Neo4jSessionManager` that persists and restores a conversation automatically
-when an agent reuses a session ID. That API is not exported by the released
-`neo4j-agent-memory` 0.5.0 package used by this sample. It is therefore not
-enabled here.
+The newer Neo4j Agent Memory docs describe a Strands `Neo4jSessionManager`.
+It saves a conversation and restores it when an agent reuses a session ID.
+The released `neo4j-agent-memory` 0.5.0 package used here does not export that
+API, so this agent does not use it.
 
-This sample creates one NAMS conversation for each agent invocation, stores
-the supplied `session_id` as conversation metadata, and records the prompt,
-response, and MCP tool calls. It is suitable for generating and inspecting
-memory traffic, but it does not inject or restore earlier turns into a later
-agent invocation. Upgrade to a release that exports `Neo4jSessionManager`
-before relying on automatic cross-invocation session recall.
+- **What the agent does:** The agent creates one NAMS conversation per call. It stores `session_id` as metadata and records the prompt, response, and MCP tool calls.
+- **What the agent does not do:** The agent does not load earlier turns into a later call.
+- **Upgrade path:** Upgrade to a release that exports `Neo4jSessionManager` before you rely on recall across calls.

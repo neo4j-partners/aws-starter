@@ -1,6 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, rmSync } from "node:fs";
-import { basename, join } from "node:path";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 const format = process.argv[2];
 const supportedFormats = new Set(["html", "pdf", "pptx"]);
@@ -18,16 +24,6 @@ const decks = [
   "current/neosemantics.md",
 ];
 
-const assets = [
-  "current/aws-neo4j-layer-map.svg",
-  "current/dual-data-architecture-aws.svg",
-  "current/exec-knowledge-layer.svg",
-  "current/fraud-ring-property-graph-detailed.svg",
-  "current/neocarta.svg",
-  "current/neocarta-v2-business-term-graph.svg",
-  "current/neo4j-agent-memory-diagram.svg",
-];
-
 rmSync("dist", { force: true, recursive: true });
 mkdirSync("dist", { recursive: true });
 
@@ -41,7 +37,34 @@ for (const source of decks) {
 }
 
 if (format === "html") {
-  for (const asset of assets) {
-    copyFileSync(asset, join("dist", basename(asset)));
+  for (const source of decks) {
+    for (const asset of localImageAssets(source)) {
+      const destination = join("dist", asset.href);
+      mkdirSync(dirname(destination), { recursive: true });
+      copyFileSync(asset.source, destination);
+    }
   }
+}
+
+function localImageAssets(source) {
+  const sourceDirectory = dirname(source);
+  const markdown = readFileSync(source, "utf8");
+  const assets = new Map();
+  const imagePattern = /!\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)/g;
+
+  for (const match of markdown.matchAll(imagePattern)) {
+    const href = match[1].replace(/[?#].*$/, "");
+
+    if (!href || /^(?:[a-z][a-z\d+.-]*:|\/\/|\/|#)/i.test(href)) {
+      continue;
+    }
+
+    const asset = join(sourceDirectory, href);
+    if (!existsSync(asset)) {
+      throw new Error(`Image referenced by ${source} was not found: ${href}`);
+    }
+    assets.set(href, { href, source: asset });
+  }
+
+  return assets.values();
 }

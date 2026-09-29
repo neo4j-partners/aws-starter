@@ -253,7 +253,7 @@ never enters the execution path.
 
 ## Neocarta Is the Context Layer in the Full Agent System
 
-![w:1150](./neocarta.svg)
+![w:1150](./images/neocarta-slides/neocarta.svg)
 
 <!--
 This diagram places Neocarta inside the larger agent system.

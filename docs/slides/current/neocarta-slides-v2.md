@@ -211,7 +211,7 @@ retrieval calls depends on the question and the available metadata.
 
 ## Graph Links Connect Business Terms to Tables and Columns
 
-![w:1120](./neocarta-v2-business-term-graph.svg)
+![w:1120](./images/neocarta-slides-v2/neocarta-v2-business-term-graph.svg)
 
 - **Business meaning:** “Order amount” maps to `orders.total_amount`.
 - **Known relationship:** `orders.customer_id` references `customers.id`.

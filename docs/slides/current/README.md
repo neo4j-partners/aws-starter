@@ -36,7 +36,7 @@ Run this command from `docs/slides`:
 npm run build:html
 ```
 
-The deck uses local SVG and PNG files in this folder. Keep `--allow-local-files` in preview and build commands so Marp can load them.
+Each deck uses local SVG and PNG files under `images/<deck-name>/`. Keep `--allow-local-files` in preview and build commands so Marp can load them.
 
 ## AWS Technical Review
 

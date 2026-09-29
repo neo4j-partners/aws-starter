@@ -209,13 +209,13 @@ li {
 
 ## AWS provides the foundation for governed enterprise AI
 
-![w:1160](./aws-neo4j-layer-map.svg#aws)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map.svg#aws)
 
 ---
 
 ## Neo4j adds connected context across the AWS platform
 
-![w:1160](./aws-neo4j-layer-map.svg#neo4j)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map.svg#neo4j)
 
 ---
 
@@ -292,7 +292,7 @@ RETURN m.title
 
 ---
 
-![bg contain](./neo4j-in-aws.svg)
+![bg contain](./images/aws-neo4j-grounded-enterprise-ai/neo4j-in-aws.svg)
 
 ---
 
@@ -355,7 +355,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-lighter-agents-compact.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-lighter-agents-compact.svg)
 
 </div>
 </div>
@@ -381,7 +381,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./exec-knowledge-layer-v2.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/exec-knowledge-layer-v2.svg)
 
 </div>
 </div>
@@ -408,7 +408,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-three-parts-compact-v2.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-three-parts-compact-v2.svg)
 
 </div>
 </div>
@@ -417,7 +417,7 @@ Agent C → open account balance
 
 ---
 
-![bg contain](./exec-knowledge-layer.svg)
+![bg contain](./images/aws-neo4j-grounded-enterprise-ai/exec-knowledge-layer.svg)
 
 ---
 
@@ -472,7 +472,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-five-ontologies-compact.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-five-ontologies-compact.svg)
 
 </div>
 </div>
@@ -500,7 +500,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-city-map-compact.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-city-map-compact.svg)
 
 </div>
 </div>
@@ -527,7 +527,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-request-flow-compact.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-request-flow-compact.svg)
 
 </div>
 </div>
@@ -555,7 +555,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-decision-trace-compact.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-decision-trace-compact.svg)
 
 </div>
 </div>
@@ -608,7 +608,7 @@ Agent C → open account balance
 
 ## Agent Memory preserves facts, context, and reasoning
 
-![w:760](./neo4j-agent-memory-diagram.svg)
+![w:760](./images/aws-neo4j-grounded-enterprise-ai/neo4j-agent-memory-diagram.svg)
 
 <div class="callout"><strong>Long-term model:</strong> POLE+O represents Person, Object, Location, Event, and Organization. Temporal validity records when a fact was true.</div>
 
@@ -649,7 +649,7 @@ Agent C → open account balance
 </div>
 <div>
 
-![h:430](./knowledge-layer-context-graph-compact.svg)
+![h:430](./images/aws-neo4j-grounded-enterprise-ai/knowledge-layer-context-graph-compact.svg)
 
 </div>
 </div>
@@ -666,7 +666,7 @@ Agent C → open account balance
 
 ---
 
-![bg contain](./virtual-graph.png)
+![bg contain](./images/aws-neo4j-grounded-enterprise-ai/virtual-graph.png)
 
 ---
 
@@ -677,7 +677,7 @@ Agent C → open account balance
 <div class="cols">
 <div>
 
-![w:680](./virtual-graph-aws-query-path.svg)
+![w:680](./images/aws-neo4j-grounded-enterprise-ai/virtual-graph-aws-query-path.svg)
 
 </div>
 <div>
@@ -731,7 +731,7 @@ Agent C → open account balance
 
 ## These capabilities meet inside an AWS-hosted agent workflow
 
-![w:1160](./aws-hosted-agent-knowledge-layer-workflow.svg)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-hosted-agent-knowledge-layer-workflow.svg)
 
 <div class="callout"><strong>Security boundary:</strong> Gateway supports OAuth 2.0 for tool traffic; targets enforce data access.</div>
 
@@ -741,4 +741,4 @@ Agent C → open account balance
 
 ## Together, connected knowledge grounds the AWS agent stack
 
-![w:1160](./aws-neo4j-layer-map.svg#complete)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map.svg#complete)

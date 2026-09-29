@@ -13,11 +13,11 @@ The gallery builds these editable sources from `docs/slides/current/`:
 - `docs/slides/current/neocarta-slides-v2.md` — revised order and titles, with 14 main slides and five appendix slides
 - `docs/slides/current/neosemantics.md` — Neosemantics 4.0 overview with a technical appendix showing graph representations, URI linking, mappings, and SHACL validation
 
-The supporting SVG files remain beside the Markdown sources so local Marp preview continues to work. Presentation outlines and supporting notes live in `docs/slides/planning/`.
+Each deck's images live in `docs/slides/current/images/<deck-name>/` so they're easy to find; Marp preview and the gallery build both resolve these relative paths. Presentation outlines and supporting notes live in `docs/slides/planning/`.
 
 ## Archived decks
 
-The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`, while earlier working drafts live in `docs/slides/archive/drafts/`. The build publishes the in-depth decks under `/archive/`, but they are not listed on the gallery page.
+The earlier AWS + Neo4j in-depth deck series is retained under `docs/slides/archive/aws-in-depth/`, while earlier working drafts live in `docs/slides/archive/drafts/`. The build publishes the in-depth decks under `/archive/`, but they are not listed on the gallery page. Images superseded by a newer version and no longer used by any current deck are kept under `docs/slides/archive/superseded-images/`.
 
 ## Quick start
 

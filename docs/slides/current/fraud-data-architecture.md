@@ -200,7 +200,7 @@ Account ACC-1001 ⇄ Account ACC-2047
 
 ## The fraud ring as a property graph
 
-![h:600](./fraud-ring-property-graph-detailed.svg)
+![h:600](./images/fraud-data-architecture/fraud-ring-property-graph-detailed.svg)
 
 ---
 
@@ -256,7 +256,7 @@ Account ACC-1001 ⇄ Account ACC-2047
 
 ## A dual data architecture puts each workload in the right place
 
-![w:940](./dual-data-architecture-aws.svg)
+![w:940](./images/fraud-data-architecture/dual-data-architecture-aws.svg)
 
 <div class="callout"><strong>Two query paths:</strong> Athena queries transaction evidence in S3 Tables; Cypher traverses connected context in Neo4j.</div>
 

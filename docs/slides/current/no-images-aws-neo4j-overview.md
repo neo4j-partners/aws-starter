@@ -31,19 +31,6 @@ ol > li {
 
 Grounding Generative AI in Graph Data
 
-<!--
-Conference overview talk. The arc runs from why connected data matters, through
-how Neo4j and AWS fit together, into the details of the integration patterns:
-data connectors, agent frameworks, memory, and GraphRAG.
-
-Source material: the original AWS Agentic AI Conference deck, plus slides
-pulled from the Neo4j hotel booking agent workshop (agent, memory,
-architecture, business-case, GraphRAG, and knowledge-graph decks), rewritten
-here in plain language for a general conference audience, then adapted from
-the hotel booking domain to a finance and fraud-investigation domain for this
-deck.
--->
-
 ---
 
 ## Neo4j Graph Intelligence Platform
@@ -62,10 +49,6 @@ Three structures, and that is the whole model:
 - **Cypher:** Neo4j's query language for these patterns. Think of it like SQL, but built to match connected paths instead of joining separate tables.
 
 The relationship is stored, not computed. Following one is a direct hop, not a join, so the cost of a hop does not grow with the size of the data on the other side.
-
----
-
-![bg contain](./images/aws-neo4j-finance-overview/fraud-ring-property-graph-detailed.svg)
 
 ---
 
@@ -90,11 +73,6 @@ Separate systems each hold one piece of the picture. A graph connects them, so h
 - **Suppliers:** route planning, real-time supply chain visibility, and risk analysis.
 - **Process, product, transactions, and customers:** the same connected approach applies to process improvement, product recommendations, fraud detection, and customer loyalty.
 
-<!--
-Diagram in the source deck: a network diagram with these areas as connected
-hubs, showing how they link into one shared graph.
--->
-
 ---
 
 ## Graph Makes It Easy to Explore Hidden Patterns
@@ -104,10 +82,6 @@ A graph lets you ask three kinds of questions directly against connected data.
 - **What's important:** find the most central or influential node in a network, such as the most connected account.
 - **What's unusual:** spot outliers, such as one address linked to multiple accounts and identifiers that other customers do not share.
 - **What's next:** predict a likely new connection, such as flagging a transfer path that matches a known fraud typology.
-
----
-
-![bg contain](./images/aws-neo4j-finance-overview/neo4j-five-roles.svg)
 
 ---
 
@@ -125,13 +99,9 @@ Companies that use Neo4j and AWS together include Adobe, Financial Times, Meredi
 
 ## AWS Provides the Foundation for Governed Enterprise AI
 
-![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map.svg#aws)
-
 ---
 
 ## Neo4j Adds Connected Context Across the AWS Platform
-
-![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map.svg#neo4j)
 
 ---
 
@@ -167,16 +137,6 @@ small { font-size: 16px; }
 
 <small>Sources: [Neo4j Spark Connector](https://neo4j.com/docs/spark/current/), [Kafka Connector](https://neo4j.com/docs/kafka/current/), [connectors and drivers](https://neo4j.com/docs/connectors/), and [Neo4j MCP](https://neo4j.com/developer/genai-ecosystem/model-context-protocol-mcp/)</small>
 
-<!--
-These are separate connection patterns, not one required stack. Pick EMR for
-large Spark workloads, Glue for managed ETL, MSK for event streams, a driver
-for direct application requests, and MCP when an agent needs graph tools.
--->
-
----
-
-![bg contain](./images/aws-neo4j-finance-overview/neo4j-in-aws.svg)
-
 ---
 
 ## A Combined Architecture: Graph Plus Lakehouse
@@ -185,16 +145,6 @@ for direct application requests, and MCP when an agent needs graph tools.
 - **Neo4j Aura** holds the connected domain, GraphRAG paths, rules, provenance, and agent memory.
 - **Stable identifiers connect both sides**, through an ETL pipeline or application services.
 - **Each store does the job it's good at:** Athena scans and totals rows. Neo4j follows relationships and returns focused context.
-
-<!--
-This is a production pattern for teams who already have a lakehouse. The graph
-does not replace it. It adds the connected layer the lakehouse does not model
-well: relationships, rules, and provenance.
--->
-
----
-
-![bg contain](./images/aws-neo4j-finance-overview/aws-finance-dual-database-architecture.svg)
 
 ---
 
@@ -225,11 +175,6 @@ well: relationships, rules, and provenance.
 
 **Combined outcome:** AWS supplies authoritative activity. Neo4j supplies the connected context needed to investigate it.
 
-<!--
-Closes the AWS section and the loop on the fraud-ring example: the end-to-end
-flow the graph-fundamentals and data-architecture slides were building toward.
--->
-
 ---
 
 ## Building GraphRAG Agents on AWS
@@ -245,18 +190,6 @@ Too much irrelevant context **degrades** LLM performance.
 - The model gets distracted or misled.
 
 "Context rot": retrieval of tangents that rots response quality. This is the problem GraphRAG's traversal step is built to avoid.
-
-<!--
-A surprising finding. When RAG retrieves chunks that are similar but not truly
-relevant, the context window fills with tangentially related information and
-the model gets confused or misled. The retrieved context actively rots the
-quality of the answer. This motivates GraphRAG, previewed on the next slide:
-traversal reaches connected facts instead of just more similar-looking text.
--->
-
----
-
-![bg contain](./images/aws-neo4j-finance-overview/strands-agents-graphrag-fraud-principles.svg)
 
 ---
 
@@ -280,11 +213,6 @@ One retrieval call, two steps:
 - **Step 2, traversal:** a reviewed query follows relationships out from that starting point to connected facts.
 - **Two decisions, two owners:** search decides where the answer starts. The traversal decides what comes back with it.
 
-<!--
-Search alone ranks similar text. The traversal is what proves a fact is
-actually connected to the record in question.
--->
-
 ---
 
 ## GraphRAG Patterns
@@ -298,23 +226,12 @@ Four patterns for building GraphRAG, all built around one graph.
 
 ---
 
-![bg contain](./images/aws-neo4j-finance-overview/aws-fraud-vector-cypher-retrieval-flow.svg)
-
----
-
 ## GraphRAG Becomes a Strands Agent Tool
 
 - **GraphRAG patterns fit as tools:** Each GraphRAG pattern can be wrapped as a Strands tool. The agent calls it to pull connected context into the conversation.
 - **Deploy to AgentCore:** A finished Strands agent deploys to AgentCore Runtime. AgentCore Gateway can expose Neo4j MCP tools to it.
 - **The model picks, the tool governs:** The model decides when to call the tool. The tool's reviewed Cypher decides what data comes back.
 - **Focused results:** The tool returns a small, bounded result, so the agent's context stays clean.
-
-<!--
-The audience already knows Strands. The point here is that everything in this
-section becomes a tool: the vector search plus traversal from the previous
-image, text-to-Cypher, or a GDS-backed query. "Focused results" closes the loop
-on context rot from the start of the section.
--->
 
 ---
 
@@ -336,11 +253,7 @@ Most agents are stateless until memory is designed on purpose.
 
 ## Agent Memory Preserves Facts, Context, and Reasoning
 
-![w:760](./images/aws-neo4j-finance-overview/neo4j-agent-memory-diagram.svg)
-
 **Long-term model:** POLE+O represents Person, Object, Location, Event, and Organization. Temporal validity records when a fact was true.
-
-<!-- Source: https://github.com/neo4j-labs/agent-memory -->
 
 ---
 
@@ -363,14 +276,6 @@ The agent uses **NAMS**, the Neo4j Hosted Agent Memory Service.
 - **Tool calls become reasoning traces:** Each MCP tool call is saved as a step in a reasoning trace.
 - **Graph and memory stay separate:** The Neo4j MCP server owns access to the fraud graph, and NAMS owns memory storage. The agent holds no Neo4j credentials.
 
-<!--
-This demo captures memory. It does not inject recalled memory back into
-prompts, which keeps a shared NAMS workspace safe for synthetic multi-user
-load runs. Recall is a library capability, not something this demo shows.
-Source: demos/fraud-amazon-quick/fraud-memory-agent/README.md and
-server/runtime_app.py.
--->
-
 ---
 
 ## Takeaways
@@ -379,88 +284,3 @@ server/runtime_app.py.
 - **GraphRAG counters context rot:** Vector search finds the starting point. A reviewed traversal returns only the connected facts.
 - **GraphRAG is an agent tool:** Strands agents on Bedrock call it directly or through Neo4j MCP on AgentCore Gateway.
 - **Graph memory persists:** Conversations, entities, and reasoning traces stay connected and inspectable across sessions.
-
----
-
-## Amazon Quick + Neo4j
-
-Bringing graph context to the enterprise AI assistant through MCP.
-
----
-
-<style scoped>
-small { font-size: 16px; }
-</style>
-
-## What Amazon Quick Is
-
-Amazon Quick is the AI assistant for work, on web and desktop.
-
-- **Chat and Spaces:** Answers are grounded in connected data such as S3, SharePoint, Slack, and Salesforce.
-- **Research:** Quick builds cited reports from business data, the web, and third-party datasets.
-- **Quick Sight:** Dashboards and natural-language Q&A run over sources such as Athena and Redshift.
-- **Flows and automation:** Quick handles repetitive tasks and multi-step processes across apps.
-- **Actions:** Quick acts on connected systems through built-in connectors and MCP servers.
-
-<small>Sources: [Amazon Quick](https://aws.amazon.com/quick/) and [Amazon Quick features](https://aws.amazon.com/quick/features/)</small>
-
-<!--
-Amazon Quick is the rebrand of the Amazon Q Business enterprise assistant.
-Amazon QuickSight is now Quick Sight, the BI part of Quick. Amazon Q Developer
-is a separate product and is unaffected. The point for this audience: Quick is
-where business users already ask questions, so it is the natural front door
-for graph context. MCP is the door Neo4j comes through.
--->
-
----
-
-<style scoped>
-small { font-size: 16px; }
-</style>
-
-## Connecting Amazon Quick to Neo4j with MCP
-
-- **Register the server:** An admin adds the Neo4j MCP endpoint as a Quick connector.
-- **Tools become actions:** Quick discovers each Neo4j tool, such as schema lookup and read-only Cypher.
-- **Authenticate as a service:** The Cognito client ID, secret, and token URL fit Quick's service-to-service option.
-- **Reach it privately:** A Quick VPC connection reaches MCP servers that are not on the public internet.
-- **Share the connector:** Analysts on the team use the same governed graph tools.
-
-<small>Source: [MCP integration with Amazon Quick](https://docs.aws.amazon.com/quick/latest/userguide/mcp-integration.html)</small>
-
-<!--
-The Neo4j MCP server from the AgentCore section works here unchanged. Point
-Quick at the AgentCore Gateway URL. The credentials file from
-./deploy.py credentials already holds the client ID, client secret, and token
-URL that Quick's service authentication asks for. The Quick setup is done in
-the console. This repository does not script it.
-
-Limits to plan for:
-- MCP integration needs a Quick Enterprise subscription.
-- Quick supports remote servers only. Streamable HTTP is preferred over SSE.
-- Each MCP operation has a fixed 60-second timeout. Keep Cypher tools bounded.
-- Quick registers at most 100 tools per MCP server.
-- Custom HTTP headers are not sent. Auth must go through OAuth.
-- Custom connectors do not pick up new tools automatically. The owner chooses
-  Sync after the server changes.
--->
-
----
-
-## One Fraud Investigation in Amazon Quick
-
-1. **Spot the anomaly:** A Quick Sight dashboard over the Athena Iceberg tables shows an alert spike.
-2. **Ask in chat:** The analyst asks Quick who is connected to the flagged accounts.
-3. **Traverse the graph:** Quick calls the Neo4j MCP tools and traces the ACC-1001 ⇄ ACC-2047 ring.
-4. **Explain the finding:** Graph context links the ring to typologies, KYC documents, and prior cases.
-5. **Share the result:** Quick turns the answer into a case summary for the team.
-
-**One assistant, both data paths:** Quick Sight counts the activity. Neo4j explains how it connects.
-
-<!--
-This closes the loop with the dual-architecture slides. Athena and Quick Sight
-cover the "counting things" side. The Neo4j MCP tools cover the "following
-connections" side. The analyst never leaves Quick, and never needs Neo4j
-credentials, because the Gateway and MCP server own database access.
-Source: demos/fraud-amazon-quick/README.md.
--->

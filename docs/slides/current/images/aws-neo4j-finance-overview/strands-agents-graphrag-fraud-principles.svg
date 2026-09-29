@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <title id="title">Three ways Neo4j GraphRAG strengthens fraud investigation agents</title>
+  <title id="title">Better context, better answers: three ways Neo4j GraphRAG helps agents</title>
   <desc id="desc">Three panels show grounded account retrieval, connected reasoning across fraud data, and a small relevant subgraph. A bottom flow shows Amazon Bedrock, a Strands agent, and Neo4j GraphRAG context.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
@@ -19,7 +19,7 @@
   <rect width="960" height="540" fill="#FFFFFF"/>
 
   <!-- Header -->
-  <text x="48" y="42" font-size="24" font-weight="700" fill="#232F3E">Three ways Neo4j GraphRAG strengthens fraud investigation agents</text>
+  <text x="48" y="42" font-size="24" font-weight="700" fill="#232F3E">Better context, better answers: three ways Neo4j GraphRAG helps agents</text>
   <text x="48" y="64" font-size="12.5" fill="#56616F">The graph gives the agent verified facts, connected evidence, and focused context.</text>
 
   <!-- Panel 1 -->

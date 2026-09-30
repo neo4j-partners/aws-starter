@@ -257,7 +257,7 @@ not public, so parts of it could be more ontology-like than the docs show.
 - **Connections:** Built-in connectors cover Gmail, Microsoft 365, Slack, Jira, and GitHub.
 - **Reach:** Users reach Genie One on the web, in Slack and Teams, and on mobile.
 - **Security:** Every answer enforces Unity Catalog row and column security.
-- **MCP server:** Claude, ChatGPT, and Cursor call Genie One through its MCP server.
+- **MCP server:** Claude, Claude Code, ChatGPT, and Cursor call Genie One through its MCP server.
 
 <!--
 Chat in Genie One reached GA on June 15, 2026. The Slack, Teams, iOS, and
@@ -394,7 +394,8 @@ runs on Databricks Apps.
 **One governance layer covers the data, the models, and the traffic between them.**
 
 <!--
-Unity Gateway reached GA on August 4, 2026. It was called Unity AI Gateway.
+Unity Gateway reached GA on August 4, 2026. The launch blog called it Unity AI
+Gateway. Current docs call it Unity Gateway.
 Service policies and agent services are in Beta.
 
 The Genie One MCP server runs on Unity Gateway. Managed MCP servers are in

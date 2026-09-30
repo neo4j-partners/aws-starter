@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
   <title id="title">How the five vendors differ</title>
-  <desc id="description">A grid comparing AWS, Databricks, Google Cloud, IBM, and Microsoft on table format, catalog, where it runs, own models, and chat tool.</desc>
+  <desc id="description">A grid comparing AWS, Databricks, Google Cloud, IBM, and Microsoft on table format, catalog, agent platform, own models, chat tool, coding assistant, and where it runs.</desc>
   <defs>
     <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
       <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
@@ -30,11 +30,19 @@
       .pill-text { font-size: 15px; font-weight: 750; }
       .legend-text { font-size: 17px; font-weight: 600; fill: #475569; }
       .foot { font-size: 18px; fill: #475569; }
+      .layer-dim { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 2; }
+      .layer-name-dim { font-size: 24px; font-weight: 750; fill: #94a3b8; }
+      .neo-chip { fill: #ecfeff; stroke: #14b8a6; stroke-width: 2; }
+      .neo-chip-strong { fill: #ccfbf1; stroke: #0d9488; stroke-width: 3; }
+      .neo-text { font-size: 21px; font-weight: 680; fill: #0c4a6e; }
+      .dim-text { font-size: 20px; font-style: italic; fill: #94a3b8; }
+      .gov-dim { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 2; stroke-dasharray: 8 6; }
+      .gov-chip-dim { fill: #ffffff; stroke: #e2e8f0; stroke-width: 2; }
     </style>
   </defs>
   <rect class="canvas" width="1600" height="900"/>
   <text class="title" x="40" y="80">How the Five Vendors Differ</text>
-  <text class="subtitle" x="40" y="118">The layers match. Format, catalog, footprint, models, and the chat front door do not.</text>
+  <text class="subtitle" x="40" y="118">The layers match. The defaults, the front doors, and the footprint do not.</text>
   <rect class="head" x="40" y="150" width="230" height="60" rx="12"/>
   <text class="head-text" text-anchor="start"><tspan x="64" y="187.7"></tspan></text>
   <rect class="head" x="276" y="150" width="254" height="60" rx="12"/>
@@ -47,69 +55,93 @@
   <text class="head-text" text-anchor="middle"><tspan x="1183.0" y="187.7">IBM</tspan></text>
   <rect class="head" x="1316" y="150" width="254" height="60" rx="12"/>
   <text class="head-text" text-anchor="middle"><tspan x="1443.0" y="187.7">Microsoft</tspan></text>
-  <rect class="label" x="40" y="220" width="230" height="110" rx="12"/>
-  <text class="label-text" text-anchor="start"><tspan x="64" y="282.4">Table format</tspan></text>
-  <rect class="cell-iceberg" x="276" y="220" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="281.6">Apache Iceberg</tspan></text>
-  <rect class="cell" x="536" y="220" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="269.8">Delta and Iceberg</tspan><tspan x="663.0" y="293.5">as equals</tspan></text>
-  <rect class="cell-iceberg" x="796" y="220" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="281.6">Apache Iceberg</tspan></text>
-  <rect class="cell-iceberg" x="1056" y="220" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="281.6">Apache Iceberg</tspan></text>
-  <rect class="cell-delta" x="1316" y="220" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="269.8">Delta Lake, translated</tspan><tspan x="1443.0" y="293.5">for Iceberg readers</tspan></text>
-  <rect class="label" x="40" y="338" width="230" height="110" rx="12"/>
-  <text class="label-text" text-anchor="start"><tspan x="64" y="400.4">Catalog</tspan></text>
-  <rect class="cell" x="276" y="338" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="387.8">Glue Data Catalog,</tspan><tspan x="403.0" y="411.5">IAM, Lake Formation</tspan></text>
-  <rect class="cell" x="536" y="338" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="387.8">Unity Catalog: data,</tspan><tspan x="663.0" y="411.5">models, MCP tools</tspan></text>
-  <rect class="cell" x="796" y="338" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="399.6">Knowledge Catalog</tspan></text>
-  <rect class="cell" x="1056" y="338" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="399.6">watsonx.data</tspan></text>
-  <rect class="cell" x="1316" y="338" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="387.8">OneLake catalog</tspan><tspan x="1443.0" y="411.5">and Purview</tspan></text>
-  <rect class="label" x="40" y="456" width="230" height="110" rx="12"/>
-  <text class="label-text" text-anchor="start"><tspan x="64" y="518.4">Where it runs</tspan></text>
-  <rect class="cell" x="276" y="456" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="517.6">AWS</tspan></text>
-  <rect class="cell" x="536" y="456" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="505.8">AWS, Azure,</tspan><tspan x="663.0" y="529.5">Google Cloud</tspan></text>
-  <rect class="cell" x="796" y="456" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="517.6">Google Cloud</tspan></text>
-  <rect class="cell" x="1056" y="456" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="505.8">IBM Cloud, AWS, Azure,</tspan><tspan x="1183.0" y="529.5">on premises</tspan></text>
-  <rect class="cell" x="1316" y="456" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="517.6">Azure</tspan></text>
-  <rect class="label" x="40" y="574" width="230" height="110" rx="12"/>
-  <text class="label-text" text-anchor="start"><tspan x="64" y="636.4">Own models</tspan></text>
-  <rect class="cell" x="276" y="574" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="635.6">Amazon Nova</tspan></text>
-  <rect class="cell" x="536" y="574" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="623.8">No frontier model</tspan><tspan x="663.0" y="647.5">of its own</tspan></text>
-  <rect class="cell" x="796" y="574" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="635.6">Gemini</tspan></text>
-  <rect class="cell" x="1056" y="574" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="635.6">Granite</tspan></text>
-  <rect class="cell" x="1316" y="574" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="623.8">MAI models, plus</tspan><tspan x="1443.0" y="647.5">OpenAI partnership</tspan></text>
-  <rect class="label" x="40" y="692" width="230" height="110" rx="12"/>
-  <text class="label-text" text-anchor="start"><tspan x="64" y="754.4">Chat front door</tspan></text>
-  <rect class="cell" x="276" y="692" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="741.8">Amazon Quick in</tspan><tspan x="403.0" y="765.5">Chrome, Slack, Teams</tspan></text>
-  <rect class="cell" x="536" y="692" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="741.8">Genie One over</tspan><tspan x="663.0" y="765.5">lakehouse data</tspan></text>
-  <rect class="cell" x="796" y="692" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="741.8">Gemini Enterprise over</tspan><tspan x="923.0" y="765.5">Workspace and M365</tspan></text>
-  <rect class="cell" x="1056" y="692" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="741.8">watsonx Orchestrate</tspan><tspan x="1183.0" y="765.5">for IT leaders</tspan></text>
-  <rect class="cell" x="1316" y="692" width="254" height="110" rx="12"/>
-  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="741.8">Microsoft 365 Copilot</tspan><tspan x="1443.0" y="765.5">inside Office apps</tspan></text>
-  <rect class="cell-iceberg" x="40" y="824" width="28" height="28" rx="6"/>
-  <text class="legend-text" x="80" y="844">Iceberg first</text>
-  <rect class="cell-delta" x="240" y="824" width="28" height="28" rx="6"/>
-  <text class="legend-text" x="280" y="844">Delta first</text>
-  <text class="foot" x="1490" y="844" text-anchor="end">Every agent platform also serves third-party models, including Anthropic Claude.</text>
+  <rect class="label" x="40" y="220" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="268.4">Table format</tspan></text>
+  <rect class="cell-iceberg" x="276" y="220" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="267.6">Apache Iceberg</tspan></text>
+  <rect class="cell" x="536" y="220" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="255.8">Delta and Iceberg</tspan><tspan x="663.0" y="279.5">as equals</tspan></text>
+  <rect class="cell-iceberg" x="796" y="220" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="267.6">Apache Iceberg</tspan></text>
+  <rect class="cell-iceberg" x="1056" y="220" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="267.6">Apache Iceberg</tspan></text>
+  <rect class="cell-delta" x="1316" y="220" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="255.8">Delta Lake, translated</tspan><tspan x="1443.0" y="279.5">for Iceberg readers</tspan></text>
+  <rect class="label" x="40" y="308" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="356.4">Catalog</tspan></text>
+  <rect class="cell" x="276" y="308" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="343.8">Glue Data Catalog,</tspan><tspan x="403.0" y="367.5">IAM, Lake Formation</tspan></text>
+  <rect class="cell" x="536" y="308" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="343.8">Unity Catalog: data,</tspan><tspan x="663.0" y="367.5">models, agents</tspan></text>
+  <rect class="cell" x="796" y="308" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="355.6">Knowledge Catalog</tspan></text>
+  <rect class="cell" x="1056" y="308" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="355.6">watsonx.data</tspan></text>
+  <rect class="cell" x="1316" y="308" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="343.8">OneLake catalog</tspan><tspan x="1443.0" y="367.5">and Purview</tspan></text>
+  <rect class="label" x="40" y="396" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="444.4">Agent platform</tspan></text>
+  <rect class="cell" x="276" y="396" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="431.8">Amazon Bedrock,</tspan><tspan x="403.0" y="455.5">Bedrock AgentCore</tspan></text>
+  <rect class="cell" x="536" y="396" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="431.8">Agent Bricks,</tspan><tspan x="663.0" y="455.5">Model Serving</tspan></text>
+  <rect class="cell" x="796" y="396" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="431.8">Gemini Enterprise</tspan><tspan x="923.0" y="455.5">Agent Platform</tspan></text>
+  <rect class="cell" x="1056" y="396" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="431.8">watsonx.ai,</tspan><tspan x="1183.0" y="455.5">watsonx Orchestrate</tspan></text>
+  <rect class="cell" x="1316" y="396" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="443.6">Microsoft Foundry</tspan></text>
+  <rect class="label" x="40" y="484" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="532.4">Own models</tspan></text>
+  <rect class="cell" x="276" y="484" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="531.6">Amazon Nova</tspan></text>
+  <rect class="cell" x="536" y="484" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="519.8">No frontier model</tspan><tspan x="663.0" y="543.5">of its own</tspan></text>
+  <rect class="cell" x="796" y="484" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="531.6">Gemini</tspan></text>
+  <rect class="cell" x="1056" y="484" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="531.6">Granite</tspan></text>
+  <rect class="cell" x="1316" y="484" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="519.8">MAI models, plus</tspan><tspan x="1443.0" y="543.5">OpenAI partnership</tspan></text>
+  <rect class="label" x="40" y="572" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="620.4">Chat front door</tspan></text>
+  <rect class="cell" x="276" y="572" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="607.8">Amazon Quick in</tspan><tspan x="403.0" y="631.5">Chrome, Slack, Teams</tspan></text>
+  <rect class="cell" x="536" y="572" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="607.8">Genie One over</tspan><tspan x="663.0" y="631.5">lakehouse data</tspan></text>
+  <rect class="cell" x="796" y="572" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="607.8">Gemini Enterprise over</tspan><tspan x="923.0" y="631.5">Workspace and M365</tspan></text>
+  <rect class="cell" x="1056" y="572" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="607.8">watsonx Orchestrate</tspan><tspan x="1183.0" y="631.5">for IT leaders</tspan></text>
+  <rect class="cell" x="1316" y="572" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="607.8">Microsoft 365 Copilot</tspan><tspan x="1443.0" y="631.5">inside Office apps</tspan></text>
+  <rect class="label" x="40" y="660" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="708.4">Coding assistant</tspan></text>
+  <rect class="cell" x="276" y="660" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="707.6">Kiro</tspan></text>
+  <rect class="cell" x="536" y="660" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="695.8">Genie Code,</tspan><tspan x="663.0" y="719.5">data work only</tspan></text>
+  <rect class="cell" x="796" y="660" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="707.6">Google Antigravity</tspan></text>
+  <rect class="cell" x="1056" y="660" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="707.6">IBM Bob</tspan></text>
+  <rect class="cell" x="1316" y="660" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="707.6">GitHub Copilot</tspan></text>
+  <rect class="label" x="40" y="748" width="230" height="82" rx="12"/>
+  <text class="label-text" text-anchor="start"><tspan x="64" y="796.4">Where it runs</tspan></text>
+  <rect class="cell" x="276" y="748" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="403.0" y="795.6">AWS</tspan></text>
+  <rect class="cell" x="536" y="748" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="663.0" y="783.8">AWS, Azure,</tspan><tspan x="663.0" y="807.5">Google Cloud</tspan></text>
+  <rect class="cell" x="796" y="748" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="923.0" y="795.6">Google Cloud</tspan></text>
+  <rect class="cell" x="1056" y="748" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1183.0" y="783.8">IBM Cloud, AWS, Azure,</tspan><tspan x="1183.0" y="807.5">on premises</tspan></text>
+  <rect class="cell" x="1316" y="748" width="254" height="82" rx="12"/>
+  <text class="cell-text" text-anchor="middle"><tspan x="1443.0" y="795.6">Azure</tspan></text>
+  <rect class="cell-iceberg" x="40" y="850" width="28" height="28" rx="6"/>
+  <text class="legend-text" x="80" y="870">Iceberg first</text>
+  <rect class="cell-delta" x="240" y="850" width="28" height="28" rx="6"/>
+  <text class="legend-text" x="280" y="870">Delta first</text>
+  <text class="foot" x="1490" y="870" text-anchor="end">Every agent platform also serves third-party models, including Anthropic Claude.</text>
 </svg>

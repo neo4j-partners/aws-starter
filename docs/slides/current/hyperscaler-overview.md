@@ -107,30 +107,36 @@ semantic layer. Vendors call the governance pieces an agent control plane.
 
 ---
 
-## Four Questions Place Any Vendor on the Stack
-
-1. **Find the data:** Where does the data live, and in which table format?
-2. **Find the meaning:** Where do business definitions and relationships live?
-3. **Find the agents:** Where are agents built, and which product governs them?
-4. **Find the people:** Which tool do employees open every day?
-
-<!--
-Ask them in order. For the last question, the usual answers are Office, Slack,
-a browser, or an IDE.
--->
-
----
-
 ## Where the Vendors Differ
 
 Same layers, different defaults.
 
 ---
 
+## Four Questions Place Any Vendor on the Stack
+
+1. **Find the data:** Which table format and catalog hold the data?
+2. **Find the meaning:** Where do business definitions and relationships live?
+3. **Find the agents:** Which platform builds agents, and which models does it offer?
+4. **Find the people:** Which chat and coding tools do employees open every day?
+
+<!--
+Ask them in order. The next grid answers the data, agents, and people
+questions for each vendor. The meaning question is the context layer, which
+gets its own slides in the next section. Who governs the agents is the control
+plane, also in the next section.
+
+For the people question, the usual answers are Office, Slack, a browser, or an
+IDE.
+-->
+
+---
+
 ![bg contain](./images/hyperscaler-overview/vendor-differences.svg)
 
 <!--
-Walk the rows top to bottom.
+The rows follow the four questions: data first, then agents, then people,
+then where it all runs.
 
 - Table format: AWS, Google Cloud, and IBM default to Apache Iceberg.
   Microsoft defaults to Delta Lake and translates the metadata for outside
@@ -138,14 +144,20 @@ Walk the rows top to bottom.
 - Catalog: Unity Catalog is the only one that governs data, models, agents,
   and MCP tools in one place. Google's Knowledge Catalog can federate to AWS
   Glue, Unity Catalog, and Snowflake, in Preview.
-- Where it runs: AWS, Google Cloud, and Microsoft run on their own cloud.
-  Databricks is multi-cloud. IBM is the only vendor here with an on-premises
-  lakehouse edition.
+- Agent platform: Gemini Enterprise Agent Platform replaced Vertex AI on
+  April 22, 2026. Microsoft Foundry puts agents, models, and tools in one
+  Azure resource with one set of access controls.
 - Models: Microsoft Foundry lists more than 10,000 models. Google Model
   Garden lists more than 200.
 - Chat: Microsoft 365 Copilot lives inside the Office apps most companies
   already use. Gemini Enterprise also connects to Microsoft 365. watsonx
   Orchestrate targets IT leaders more than end users.
+- Coding: Kiro, Antigravity, IBM Bob, and GitHub Copilot help developers build
+  any software. Genie Code works only inside Databricks. It reads Unity
+  Catalog tables, columns, and lineage before it writes code.
+- Where it runs: AWS, Google Cloud, and Microsoft run on their own cloud.
+  Databricks is multi-cloud. IBM is the only vendor here with an on-premises
+  lakehouse edition.
 -->
 
 ---
@@ -167,6 +179,10 @@ not shipped yet: the Databricks Iceberg docs still list Iceberg v1 to v3.
 
 OneLake translation limits: it writes Iceberg V2 only, handles Parquet only,
 and skips tables with 5,000 or more commits.
+
+Bridge to the next section: the catalog is also growing up. It no longer just
+lists tables. Every vendor is turning it into a context layer that stores what
+the data means.
 -->
 
 ---
@@ -180,14 +196,35 @@ The same moves show up at every vendor in 2026.
 ![bg contain](./images/hyperscaler-overview/shift-status.svg)
 
 <!--
-One view of where each shift stands. The next slides cover the shifts that
-matter most for connected data: context graphs, control planes, MCP, and
-memory.
+One view of where each shift stands. The next slides start with MCP, the
+protocol most of these shifts depend on. Then they follow the grid's rows from
+top to bottom.
 
 "Announced" means the vendor announced the product, but the source does not
 state a release status. Google rebuilt Gemini Cloud Assist around proactive
 agents at Next '26 on April 22, 2026. IBM announced IBM Concert on May 5,
 2026.
+-->
+
+---
+
+## MCP and A2A Connect Agents Across Platforms
+
+- **MCP:** The Model Context Protocol lets an agent call an outside tool through one interface.
+- **A2A:** The Agent2Agent protocol lets one agent call another, even on another platform.
+- **MCP support:** All five vendors support MCP.
+- **A2A support:** AWS, Google Cloud, IBM, and Microsoft support A2A.
+
+**One MCP server** plugs into all five agent platforms.
+
+<!--
+AgentCore Gateway turns APIs and Lambda functions into MCP tools. Databricks
+offers managed MCP servers and a GA Genie One MCP server. Google runs managed
+MCP servers for its own services. watsonx Orchestrate and Foundry agents both
+call MCP servers.
+
+Google supports A2A 1.0, and IBM supports 0.3.0. Databricks documents A2A in
+a community blog post.
 -->
 
 ---
@@ -208,12 +245,38 @@ Cloud, and Microsoft all describe their context layer as a graph.
 - AWS Context is coming soon. Pieces available now: Glue Data Catalog
   business context is in preview, and S3 annotations are GA.
 - Genie Ontology is in Public Preview and on by default since August 6, 2026.
-- Knowledge Catalog is GA. Its Context API is in preview. BigQuery Graph is in
-  preview.
+- Knowledge Catalog is GA. Its Context API is in preview.
 - The Fabric IQ workload is GA. The ontology item is in preview. Work IQ and
   Foundry IQ round out Microsoft's context layer.
 - Context in watsonx.data entered private preview on May 5, 2026.
 - Snowflake Horizon Context competes for the same layer.
+-->
+
+---
+
+## Vendors Now Ship Their Own Graphs
+
+- **Google Cloud:** BigQuery Graph models entities and relationships inside BigQuery. It is in preview.
+- **Microsoft:** Graph in Fabric stores the connections that the Fabric IQ ontology declares.
+- **AWS:** AWS Context maps relationships across existing data into a knowledge graph.
+- **Amazon Quick:** Quick already runs on a knowledge graph. AWS Context grows it from one person to the whole company.
+
+**The graph model is now standard.** The question shifts from "why a graph" to "whose graph."
+
+<!--
+This is the most important slide for a Neo4j audience.
+
+Microsoft says the Fabric IQ ontology "declares what connects and why," and
+Graph in Fabric stores those connections. Databricks calls Genie Ontology a
+"living context graph." Google calls Knowledge Catalog a "dynamic context
+graph."
+
+Each of these graphs lives inside one vendor's platform and serves that
+vendor's agents. That validates the graph model. It also means the
+difference is now a graph the customer owns, queries with Cypher, and uses
+across every cloud.
+
+The "whose graph" framing is our inference from the vendor pages.
 -->
 
 ---
@@ -270,27 +333,6 @@ platform and Microsoft Foundry.
 
 ---
 
-## MCP and A2A Connect Agents Across Platforms
-
-- **MCP:** The Model Context Protocol lets an agent call an outside tool through one interface.
-- **A2A:** The Agent2Agent protocol lets one agent call another, even on another platform.
-- **MCP support:** All five vendors support MCP.
-- **A2A support:** AWS, Google Cloud, IBM, and Microsoft support A2A.
-
-**One MCP server** plugs into all five agent platforms.
-
-<!--
-AgentCore Gateway turns APIs and Lambda functions into MCP tools. Databricks
-offers managed MCP servers and a GA Genie One MCP server. Google runs managed
-MCP servers for its own services. watsonx Orchestrate and Foundry agents both
-call MCP servers.
-
-Google supports A2A 1.0, and IBM supports 0.3.0. Databricks documents A2A in
-a community blog post.
--->
-
----
-
 ## Memory and Evaluation Become Managed Services
 
 - **Agent memory:** Memory stores what an agent learned across sessions.
@@ -334,28 +376,6 @@ The vector point is our inference from the vendor pages.
 
 ---
 
-## Agents Now Run Inside the Services
-
-- **First wave:** Built-in agents handle incidents, failed pipelines, and cost spikes.
-- **Turned on, not built:** The customer turns the agent on instead of building one.
-- **Examples:** AWS DevOps Agent, Azure SRE Agent, Gemini Cloud Assist, Genie ZeroOps, and IBM Concert.
-- **Needs a map:** Each agent needs a map of how services, code, and deployments connect.
-
-**AWS DevOps Agent** builds an application topology. **Genie ZeroOps** reads Unity Catalog lineage.
-
-<!--
-AWS DevOps Agent reached GA on March 31, 2026. It covers AWS, Azure, and
-on-premises systems, and reaches on-premises tools through MCP. Azure SRE
-Agent reached GA in March 2026 and can restart, scale, or roll back within
-policy guardrails. Genie ZeroOps is in private preview and tests a fix in a
-sandbox before a human applies it.
-
-Built-in agents will likely spread from operations to other routine tasks.
-That point is our inference from the vendor pages.
--->
-
----
-
 ## App Builders and Custom Chips Round Out the Stack
 
 - **App builders:** Business users describe an app, and the platform builds it on company data.
@@ -376,26 +396,42 @@ its host clouds.
 
 ---
 
+## Agents Now Run Inside the Services
+
+- **First wave:** Built-in agents handle incidents, failed pipelines, and cost spikes.
+- **Turned on, not built:** The customer turns the agent on instead of building one.
+- **Examples:** AWS DevOps Agent, Azure SRE Agent, Gemini Cloud Assist, Genie ZeroOps, and IBM Concert.
+- **Needs a map:** Each agent needs a map of how services, code, and deployments connect.
+
+**AWS DevOps Agent** builds an application topology. **Genie ZeroOps** reads Unity Catalog lineage.
+
+<!--
+AWS DevOps Agent reached GA on March 31, 2026. It covers AWS, Azure, and
+on-premises systems, and reaches on-premises tools through MCP. Azure SRE
+Agent reached GA in March 2026 and can restart, scale, or roll back within
+policy guardrails. Genie ZeroOps is in private preview and tests a fix in a
+sandbox before a human applies it.
+
+Built-in agents will likely spread from operations to other routine tasks.
+That point is our inference from the vendor pages.
+
+Bridge to the Neo4j section: a map of how things connect is a graph.
+-->
+
+---
+
 ## Where Neo4j Fits
 
 A graph adds connected context to each layer.
 
 ---
 
-## Neo4j Adds a Context Graph the Customer Owns
-
-- **Context layer:** Neo4j adds a context graph that works across all five clouds.
-- **Lakehouse:** Neo4j builds a graph from lakehouse tables and adds the links between them.
-- **Agents:** The Neo4j MCP Server gives graph queries to any agent platform with MCP.
-- **Agent memory:** The Neo4j Agent Memory library stores agent memory as a graph.
-- **Chat and coding:** Chat tools and coding assistants reach the graph through MCP.
+![bg contain](./images/hyperscaler-overview/neo4j-in-the-stack.svg)
 
 <!--
-Each vendor builds a context graph inside its own platform. Neo4j adds one
-that the customer owns, queries with Cypher, and uses across every cloud.
-
-The lakehouse keeps the tables. The graph adds the relationships that link
-them, so an agent can follow a chain of links in one query.
+The same stack from the start of the deck. Neo4j adds a role on four layers:
+the context layer, the agent layer, the apps layer, and the lakehouse. The
+vendor keeps the chips, the operational databases, and agent governance.
 
 AgentCore Gateway, Databricks Agent Bricks, and IBM watsonx Orchestrate all
 connect to MCP servers. The Neo4j Agent Memory library ships an integration
@@ -404,10 +440,207 @@ for Amazon Bedrock AgentCore.
 
 ---
 
+## A Customer-Owned Graph Works Across Every Vendor
+
+- **One graph, every cloud:** A customer on two clouds keeps one context graph instead of two.
+- **Traceable answers:** The graph returns multi-hop answers that trace back to their source.
+- **A map for built-in agents:** Built-in agents need a map of how services connect. A graph is that map.
+- **Reached through MCP:** Every agent platform reaches the graph through the Neo4j MCP Server.
+- **Built from the lakehouse:** The lakehouse keeps the tables. The graph adds the links.
+
+<!--
+Each vendor builds a context graph inside its own platform. Neo4j adds one
+that the customer owns, queries with Cypher, and uses across every cloud.
+
+The graph stores entities and the relationships between them, so an agent can
+follow a chain of links in one query.
+
+The built-in agents point is our inference. AWS DevOps Agent builds an
+application topology, and Genie ZeroOps reads lineage. Both are maps of
+connected things, which is what a graph stores.
+-->
+
+---
+
 ## Takeaways
 
 - **One stack, five vendors:** The layers match. The names, formats, and catalogs differ.
 - **Iceberg is common ground:** Format locks customers in less. The catalog decides more.
-- **Context graphs are platform-bound:** Each vendor's graph lives inside its own platform.
+- **Every vendor now ships a graph:** Each one stays inside its own platform.
 - **MCP is the shared interface:** One MCP server reaches every agent platform.
+- **Memory is still open:** Agent memory is in Beta or preview at three of five vendors.
 - **Neo4j spans the clouds:** A customer-owned graph serves agents on any vendor.
+
+---
+
+## AWS Main Services
+
+The main AWS products behind each layer of the stack.
+
+<!--
+A closer look at one vendor. The slides follow the stack from the bottom up:
+data first, then models, agents, and apps.
+
+Source material: cloud-integration/hyperscaler.md,
+cloud-integration/aws/current/briefing/aws-briefing-review.md, and
+cloud-integration/aws/current/reference/aws-ecosystem-summary.md.
+-->
+
+---
+
+## AWS Has a Product on Every Layer
+
+- **Infrastructure:** Trainium3, Inferentia2, and Graviton5 chips run next to NVIDIA GPUs.
+- **Lakehouse:** Amazon S3 Tables holds the data. The AWS Glue Data Catalog lists it.
+- **Operational data:** Amazon Aurora holds the present. Amazon MSK and Kinesis carry streams.
+- **Context:** AWS Context maps existing data into a knowledge graph.
+- **Agents and models:** Amazon Bedrock serves models. Amazon Bedrock AgentCore runs agents.
+- **Apps:** Amazon Quick serves employees. Kiro serves developers.
+
+<!--
+Agent governance runs across every layer. At AWS it is AgentCore Identity,
+AgentCore Gateway, Policy in AgentCore, and AWS Agent Registry.
+
+AWS Context is coming soon. Glue Data Catalog business context is in preview,
+and S3 annotations are GA.
+-->
+
+---
+
+## AWS Stores Data Once in Iceberg Tables on S3
+
+- **S3 Tables:** Amazon S3 Tables stores data as managed Apache Iceberg tables.
+- **Many engines:** Athena, Redshift, EMR, Spark, and Snowflake read the same tables.
+- **Catalog:** The Glue Data Catalog lists every table. IAM and Lake Formation control access.
+- **Postgres:** Aurora DSQL and Aurora PostgreSQL hold app state. pgvector adds vector search.
+- **Streams:** Amazon MSK runs managed Kafka. Kinesis Data Streams runs serverless streams.
+- **Graph:** Amazon Neptune is AWS's graph database. Neptune Analytics adds algorithms and vector search.
+
+<!--
+S3 Tables exposes the Iceberg REST Catalog API, so Trino and Flink can also
+read and write the tables.
+
+The lakehouse architecture of Amazon SageMaker was called SageMaker Lakehouse
+until 2026. It joins S3 data lakes and Redshift warehouses into one copy of
+the data. SageMaker Unified Studio is the browser workspace over all of it.
+
+Aurora DSQL is a serverless, distributed, PostgreSQL-compatible database.
+Aurora PostgreSQL express configuration creates a serverless database in
+seconds.
+
+Amazon Neptune has two products. Neptune Database is a serverless graph
+database for operational workloads such as fraud alerts and Customer 360. It
+supports openCypher, Gremlin, and SPARQL, but has no graph algorithms or
+vector search. Neptune Analytics is an in-memory engine with more than 25
+graph algorithms and vector search. It loads a point-in-time copy from
+Neptune Database or S3.
+-->
+
+---
+
+## Amazon Bedrock Serves Models Through One API
+
+- **Models:** Bedrock serves models from 18 providers, including Anthropic, Amazon, Meta, and OpenAI.
+- **Knowledge Bases:** Knowledge Bases run managed RAG and cite their sources.
+- **Bedrock Agents:** Bedrock Agents runs a managed agent loop over Lambda or OpenAPI actions.
+- **Guardrails:** Guardrails filter content, topics, and personal data on any model call.
+- **Pricing:** Bedrock bills on-demand use per token.
+
+<!--
+Amazon Nova is Amazon's own model family. Bedrock also offers fine-tuning,
+distillation, Flows, Data Automation, model evaluation, and prompt management.
+
+Knowledge Bases chunk, embed, and index documents. They store vectors in
+OpenSearch, S3 Vectors, Aurora PostgreSQL, Pinecone, Redis, or MongoDB Atlas.
+Knowledge Bases GraphRAG uses Amazon Neptune Analytics, AWS's own graph
+database.
+
+Bedrock Agents is configuration over code: Bedrock runs the reasoning loop.
+AgentCore, on the next slide, is for teams that write their own agent code.
+-->
+
+---
+
+## AgentCore Runs Agents Built with Any Framework
+
+- **Any framework:** AgentCore runs agents built with Strands, LangGraph, CrewAI, and others.
+- **Host:** Runtime hosts agents in isolated microVMs. Harness runs a managed agent loop.
+- **Connect:** Gateway turns APIs, Lambda functions, and MCP servers into MCP tools.
+- **Remember:** Memory keeps session context and long-term facts.
+- **Govern:** Identity, Policy, and Registry control who acts and which tools they call.
+- **Measure:** Observability traces every step. Evaluations scores the answers.
+
+<!--
+AgentCore has 13 core services. The others are Code Interpreter, Browser,
+Optimization, and Payments. Confirm the status of Payments and the
+Optimization Insights feature before citing them to a customer.
+
+- Runtime sessions last up to 8 hours.
+- Gateway ships built-in templates for 16 providers, such as Salesforce,
+  Jira, and Slack.
+- Memory extracts long-term memory with four strategies.
+- Identity has 24 built-in OAuth providers.
+- Policy checks every tool call through Gateway. Teams write policies in
+  natural language or Dogwood, which is compatible with Cedar.
+
+AgentCore works with any model, in or outside Bedrock. This repo runs the
+Neo4j MCP Server on AgentCore Runtime behind AgentCore Gateway.
+-->
+
+---
+
+## Amazon Quick Puts Agents in Front of Employees
+
+- **Chat:** Amazon Quick answers questions and acts on company data and apps.
+- **Features:** Quick bundles BI, search, research, flows, automation, and app building.
+- **Reach:** Quick runs inside Chrome, Slack, Microsoft Teams, and Microsoft 365.
+- **MCP client:** Quick connects to outside MCP servers as tools.
+
+<!--
+The six Quick features are Quick Sight, Quick Index, Quick Research, Quick
+Flows, Quick Automate, and Apps in Amazon Quick. Apps in Amazon Quick
+reached GA on September 1, 2026. Users can sign up with an email address and
+no AWS account.
+
+Renames: Amazon QuickSight and Amazon Quick Suite became Amazon Quick. The BI
+feature is now Quick Sight.
+
+AWS publishes a pattern for connecting an MCP server on AgentCore Runtime to
+Amazon Quick. Using it with the Neo4j MCP Server is our inference. Neither
+AWS nor Neo4j has published that pairing.
+-->
+
+---
+
+## Kiro Brings Spec-Driven Development to the IDE
+
+- **Agentic IDE:** The Kiro IDE is based on Code OSS and imports VS Code settings.
+- **Specs:** Kiro turns a prompt into requirements, a design, and a task list.
+- **Parallel agents:** Agents build the tasks on the laptop or in the cloud.
+- **Correctness:** Property-based tests catch edge cases that unit tests miss.
+- **Every surface:** Kiro also runs as a CLI, a web app, and a mobile app.
+- **Open standards:** Kiro supports MCP, AGENTS.md, skills, and the Agent Client Protocol.
+
+<!--
+Kiro calls this agentic engineering, as opposed to vibe coding. A spec records
+the requirements and design decisions before any code exists, so the team can
+review them. Kiro checks requirements for contradictions and gaps before it
+writes code.
+
+- Hooks run tasks automatically, such as updating tests or docs on save.
+- Steering files give the agent project rules. They carry across every Kiro
+  surface.
+- Powers pull context from tools like Figma and Terraform.
+- The IDE installs Open VSX extensions.
+- The headless CLI runs in CI/CD to review pull requests and fix bugs.
+- Kiro on the web runs sessions in cloud sandboxes that keep going after the
+  laptop closes.
+
+Models: Anthropic Claude, OpenAI GPT, and open-weight models such as DeepSeek
+and Qwen. Auto picks a model per task. Pricing is credit-based. Developers
+sign in with GitHub, Google, AWS Builder ID, or IAM Identity Center, and need
+no AWS account.
+
+AWS groups Kiro, AWS DevOps Agent, and AWS Security Agent as "frontier
+agents."
+-->

@@ -14,11 +14,28 @@ import { dirname, join } from "node:path";
 const ARCHIVE_DIR = "archive/aws-in-depth";
 const ARCHIVE_DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
 
+const deckGroups = [
+  { id: "landscape", title: "Landscape" },
+  { id: "architecture", title: "Architecture and use cases" },
+  { id: "semantics", title: "Semantics and knowledge" },
+];
+
 const activeDecks = [
+  {
+    file: "hyperscaler-overview.md",
+    source: "current/hyperscaler-overview.md",
+    group: "landscape",
+    tags: ["Overview", "Multi-cloud"],
+    title: "Cloud Data and AI Stacks",
+    output: "hyperscaler-overview.html",
+    description:
+      "How AWS, Databricks, Google Cloud, IBM, and Microsoft build the same data and AI stack, where they differ, and where a customer-owned graph fits.",
+  },
   {
     file: "aws-neo4j-grounded-enterprise-ai.md",
     source: "current/aws-neo4j-grounded-enterprise-ai.md",
-    order: "01",
+    group: "architecture",
+    tags: ["Architecture", "Agent memory"],
     title: "AWS + Neo4j: Connected Context for Grounded Enterprise AI",
     output: "aws-neo4j-grounded-enterprise-ai.html",
     description:
@@ -27,16 +44,28 @@ const activeDecks = [
   {
     file: "fraud-data-architecture.md",
     source: "current/fraud-data-architecture.md",
-    order: "02",
+    group: "architecture",
+    tags: ["Fraud", "Architecture"],
     title: "Fraud Data Architecture",
     output: "fraud-data-architecture.html",
     description:
       "How AWS transaction evidence and Neo4j connected context work together to expose a fraud ring.",
   },
   {
+    file: "aws-neo4j-finance-overview.md",
+    source: "current/aws-neo4j-finance-overview.md",
+    group: "architecture",
+    tags: ["Fraud", "GraphRAG", "MCP"],
+    title: "Neo4j + AWS: Grounding Generative AI in Graph Data",
+    output: "aws-neo4j-finance-overview.html",
+    description:
+      "A fraud-investigation overview of Neo4j on AWS: connected context, Amazon Quick over MCP, GraphRAG agents, and agent memory.",
+  },
+  {
     file: "neocarta-slides-v2.md",
     source: "current/neocarta-slides-v2.md",
-    order: "03",
+    group: "semantics",
+    tags: ["Semantics", "Metadata"],
     title: "Neocarta: A Semantic Map for Enterprise Data",
     output: "neocarta-slides-v2.html",
     description:
@@ -45,30 +74,30 @@ const activeDecks = [
   {
     file: "neosemantics.md",
     source: "current/neosemantics.md",
-    order: "04",
+    group: "semantics",
+    tags: ["Semantics", "RDF"],
     title: "Neosemantics: Bringing RDF Semantics Into Neo4j",
     output: "neosemantics.html",
     description:
       "How Neosemantics imports, maps, validates, reasons over, and exports RDF with Neo4j, with concrete graph examples in the technical appendix.",
   },
   {
-    file: "aws-neo4j-finance-overview.md",
-    source: "current/aws-neo4j-finance-overview.md",
-    order: "05",
-    title: "Neo4j + AWS: Grounding Generative AI in Graph Data",
-    output: "aws-neo4j-finance-overview.html",
-    description:
-      "A fraud-investigation overview of Neo4j on AWS: connected context, Amazon Quick over MCP, GraphRAG agents, and agent memory.",
-  },
-  {
     file: "enterprise-knowledge-layer.md",
     source: "current/enterprise-knowledge-layer.md",
-    order: "06",
+    group: "semantics",
+    tags: ["Semantics", "Governance"],
     title: "Enterprise Knowledge Layer",
     output: "enterprise-knowledge-layer.html",
     description:
       "How a shared, governed Knowledge Layer gives every agent the same business meaning, source routing, policy, and decision traces.",
   },
+];
+
+const THEME_ARGS = [
+  "--theme-set",
+  "themes/finance.css",
+  "--theme-set",
+  "themes/graph-lakehouse.css",
 ];
 
 const REPO_URL = "https://github.com/neo4j-partners/aws-starter";
@@ -106,7 +135,14 @@ const resources = [
     title: "GraphRAG with Neo4j on AWS: From Search to Grounded Agents",
     description:
       "Build a hotel booking agent that answers from a connected graph. You deploy its tools and the agent to AgentCore, then add graph memory in Neo4j.",
-    tags: ["6 modules", "us-east-1", "Under $2 in AWS charges"],
+    tags: [
+      "6 modules",
+      "Hands-on notebooks",
+      "Bedrock AgentCore",
+      "MCP",
+      "Graph memory",
+      "Basic Python",
+    ],
     actions: [
       {
         text: "Open workshop",
@@ -190,10 +226,7 @@ for (const deck of selected) {
       output,
       "--html",
       "--allow-local-files",
-      "--theme-set",
-      "themes/finance.css",
-      "--theme-set",
-      "themes/graph-lakehouse.css",
+      ...THEME_ARGS,
     ],
     { stdio: "inherit" },
   );
@@ -225,10 +258,34 @@ writeFileSync(join("build", ".nojekyll"), "");
 
 if (requested === "all") {
   copyFileSync(
-    join("build", activeDecks[0].output),
+    join("build", "aws-neo4j-grounded-enterprise-ai.html"),
     join("build", "slides.html"),
   );
+
+  for (const deck of activeDecks) {
+    execFileSync(
+      "marp",
+      [
+        deck.source,
+        "-o",
+        join("build", thumbnailPath(deck)),
+        "--image",
+        "png",
+        "--image-scale",
+        "0.5",
+        "--html",
+        "--allow-local-files",
+        ...THEME_ARGS,
+      ],
+      { stdio: "inherit" },
+    );
+  }
+
   writeFileSync(join("build", "index.html"), renderIndex());
+}
+
+function thumbnailPath(deck) {
+  return join("thumbnails", deck.output.replace(/\.html$/, ".png"));
 }
 
 function localImageAssets(source) {
@@ -323,7 +380,7 @@ function renderIndex() {
       .decks {
         display: grid;
         gap: 16px;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
         margin: 24px 0 0;
       }
 
@@ -332,10 +389,31 @@ function renderIndex() {
         border: 1px solid var(--line);
         border-radius: 8px;
         color: inherit;
-        display: block;
-        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         text-decoration: none;
         transition: border-color 120ms ease, transform 120ms ease;
+      }
+
+      .deck-thumb {
+        aspect-ratio: 16 / 9;
+        border-bottom: 1px solid var(--line);
+        display: block;
+        object-fit: cover;
+        width: 100%;
+      }
+
+      .deck-body {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        padding: 16px 20px 20px;
+      }
+
+      .deck-body .tags {
+        margin-top: auto;
+        padding-top: 16px;
       }
 
       .deck-card:hover {
@@ -355,7 +433,7 @@ function renderIndex() {
         color: var(--ink);
         display: block;
         font-size: 19px;
-        margin: 6px 0 8px;
+        margin: 0 0 8px;
       }
 
       .deck-desc {
@@ -368,6 +446,7 @@ function renderIndex() {
       .resources {
         display: grid;
         gap: 16px;
+        align-items: start;
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         margin: 24px 0 0;
       }
@@ -451,20 +530,15 @@ function renderIndex() {
   </head>
   <body>
     <main>
-      <div class="eyebrow">AWS + Neo4j</div>
-      <h1>Presentations</h1>
-      <p>Current presentations on semantic data discovery and grounded enterprise AI with AWS and Neo4j. The resources below link to starter code and a hands-on workshop.</p>
+      <div class="eyebrow">Presentations</div>
+      <h1>AWS + Neo4j</h1>
+      <p>Presentations on grounded enterprise AI with Neo4j, from the cloud data and AI landscape to fraud investigation, semantics, and agent memory. The resources below link to starter code and a hands-on workshop.</p>
 
-      <section aria-labelledby="current-presentations">
-        <h2 id="current-presentations">Current presentations</h2>
-        <div class="decks">
-${renderCards(activeDecks, "Deck")}
-        </div>
-      </section>
+${renderGroups(deckGroups)}
 
       <section aria-labelledby="resources">
-        <h2 id="resources">AWS + Neo4j Resources</h2>
-        <p class="section-intro">Code and workshops for building grounded agents with Neo4j on AWS.</p>
+        <h2 id="resources">Code and workshops</h2>
+        <p class="section-intro">Starter code and a hands-on workshop for building grounded agents with Neo4j on AWS.</p>
         <div class="resources">
 ${renderResources(resources)}
         </div>
@@ -475,13 +549,31 @@ ${renderResources(resources)}
 `;
 }
 
-function renderCards(sectionDecks, label) {
+function renderGroups(groups) {
+  return groups
+    .map(
+      (group) => `      <section aria-labelledby="${group.id}">
+        <h2 id="${group.id}">${escapeHtml(group.title)}</h2>
+        <div class="decks">
+${renderCards(activeDecks.filter((deck) => deck.group === group.id))}
+        </div>
+      </section>`,
+    )
+    .join("\n\n");
+}
+
+function renderCards(sectionDecks) {
   return sectionDecks
     .map(
       (deck) => `          <a class="deck-card" href="./${deck.output}">
-            <span class="deck-order">${label} ${deck.order}</span>
-            <strong>${escapeHtml(deck.title)}</strong>
-            <span class="deck-desc">${escapeHtml(deck.description)}</span>
+            <img class="deck-thumb" src="./${thumbnailPath(deck)}" alt="" loading="lazy">
+            <span class="deck-body">
+              <strong>${escapeHtml(deck.title)}</strong>
+              <span class="deck-desc">${escapeHtml(deck.description)}</span>
+              <span class="tags">
+${deck.tags.map((tag) => `                <span class="tag">${escapeHtml(tag)}</span>`).join("\n")}
+              </span>
+            </span>
           </a>`,
     )
     .join("\n");

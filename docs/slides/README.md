@@ -28,15 +28,17 @@ the gallery first, then serves `docs/slides/build/` with Python on port 8080.
 
 The gallery page lists these decks from `docs/slides/current/`:
 
-- **`aws-neo4j-grounded-enterprise-ai.md`:** This deck covers connected context for grounded enterprise AI.
+- **`hyperscaler-overview.md`:** This deck compares how AWS, Databricks, Google Cloud, IBM, and Microsoft build the same data and AI stack. It shows where they differ and where a customer-owned graph fits.
+- **`aws-neo4j-finance-overview.md`:** This deck gives a fraud-investigation overview of Neo4j on AWS. It covers connected context, Virtual Graph, Amazon Quick over MCP, GraphRAG agents, and agent memory.
 - **`fraud-data-architecture.md`:** This deck shows how AWS transaction data and Neo4j work together to expose a fraud ring.
 - **`neocarta-slides-v2.md`:** This deck is the revised Neocarta deck. It has new slide order and titles, with 14 main slides and five appendix slides.
 - **`neosemantics.md`:** This deck gives a Neosemantics 4.0 overview. Its technical appendix shows graph representations, URI linking, mappings, and SHACL validation.
+- **`enterprise-knowledge-layer.md`:** This deck shows how a shared, governed Knowledge Layer gives every agent the same business meaning, source routing, policy, and decision traces.
 
-The export commands build these four decks plus `neocarta-slides.md`. The
-folder also holds `neocarta-aws-appendix.md`, `aws-neo4j-finance-overview.md`,
-and `no-images-aws-neo4j-overview.md`. Neither the gallery nor the exports
-build those three.
+The export commands build `aws-neo4j-finance-overview.md`,
+`fraud-data-architecture.md`, `neocarta-slides-v2.md`, `neosemantics.md`, and
+`neocarta-slides.md`. The folder also holds `neocarta-aws-appendix.md`. Neither
+the gallery nor the exports build it.
 
 ## Resources section
 

@@ -15,8 +15,7 @@ const ARCHIVE_DIR = "archive/aws-in-depth";
 const ARCHIVE_DECK_PATTERN = /^(\d+)-(.+)-slides\.md$/;
 
 const deckGroups = [
-  { id: "landscape", title: "Landscape" },
-  { id: "architecture", title: "Architecture and use cases" },
+  { id: "architecture", title: "Landscape, architecture, and use cases" },
   { id: "semantics", title: "Semantics and knowledge" },
 ];
 
@@ -24,7 +23,7 @@ const activeDecks = [
   {
     file: "hyperscaler-overview.md",
     source: "current/hyperscaler-overview.md",
-    group: "landscape",
+    group: "architecture",
     tags: ["Overview", "Multi-cloud"],
     title: "Cloud Data and AI Stacks",
     output: "hyperscaler-overview.html",
@@ -32,14 +31,14 @@ const activeDecks = [
       "How AWS, Databricks, Google Cloud, IBM, and Microsoft build the same data and AI stack, where they differ, and where a customer-owned graph fits.",
   },
   {
-    file: "aws-neo4j-grounded-enterprise-ai.md",
-    source: "current/aws-neo4j-grounded-enterprise-ai.md",
+    file: "aws-neo4j-finance-overview.md",
+    source: "current/aws-neo4j-finance-overview.md",
     group: "architecture",
-    tags: ["Architecture", "Agent memory"],
-    title: "AWS + Neo4j: Connected Context for Grounded Enterprise AI",
-    output: "aws-neo4j-grounded-enterprise-ai.html",
+    tags: ["Fraud", "GraphRAG", "MCP"],
+    title: "Neo4j + AWS: Grounding Generative AI in Graph Data",
+    output: "aws-neo4j-finance-overview.html",
     description:
-      "How AWS and Neo4j combine governed data, connected context, and agent memory for grounded enterprise AI, with integration paths and the planned Virtual Graph for AWS.",
+      "A fraud-investigation overview of Neo4j on AWS: connected context, Virtual Graph, Amazon Quick over MCP, GraphRAG agents, and agent memory.",
   },
   {
     file: "fraud-data-architecture.md",
@@ -50,16 +49,6 @@ const activeDecks = [
     output: "fraud-data-architecture.html",
     description:
       "How AWS transaction evidence and Neo4j connected context work together to expose a fraud ring.",
-  },
-  {
-    file: "aws-neo4j-finance-overview.md",
-    source: "current/aws-neo4j-finance-overview.md",
-    group: "architecture",
-    tags: ["Fraud", "GraphRAG", "MCP"],
-    title: "Neo4j + AWS: Grounding Generative AI in Graph Data",
-    output: "aws-neo4j-finance-overview.html",
-    description:
-      "A fraud-investigation overview of Neo4j on AWS: connected context, Amazon Quick over MCP, GraphRAG agents, and agent memory.",
   },
   {
     file: "neocarta-slides-v2.md",
@@ -258,7 +247,7 @@ writeFileSync(join("build", ".nojekyll"), "");
 
 if (requested === "all") {
   copyFileSync(
-    join("build", "aws-neo4j-grounded-enterprise-ai.html"),
+    join("build", "aws-neo4j-finance-overview.html"),
     join("build", "slides.html"),
   );
 

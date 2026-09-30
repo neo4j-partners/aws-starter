@@ -17,7 +17,7 @@ if (!supportedFormats.has(format)) {
 }
 
 const decks = [
-  "current/aws-neo4j-grounded-enterprise-ai.md",
+  "current/aws-neo4j-finance-overview.md",
   "current/fraud-data-architecture.md",
   "current/neocarta-slides.md",
   "current/neocarta-slides-v2.md",

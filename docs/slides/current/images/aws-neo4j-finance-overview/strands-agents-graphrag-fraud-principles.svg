@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <title id="title">Better context, better answers: three ways Neo4j GraphRAG helps agents</title>
+  <title id="title">Better Context, Better Answers: Three Ways Neo4j GraphRAG Helps Agents</title>
   <desc id="desc">Three panels show grounded account retrieval, connected reasoning across fraud data, and a small relevant subgraph. A bottom flow shows Amazon Bedrock, a Strands agent, and Neo4j GraphRAG context.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
@@ -19,14 +19,14 @@
   <rect width="960" height="540" fill="#FFFFFF"/>
 
   <!-- Header -->
-  <text x="48" y="42" font-size="24" font-weight="700" fill="#232F3E">Better context, better answers: three ways Neo4j GraphRAG helps agents</text>
+  <text x="48" y="42" font-size="24" font-weight="700" fill="#232F3E">Better Context, Better Answers: Three Ways Neo4j GraphRAG Helps Agents</text>
   <text x="48" y="64" font-size="12.5" fill="#56616F">The graph gives the agent verified facts, connected evidence, and focused context.</text>
 
   <!-- Panel 1 -->
   <rect x="48" y="88" width="272" height="322" rx="12" fill="#F7FAFC" stroke="#D9E2EC" filter="url(#shadow)"/>
   <circle cx="73" cy="116" r="13" fill="#4581C3"/>
   <text x="73" y="121" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">1</text>
-  <text x="94" y="121" font-size="16" font-weight="700" fill="#1F4E7A">Grounded retrieval</text>
+  <text x="94" y="121" font-size="16" font-weight="700" fill="#1F4E7A">Grounded Retrieval</text>
   <text x="64" y="143" font-size="10.5" fill="#56616F">Resolve the request to facts in the graph.</text>
   <line x1="64" y1="157" x2="304" y2="157" stroke="#D9E2EC"/>
 
@@ -54,7 +54,7 @@
   <rect x="344" y="88" width="272" height="322" rx="12" fill="#F7FAFC" stroke="#D9E2EC" filter="url(#shadow)"/>
   <circle cx="369" cy="116" r="13" fill="#4581C3"/>
   <text x="369" y="121" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">2</text>
-  <text x="390" y="121" font-size="16" font-weight="700" fill="#1F4E7A">Connected reasoning</text>
+  <text x="390" y="121" font-size="16" font-weight="700" fill="#1F4E7A">Connected Reasoning</text>
   <text x="360" y="143" font-size="10.5" fill="#56616F">Follow stored relationships to collect evidence.</text>
   <line x1="360" y1="157" x2="600" y2="157" stroke="#D9E2EC"/>
 
@@ -88,7 +88,7 @@
   <rect x="640" y="88" width="272" height="322" rx="12" fill="#F7FAFC" stroke="#D9E2EC" filter="url(#shadow)"/>
   <circle cx="665" cy="116" r="13" fill="#4581C3"/>
   <text x="665" y="121" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">3</text>
-  <text x="686" y="121" font-size="16" font-weight="700" fill="#1F4E7A">Right-sized context</text>
+  <text x="686" y="121" font-size="16" font-weight="700" fill="#1F4E7A">Right-Sized Context</text>
   <text x="656" y="143" font-size="10.5" fill="#56616F">Return only the graph slice the question needs.</text>
   <line x1="656" y1="157" x2="896" y2="157" stroke="#D9E2EC"/>
 
@@ -133,14 +133,14 @@
 
   <rect x="70" y="466" width="246" height="34" rx="8" fill="#FFFFFF" stroke="#00A87A" stroke-width="2"/>
   <path d="M86,477 C93,475 99,479 104,475 M86,489 C93,487 99,491 104,487" fill="none" stroke="#00A87A" stroke-width="2.2" stroke-linecap="round"/>
-  <text x="119" y="480" font-size="11.5" font-weight="700" fill="#232F3E">Strands agent</text>
+  <text x="119" y="480" font-size="11.5" font-weight="700" fill="#232F3E">Strands Agent</text>
   <text x="119" y="493" font-size="8.5" fill="#56616F">Claude on Amazon Bedrock</text>
 
   <line x1="316" y1="483" x2="338" y2="483" stroke="#C8D2DD" stroke-width="2" marker-end="url(#arrow-gray)"/>
 
   <rect x="342" y="466" width="242" height="34" rx="8" fill="#FFFFFF"/>
   <circle cx="359" cy="483" r="7" fill="#FF9900"/>
-  <text x="374" y="487" font-size="11.5" font-weight="700" fill="#232F3E">GraphRAG retrieval tool</text>
+  <text x="374" y="487" font-size="11.5" font-weight="700" fill="#232F3E">GraphRAG Retrieval Tool</text>
 
   <line x1="584" y1="483" x2="610" y2="483" stroke="#00A87A" stroke-width="2.2" marker-end="url(#arrow-green)"/>
 

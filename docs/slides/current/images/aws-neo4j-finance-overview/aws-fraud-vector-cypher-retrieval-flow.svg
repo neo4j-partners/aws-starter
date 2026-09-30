@@ -34,7 +34,7 @@
   <rect x="86" y="178" width="530" height="92" rx="14" fill="#F0FBF7" stroke="#00A87A" stroke-width="2"/>
   <circle cx="116" cy="208" r="16" fill="#00A87A"/>
   <text x="116" y="214" text-anchor="middle" font-size="16" font-weight="700" fill="#FFFFFF">1</text>
-  <text x="146" y="210" font-size="21" font-weight="700" fill="#155D4B">Ask a fraud investigation question</text>
+  <text x="146" y="210" font-size="21" font-weight="700" fill="#155D4B">Ask a Fraud Investigation Question</text>
   <text x="146" y="239" font-size="15" fill="#477565">The question comes from Strands Agents.</text>
   <text x="146" y="259" font-size="12" fill="#667085">Example: Which accounts share an address with ACC-1001, and what policy governs escalation?</text>
 
@@ -44,7 +44,7 @@
   <rect x="86" y="300" width="530" height="92" rx="14" fill="#FFF7ED" stroke="#FF9900" stroke-width="2"/>
   <circle cx="116" cy="330" r="16" fill="#FF9900"/>
   <text x="116" y="336" text-anchor="middle" font-size="16" font-weight="700" fill="#232F3E">2</text>
-  <text x="146" y="332" font-size="21" font-weight="700" fill="#8A4B08">Embed the question</text>
+  <text x="146" y="332" font-size="21" font-weight="700" fill="#8A4B08">Embed the Question</text>
   <text x="146" y="361" font-size="15" fill="#8A5A24">Amazon Nova 2 Multimodal Embeddings</text>
   <text x="146" y="381" font-size="12" fill="#667085">Runs on Amazon Bedrock and uses the same embedding contract as the chunks.</text>
 
@@ -64,7 +64,7 @@
   <rect x="86" y="544" width="530" height="92" rx="14" fill="#ECFDF3" stroke="#19A974" stroke-width="2"/>
   <circle cx="116" cy="574" r="16" fill="#19A974"/>
   <text x="116" y="580" text-anchor="middle" font-size="16" font-weight="700" fill="#FFFFFF">4</text>
-  <text x="146" y="576" font-size="21" font-weight="700" fill="#166534">Return graph-enriched context</text>
+  <text x="146" y="576" font-size="21" font-weight="700" fill="#166534">Return Graph-Enriched Context</text>
   <text x="146" y="605" font-size="15" fill="#39715A">Account, alerts, policy, source filename, and matched text</text>
   <text x="146" y="625" font-size="13" fill="#667085">Source provenance shows where each returned fact came from.</text>
 
@@ -90,7 +90,7 @@
   <circle cx="790" cy="152" r="3.5" fill="#018BFF"/>
   <line x1="781" y1="144" x2="787" y2="141" stroke="#018BFF" stroke-width="1.5"/>
   <line x1="781" y1="148" x2="787" y2="151" stroke="#018BFF" stroke-width="1.5"/>
-  <text x="810" y="153" font-size="22" font-weight="700" fill="#FFFFFF">Neo4j fraud knowledge graph</text>
+  <text x="810" y="153" font-size="22" font-weight="700" fill="#FFFFFF">Neo4j Fraud Knowledge Graph</text>
 
   <text x="788" y="206" font-size="16" fill="#5C6470">Vector search enters through</text>
   <text x="980" y="206" font-size="16" font-weight="700" fill="#1F4E86" font-family="'SFMono-Regular', Consolas, monospace">(:Chunk)</text>
@@ -100,7 +100,7 @@
   <rect x="788" y="228" width="716" height="54" rx="12" fill="#EEF4FB" stroke="#B8CDE4"/>
   <circle cx="818" cy="255" r="17" fill="#2E6DB4"/>
   <text x="818" y="261" text-anchor="middle" font-size="16" font-weight="700" fill="#FFFFFF">1</text>
-  <text x="847" y="262" font-size="18" font-weight="700" fill="#1F4E86">Vector search finds the Chunk</text>
+  <text x="847" y="262" font-size="18" font-weight="700" fill="#1F4E86">Vector Search Finds the Chunk</text>
 
   <!-- Chunk and Document -->
   <rect x="820" y="314" width="254" height="76" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="3"/>
@@ -119,7 +119,7 @@
   <rect x="1110" y="418" width="394" height="54" rx="12" fill="#EAF9F5" stroke="#A8DCCF"/>
   <circle cx="1140" cy="445" r="17" fill="#008C72"/>
   <text x="1140" y="451" text-anchor="middle" font-size="16" font-weight="700" fill="#FFFFFF">2</text>
-  <text x="1169" y="452" font-size="16.5" font-weight="700" fill="#126B59">Reviewed Cypher adds connected facts</text>
+  <text x="1169" y="452" font-size="16.5" font-weight="700" fill="#126B59">Reviewed Cypher Adds Connected Facts</text>
 
   <!-- Reverse FROM_CHUNK traversal -->
   <path d="M947,392 V502" fill="none" stroke="#008C72" stroke-width="3.5" stroke-dasharray="8 5" marker-end="url(#arrow-teal)"/>

@@ -37,13 +37,13 @@
       <rect class="layer-alt" x="90" y="581" width="1420" height="105" rx="16"/>
       <rect class="layer" x="90" y="703" width="1420" height="105" rx="16"/>
     </g>
-    <text class="layer-name" x="125" y="263">Applications and agents</text>
+    <text class="layer-name" x="125" y="263">Applications and Agents</text>
     <text class="service" x="525" y="263">AgentCore Runtime · AgentCore Gateway · Strands Agents</text>
     <text class="layer-name" x="125" y="385">Models</text>
     <text class="service" x="525" y="385">Amazon Bedrock</text>
-    <text class="layer-name" x="125" y="507">Analytics and processing</text>
+    <text class="layer-name" x="125" y="507">Analytics and Processing</text>
     <text class="service" x="525" y="507">Athena · EMR · Glue · MSK · SageMaker AI</text>
-    <text class="layer-name" x="125" y="629">Catalog and governance</text>
+    <text class="layer-name" x="125" y="629">Catalog and Governance</text>
     <text class="service" x="525" y="629">Glue Data Catalog · SageMaker Catalog · Lake Formation</text>
     <text class="layer-name" x="125" y="751">Storage</text>
     <text class="service" x="525" y="751">Amazon S3 · Amazon S3 Tables with Apache Iceberg</text>
@@ -67,26 +67,26 @@
       <rect class="neo-chip" x="1040" y="581" width="470" height="105" rx="16"/>
       <rect class="neo-chip" x="1040" y="703" width="470" height="105" rx="16"/>
     </g>
-    <text class="layer-name" x="125" y="253">Applications and agents</text>
+    <text class="layer-name" x="125" y="253">Applications and Agents</text>
     <text class="service" x="425" y="253">AgentCore · Strands</text>
     <text class="layer-name" x="125" y="375">Models</text>
     <text class="service" x="425" y="375">Amazon Bedrock</text>
-    <text class="layer-name" x="125" y="497">Analytics and processing</text>
+    <text class="layer-name" x="125" y="497">Analytics and Processing</text>
     <text class="service" x="425" y="497">Athena · EMR · Glue · MSK · SageMaker AI</text>
-    <text class="layer-name" x="125" y="619">Catalog and governance</text>
+    <text class="layer-name" x="125" y="619">Catalog and Governance</text>
     <text class="service" x="425" y="619">Glue Data Catalog · SageMaker Catalog</text>
     <text class="layer-name" x="125" y="741">Storage</text>
     <text class="service" x="425" y="741">Amazon S3 · S3 Tables</text>
 
-    <text class="neo-title" x="1070" y="251">Cypher, drivers, and MCP</text>
+    <text class="neo-title" x="1070" y="251">Cypher, Drivers, and MCP</text>
     <text class="neo-copy" x="1070" y="282">Connected tools for AWS agents</text>
     <text class="neo-title" x="1070" y="373">Context for Amazon Bedrock</text>
     <text class="neo-copy" x="1070" y="404">Connected facts and policies</text>
-    <text class="neo-title" x="1070" y="495">Graph analytics</text>
+    <text class="neo-title" x="1070" y="495">Graph Analytics</text>
     <text class="neo-copy" x="1070" y="526">Traversal, patterns, communities</text>
     <text class="neo-title" x="1070" y="617">Enterprise Knowledge Layer</text>
     <text class="neo-copy" x="1070" y="648">NeoCarta semantic map</text>
-    <text class="neo-title" x="1070" y="739">Neo4j graph database</text>
+    <text class="neo-title" x="1070" y="739">Neo4j Graph Database</text>
     <text class="neo-copy" x="1070" y="770">AuraDB or self-managed</text>
   </g>
 
@@ -95,7 +95,7 @@
     <rect class="canvas" width="1600" height="900"/>
     <rect class="frame" x="45" y="35" width="1510" height="830" rx="24"/>
     <text class="eyebrow" x="90" y="88">STATE 3 · COMPLETE ARCHITECTURE</text>
-    <text class="title" x="90" y="137">AWS runs the platform; Neo4j supplies connected knowledge and memory</text>
+    <text class="title" x="90" y="137">AWS Runs the Platform; Neo4j Supplies Connected Knowledge and Memory</text>
     <text class="subtitle" x="90" y="171">Governed AWS data stays authoritative while graph context grounds applications and agents.</text>
 
     <g filter="url(#shadow)">
@@ -110,18 +110,18 @@
       <rect class="neo-chip" x="1040" y="581" width="470" height="105" rx="16"/>
       <rect class="neo-chip" x="1040" y="703" width="470" height="105" rx="16"/>
     </g>
-    <text class="layer-name" x="125" y="250">Applications and agents</text>
+    <text class="layer-name" x="125" y="250">Applications and Agents</text>
     <text class="service" x="425" y="250">AgentCore Runtime · Gateway · Strands</text>
     <text class="layer-name" x="125" y="372">Models</text>
     <text class="service" x="425" y="372">Amazon Bedrock</text>
-    <text class="layer-name" x="125" y="494">Analytics and processing</text>
+    <text class="layer-name" x="125" y="494">Analytics and Processing</text>
     <text class="service" x="425" y="494">Athena · EMR · Glue · MSK · SageMaker AI</text>
-    <text class="layer-name" x="125" y="616">Catalog and governance</text>
+    <text class="layer-name" x="125" y="616">Catalog and Governance</text>
     <text class="service" x="425" y="616">Glue · SageMaker Catalog · Lake Formation</text>
     <text class="layer-name" x="125" y="738">Storage</text>
     <text class="service" x="425" y="738">Amazon S3 · S3 Tables with Iceberg</text>
 
-    <text class="neo-title" x="1070" y="249">MCP tools + Agent Memory</text>
+    <text class="neo-title" x="1070" y="249">MCP Tools + Agent Memory</text>
     <text class="neo-copy" x="1070" y="280">Evidence and decision context</text>
     <text class="neo-title" x="1070" y="371">Context for Amazon Bedrock</text>
     <text class="neo-copy" x="1070" y="402">Connected facts and policies</text>
@@ -129,7 +129,7 @@
     <text class="neo-copy" x="1070" y="524">Graph paths · AWS support in build</text>
     <text class="neo-title" x="1070" y="615">Knowledge Layer + NeoCarta</text>
     <text class="neo-copy" x="1070" y="646">Meaning, metadata, provenance</text>
-    <text class="neo-title" x="1070" y="737">Neo4j graph database</text>
+    <text class="neo-title" x="1070" y="737">Neo4j Graph Database</text>
     <text class="neo-copy" x="1070" y="768">AuraDB or EKS and EC2</text>
   </g>
 </svg>

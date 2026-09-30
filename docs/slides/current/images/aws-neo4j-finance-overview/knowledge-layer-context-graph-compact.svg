@@ -44,8 +44,8 @@
     <circle cx="154" cy="232" r="4.5"/>
     <circle cx="168" cy="217" r="4.5"/>
   </g>
-  <text class="component-title" x="150" y="270">Long-term</text>
-  <text class="component-title" x="150" y="291">knowledge</text>
+  <text class="component-title" x="150" y="270">Long-Term</text>
+  <text class="component-title" x="150" y="291">Knowledge</text>
   <text class="component-copy" x="150" y="317">What the enterprise knows</text>
   <line x1="82" y1="335" x2="218" y2="335" stroke="#ccfbf1" stroke-width="2"/>
   <rect x="78" y="354" width="144" height="34" rx="17" fill="#ecfeff"/>
@@ -64,8 +64,8 @@
     <circle cx="350" cy="214" r="2" fill="#475569"/>
     <circle cx="358" cy="214" r="2" fill="#475569"/>
   </g>
-  <text class="component-title" x="350" y="270">Short-term</text>
-  <text class="component-title" x="350" y="291">state</text>
+  <text class="component-title" x="350" y="270">Short-Term</text>
+  <text class="component-title" x="350" y="291">State</text>
   <text class="component-copy" x="350" y="317">What is happening now</text>
   <line x1="282" y1="335" x2="418" y2="335" stroke="#e2e8f0" stroke-width="2"/>
   <rect x="278" y="354" width="144" height="34" rx="17" fill="#f1f5f9"/>
@@ -85,7 +85,7 @@
     <path d="M565 229h7v-7"/>
   </g>
   <text class="component-title" x="550" y="270">Reasoning</text>
-  <text class="component-title" x="550" y="291">memory</text>
+  <text class="component-title" x="550" y="291">Memory</text>
   <text class="component-copy" x="550" y="317">Why decisions were made</text>
   <line x1="482" y1="335" x2="618" y2="335" stroke="#ccfbf1" stroke-width="2"/>
   <rect x="478" y="354" width="144" height="34" rx="17" fill="#ecfeff"/>
@@ -103,13 +103,13 @@
 
   <!-- Request-time retrieval -->
   <rect x="42" y="610" width="224" height="106" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
-  <text class="flow-title" x="154" y="650">User · task · workflow</text>
+  <text class="flow-title" x="154" y="650">User · Task · Workflow</text>
   <text class="flow-copy" x="154" y="676">Selects what is relevant</text>
 
   <path d="M276 663h120" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
 
   <rect x="406" y="610" width="252" height="106" rx="18" fill="#ecfeff" stroke="#14b8a6" stroke-width="2.5"/>
-  <text class="flow-title" x="532" y="650">Relevant connected context</text>
+  <text class="flow-title" x="532" y="650">Relevant Connected Context</text>
   <text class="flow-copy" x="532" y="676">Retrieved for this request</text>
 
   <path d="M350 556v36q0 18 18 18h156" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>

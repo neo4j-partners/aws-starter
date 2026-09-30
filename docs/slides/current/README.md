@@ -5,8 +5,8 @@ This folder holds the current AWS and Neo4j presentations. Each deck is a
 
 ## Overview
 
-- **Gallery decks:** The published gallery shows `aws-neo4j-grounded-enterprise-ai.md`, `fraud-data-architecture.md`, `neocarta-slides-v2.md`, and `neosemantics.md`.
-- **Other decks:** The folder also holds `aws-neo4j-finance-overview.md`, `neocarta-aws-appendix.md`, `neocarta-slides.md`, and `no-images-aws-neo4j-overview.md`.
+- **Gallery decks:** The published gallery shows `hyperscaler-overview.md`, `aws-neo4j-finance-overview.md`, `fraud-data-architecture.md`, `neocarta-slides-v2.md`, `neosemantics.md`, and `enterprise-knowledge-layer.md`.
+- **Other decks:** The folder also holds `neocarta-aws-appendix.md` and `neocarta-slides.md`.
 - **`neocarta-slides-v2.md`:** This deck revises the order and titles of `neocarta-slides.md`. It has 14 main slides and five appendix slides.
 - **`neocarta-outline.md`:** This file is the Neocarta outline. It is plain Markdown, not a Marp deck.
 - **Images:** Each deck loads local SVG and PNG files from `images/<deck-name>/`.
@@ -23,7 +23,7 @@ cd docs/slides
 npm run preview
 ```
 
-Open <http://localhost:8080/aws-neo4j-grounded-enterprise-ai.md> in your
+Open <http://localhost:8080/aws-neo4j-finance-overview.md> in your
 browser. Marp reloads the deck each time you save the file. Press <kbd>P</kbd>
 in the browser to open presenter view.
 
@@ -35,7 +35,7 @@ Run this command from `docs/slides/`:
 npm run build:html
 ```
 
-- **Output:** The command writes HTML files to `docs/slides/dist/`. It builds `aws-neo4j-grounded-enterprise-ai.md`, `fraud-data-architecture.md`, `neocarta-slides.md`, `neocarta-slides-v2.md`, and `neosemantics.md`.
+- **Output:** The command writes HTML files to `docs/slides/dist/`. It builds `aws-neo4j-finance-overview.md`, `fraud-data-architecture.md`, `neocarta-slides.md`, `neocarta-slides-v2.md`, and `neosemantics.md`.
 - **Local files:** Keep `--allow-local-files` in the preview and build commands. Marp needs this flag to load the images in `images/<deck-name>/`.
 
 ## AWS technical review

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
   <title id="title">The cloud data and AI stack</title>
-  <desc id="description">Six layers in two groups. AI layers: apps, agents, context. Data layers: operational data, lakehouse, infrastructure. Agent governance runs across every layer.</desc>
+  <desc id="description">Six layers in two groups. AI layers: apps, agents, context. Data layers: operational data with an operational graph, lakehouse with an analytical graph, infrastructure. Agent governance runs across every layer.</desc>
   <defs>
     <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
       <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
@@ -75,14 +75,18 @@
   <text class="layer-name" text-anchor="start"><tspan x="92" y="607.4">Operational data</tspan></text>
   <rect class="data-chip" x="380" y="576" width="260" height="46" rx="12"/>
   <text class="chip-text" text-anchor="middle"><tspan x="510.0" y="606.0">Operational database</tspan></text>
-  <rect class="data-chip" x="656" y="576" width="139" height="46" rx="12"/>
-  <text class="chip-text" text-anchor="middle"><tspan x="725.5" y="606.0">Streaming</tspan></text>
+  <rect class="data-chip" x="656" y="576" width="227" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="769.5" y="606.0">Operational graph</tspan></text>
+  <rect class="data-chip" x="899" y="576" width="139" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="968.5" y="606.0">Streaming</tspan></text>
   <rect class="layer" x="60" y="652" width="1190" height="86" rx="16" filter="url(#shadow)"/>
   <text class="layer-name" text-anchor="start"><tspan x="92" y="703.4">Lakehouse</tspan></text>
   <rect class="data-chip" x="380" y="672" width="161" height="46" rx="12"/>
   <text class="chip-text" text-anchor="middle"><tspan x="460.5" y="702.0">Open tables</tspan></text>
   <rect class="data-chip" x="557" y="672" width="172" height="46" rx="12"/>
   <text class="chip-text" text-anchor="middle"><tspan x="643.0" y="702.0">Data catalog</tspan></text>
+  <rect class="data-chip" x="745" y="672" width="216" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="853.0" y="702.0">Analytical graph</tspan></text>
   <rect class="layer" x="60" y="748" width="1190" height="86" rx="16" filter="url(#shadow)"/>
   <text class="layer-name" text-anchor="start"><tspan x="92" y="799.4">Infrastructure</tspan></text>
   <rect class="data-chip" x="380" y="768" width="172" height="46" rx="12"/>

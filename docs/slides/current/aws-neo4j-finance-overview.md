@@ -81,32 +81,6 @@ The relationship is stored, not computed. Following one is a direct hop, not a j
 
 ---
 
-## From Silos to Connected Context
-
-Separate systems each hold one piece of the picture. A graph connects them, so hidden context becomes visible.
-
-- **Employees:** talent development, career management, and knowing who is who in the organization.
-- **Network & security:** identity and access management, identity resolution, reputation scoring, and threat detection.
-- **Suppliers:** route planning, real-time supply chain visibility, and risk analysis.
-- **Process, product, transactions, and customers:** the same connected approach applies to process improvement, product recommendations, fraud detection, and customer loyalty.
-
-<!--
-Diagram in the source deck: a network diagram with these areas as connected
-hubs, showing how they link into one shared graph.
--->
-
----
-
-## Graph Makes It Easy to Explore Hidden Patterns
-
-A graph lets you ask three kinds of questions directly against connected data.
-
-- **What's important:** find the most central or influential node in a network, such as the most connected account.
-- **What's unusual:** spot outliers, such as one address linked to multiple accounts and identifiers that other customers do not share.
-- **What's next:** predict a likely new connection, such as flagging a transfer path that matches a known fraud typology.
-
----
-
 ![bg contain](./images/aws-neo4j-finance-overview/neo4j-five-roles.svg)
 
 ---
@@ -132,21 +106,6 @@ Companies that use Neo4j and AWS together include Adobe, Financial Times, Meredi
 ## Neo4j Adds Connected Context Across the AWS Platform
 
 ![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map-neo4j.svg)
-
----
-
-<style scoped>
-table { font-size: 21px; }
-</style>
-
-## AWS Provides Scale, Neo4j Provides Connected Context
-
-| AWS | Neo4j |
-| --- | --- |
-| **Store:** Keep authoritative records, documents, tables, and operational history. | **Connect:** Represent important entities, relationships, and investigation context. |
-| **Govern:** Control access through catalogs, policies, identities, and platform services. | **Explain:** Link data to business terms, policies, typologies, and prior decisions. |
-| **Analyze:** Use SQL, Spark, streaming, and ML for activity at scale. | **Traverse:** Find paths, communities, shared identifiers, and network patterns. |
-| **Run AI:** Supply models, agent runtimes, gateways, and application infrastructure. | **Ground AI:** Give agents connected facts, semantic routing, tools, and memory. |
 
 ---
 
@@ -239,6 +198,21 @@ Pick Spark on EMR when the job needs custom Cypher or very large batches.
 
 ---
 
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+## Neo4j Supports Managed and Self-Managed AWS Deployment
+
+- **AuraDB on AWS:** Use Neo4j's managed graph database in an AWS region that fits the workload.
+- **AWS Marketplace:** Purchase eligible Aura plans through AWS billing and marketplace terms.
+- **Private connectivity:** Use AWS PrivateLink with supported Aura enterprise configurations.
+- **Self-managed:** Deploy Neo4j on Amazon EKS or Amazon EC2 when the customer manages the runtime.
+
+<small>Sources: [Aura through cloud marketplaces](https://neo4j.com/docs/aura/cloud-providers/), [Aura secure connections](https://neo4j.com/docs/aura/security/secure-connections/), and [AgentCore supported regions](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agentcore-regions.html)</small>
+
+---
+
 ## A Combined Architecture: Graph Plus Lakehouse
 
 - **Amazon S3 Tables, Amazon Athena, and AWS Glue Data Catalog** hold and query high-volume analytic data as open Iceberg tables. AWS Lake Formation can govern access.
@@ -258,6 +232,11 @@ well: relationships, rules, and provenance.
 
 ---
 
+<style scoped>
+table { font-size: 21px; }
+ul, p { font-size: 24px; }
+</style>
+
 ## Decision Table: SQL vs. Cypher
 
 | Signal | Stay in SQL | Move to Cypher |
@@ -275,20 +254,52 @@ well: relationships, rules, and provenance.
 
 ---
 
-## One Investigation Uses Both Data Paths
+## Virtual Graph for AWS
 
-1. **Detect in AWS:** SQL in Athena flags unusual transactions, accounts, or merchants in governed S3 data.
-2. **Expand in Neo4j:** the investigation starts from those identifiers and traverses the connected network.
-3. **Find the pattern:** Cypher detects shared identities, circular transfers, and exposed entities, such as the ACC-1001 ⇄ ACC-2047 ring from earlier.
-4. **Explain the finding:** policies, fraud typologies, KYC documents, and prior cases establish significance.
-5. **Return the result:** graph findings flow back to AWS for analytics, reporting, and case workflows.
+Planned: query Amazon S3 Tables with Cypher through Athena.
 
-**Combined outcome:** AWS supplies authoritative activity. Neo4j supplies the connected context needed to investigate it.
+---
+
+![bg contain](./images/aws-neo4j-finance-overview/virtual-graph.png)
+
+---
+
+## Planned AWS Query Path: Cypher Through Athena to S3 Tables
+
+![w:760](./images/aws-neo4j-finance-overview/virtual-graph-aws-query-path.svg)
+
+**Read in place:** Virtual Graph queries current S3 Tables data without materializing a second copy in Neo4j.
+
+---
+
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+## What Each Component Does in the Virtual Graph Path
+
+- **Translate:** Virtual Graph turns Cypher into SQL and maps the returned rows back to a Cypher result.
+- **Execute:** Athena runs the SQL against the table bucket.
+- **Resolve:** Glue exposes each table bucket as a child federated catalog under `s3tablescatalog`.
+- **Govern:** IAM or Lake Formation permissions control access to catalog and table resources.
+- **Store:** S3 Tables remains the authoritative source.
+
+<small>**Public preview:** Snowflake, Databricks, and Google BigQuery. **Planned for AWS:** Athena, AWS Glue Data Catalog, and Amazon S3 Tables.</small>
 
 <!--
-Closes the AWS section and the loop on the fraud-ring example: the end-to-end
-flow the graph-fundamentals and data-architecture slides were building toward.
+Sources: https://neo4j.com/blog/auradb/neo4j-virtual-graph-is-now-in-public-preview/,
+https://docs.aws.amazon.com/athena/latest/ug/gdc-register-s3-table-bucket-cat.html,
+and https://docs.aws.amazon.com/glue/latest/dg/enable-s3-tables-catalog-integration.html
 -->
+
+---
+
+## Choose the Execution Path That Fits the Workload
+
+| Workload | Recommended path | Execution |
+| --- | --- | --- |
+| **Query current S3 Tables data without copying it**<br>*Planned* | Cypher through Virtual Graph | Athena queries the table-bucket child catalog mounted in AWS Glue Data Catalog. |
+| **Run frequent, low-latency traversals or graph algorithms** | Materialize selected data in Neo4j | Neo4j executes Cypher against the persisted graph. |
 
 ---
 
@@ -328,21 +339,15 @@ The client discovers these tools automatically through MCP. Schema lookup shows 
 
 ---
 
-## AWS Deployment Architecture
-
-```
-AI assistant      →  Amazon Cognito  →  AgentCore  →  AgentCore Runtime  →  Neo4j
-or agent             (JWT token)        Gateway       (Neo4j MCP Server)     Aura
-```
-
-- **Amazon Cognito:** The client exchanges a client ID and secret for a JWT.
-- **AgentCore Gateway:** The Gateway validates the JWT and routes each tool call to the runtime.
-- **AgentCore Runtime:** The runtime hosts the read-only Neo4j MCP Server over Streamable HTTP.
-- **AWS Secrets Manager:** Secrets Manager stores the Neo4j password. The runtime receives it at deploy time.
-
-The client never holds Neo4j credentials. Deployment code lives in `neo4j-mcp-server/`.
+![bg contain](./images/aws-neo4j-finance-overview/aws-fraud-gateway-request-flow.svg)
 
 <!--
+The client never holds Neo4j credentials. Cognito exchanges a client ID and
+secret for a JWT. The Gateway validates the JWT and routes each tool call to
+the runtime. The runtime hosts the read-only Neo4j MCP Server over Streamable
+HTTP. Secrets Manager stores the Neo4j password, and the runtime receives it
+at deploy time. Deployment code lives in neo4j-mcp-server/.
+
 ./deploy.py builds the ARM64 image, pushes it to ECR, and deploys the CDK
 stack. ./deploy.py credentials writes the Gateway URL, client ID, client
 secret, and token URL that the Quick connection slide uses. The Gateway also
@@ -469,21 +474,6 @@ The agent answers from evidence the graph can defend.
 
 ---
 
-## How Graph-Enriched Retrieval Works
-
-One retrieval call, two steps:
-
-- **Step 1, search:** the question is matched against stored text to find the closest starting point.
-- **Step 2, traversal:** a reviewed query follows relationships out from that starting point to connected facts.
-- **Two decisions, two owners:** search decides where the answer starts. The traversal decides what comes back with it.
-
-<!--
-Search alone ranks similar text. The traversal is what proves a fact is
-actually connected to the record in question.
--->
-
----
-
 ## GraphRAG Patterns
 
 Four patterns for building GraphRAG, all built around one graph.
@@ -519,15 +509,40 @@ on context rot from the start of the section.
 
 Tools answer the current question. Memory carries context across turns and sessions.
 
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+<small>[Library documentation](https://neo4j.com/labs/agent-memory/) · [GitHub project](https://github.com/neo4j-labs/agent-memory)</small>
+
 ---
 
-## Three Layers of Agent Memory
+## A Context Graph Is Persistent Connected Memory for Agents
 
-- **Short-term memory:** conversation history, session state, and the entities mentioned in each turn. This is what lets an agent resolve "what's the current balance?" after an account was already named.
-- **Long-term memory:** durable facts and preferences that should outlive one conversation, plus a record of what changed and when.
-- **Reasoning memory:** the tool calls, decisions, and outcomes an agent produced. This is evidence for debugging and review.
+One queryable graph links three kinds of memory.
 
-Most agents are stateless until memory is designed on purpose.
+- **Long-term knowledge:** Entities, relationships, business meaning, policies, and authoritative facts.
+- **Short-term state:** Conversation, user intent, task, workflow state, and tool observations.
+- **Reasoning memory:** Decisions linked to their situation, rationale, actions, outcomes, and precedents.
+
+**Compounding context:** Each request retrieves relevant context and adds new state or traces. The graph persists across requests.
+
+<!--
+Short-term state is what lets an agent resolve "what's the current balance?"
+after an account was already named. Long-term knowledge holds durable facts
+and preferences that should outlive one conversation, plus a record of what
+changed and when. Reasoning memory keeps the tool calls, decisions, and
+outcomes an agent produced, which is evidence for debugging and review. Most
+agents are stateless until memory is designed on purpose.
+
+Sources: https://neo4j.com/blog/agentic-ai/what-is-context-graph/,
+https://neo4j.com/blog/agentic-ai/context-graph-ai-agent-memory/, and
+https://neo4j.com/blog/agentic-ai/hands-on-with-context-graphs-and-neo4j/
+-->
+
+---
+
+![bg contain](./images/aws-neo4j-finance-overview/knowledge-layer-context-graph-compact.svg)
 
 ---
 
@@ -541,6 +556,10 @@ Most agents are stateless until memory is designed on purpose.
 
 ---
 
+<style scoped>
+ul, p { font-size: 25px; }
+</style>
+
 ## Why Graphs for Agent Memory
 
 - **Relationships are first-class.** A conversation, a preference, and a transaction can all point to the same real-world record.
@@ -548,6 +567,9 @@ Most agents are stateless until memory is designed on purpose.
 - **Provenance stays traversable.** A stored memory can point back to the exact source that produced it.
 - **Graph identity prevents copies.** One canonical record accumulates facts, conversations, preferences, and actions instead of scattering them.
 - **Memory is scoped to individual users.** Each user's memory stays isolated across sessions.
+- **History is retained.** Outdated memory is superseded without erasing its correction path.
+
+**Store deliberately:** Entity extraction identifies what a turn is about. Policy or confirmation decides what becomes durable memory.
 
 ---
 
@@ -567,6 +589,25 @@ load runs. Recall is a library capability, not something this demo shows.
 Source: demos/fraud-amazon-quick/fraud-memory-agent/README.md and
 server/runtime_app.py.
 -->
+
+---
+
+## These Capabilities Meet Inside an AWS-Hosted Agent Workflow
+
+![w:1160](./images/aws-neo4j-finance-overview/aws-hosted-agent-knowledge-layer-workflow.svg)
+
+**Security boundary:** Gateway supports OAuth 2.0 for tool traffic. Targets enforce data access.
+
+<!--
+Sources: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html
+and https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html
+-->
+
+---
+
+## Together, Connected Knowledge Grounds the AWS Agent Stack
+
+![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map-complete.svg)
 
 ---
 

@@ -63,7 +63,7 @@
   <rect class="layer" x="60" y="652" width="1190" height="86" rx="16" filter="url(#shadow)"/>
   <text class="layer-name" text-anchor="start"><tspan x="92" y="703.4">Lakehouse</tspan></text>
   <rect class="neo-chip" x="380" y="670" width="840" height="50" rx="12"/>
-  <text class="neo-text" text-anchor="middle"><tspan x="800" y="702.4">A graph built from lakehouse tables adds the links</tspan></text>
+  <text class="neo-text" text-anchor="middle"><tspan x="800" y="702.4">A graph and graph analytics built from lakehouse tables</tspan></text>
   <rect class="layer-dim" x="60" y="748" width="1190" height="86" rx="16"/>
   <text class="layer-name-dim" text-anchor="start"><tspan x="92" y="799.4">Infrastructure</tspan></text>
   <text class="dim-text" text-anchor="start"><tspan x="380" y="798.0">Stays with the vendor</tspan></text>

@@ -50,7 +50,7 @@
   </g>
 
   <rect x="76" y="570" width="590" height="218" rx="14" fill="#F3F5F7" stroke="#CDD3DA"/>
-  <text x="100" y="603" font-size="17" font-weight="700" fill="#17233A">Optimized for analytics</text>
+  <text x="100" y="603" font-size="17" font-weight="700" fill="#17233A">Optimized for Analytics</text>
   <g font-size="16" fill="#354052">
     <circle cx="108" cy="637" r="3.5" fill="#E87722"/><text x="126" y="643">Totals, averages, and risk score distribution</text>
     <circle cx="108" cy="674" r="3.5" fill="#E87722"/><text x="126" y="680">Hourly, daily, and monthly trends</text>
@@ -109,7 +109,7 @@
   </g>
 
   <rect x="934" y="660" width="590" height="128" rx="14" fill="#F3F5F7" stroke="#CDD3DA"/>
-  <text x="958" y="692" font-size="17" font-weight="700" fill="#17233A">Optimized for connected questions</text>
+  <text x="958" y="692" font-size="17" font-weight="700" fill="#17233A">Optimized for Connected Questions</text>
   <g font-size="15" fill="#354052">
     <circle cx="966" cy="724" r="3.5" fill="#3574B9"/><text x="984" y="730">Multi-hop traversal and graph-enriched retrieval</text>
     <circle cx="966" cy="756" r="3.5" fill="#3574B9"/><text x="984" y="762">Rules, provenance, alerts, and case memory</text>

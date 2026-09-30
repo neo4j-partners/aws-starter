@@ -37,7 +37,8 @@ where the vendors differ, into the shifts that show up across all of them in
 2026, and ends with where Neo4j fits.
 
 Product names and status were checked against vendor pages on September 27,
-2026. Names changed often in 2025 and 2026, so check again before reuse.
+2026. Graph engine facts were checked on September 29, 2026. Names changed
+often in 2025 and 2026, so check again before reuse.
 
 Source material: cloud-integration/hyperscaler.md.
 -->
@@ -83,11 +84,17 @@ service it runs in, so the stack keeps its six layers.
 - **Infrastructure:** Custom chips and NVIDIA GPUs train and run the models.
 - **Lakehouse:** Open tables in object storage hold the data once. Many query engines read the same tables.
 - **Operational data:** Databases and streams hold the present. The lakehouse holds the history.
+- **Graph engine:** Operational graphs sit next to the databases. Analytical graphs sit on the lakehouse.
 
 <!--
 An operational database stores the current state that an app changes many
 times per second, such as an order or an agent session. A stream carries
 events as they happen.
+
+A graph engine stores entities and the relationships between them. It follows
+a chain of relationships in one query. Spanner Graph and Amazon Neptune
+Database are operational graphs. BigQuery Graph, Graph in Microsoft Fabric,
+and Amazon Neptune Analytics are analytical graphs.
 -->
 
 ---
@@ -204,6 +211,9 @@ top to bottom.
 state a release status. Google rebuilt Gemini Cloud Assist around proactive
 agents at Next '26 on April 22, 2026. IBM announced IBM Concert on May 5,
 2026.
+
+The graph engine row counts native engines only. Databricks offers the
+GraphFrames library on Spark. IBM sells DataStax Graph in DataStax Enterprise.
 -->
 
 ---
@@ -240,7 +250,9 @@ a community blog post.
 
 <!--
 An example of a wrong meaning is the term "revenue." AWS, Databricks, Google
-Cloud, and Microsoft all describe their context layer as a graph.
+Cloud, and Microsoft all describe their context layer as a graph. Only
+Microsoft documents the graph engine behind it: Graph in Fabric stores the
+Fabric IQ instance graph.
 
 - AWS Context is coming soon. Pieces available now: Glue Data Catalog
   business context is in preview, and S3 annotations are GA.
@@ -254,29 +266,39 @@ Cloud, and Microsoft all describe their context layer as a graph.
 
 ---
 
-## Vendors Now Ship Their Own Graphs
+## Every Cloud Now Ships a Graph Engine
 
-- **Google Cloud:** BigQuery Graph models entities and relationships inside BigQuery. It is in preview.
-- **Microsoft:** Graph in Fabric stores the connections that the Fabric IQ ontology declares.
-- **AWS:** AWS Context maps relationships across existing data into a knowledge graph.
-- **Amazon Quick:** Quick already runs on a knowledge graph. AWS Context grows it from one person to the whole company.
+- **Google Cloud:** Spanner Graph is the operational graph. BigQuery Graph is the analytical graph. Both are GA.
+- **Microsoft:** Graph in Fabric is the analytical graph over OneLake. It reached GA on June 2, 2026.
+- **AWS:** Neptune Database is the operational graph. Neptune Analytics is the analytical graph.
+- **No native engine:** Databricks and IBM ship no graph engine in their lakehouse.
+- **GQL:** Google and Microsoft query with ISO GQL. AWS queries with Gremlin, openCypher, and SPARQL.
 
-**The graph model is now standard.** The question shifts from "why a graph" to "whose graph."
+**The graph model is now standard.** Graph deals now open with "why a separate graph database?"
 
 <!--
 This is the most important slide for a Neo4j audience.
 
-Microsoft says the Fabric IQ ontology "declares what connects and why," and
-Graph in Fabric stores those connections. Databricks calls Genie Ontology a
-"living context graph." Google calls Knowledge Catalog a "dynamic context
-graph."
+A context graph records what data means. A graph engine stores the entities
+and relationships themselves. It runs traversals and graph algorithms over
+them.
 
-Each of these graphs lives inside one vendor's platform and serves that
-vendor's agents. That validates the graph model. It also means the
-difference is now a graph the customer owns, queries with Cypher, and uses
-across every cloud.
+- Spanner Graph has been GA since December 2, 2024. BigQuery Graph reached GA
+  on August 31, 2026. Google says the two share one graph schema and query
+  language.
+- Graph in Fabric stores the instance graph of the Fabric IQ ontology.
+  Microsoft says the ontology "declares what connects and why."
+- AWS Context and the Amazon Quick knowledge graph name no graph store. The
+  open-source Context Ontology Accelerator uses Neptune.
+- GQL is ISO/IEC 39075:2024. Neptune supports neither GQL nor SQL/PGQ. Neo4j
+  Cypher 25 supports most mandatory GQL features.
 
-The "whose graph" framing is our inference from the vendor pages.
+Each engine lives inside one vendor's platform and serves that vendor's
+agents. That validates the graph model. It also means the difference is now a
+graph the customer owns, queries with Cypher, and uses across every cloud.
+
+The "why a separate graph database" point is our inference from the vendor
+pages.
 -->
 
 ---
@@ -447,10 +469,22 @@ for Amazon Bedrock AgentCore.
 - **A map for built-in agents:** Built-in agents need a map of how services connect. A graph is that map.
 - **Reached through MCP:** Every agent platform reaches the graph through the Neo4j MCP Server.
 - **Built from the lakehouse:** The lakehouse keeps the tables. The graph adds the links.
+- **Graph depth:** Graph Data Science runs more than 65 algorithms. Cypher 25 supports most mandatory GQL features.
 
 <!--
 Each vendor builds a context graph inside its own platform. Neo4j adds one
 that the customer owns, queries with Cypher, and uses across every cloud.
+
+Graph deals on Google Cloud and Microsoft will open with "why a separate graph
+database?" Neo4j answers with depth and reach. Teams that learn GQL on Google
+Cloud or Microsoft can carry those skills to Neo4j.
+
+- Neo4j Graph Intelligence for Microsoft Fabric reached GA on October 23,
+  2025. It brings Graph Data Science algorithms into Fabric, so it adds to
+  Graph in Fabric on Microsoft accounts.
+- Neo4j Graph Analytics runs inside Snowflake as a Native App.
+- Neo4j Aura is listed on AWS Marketplace and Google Cloud Marketplace.
+  AuraDB Professional is listed on Microsoft Marketplace.
 
 The graph stores entities and the relationships between them, so an agent can
 follow a chain of links in one query.
@@ -466,7 +500,7 @@ connected things, which is what a graph stores.
 
 - **One stack, five vendors:** The layers match. The names, formats, and catalogs differ.
 - **Iceberg is common ground:** Format locks customers in less. The catalog decides more.
-- **Every vendor now ships a graph:** Each one stays inside its own platform.
+- **Every cloud now ships a graph engine:** Each one stays inside its own platform.
 - **MCP is the shared interface:** One MCP server reaches every agent platform.
 - **Memory is still open:** Agent memory is in Beta or preview at three of five vendors.
 - **Neo4j spans the clouds:** A customer-owned graph serves agents on any vendor.
@@ -492,7 +526,7 @@ cloud-integration/aws/current/reference/aws-ecosystem-summary.md.
 
 - **Infrastructure:** Trainium3, Inferentia2, and Graviton5 chips run next to NVIDIA GPUs.
 - **Lakehouse:** Amazon S3 Tables holds the data. The AWS Glue Data Catalog lists it.
-- **Operational data:** Amazon Aurora holds the present. Amazon MSK and Kinesis carry streams.
+- **Operational data:** Amazon Aurora and Amazon Neptune hold the present. MSK and Kinesis carry streams.
 - **Context:** AWS Context maps existing data into a knowledge graph.
 - **Agents and models:** Amazon Bedrock serves models. Amazon Bedrock AgentCore runs agents.
 - **Apps:** Amazon Quick serves employees. Kiro serves developers.
@@ -502,7 +536,12 @@ Agent governance runs across every layer. At AWS it is AgentCore Identity,
 AgentCore Gateway, Policy in AgentCore, and AWS Agent Registry.
 
 AWS Context is coming soon. Glue Data Catalog business context is in preview,
-and S3 annotations are GA.
+and S3 annotations are GA. The open-source Context Ontology Accelerator uses
+Neptune as its graph store. AWS does not say the managed service runs on
+Neptune.
+
+Neptune Database is the operational graph. Neptune Analytics is the analytical
+graph on the lakehouse.
 -->
 
 ---
@@ -514,7 +553,7 @@ and S3 annotations are GA.
 - **Catalog:** The Glue Data Catalog lists every table. IAM and Lake Formation control access.
 - **Postgres:** Aurora DSQL and Aurora PostgreSQL hold app state. pgvector adds vector search.
 - **Streams:** Amazon MSK runs managed Kafka. Kinesis Data Streams runs serverless streams.
-- **Graph:** Amazon Neptune is AWS's graph database. Neptune Analytics adds algorithms and vector search.
+- **Graph:** Neptune Database runs the operational graph. Neptune Analytics runs the analytical graph.
 
 <!--
 S3 Tables exposes the Iceberg REST Catalog API, so Trino and Flink can also
@@ -533,7 +572,7 @@ database for operational workloads such as fraud alerts and Customer 360. It
 supports openCypher, Gremlin, and SPARQL, but has no graph algorithms or
 vector search. Neptune Analytics is an in-memory engine with more than 25
 graph algorithms and vector search. It loads a point-in-time copy from
-Neptune Database or S3.
+Neptune Database or S3. Neither product supports GQL or SQL/PGQ.
 -->
 
 ---
@@ -552,8 +591,9 @@ distillation, Flows, Data Automation, model evaluation, and prompt management.
 
 Knowledge Bases chunk, embed, and index documents. They store vectors in
 OpenSearch, S3 Vectors, Aurora PostgreSQL, Pinecone, Redis, or MongoDB Atlas.
-Knowledge Bases GraphRAG uses Amazon Neptune Analytics, AWS's own graph
-database.
+Knowledge Bases GraphRAG reached GA on March 7, 2025, and builds its graph in
+Neptune Analytics. S3 is the only data source, with 1,000 files per source.
+Customers cannot define their own graph structure. It runs in 7 Regions.
 
 Bedrock Agents is configuration over code: Bedrock runs the reasoning loop.
 AgentCore, on the next slide, is for teams that write their own agent code.
@@ -619,13 +659,13 @@ AWS nor Neo4j has published that pairing.
 - **Parallel agents:** Agents build the tasks on the laptop or in the cloud.
 - **Correctness:** Property-based tests catch edge cases that unit tests miss.
 - **Every surface:** Kiro also runs as a CLI, a web app, and a mobile app.
-- **Open standards:** Kiro supports MCP, AGENTS.md, skills, and the Agent Client Protocol.
+- **Open standards:** Kiro supports MCP, AGENTS.md, Agent Skills, and the Agent Client Protocol.
 
 <!--
 Kiro calls this agentic engineering, as opposed to vibe coding. A spec records
 the requirements and design decisions before any code exists, so the team can
 review them. Kiro checks requirements for contradictions and gaps before it
-writes code.
+writes code. Property-based testing runs in the Kiro IDE only.
 
 - Hooks run tasks automatically, such as updating tests or docs on save.
 - Steering files give the agent project rules. They carry across every Kiro
@@ -635,12 +675,15 @@ writes code.
 - The headless CLI runs in CI/CD to review pull requests and fix bugs.
 - Kiro on the web runs sessions in cloud sandboxes that keep going after the
   laptop closes.
+- Through ACP, the Kiro CLI runs as an agent inside JetBrains IDEs, Zed, and
+  other ACP editors.
 
 Models: Anthropic Claude, OpenAI GPT, and open-weight models such as DeepSeek
-and Qwen. Auto picks a model per task. Pricing is credit-based. Developers
+and Qwen. Auto picks a model per task. Pricing is credit-based. Plans run
+from Free with 50 credits to Power at $200 per user per month. Developers
 sign in with GitHub, Google, AWS Builder ID, or IAM Identity Center, and need
 no AWS account.
 
-AWS groups Kiro, AWS DevOps Agent, and AWS Security Agent as "frontier
-agents."
+AWS groups Kiro, AWS DevOps Agent, AWS Security Agent, and AWS FinOps Agent
+as "frontier agents." FinOps Agent is in preview.
 -->

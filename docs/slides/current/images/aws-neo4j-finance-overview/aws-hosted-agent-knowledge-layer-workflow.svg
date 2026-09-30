@@ -34,8 +34,8 @@
     <rect x="30" y="42" width="245" height="64" rx="32" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
     <rect x="30" y="542" width="245" height="64" rx="32" fill="#ecfeff" stroke="#14b8a6" stroke-width="2"/>
   </g>
-  <text x="152" y="81" text-anchor="middle" class="pill-title">User question</text>
-  <text x="152" y="572" text-anchor="middle" class="pill-title">Grounded answer</text>
+  <text x="152" y="81" text-anchor="middle" class="pill-title">User Question</text>
+  <text x="152" y="572" text-anchor="middle" class="pill-title">Grounded Answer</text>
   <text x="152" y="592" text-anchor="middle" class="small">evidence + provenance</text>
 
   <!-- AWS-hosted agent -->
@@ -47,7 +47,7 @@
   <text x="58" y="251" class="copy">Runs the agent securely</text>
 
   <rect x="58" y="280" width="189" height="72" rx="13" fill="#ffffff" stroke="#fed7aa" stroke-width="2"/>
-  <text x="76" y="310" class="chip-title">Strands agent</text>
+  <text x="76" y="310" class="chip-title">Strands Agent</text>
   <text x="76" y="335" class="chip-copy">Plans and invokes tools</text>
 
   <rect x="58" y="372" width="189" height="72" rx="13" fill="#ffffff" stroke="#fed7aa" stroke-width="2"/>
@@ -114,11 +114,11 @@
     <rect x="1096" y="461" width="208" height="104" rx="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
     <rect x="1319" y="461" width="241" height="104" rx="15" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
   </g>
-  <text x="674" y="497" class="chip-title">Neo4j graph</text>
+  <text x="674" y="497" class="chip-title">Neo4j Graph</text>
   <text x="674" y="524" class="chip-copy">Cypher over connected</text>
   <text x="674" y="545" class="chip-copy">facts and relationships</text>
 
-  <text x="897" y="497" class="chip-title">AWS data</text>
+  <text x="897" y="497" class="chip-title">AWS Data</text>
   <text x="897" y="524" class="chip-copy">Athena over S3 and</text>
   <text x="897" y="545" class="chip-copy">governed tables</text>
 

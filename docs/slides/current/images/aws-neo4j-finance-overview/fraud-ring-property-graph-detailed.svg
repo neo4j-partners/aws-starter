@@ -2,7 +2,7 @@
   <rect x="0" y="0" width="1000" height="670" fill="#FFFFFF"/>
 
   <!-- title -->
-  <text x="500" y="44" text-anchor="middle" font-size="25" font-weight="700" fill="#0E2A33">Fraud Ring — Property Graph</text>
+  <text x="500" y="44" text-anchor="middle" font-size="25" font-weight="700" fill="#0E2A33">Fraud Ring: Property Graph</text>
 
   <!-- outer container -->
   <rect x="40" y="70" width="920" height="524" rx="16" fill="#FFFFFF" stroke="#1B3139" stroke-width="2"/>

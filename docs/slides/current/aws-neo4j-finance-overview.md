@@ -125,13 +125,13 @@ Companies that use Neo4j and AWS together include Adobe, Financial Times, Meredi
 
 ## AWS Provides the Foundation for Governed Enterprise AI
 
-![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map.svg#aws)
+![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map-aws.svg)
 
 ---
 
 ## Neo4j Adds Connected Context Across the AWS Platform
 
-![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map.svg#neo4j)
+![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map-neo4j.svg)
 
 ---
 
@@ -232,9 +232,62 @@ flow the graph-fundamentals and data-architecture slides were building toward.
 
 ---
 
-## Amazon Quick + Neo4j
+## Connecting Amazon Quick and Neo4j with MCP
 
 Bringing graph context to the enterprise AI assistant through MCP.
+
+---
+
+## Model Context Protocol (MCP)
+
+**MCP** is an open standard that defines how AI agents discover and use external tools.
+
+```
+AI Assistant or Agent  ←→  MCP Server  ←→  Data Source
+                           (Neo4j MCP)     (Neo4j Aura)
+```
+
+- **Client:** The assistant or agent asks the MCP server which tools it offers.
+- **MCP server:** The server translates between the protocol and the native API.
+- **Data source:** Neo4j, a REST API, or a file system holds the data.
+
+Any MCP-compatible client connects to any MCP-compatible server.
+
+---
+
+## Neo4j MCP Server Tools
+
+The Neo4j MCP Server exposes two tools in read-only mode:
+
+| Tool | Description |
+|------|-------------|
+| **`get_neo4j_schema`** | Reads the graph schema: node labels, relationship types, and properties. The format is token-efficient for LLM use. |
+| **`read_neo4j_cypher`** | Executes a read-only Cypher query. It runs `EXPLAIN` first to reject writes such as CREATE, MERGE, DELETE, and SET. |
+
+The client discovers these tools automatically through MCP. Schema lookup shows it the Customer, Account, Phone, Address, and Merchant labels before it writes Cypher.
+
+---
+
+## AWS Deployment Architecture
+
+```
+AI assistant      →  Amazon Cognito  →  AgentCore  →  AgentCore Runtime  →  Neo4j
+or agent             (JWT token)        Gateway       (Neo4j MCP Server)     Aura
+```
+
+- **Amazon Cognito:** The client exchanges a client ID and secret for a JWT.
+- **AgentCore Gateway:** The Gateway validates the JWT and routes each tool call to the runtime.
+- **AgentCore Runtime:** The runtime hosts the read-only Neo4j MCP Server over Streamable HTTP.
+- **AWS Secrets Manager:** Secrets Manager stores the Neo4j password. The runtime receives it at deploy time.
+
+The client never holds Neo4j credentials. Deployment code lives in `neo4j-mcp-server/`.
+
+<!--
+./deploy.py builds the ARM64 image, pushes it to ECR, and deploys the CDK
+stack. ./deploy.py credentials writes the Gateway URL, client ID, client
+secret, and token URL that the Quick connection slide uses. The Gateway also
+exchanges its own OAuth token with the runtime, so callers see one endpoint.
+-->
 
 ---
 
@@ -244,10 +297,9 @@ small { font-size: 16px; }
 
 ## What Amazon Quick Is
 
-Amazon Quick is the AI assistant for work, on web and desktop.
+Amazon Quick is the AI assistant for work, on web and desktop. As an MCP client, it can call the Neo4j tools from the previous slides.
 
 - **Chat and Spaces:** Answers are grounded in connected data such as S3, SharePoint, Slack, and Salesforce.
-- **Research:** Quick builds cited reports from business data, the web, and third-party datasets.
 - **Quick Sight:** Dashboards and natural-language Q&A run over sources such as Athena and Redshift.
 - **Flows and automation:** Quick handles repetitive tasks and multi-step processes across apps.
 - **Actions:** Quick acts on connected systems through built-in connectors and MCP servers.
@@ -272,14 +324,14 @@ small { font-size: 16px; }
 
 - **Register the server:** An admin adds the Neo4j MCP endpoint as a Quick connector.
 - **Tools become actions:** Quick discovers each Neo4j tool, such as schema lookup and read-only Cypher.
-- **Authenticate as a service:** The Cognito client ID, secret, and token URL fit Quick's service-to-service option.
+- **Authenticate as a service:** Quick's service-to-service option uses the same Cognito client credentials.
 - **Reach it privately:** A Quick VPC connection reaches MCP servers that are not on the public internet.
 - **Share the connector:** Analysts on the team use the same governed graph tools.
 
 <small>Source: [MCP integration with Amazon Quick](https://docs.aws.amazon.com/quick/latest/userguide/mcp-integration.html)</small>
 
 <!--
-The Neo4j MCP server from the AgentCore section works here unchanged. Point
+The Neo4j MCP server from the deployment slide works here unchanged. Point
 Quick at the AgentCore Gateway URL. The credentials file from
 ./deploy.py credentials already holds the client ID, client secret, and token
 URL that Quick's service authentication asks for. The Quick setup is done in

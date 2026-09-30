@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title description">
+  <title id="title">A Context Graph connects knowledge and memory</title>
+  <desc id="description">A persistent Context Graph links enterprise knowledge and agent memory. A request retrieves relevant connected context and adds new memory.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-25%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#0f766e"/>
+    </marker>
+    <style>
+      text { font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+      .eyebrow { fill: #ccfbf1; font-size: 14px; font-weight: 750; letter-spacing: 1.6px; text-anchor: middle; }
+      .graph-title { fill: #ffffff; font-size: 31px; font-weight: 750; text-anchor: middle; }
+      .component-title { fill: #0f172a; font-size: 20px; font-weight: 750; text-anchor: middle; }
+      .component-copy { fill: #475569; font-size: 14px; font-weight: 500; text-anchor: middle; }
+      .chip { fill: #0f766e; font-size: 13.5px; font-weight: 650; text-anchor: middle; }
+      .flow-title { fill: #0f172a; font-size: 16px; font-weight: 750; text-anchor: middle; }
+      .flow-copy { fill: #475569; font-size: 13px; font-weight: 500; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect width="700" height="760" fill="#ffffff"/>
+
+  <!-- Persistent Context Graph -->
+  <g filter="url(#shadow)">
+    <rect x="42" y="36" width="616" height="520" rx="24" fill="#f8fafc" stroke="#0f766e" stroke-width="3"/>
+    <path d="M66 36h568a24 24 0 0 1 24 24v72H42V60a24 24 0 0 1 24-24Z" fill="#0f766e"/>
+  </g>
+  <text class="eyebrow" x="350" y="72">PERSISTENT · SHARED · QUERYABLE</text>
+  <text class="graph-title" x="350" y="112">Context Graph</text>
+
+  <!-- Knowledge -->
+  <rect x="60" y="164" width="270" height="334" rx="18" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+  <circle cx="195" cy="215" r="28" fill="#ccfbf1"/>
+  <g fill="#ffffff" stroke="#0f766e" stroke-width="2.3" stroke-linecap="round">
+    <line x1="179" y1="216" x2="197" y2="201"/>
+    <line x1="179" y1="216" x2="199" y2="232"/>
+    <line x1="197" y1="201" x2="213" y2="217"/>
+    <line x1="199" y1="232" x2="213" y2="217"/>
+    <circle cx="179" cy="216" r="4.5"/>
+    <circle cx="197" cy="201" r="4.5"/>
+    <circle cx="199" cy="232" r="4.5"/>
+    <circle cx="213" cy="217" r="4.5"/>
+  </g>
+  <text class="component-title" x="195" y="282">Knowledge</text>
+  <text class="component-copy" x="195" y="310">What the enterprise knows</text>
+  <line x1="84" y1="335" x2="306" y2="335" stroke="#ccfbf1" stroke-width="2"/>
+  <rect x="95" y="354" width="200" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="195" y="376">Entities + relations</text>
+  <rect x="95" y="398" width="200" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="195" y="420">Meaning + policy</text>
+  <rect x="95" y="442" width="200" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="195" y="464">Authoritative facts</text>
+
+  <!-- Memory -->
+  <rect x="370" y="164" width="270" height="334" rx="18" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+  <circle cx="505" cy="215" r="28" fill="#ccfbf1"/>
+  <g fill="none" stroke="#0f766e" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M490 203h14l8 8v18h-22z"/>
+    <path d="M504 203v9h8"/>
+    <path d="M517 222l7 7"/>
+    <path d="M520 229h7v-7"/>
+  </g>
+  <text class="component-title" x="505" y="282">Memory</text>
+  <text class="component-copy" x="505" y="310">What agents have learned</text>
+  <line x1="394" y1="335" x2="616" y2="335" stroke="#ccfbf1" stroke-width="2"/>
+  <rect x="405" y="354" width="200" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="505" y="376">Interactions + preferences</text>
+  <rect x="405" y="398" width="200" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="505" y="420">Actions + decisions</text>
+  <rect x="405" y="442" width="200" height="34" rx="17" fill="#ecfeff"/>
+  <text class="chip" x="505" y="464">Outcomes + feedback</text>
+
+  <!-- Knowledge and memory remain connected -->
+  <line x1="331" y1="331" x2="369" y2="331" stroke="#0f766e" stroke-width="3"/>
+  <circle cx="350" cy="331" r="5" fill="#0f766e"/>
+
+  <!-- Request-time retrieval -->
+  <rect x="42" y="610" width="224" height="106" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text class="flow-title" x="154" y="650">User · task · workflow</text>
+  <text class="flow-copy" x="154" y="676">Selects what is relevant</text>
+
+  <path d="M276 663h120" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <rect x="406" y="610" width="252" height="106" rx="18" fill="#ecfeff" stroke="#14b8a6" stroke-width="2.5"/>
+  <text class="flow-title" x="532" y="650">Relevant connected context</text>
+  <text class="flow-copy" x="532" y="676">Retrieved for this request</text>
+
+  <path d="M350 556v36q0 18 18 18h156" fill="none" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrow)"/>
+</svg>

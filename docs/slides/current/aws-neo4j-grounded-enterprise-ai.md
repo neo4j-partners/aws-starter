@@ -209,13 +209,13 @@ li {
 
 ## AWS provides the foundation for governed enterprise AI
 
-![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map.svg#aws)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map-aws.svg)
 
 ---
 
 ## Neo4j adds connected context across the AWS platform
 
-![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map.svg#neo4j)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map-neo4j.svg)
 
 ---
 
@@ -741,4 +741,4 @@ Agent C → open account balance
 
 ## Together, connected knowledge grounds the AWS agent stack
 
-![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map.svg#complete)
+![w:1160](./images/aws-neo4j-grounded-enterprise-ai/aws-neo4j-layer-map-complete.svg)

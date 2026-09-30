@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760" role="img" aria-labelledby="title description">
+  <title id="title">How the Enterprise Knowledge Layer resolves a business request</title>
+  <desc id="description">The request, What is our exposure to this customer, moves through five runtime steps: interpret intent, assemble context, route queries and tools, enforce policy during resolution, and explain and learn.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10Z" fill="#0f766e"/>
+    </marker>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <style>
+      text { font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+      .eyebrow { fill: #0f766e; font-size: 15px; font-weight: 800; letter-spacing: 1.7px; }
+      .request { fill: #0f172a; font-size: 22px; font-weight: 750; }
+      .number { fill: #0f766e; font-size: 17px; font-weight: 800; }
+      .step { fill: #0f172a; font-size: 22px; font-weight: 750; }
+      .copy { fill: #475569; font-size: 16px; font-weight: 500; }
+      .flow { fill: none; stroke: #0f766e; stroke-width: 3.5; stroke-linecap: round; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="700" height="760" fill="#ffffff"/>
+  <g filter="url(#shadow)">
+    <rect x="55" y="22" width="590" height="76" rx="20" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  </g>
+  <text class="eyebrow" x="82" y="51">BUSINESS REQUEST</text>
+  <text class="request" x="82" y="79">“What is our exposure to this customer?”</text>
+  <path class="flow" d="M350 98V119"/>
+  <rect x="38" y="128" width="624" height="606" rx="26" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text class="eyebrow" x="68" y="161">ENTERPRISE KNOWLEDGE LAYER · RUNTIME RESOLUTION</text>
+  <g filter="url(#shadow)">
+    <rect x="68" y="180" width="564" height="88" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="68" y="284" width="564" height="88" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="68" y="388" width="564" height="88" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="68" y="492" width="564" height="88" rx="16" fill="#ffffff" stroke="#99f6e4" stroke-width="2"/>
+    <rect x="68" y="596" width="564" height="108" rx="16" fill="#ecfeff" stroke="#14b8a6" stroke-width="2.5"/>
+  </g>
+  <text class="number" x="94" y="215">01</text>
+  <text class="step" x="143" y="216">Interpret intent</text>
+  <text class="copy" x="143" y="244">Resolve “exposure” and “customer” to business meaning</text>
+  <text class="number" x="94" y="319">02</text>
+  <text class="step" x="143" y="320">Assemble context</text>
+  <text class="copy" x="143" y="348">Authoritative sources and relationships</text>
+  <text class="number" x="94" y="423">03</text>
+  <text class="step" x="143" y="424">Route queries and tools</text>
+  <text class="copy" x="143" y="452">Reach the right systems through governed interfaces</text>
+  <text class="number" x="94" y="527">04</text>
+  <text class="step" x="143" y="528">Enforce policy during resolution</text>
+  <text class="copy" x="143" y="556">Apply access and business rules in context</text>
+  <text class="number" x="94" y="635">05</text>
+  <text class="step" x="143" y="636">Explain and learn</text>
+  <text class="copy" x="143" y="665">Return evidence + lineage</text>
+  <text class="copy" x="143" y="686">Retain useful trace + memory</text>
+  <path class="flow" d="M350 268V278"/>
+  <path class="flow" d="M350 372V382"/>
+  <path class="flow" d="M350 476V486"/>
+  <path class="flow" d="M350 580V590"/>
+</svg>

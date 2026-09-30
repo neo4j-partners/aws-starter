@@ -60,6 +60,15 @@ const activeDecks = [
     description:
       "A fraud-investigation overview of Neo4j on AWS: connected context, Amazon Quick over MCP, GraphRAG agents, and agent memory.",
   },
+  {
+    file: "enterprise-knowledge-layer.md",
+    source: "current/enterprise-knowledge-layer.md",
+    order: "06",
+    title: "Enterprise Knowledge Layer",
+    output: "enterprise-knowledge-layer.html",
+    description:
+      "How a shared, governed Knowledge Layer gives every agent the same business meaning, source routing, policy, and decision traces.",
+  },
 ];
 
 const archiveDescriptions = {

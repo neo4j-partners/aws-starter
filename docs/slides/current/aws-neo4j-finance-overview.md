@@ -175,6 +175,66 @@ for direct application requests, and MCP when an agent needs graph tools.
 
 ---
 
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+## Spark on Amazon EMR: A Two-Way Bridge to Neo4j
+
+The Neo4j Connector for Apache Spark maps Spark DataFrames to graph data in both directions.
+
+```text
+Write   transfers DataFrame  →  (:Account)-[:TRANSFERRED_TO]->(:Account)
+Read    (:Customer) nodes    →  DataFrame with one column per property
+```
+
+- **Write:** Rows become nodes by label and key. Rows can also become relationships between matched source and target nodes.
+- **Read:** A label, a relationship type, or a Cypher query returns a DataFrame. The connector infers its columns from the graph.
+- **Run on EMR:** The connector is a Spark DataSource, so an EMR Spark job adds it as a package.
+
+<small>Sources: [Neo4j Connector for Apache Spark](https://neo4j.com/docs/spark/current/) and [writer options](https://neo4j.com/docs/spark/current/write/options/)</small>
+
+<!--
+Use this path for large batch loads from S3 or Iceberg into the graph, and for
+pulling graph results back into Spark for analytics. Writes are batched, and
+each batch commits in its own transaction. Custom Cypher works for both reads
+and writes when the label and key options are not enough. Check the connector
+version against the EMR release's Spark version: connector 5.x targets Spark
+3.4 and 3.5, and connector 6.x targets Spark 4.
+-->
+
+---
+
+<style scoped>
+small { font-size: 16px; }
+</style>
+
+## AWS Glue Stays Tabular While Neo4j Receives Cypher
+
+The Neo4j Connector for AWS Glue is a JDBC driver that translates SQL to Cypher.
+
+```text
+Account table             →  (:Account)
+account_id column         →  .account_id
+Customer_OWNS_Account     →  (:Customer)-[:OWNS]->(:Account)
+```
+
+- **Runtime path:** Glue Visual ETL sends SQL over JDBC. The driver translates it to Cypher and sends it to Neo4j over Bolt.
+- **Model first:** A blueprint graph defines the labels, relationship types, and properties. Glue reads it as table metadata.
+- **Load order:** Jobs import nodes before relationships. Glue can also export labels back to Parquet on S3.
+
+<small>Sources: [Neo4j Connector for AWS Glue](https://neo4j.com/docs/neo4j-aws-glue/), [Getting Started](https://neo4j.com/docs/neo4j-aws-glue/getting-started/), and [JDBC SQL-to-Cypher translation](https://neo4j.com/docs/jdbc-manual/current/sql2cypher/)</small>
+
+<!--
+Setup: upload the connector JAR to S3 and create a Glue custom connector with
+driver class org.neo4j.jdbc.Neo4jDriver. The JDBC URL adds
+enableSQLTranslation=true. Neo4j credentials live in Secrets Manager. Only
+supported SQL constructs are translated. Pick Glue for managed, visual ETL.
+Pick Spark on EMR when the job needs custom Cypher or very large batches.
+-->
+
+---
+
 ![bg contain](./images/aws-neo4j-finance-overview/neo4j-in-aws.svg)
 
 ---

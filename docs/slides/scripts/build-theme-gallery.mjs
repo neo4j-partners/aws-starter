@@ -71,6 +71,55 @@ const activeDecks = [
   },
 ];
 
+const REPO_URL = "https://github.com/neo4j-partners/aws-starter";
+
+const resources = [
+  {
+    label: "Starter kit",
+    title: "AWS Bedrock AgentCore Starter Kit",
+    description:
+      "The starter kit deploys the Neo4j MCP server to Amazon Bedrock AgentCore behind an OAuth2 Gateway. Its samples show several ways for AI agents to call that server.",
+    links: [
+      {
+        name: "Demos",
+        href: `${REPO_URL}/tree/main/demos`,
+        snippet:
+          "End-to-end GraphRAG demos for an aircraft fleet, fraud investigation, and SEC filings.",
+      },
+      {
+        name: "Integrations",
+        href: `${REPO_URL}/tree/main/integrations`,
+        snippet:
+          "Connections from Databricks Unity Catalog and Neo4j Aura Agents to the graph.",
+      },
+      {
+        name: "Patterns",
+        href: `${REPO_URL}/tree/main/patterns`,
+        snippet:
+          "An OAuth2 Gateway with a Lambda interceptor that enforces role-based access.",
+      },
+    ],
+    actions: [{ text: "View on GitHub", href: REPO_URL }],
+  },
+  {
+    label: "Workshop",
+    title: "GraphRAG with Neo4j on AWS: From Search to Grounded Agents",
+    description:
+      "Build a hotel booking agent that answers from a connected graph. You deploy its tools and the agent to AgentCore, then add graph memory in Neo4j.",
+    tags: ["6 modules", "us-east-1", "Under $2 in AWS charges"],
+    actions: [
+      {
+        text: "Open workshop",
+        href: "https://neo4j-partners.github.io/neo4j-hotel-booking-agent-workshop/neo4j-hotel-booking-agent-workshop/1.0/index.html",
+      },
+      {
+        text: "Source code",
+        href: "https://github.com/neo4j-partners/neo4j-hotel-booking-agent-workshop",
+      },
+    ],
+  },
+];
+
 const archiveDescriptions = {
   "01-neo4j-for-agentic-ai-slides.md":
     "Neo4j for agentic AI: managed graph database, GraphRAG retrieval, and the path from retrievers to agents.",
@@ -316,31 +365,95 @@ function renderIndex() {
         line-height: 1.45;
       }
 
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin: 40px 0 0;
+      .resources {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        margin: 24px 0 0;
       }
 
-      .button {
-        align-items: center;
-        background: var(--ink);
-        border-radius: 6px;
-        color: white;
-        display: inline-flex;
+      .resource-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+      }
+
+      .resource-card strong {
+        color: var(--ink);
+        display: block;
+        font-size: 19px;
+        margin: 6px 0 8px;
+      }
+
+      .resource-links {
+        list-style: none;
+        margin: 16px 0 0;
+        padding: 0;
+      }
+
+      .resource-links li {
+        border-top: 1px solid var(--line);
+        padding: 10px 0;
+      }
+
+      .resource-links a {
+        color: var(--accent-2);
         font-weight: 700;
-        min-height: 44px;
-        padding: 0 16px;
         text-decoration: none;
       }
+
+      .resource-links a:hover { text-decoration: underline; }
+
+      .resource-links span {
+        color: var(--muted);
+        display: block;
+        font-size: 14px;
+        line-height: 1.45;
+        margin-top: 2px;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0 0;
+      }
+
+      .tag {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+        padding: 4px 10px;
+      }
+
+      .card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-top: auto;
+        padding-top: 16px;
+      }
+
+      .card-actions a {
+        color: var(--accent);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .card-actions a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
     <main>
       <div class="eyebrow">AWS + Neo4j</div>
       <h1>Presentations</h1>
-      <p>Current presentations on semantic data discovery and grounded enterprise AI with AWS and Neo4j.</p>
+      <p>Current presentations on semantic data discovery and grounded enterprise AI with AWS and Neo4j. The resources below link to starter code and a hands-on workshop.</p>
 
       <section aria-labelledby="current-presentations">
         <h2 id="current-presentations">Current presentations</h2>
@@ -349,9 +462,13 @@ ${renderCards(activeDecks, "Deck")}
         </div>
       </section>
 
-      <div class="actions">
-        <a class="button" href="https://github.com/neo4j-partners/aws-starter">View project on GitHub</a>
-      </div>
+      <section aria-labelledby="resources">
+        <h2 id="resources">AWS + Neo4j Resources</h2>
+        <p class="section-intro">Code and workshops for building grounded agents with Neo4j on AWS.</p>
+        <div class="resources">
+${renderResources(resources)}
+        </div>
+      </section>
     </main>
   </body>
 </html>
@@ -367,6 +484,47 @@ function renderCards(sectionDecks, label) {
             <span class="deck-desc">${escapeHtml(deck.description)}</span>
           </a>`,
     )
+    .join("\n");
+}
+
+function renderResources(items) {
+  return items
+    .map((item) => {
+      const links = item.links
+        ? `
+            <ul class="resource-links">
+${item.links
+  .map(
+    (link) => `              <li>
+                <a href="${escapeHtml(link.href)}">${escapeHtml(link.name)}</a>
+                <span>${escapeHtml(link.snippet)}</span>
+              </li>`,
+  )
+  .join("\n")}
+            </ul>`
+        : "";
+      const tags = item.tags
+        ? `
+            <div class="tags">
+${item.tags.map((tag) => `              <span class="tag">${escapeHtml(tag)}</span>`).join("\n")}
+            </div>`
+        : "";
+      const actions = item.actions
+        .map(
+          (action) =>
+            `              <a href="${escapeHtml(action.href)}">${escapeHtml(action.text)} &rarr;</a>`,
+        )
+        .join("\n");
+
+      return `          <div class="resource-card">
+            <span class="deck-order">${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span class="deck-desc">${escapeHtml(item.description)}</span>${links}${tags}
+            <div class="card-actions">
+${actions}
+            </div>
+          </div>`;
+    })
     .join("\n");
 }
 

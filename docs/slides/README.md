@@ -38,6 +38,19 @@ folder also holds `neocarta-aws-appendix.md`, `aws-neo4j-finance-overview.md`,
 and `no-images-aws-neo4j-overview.md`. Neither the gallery nor the exports
 build those three.
 
+## Resources section
+
+The gallery page also has an **AWS + Neo4j Resources** section below the decks.
+The `resources` array in [`scripts/build-theme-gallery.mjs`](./scripts/build-theme-gallery.mjs)
+defines its cards:
+
+- **Starter kit:** This card gives an overview of the aws-starter repo. It links to the `demos/`, `integrations/`, and `patterns/` folders on GitHub, with a short summary of each.
+- **Workshop:** This card links to the GraphRAG with Neo4j on AWS workshop and its source repo. Tags show the module count, the region, and the estimated cost.
+
+To add a resource, add an entry to the `resources` array. Each entry needs a
+`label`, `title`, `description`, and `actions`. The `links` and `tags` fields
+are optional.
+
 ## Archived decks
 
 - **`docs/slides/archive/aws-in-depth/`:** This folder holds the earlier AWS + Neo4j in-depth deck series. The build publishes these decks under `/archive/`, but the gallery page does not list them.

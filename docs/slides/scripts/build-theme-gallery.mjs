@@ -31,6 +31,16 @@ const activeDecks = [
       "How AWS, Databricks, Google Cloud, IBM, and Microsoft build the same data and AI stack, where they differ, and where a customer-owned graph fits.",
   },
   {
+    file: "aws-main-services.md",
+    source: "current/aws-main-services.md",
+    group: "architecture",
+    tags: ["AWS", "Bedrock", "AgentCore"],
+    title: "AWS Main Services",
+    output: "aws-main-services.html",
+    description:
+      "The main AWS products behind each layer of the data and AI stack, from S3 Tables and Neptune to Bedrock, AgentCore, Amazon Quick, and Kiro, and where Neo4j plugs in.",
+  },
+  {
     file: "aws-neo4j-finance-overview.md",
     source: "current/aws-neo4j-finance-overview.md",
     group: "architecture",

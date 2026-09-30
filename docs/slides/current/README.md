@@ -5,7 +5,7 @@ This folder holds the current AWS and Neo4j presentations. Each deck is a
 
 ## Overview
 
-- **Gallery decks:** The published gallery shows `hyperscaler-overview.md`, `aws-neo4j-finance-overview.md`, `fraud-data-architecture.md`, `neocarta-slides-v2.md`, `neosemantics.md`, and `enterprise-knowledge-layer.md`.
+- **Gallery decks:** The published gallery shows `hyperscaler-overview.md`, `aws-main-services.md`, `aws-neo4j-finance-overview.md`, `fraud-data-architecture.md`, `neocarta-slides-v2.md`, `neosemantics.md`, and `enterprise-knowledge-layer.md`.
 - **Other decks:** The folder also holds `neocarta-aws-appendix.md` and `neocarta-slides.md`.
 - **`neocarta-slides-v2.md`:** This deck revises the order and titles of `neocarta-slides.md`. It has 14 main slides and five appendix slides.
 - **`neocarta-outline.md`:** This file is the Neocarta outline. It is plain Markdown, not a Marp deck.

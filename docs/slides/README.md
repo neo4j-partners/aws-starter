@@ -30,6 +30,7 @@ The gallery page lists these decks from `docs/slides/current/`:
 
 - **`hyperscaler-overview.md`:** This deck compares how AWS, Databricks, Google Cloud, IBM, and Microsoft build the same data and AI stack. It shows where they differ and where a customer-owned graph fits.
 - **`aws-main-services.md`:** This deck walks through the main AWS products behind each layer of the data and AI stack. It ends with where Neo4j plugs into the AWS agent stack.
+- **`databricks-overview.md`:** This deck walks through the main Databricks products on each layer of the stack, from the lakehouse to Genie and Agent Bricks. It ends with the four Neo4j connectors and where Neo4j plugs into each Databricks agent surface.
 - **`aws-neo4j-finance-overview.md`:** This deck gives a fraud-investigation overview of Neo4j on AWS. It covers connected context, Virtual Graph, Amazon Quick over MCP, GraphRAG agents, and agent memory.
 - **`fraud-data-architecture.md`:** This deck shows how AWS transaction data and Neo4j work together to expose a fraud ring.
 - **`neocarta-slides-v2.md`:** This deck is the revised Neocarta deck. It has new slide order and titles, with 14 main slides and five appendix slides.

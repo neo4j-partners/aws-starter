@@ -41,6 +41,16 @@ const activeDecks = [
       "The main AWS products behind each layer of the data and AI stack, from S3 Tables and Neptune to Bedrock, AgentCore, Amazon Quick, and Kiro, and where Neo4j plugs in.",
   },
   {
+    file: "databricks-overview.md",
+    source: "current/databricks-overview.md",
+    group: "architecture",
+    tags: ["Databricks", "Genie", "Unity Catalog"],
+    title: "Databricks Main Services",
+    output: "databricks-overview.html",
+    description:
+      "The main Databricks products behind each layer of the data and AI stack, from Delta, Iceberg, and Lakebase to Genie Ontology, Genie One, Agent Bricks, and Unity Gateway, and where Neo4j plugs in.",
+  },
+  {
     file: "aws-neo4j-finance-overview.md",
     source: "current/aws-neo4j-finance-overview.md",
     group: "architecture",

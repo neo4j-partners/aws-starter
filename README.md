@@ -1,5 +1,11 @@
 # AWS Bedrock AgentCore Starter Kit
 
+> **[View the AWS + Neo4j presentation gallery →](https://neo4j-partners.github.io/aws-starter/)**
+>
+> The gallery has the current decks, from the cloud data and AI landscape to
+> fraud investigation, semantics, and agent memory. It also links to starter
+> code and a hands-on workshop.
+
 This repository deploys the Neo4j MCP server to Amazon Bedrock AgentCore. It
 also shows several ways for AI agents to call that server.
 
@@ -10,7 +16,6 @@ also shows several ways for AI agents to call that server.
 - **GraphRAG on Bedrock:** The demos use the [`neo4j-graphrag`](https://neo4j.com/docs/neo4j-graphrag-python/current/) library. It adds Bedrock embeddings, LLM entity extraction, and vector search over a Neo4j graph.
 - **Advanced patterns:** Other samples cover multi-agent routing, agent memory, observability, and cloud deployment.
 - **Architecture:** The [Architecture Documentation](./docs/ARCHITECTURE.md) has diagrams, component descriptions, and request flows.
-- **Slides:** The [AWS + Neo4j presentation gallery](https://neo4j-partners.github.io/aws-starter/) has the current decks on semantic data discovery and grounded enterprise AI.
 
 ## Quick start
 

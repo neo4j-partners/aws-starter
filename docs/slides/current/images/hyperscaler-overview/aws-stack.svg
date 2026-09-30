@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title description">
+  <title id="title">AWS on the cloud data and AI stack</title>
+  <desc id="description">The six stack layers with the main AWS product in each. Apps: Amazon Quick and Kiro. Agents: Amazon Bedrock, Bedrock AgentCore, AgentCore Memory. Context: AWS Context and Glue business context. Operational data: Aurora DSQL, Aurora PostgreSQL, Neptune Database, MSK and Kinesis. Lakehouse: S3 Tables, Glue Data Catalog, Neptune Analytics. Infrastructure: Trainium3, Inferentia2, Graviton5, NVIDIA GPUs. Agent governance: AgentCore Identity, AWS Agent Registry, AgentCore Gateway, Policy in AgentCore.</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .canvas { fill: #ffffff; }
+      .eyebrow { font-size: 18px; font-weight: 800; letter-spacing: 2.5px; fill: #64748b; }
+      .title { font-size: 40px; font-weight: 750; fill: #0f172a; }
+      .subtitle { font-size: 21px; fill: #475569; }
+      .head { fill: #0f172a; }
+      .head-text { font-size: 22px; font-weight: 750; fill: #ffffff; }
+      .label { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 2; }
+      .label-text { font-size: 21px; font-weight: 750; fill: #0f172a; }
+      .cell { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .cell-iceberg { fill: #ecfeff; stroke: #14b8a6; stroke-width: 2; }
+      .cell-delta { fill: #fff7ed; stroke: #fb923c; stroke-width: 2; }
+      .cell-text { font-size: 19px; font-weight: 600; fill: #334155; }
+      .layer { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .layer-name { font-size: 24px; font-weight: 750; fill: #0f172a; }
+      .ai-chip { fill: #eef2ff; stroke: #6366f1; stroke-width: 2; }
+      .data-chip { fill: #f0f9ff; stroke: #0ea5e9; stroke-width: 2; }
+      .gov { fill: #f8fafc; stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 8 6; }
+      .gov-chip { fill: #ffffff; stroke: #64748b; stroke-width: 2; }
+      .chip-text { font-size: 20px; font-weight: 620; fill: #1e293b; }
+      .pill-text { font-size: 15px; font-weight: 750; }
+      .legend-text { font-size: 17px; font-weight: 600; fill: #475569; }
+      .foot { font-size: 18px; fill: #475569; }
+      .layer-dim { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 2; }
+      .layer-name-dim { font-size: 24px; font-weight: 750; fill: #94a3b8; }
+      .neo-chip { fill: #ecfeff; stroke: #14b8a6; stroke-width: 2; }
+      .neo-chip-strong { fill: #ccfbf1; stroke: #0d9488; stroke-width: 3; }
+      .neo-text { font-size: 21px; font-weight: 680; fill: #0c4a6e; }
+      .dim-text { font-size: 20px; font-style: italic; fill: #94a3b8; }
+      .gov-dim { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 2; stroke-dasharray: 8 6; }
+      .gov-chip-dim { fill: #ffffff; stroke: #e2e8f0; stroke-width: 2; }
+    </style>
+  </defs>
+  <rect class="canvas" width="1600" height="900"/>
+  <text class="title" x="60" y="92">AWS Has a Product on Every Layer</text>
+  <text class="subtitle" x="60" y="130">The same six layers, with the main AWS product behind each one.</text>
+  <text class="eyebrow" x="60" y="200">AI LAYERS</text>
+  <rect class="layer" x="60" y="216" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="267.4">Apps</tspan></text>
+  <rect class="ai-chip" x="340" y="236" width="166" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="423.0" y="266.0">Amazon Quick</tspan></text>
+  <rect class="ai-chip" x="522" y="236" width="79" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="561.5" y="266.0">Kiro</tspan></text>
+  <rect class="layer" x="60" y="312" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="363.4">Agents</tspan></text>
+  <rect class="ai-chip" x="340" y="332" width="187" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="433.5" y="362.0">Amazon Bedrock</tspan></text>
+  <rect class="ai-chip" x="543" y="332" width="220" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="653.0" y="362.0">Bedrock AgentCore</tspan></text>
+  <rect class="ai-chip" x="779" y="332" width="209" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="883.5" y="362.0">AgentCore Memory</tspan></text>
+  <rect class="layer" x="60" y="408" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="459.4">Context</tspan></text>
+  <rect class="ai-chip" x="340" y="428" width="306" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="493.0" y="458.0">AWS Context (coming soon)</tspan></text>
+  <rect class="ai-chip" x="662" y="428" width="263" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="793.5" y="458.0">Glue business context</tspan></text>
+  <text class="eyebrow" x="60" y="540">DATA LAYERS</text>
+  <rect class="layer" x="60" y="556" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="607.4">Operational data</tspan></text>
+  <rect class="data-chip" x="340" y="576" width="155" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="417.5" y="606.0">Aurora DSQL</tspan></text>
+  <rect class="data-chip" x="511" y="576" width="220" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="621.0" y="606.0">Aurora PostgreSQL</tspan></text>
+  <rect class="data-chip" x="747" y="576" width="209" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="851.5" y="606.0">Neptune Database</tspan></text>
+  <rect class="data-chip" x="972" y="576" width="198" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1071.0" y="606.0">MSK and Kinesis</tspan></text>
+  <rect class="layer" x="60" y="652" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="703.4">Lakehouse</tspan></text>
+  <rect class="data-chip" x="340" y="672" width="241" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="460.5" y="702.0">S3 Tables (Iceberg)</tspan></text>
+  <rect class="data-chip" x="597" y="672" width="220" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="707.0" y="702.0">Glue Data Catalog</tspan></text>
+  <rect class="data-chip" x="833" y="672" width="220" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="943.0" y="702.0">Neptune Analytics</tspan></text>
+  <rect class="layer" x="60" y="748" width="1190" height="86" rx="16" filter="url(#shadow)"/>
+  <text class="layer-name" text-anchor="start"><tspan x="92" y="799.4">Infrastructure</tspan></text>
+  <rect class="data-chip" x="340" y="768" width="133" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="406.5" y="798.0">Trainium3</tspan></text>
+  <rect class="data-chip" x="489" y="768" width="155" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="566.5" y="798.0">Inferentia2</tspan></text>
+  <rect class="data-chip" x="660" y="768" width="133" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="726.5" y="798.0">Graviton5</tspan></text>
+  <rect class="data-chip" x="809" y="768" width="155" height="46" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="886.5" y="798.0">NVIDIA GPUs</tspan></text>
+  <text class="eyebrow" x="1284" y="200">ACROSS EVERY LAYER</text>
+  <rect class="gov" x="1284" y="216" width="256" height="618" rx="16"/>
+  <text class="layer-name" text-anchor="middle"><tspan x="1412" y="259.4">Agent</tspan><tspan x="1412" y="289.4">governance</tspan></text>
+  <rect class="gov-chip" x="1316" y="340" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="375">AgentCore</tspan><tspan x="1412" y="401">Identity</tspan></text>
+  <rect class="gov-chip" x="1316" y="460" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="495">AWS Agent</tspan><tspan x="1412" y="521">Registry</tspan></text>
+  <rect class="gov-chip" x="1316" y="580" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="615">AgentCore</tspan><tspan x="1412" y="641">Gateway</tspan></text>
+  <rect class="gov-chip" x="1316" y="700" width="192" height="80" rx="12"/>
+  <text class="chip-text" text-anchor="middle"><tspan x="1412" y="735">Policy in</tspan><tspan x="1412" y="761">AgentCore</tspan></text>
+</svg>

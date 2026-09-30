@@ -105,7 +105,7 @@ Companies that use Neo4j and AWS together include Adobe, Financial Times, Meredi
 
 ## Neo4j Adds Connected Context Across the AWS Platform
 
-![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map-neo4j.svg)
+![w:1160](./images/aws-neo4j-finance-overview/aws-neo4j-layer-map-complete.svg)
 
 ---
 
@@ -458,10 +458,6 @@ traversal reaches connected facts instead of just more similar-looking text.
 
 ---
 
-![bg contain](./images/aws-neo4j-finance-overview/strands-agents-graphrag-fraud-principles.svg)
-
----
-
 ## The Shift to GraphRAG
 
 - **One step past vector search:** a graph traversal follows the matched text to the facts connected to it.
@@ -471,6 +467,10 @@ traversal reaches connected facts instead of just more similar-looking text.
 - **Fewer tokens:** the agent receives the facts an answer needs, not everything that looked similar.
 
 The agent answers from evidence the graph can defend.
+
+---
+
+![bg contain](./images/aws-neo4j-finance-overview/strands-agents-graphrag-fraud-principles.svg)
 
 ---
 

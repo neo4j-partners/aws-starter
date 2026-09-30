@@ -234,7 +234,7 @@ flow the graph-fundamentals and data-architecture slides were building toward.
 
 ## Connecting Amazon Quick and Neo4j with MCP
 
-Bringing graph context to the enterprise AI assistant through MCP.
+Graph context for the enterprise AI assistant.
 
 ---
 
@@ -320,7 +320,7 @@ for graph context. MCP is the door Neo4j comes through.
 small { font-size: 16px; }
 </style>
 
-## Connecting Amazon Quick to Neo4j with MCP
+## Registering Neo4j MCP in Amazon Quick
 
 - **Register the server:** An admin adds the Neo4j MCP endpoint as a Quick connector.
 - **Tools become actions:** Quick discovers each Neo4j tool, such as schema lookup and read-only Cypher.

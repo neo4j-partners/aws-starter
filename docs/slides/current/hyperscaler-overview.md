@@ -220,7 +220,7 @@ Cloud, and Microsoft all describe their context layer as a graph.
 
 ## Context Graphs Share Four Traits
 
-- **Two sources:** Curated definitions combine with context learned from usage.
+- **Written and learned:** Teams write some definitions by hand. The layer learns others by watching queries.
 - **Permissions:** The layer answers with the caller's own permissions.
 - **MCP access:** Agents reach the layer through MCP tools.
 - **Open standard:** Apache Ossie specifies semantic layers and ontologies.

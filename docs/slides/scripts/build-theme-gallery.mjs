@@ -22,7 +22,7 @@ const activeDecks = [
     title: "AWS + Neo4j: Connected Context for Grounded Enterprise AI",
     output: "aws-neo4j-grounded-enterprise-ai.html",
     description:
-      "How AWS and Neo4j combine governed data, connected context, semantic discovery, and agent memory for grounded enterprise AI.",
+      "How AWS and Neo4j combine governed data, connected context, and agent memory for grounded enterprise AI, with integration paths and the planned Virtual Graph for AWS.",
   },
   {
     file: "fraud-data-architecture.md",

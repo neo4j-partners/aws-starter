@@ -615,6 +615,26 @@ Source: demos/fraud-amazon-quick/README.md.
 
 ---
 
+## The Same Pattern Applies to Other Finance Use Cases
+
+- **Counterparty exposure:** Graph traversal shows who owes whom, directly and indirectly.
+- **Fraud rings:** Shared identifiers and circular transfers expose coordinated groups.
+- **Contagion risk:** Following links shows how one failure spreads through the network.
+- **KYC and AML:** Ownership chains and transaction paths show who really sits behind an account.
+
+<!--
+The fraud demo is one instance of a general pattern. The data is a set of entities and the links between them, and the hard question is about the links.
+
+- **Counterparty exposure:** A table shows the direct counterparties of a firm. A graph follows obligations through several hops, so you can see exposure to a counterparty's counterparties. Aggregate the paths to find concentration, such as many positions that all depend on one institution.
+- **Fraud rings:** Individual accounts look normal. The ring shows up when accounts share a phone, address, or device, or when money loops back to its origin. Community detection and shortest-path queries find these groups without knowing the shape in advance.
+- **Contagion risk:** Model institutions, accounts, or assets as nodes and exposures as relationships. Start from a stressed node and traverse outward to see what it reaches and how fast. Graph algorithms such as centrality rank the nodes whose failure would spread furthest.
+- **KYC and AML:** Beneficial ownership is a chain of companies and people, often several layers deep. Traversal resolves the ultimate owner behind an account, and screens that owner against sanctions lists and prior cases. Transaction paths support AML monitoring by tracing where funds came from and where they went.
+
+The architecture stays the same for each. Athena and the lakehouse count the activity, Neo4j follows the connections, and the agent reaches the graph through MCP.
+-->
+
+---
+
 ## Building GraphRAG Agents on AWS
 
 <!--

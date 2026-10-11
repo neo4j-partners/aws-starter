@@ -11,7 +11,7 @@ where needed, never from this ``__init__``:
 - :mod:`core.factory`  — Bedrock model + MCP client factories (Strands)
 """
 
-from core.config import AWS_REGION, MODEL_ID, SYSTEM_PROMPT
+from core.config import AWS_REGION, MEMORY_TOOLS_ENABLED, MODEL_ID, SYSTEM_PROMPT
 from core.credentials import (
     check_token_expiry,
     get_active_credentials,
@@ -21,6 +21,7 @@ from core.credentials import (
 
 __all__ = [
     "AWS_REGION",
+    "MEMORY_TOOLS_ENABLED",
     "MODEL_ID",
     "SYSTEM_PROMPT",
     "check_token_expiry",

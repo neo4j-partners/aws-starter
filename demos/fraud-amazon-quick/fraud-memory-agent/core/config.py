@@ -12,6 +12,15 @@ MODEL_ID = os.environ.get(
 )
 AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 
+# Optional: give the agent NAMS memory tools it can call on its own. These
+# search the whole NAMS workspace, not only the current user's memory.
+MEMORY_TOOLS_ENABLED = os.environ.get("MEMORY_TOOLS", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 SYSTEM_PROMPT = (
     "You are a financial-crime analyst with access to a Neo4j transaction "
     "graph. The graph models a money-movement network:\n\n"

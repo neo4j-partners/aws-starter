@@ -199,6 +199,45 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return env
 
 
+def resolve_image_tag(neo4j_mcp_repo: str) -> str:
+    """Return IMAGE_TAG if set, else the repo's short HEAD SHA, else "latest".
+
+    NEO4J_MCP_REPO usually points at a subfolder of a git repo (the server
+    dir that holds the Dockerfile), so the repo is found with
+    `git rev-parse --show-toplevel` rather than by looking for a .git dir.
+    """
+    image_tag = os.environ.get("IMAGE_TAG", "")
+    if image_tag:
+        return image_tag
+
+    in_git_repo = False
+    if neo4j_mcp_repo:
+        try:
+            in_git_repo = (
+                subprocess.run(
+                    ["git", "-C", neo4j_mcp_repo, "rev-parse", "--show-toplevel"],
+                    capture_output=True,
+                    text=True,
+                ).returncode
+                == 0
+            )
+        except FileNotFoundError:
+            log_info("git not found on PATH")
+
+    if not in_git_repo:
+        log_info(f"No git repo found at {neo4j_mcp_repo}, using tag: latest")
+        return "latest"
+
+    image_tag = subprocess.run(
+        ["git", "-C", neo4j_mcp_repo, "rev-parse", "--short=7", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    log_info(f"Image tag from git SHA: {image_tag}")
+    return image_tag
+
+
 def load_env(suffix: str = "") -> Config:
     """Load .env into os.environ and resolve defaults (mirrors set -a; source)."""
     env_path = env_file(suffix)
@@ -225,19 +264,7 @@ def load_env(suffix: str = "") -> Config:
         or DEFAULT_CDK_BOOTSTRAP_EXECUTION_POLICIES
     )
 
-    image_tag = os.environ.get("IMAGE_TAG", "")
-    if not image_tag:
-        if neo4j_mcp_repo and (Path(neo4j_mcp_repo) / ".git").is_dir():
-            image_tag = subprocess.run(
-                ["git", "-C", neo4j_mcp_repo, "rev-parse", "--short=7", "HEAD"],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-            log_info(f"Image tag from git SHA: {image_tag}")
-        else:
-            image_tag = "latest"
-            log_info(f"No git repo found at {neo4j_mcp_repo}, using tag: latest")
+    image_tag = resolve_image_tag(neo4j_mcp_repo)
 
     return Config(
         env_suffix=suffix,

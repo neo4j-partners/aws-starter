@@ -66,6 +66,7 @@ load_nams_env() {
     : "${MEMORY_API_KEY:=$(read_env_var "$src" MEMORY_API_KEY)}"
     : "${MEMORY_ENDPOINT:=$(read_env_var "$src" MEMORY_ENDPOINT)}"
     : "${MEMORY_WORKSPACE_ID:=$(read_env_var "$src" MEMORY_WORKSPACE_ID)}"
+    : "${MEMORY_TOOLS:=$(read_env_var "$src" MEMORY_TOOLS)}"
 }
 
 clear_stale_runtime_binding() {
@@ -223,6 +224,7 @@ case "${1:-help}" in
         DEPLOY_ARGS=(--env "MEMORY_API_KEY=$MEMORY_API_KEY")
         [ -z "$MEMORY_ENDPOINT" ] || DEPLOY_ARGS+=(--env "MEMORY_ENDPOINT=$MEMORY_ENDPOINT")
         [ -z "$MEMORY_WORKSPACE_ID" ] || DEPLOY_ARGS+=(--env "MEMORY_WORKSPACE_ID=$MEMORY_WORKSPACE_ID")
+        [ -z "$MEMORY_TOOLS" ] || DEPLOY_ARGS+=(--env "MEMORY_TOOLS=$MEMORY_TOOLS")
         REBUILD_DEPENDENCIES=false
         if deployment_needs_dependency_rebuild; then
             REBUILD_DEPENDENCIES=true

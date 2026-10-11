@@ -39,16 +39,35 @@ uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Termina
 
 ## What NAMS captures
 
-Each call to the agent creates a NAMS conversation. The conversation is
-tagged with the request's `user_id` and `session_id`.
+Each call to the agent stores its turn in a NAMS conversation. A call that
+omits `session_id` creates a new conversation. A call that repeats a
+`session_id` for the same `user_id` continues that conversation. The
+conversation is tagged with the request's `user_id` and `session_id`.
 
 - **Messages:** NAMS saves the text messages when the turn completes.
 - **Entities:** NAMS extracts entities on the server side.
 - **Reasoning traces:** NAMS saves each MCP tool call as a reasoning trace.
 - **Conversation ID:** NAMS assigns the stored conversation UUID. The agent keeps `session_id` as metadata, so you can group load runs in the NAMS workspace.
 
-The agent does not add workspace-wide search results to its prompts. This
-keeps a shared NAMS workspace safe for synthetic multi-user load runs.
+## What the agent recalls
+
+Before each turn, the agent reads back the caller's own memory and adds it to
+the system prompt as background data.
+
+- **This session:** When the call continues a session, NAMS returns that conversation's reflections, observations, and recent messages.
+- **Earlier sessions:** The agent searches the user's ten most recent other conversations for messages that match the question. Past answers are recalled this way, because the assistant reply is stored as a message.
+- **User filter:** Recall reads only conversations that belong to the request's `user_id`. NAMS entity search has no user filter, so the agent does not use it. This keeps a shared NAMS workspace safe for synthetic multi-user load runs.
+- **Anonymous calls:** A call without a `user_id` gets no recall, because every anonymous caller shares one NAMS user.
+- **Failures:** If a NAMS read fails, the agent logs a warning and answers without that part of the recall.
+- **Extraction lag:** Reflections and observations come from NAMS server-side processing, so they can trail the turn that produced them. Recent messages are available right away.
+
+### Optional memory tools
+
+Set `MEMORY_TOOLS=true` to also give the agent the NAMS Strands tools
+(`search_context`, `set_entity_feedback`, `get_entity_provenance`, and a
+read-only `cypher_query`). The agent decides when to call them. These tools
+search the whole NAMS workspace, not only the current user's memory, so leave
+the flag off in a shared workspace. They also ignore `MEMORY_WORKSPACE_ID`.
 
 ## Fraud graph dataset
 
@@ -108,6 +127,7 @@ uv run fraud-invoke --local memory-demo   # two turns in one session
 
 - **`MEMORY_API_KEY`:** This key is required. Without it, every request returns an error.
 - **`MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`:** These values are optional. Set them for a private or staging NAMS deployment.
+- **`MEMORY_TOOLS`:** This value is optional. Set it to `true` to add the NAMS memory tools. It is off by default. `agent.sh deploy` passes it to the runtime when you set it.
 - **`MODEL_ID`:** This value is optional. The default is `global.anthropic.claude-haiku-4-5-20251001-v1:0`.
 - **`AWS_REGION`:** This value is optional. The default is `us-west-2`.
 - **`PORT`:** This value is optional. The local server uses port 7020 by default.
@@ -235,6 +255,6 @@ It saves a conversation and restores it when an agent reuses a session ID.
 The released `neo4j-agent-memory` 0.5.0 package used here does not export that
 API, so this agent does not use it.
 
-- **What the agent does:** The agent creates one NAMS conversation per call. It stores `session_id` as metadata and records the prompt, response, and MCP tool calls.
-- **What the agent does not do:** The agent does not load earlier turns into a later call.
-- **Upgrade path:** Upgrade to a release that exports `Neo4jSessionManager` before you rely on recall across calls.
+- **What the agent does:** The agent stores `session_id` as metadata and records the prompt, response, and MCP tool calls. It finds and continues a session by that metadata and recalls the user's earlier turns with the NAMS calls described in [What the agent recalls](#what-the-agent-recalls).
+- **What the agent does not do:** The agent does not restore the Strands message history of a session. Recalled memory reaches the model as text in the system prompt.
+- **Upgrade path:** `Neo4jSessionManager` would restore the Strands history itself. Use it after you upgrade to a release that exports it.

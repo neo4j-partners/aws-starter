@@ -17,12 +17,11 @@ from graph_loader.load_neo4j import _connection_settings
 
 
 def _drop_graph(session, name: str) -> None:
-    try:
-        session.run("CALL gds.graph.drop($name)", name=name).consume()
-    except Exception as error:  # GDS raises when a named projection is absent.
-        message = str(error).lower()
-        if "not found" not in message and "does not exist" not in message:
-            raise
+    # failIfMissing=false makes an absent projection a no-op. Yielding only
+    # graphName avoids the deprecated `schema` column and its DBMS notification.
+    session.run(
+        "CALL gds.graph.drop($name, false) YIELD graphName", name=name
+    ).consume()
 
 
 def _project_graph(
@@ -42,6 +41,7 @@ def _project_graph(
     }
     if undirected_relationship_types:
         configuration["undirectedRelationshipTypes"] = undirected_relationship_types
+    print(f"Projecting {name} (the first projection may start a GDS session)...")
     session.run(
         "CALL gds.graph.project($name, $node_labels, $relationship_types, "
         "$configuration)",

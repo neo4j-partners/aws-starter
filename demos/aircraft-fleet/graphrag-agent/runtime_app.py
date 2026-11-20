@@ -5,8 +5,8 @@ A Strands-native agent that connects **directly to Neo4j** (no MCP server, no
 AgentCore Gateway). Two ``neo4j-graphrag`` retrievers are exposed as Strands
 tools:
 
-- ``graph_query``   — Text2Cypher over the live schema (exact/aggregate).
-- ``vector_search`` — semantic search over maintenance-document chunks.
+- ``graph_query_tool``: Text2Cypher over the live schema (exact/aggregate).
+- ``vector_search_tool``: semantic search over maintenance-document chunks.
 
 The model and tools are built once at module load; the schema is fetched once
 and injected into the system prompt at ``Agent`` construction. Each request
@@ -27,23 +27,32 @@ Cloud deployment:
 import asyncio
 import logging
 import os
+import uuid
 from collections.abc import AsyncGenerator
-from enum import Enum
+from enum import StrEnum
 
-import neo4j
-from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from strands import Agent
+from dotenv import find_dotenv, load_dotenv
 
-from agent import (
+# Local runs read the shared aircraft-fleet .env, found by walking up from the
+# working directory. Existing env vars win, so Runtime env vars are untouched.
+# This runs before the agent imports because ``agent.config`` resolves
+# settings at import time.
+load_dotenv(find_dotenv(usecwd=True))
+
+import neo4j  # noqa: E402
+from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext  # noqa: E402
+from pydantic import BaseModel, ConfigDict, Field, ValidationError  # noqa: E402
+from strands import Agent  # noqa: E402
+
+from agent import (  # noqa: E402
     SYSTEM_PROMPT_TEMPLATE,
     get_graph_schema,
     graph_query,
     settings,
     vector_search,
 )
-from agent.model import build_bedrock_model
-from agent.tools import graph_query_tool, vector_search_tool
+from agent.model import build_bedrock_model  # noqa: E402
+from agent.tools import graph_query_tool, vector_search_tool  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +73,7 @@ model = build_bedrock_model(
 )
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     """The direct (non-agent) surfaces selectable via the ``mode`` field."""
 
     SCHEMA = "schema"
@@ -86,8 +95,7 @@ class RequestPayload(BaseModel):
 
     mode: Mode | None = None
     top_k: int = 5
-    session_id: str = "default_session"
-    user_id: str = "default_user"
+    user_id: str | None = None
 
     prompt: str | None = None
     message: str | None = None
@@ -114,7 +122,8 @@ class RequestPayload(BaseModel):
 
 @app.entrypoint
 async def invoke(
-    payload: dict | None = None,
+    payload: dict | None,
+    context: RequestContext,
 ) -> AsyncGenerator[dict, None]:
     """AgentCore Runtime handler — direct Neo4j GraphRAG, streamed.
 
@@ -129,6 +138,9 @@ async def invoke(
 
     The three data modes emit one ``chunk`` then ``complete``, so the SSE
     parser in ``client.transport`` handles them with no special casing.
+
+    The session ID comes from the AgentCore session header, which the Runtime
+    sets on every request. A local call without the header gets a fresh ID.
     """
     raw = payload or {}
 
@@ -195,10 +207,11 @@ async def invoke(
             }
             return
 
+        session_id = context.session_id or f"local-{uuid.uuid4()}"
         logger.info(
             "Processing query for user %s, session %s: %s...",
             req.user_id,
-            req.session_id,
+            session_id,
             prompt[:100],
         )
         logger.info("Model: %s", settings.model_id)
@@ -217,7 +230,7 @@ async def invoke(
         # Strands repeats ``current_tool_use`` on every input delta while a
         # tool call is being assembled; dedupe by toolUseId so each call
         # surfaces exactly once. Emitting these as ``tool`` events lets the
-        # client print a labelled boundary where graph_query/vector_search ran.
+        # client print a labelled boundary where a retriever tool ran.
         last_tool_id: str | None = None
         async for event in agent.stream_async(prompt):
             if "data" in event:
@@ -244,27 +257,26 @@ async def invoke(
                 "credentials and that the instance is running."
             ),
         }
-    except Exception as e:
-        logger.error("Error processing request: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("Error processing request")
         yield {
             "type": "error",
             "error": (
-                f"Error processing your request: {str(e)}\n\n"
-                "Please try rephrasing your question or check the logs."
+                "Error processing your request. Please try rephrasing your "
+                "question or check the server logs."
             ),
         }
 
 
-def main() -> None:
-    """Local dev entry point: ``uv run fleet-server``.
+def main(default_port: int = 7070) -> None:
+    """Start the server in the foreground. Stop it with Ctrl+C.
 
-    Runs the server in the foreground; stop with Ctrl+C. Defaults to port
-    7070 for local use so it never collides with a local service on 8080;
-    an explicit ``AGENT_PORT`` still wins. The cloud container never calls
-    this. it uses the ``__main__`` block below. For local OTEL tracing,
-    prefix with ``opentelemetry-instrument``.
+    ``uv run fleet-server`` calls this with port 7070, so local runs never
+    collide with a local service on 8080. The deployed Runtime runs this file
+    as a script and must serve 8080. ``AGENT_PORT`` overrides both. For local
+    OTEL tracing, prefix the command with ``opentelemetry-instrument``.
     """
-    port = int(os.environ.get("AGENT_PORT", "7070"))
+    port = int(os.environ.get("AGENT_PORT", str(default_port)))
     logger.info(
         "Starting Aircraft Fleet GraphRAG Agent with model: %s on port %s",
         settings.model_id,
@@ -274,13 +286,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # AgentCore Runtime requires the deployed container to serve 8080, so
-    # that is the default for the container path. Local dev uses ``main``
-    # (fleet-server, 7070).
-    port = int(os.environ.get("AGENT_PORT", "8080"))
-    logger.info(
-        "Starting Aircraft Fleet GraphRAG Agent with model: %s on port %s",
-        settings.model_id,
-        port,
-    )
-    app.run(port=port)
+    main(default_port=8080)

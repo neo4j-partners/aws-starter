@@ -121,15 +121,9 @@ def _text2cypher_retriever() -> Text2CypherRetriever:
 
 
 def vector_search(query: str, top_k: int = 5) -> str:
-    """Semantic search over aircraft maintenance-document chunks.
+    """Return the ``top_k`` closest chunks, joined into one string.
 
-    Use for conceptual or descriptive questions ("what does the manual say
-    about hydraulic leaks") where wording varies. For exact lookups, counts,
-    or graph traversal, use ``graph_query`` instead.
-
-    Args:
-        query: Natural-language search text.
-        top_k: Number of chunks to return (default 5).
+    The model-facing description lives on ``agent.tools.vector_search_tool``.
     """
     result = _vector_retriever().search(query_text=query, top_k=top_k)
     if not result.items:
@@ -138,14 +132,9 @@ def vector_search(query: str, top_k: int = 5) -> str:
 
 
 def graph_query(question: str) -> str:
-    """Answer a structured question by generating and running read-only Cypher.
+    """Generate Cypher for ``question``, run it, and return the rows as text.
 
-    Use for exact lookups, counts, aggregations, and relationship traversal
-    over the aircraft graph (aircraft, systems, components, flights,
-    maintenance events). For fuzzy document search, use ``vector_search``.
-
-    Args:
-        question: Natural-language question about the graph.
+    The model-facing description lives on ``agent.tools.graph_query_tool``.
     """
     result = _text2cypher_retriever().search(query_text=question)
     if not result.items:

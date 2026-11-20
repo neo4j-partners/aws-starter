@@ -10,27 +10,16 @@ The agent connects straight to Neo4j (no MCP server, no AgentCore Gateway).
 Strands-specific wiring (LLM construction, tool binding) lives in
 ``runtime_app.py``; the retrieval callables here are plain functions it wraps.
 
-Importing this package loads the shared ``.env`` at the aircraft-fleet
-root (two levels up from ``agent/``), so local runs pick up the Neo4j
-connection vars regardless of the working directory. Existing environment
-variables are never overridden, so shell-exported vars and AgentCore Runtime
-env vars still take precedence; in the deployed Runtime there is no ``.env``
-and the load is a harmless no-op.
+Importing this package has no side effects on the environment. Entry points
+such as ``runtime_app.py`` load the local ``.env`` before importing it.
 """
 
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-# The shared .env at the aircraft-fleet root is the local config source.
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
-
-from agent.config import (  # noqa: E402  (must follow load_dotenv)
+from agent.config import (
     SYSTEM_PROMPT_TEMPLATE,
     Settings,
     settings,
 )
-from agent.retrieval import (  # noqa: E402  (must follow load_dotenv)
+from agent.retrieval import (
     close,
     get_driver,
     get_graph_schema,

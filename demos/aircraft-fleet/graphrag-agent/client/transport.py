@@ -20,12 +20,14 @@ import json
 import logging
 import sys
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Literal
 
 import boto3
 import httpx
 import yaml
+from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,10 @@ logger = logging.getLogger(__name__)
 # default local URL both anchor here regardless of the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_URL = "http://localhost:7070/invocations"
+
+# A full agent turn with adaptive thinking and several tool calls can stream
+# for minutes. botocore's 60 s default read timeout would cut it off.
+DEPLOYED_READ_TIMEOUT_S = 300
 
 Target = Literal["local", "deployed"]
 
@@ -136,7 +142,11 @@ def invoke_deployed(payload: dict, stream: bool = True) -> dict:
     agent_arn, region = get_agent_config()
     logger.info("Agent ARN: %s | region: %s | payload: %s", agent_arn, region, payload)
 
-    client = boto3.client("bedrock-agentcore", region_name=region)
+    client = boto3.client(
+        "bedrock-agentcore",
+        region_name=region,
+        config=Config(read_timeout=DEPLOYED_READ_TIMEOUT_S),
+    )
     response = client.invoke_agent_runtime(
         agentRuntimeArn=agent_arn,
         runtimeSessionId=str(uuid.uuid4()),
@@ -156,15 +166,17 @@ def invoke_local(
     """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 7070)."""
     logger.info("Local URL: %s | payload: %s", url, payload)
     try:
-        with httpx.Client(timeout=timeout) as c:
-            with c.stream("POST", url, json=payload) as r:
-                if r.status_code != 200:
-                    r.read()
-                    return {
-                        "status": "error",
-                        "errors": [f"HTTP {r.status_code}: {r.text}"],
-                    }
-                content_parts, errors = _consume_sse(r.iter_bytes(), stream)
+        with (
+            httpx.Client(timeout=timeout) as c,
+            c.stream("POST", url, json=payload) as r,
+        ):
+            if r.status_code != 200:
+                r.read()
+                return {
+                    "status": "error",
+                    "errors": [f"HTTP {r.status_code}: {r.text}"],
+                }
+            content_parts, errors = _consume_sse(r.iter_bytes(), stream)
         return _result(content_parts, errors)
     except httpx.ConnectError:
         return {

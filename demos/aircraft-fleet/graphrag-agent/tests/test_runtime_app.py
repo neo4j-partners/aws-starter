@@ -1,0 +1,106 @@
+"""Tests for the ``runtime_app.invoke`` request handling paths.
+
+These paths never reach Neo4j or Bedrock. Retrieval calls are monkeypatched.
+"""
+
+from __future__ import annotations
+
+import asyncio
+
+import pytest
+from bedrock_agentcore.runtime import RequestContext
+
+import runtime_app
+
+
+def _run(payload: dict | None, session_id: str | None = None) -> list[dict]:
+    async def collect() -> list[dict]:
+        ctx = RequestContext(session_id=session_id)
+        return [event async for event in runtime_app.invoke(payload, ctx)]
+
+    return asyncio.run(collect())
+
+
+def test_handler_takes_context() -> None:
+    assert runtime_app.app._takes_context(runtime_app.invoke)
+
+
+def test_invalid_mode_is_rejected() -> None:
+    events = _run({"mode": "drop_database"})
+    assert len(events) == 1
+    assert events[0]["type"] == "error"
+    assert "Invalid request payload" in events[0]["error"]
+
+
+def test_missing_prompt_is_an_error() -> None:
+    events = _run({})
+    assert events == [
+        {
+            "type": "error",
+            "error": "No prompt provided. Please include 'prompt' in your request.",
+        }
+    ]
+
+
+def test_missing_query_for_data_mode() -> None:
+    events = _run({"mode": "graph_query"})
+    assert events[0]["type"] == "error"
+    assert "No query provided for mode 'graph_query'" in events[0]["error"]
+
+
+def test_schema_mode_streams_chunk_then_complete(monkeypatch) -> None:
+    monkeypatch.setattr(runtime_app, "get_graph_schema", lambda: "SCHEMA")
+    assert _run({"mode": "schema"}) == [
+        {"type": "chunk", "data": "SCHEMA"},
+        {"type": "complete"},
+    ]
+
+
+def test_vector_search_mode_passes_top_k(monkeypatch) -> None:
+    calls: list[tuple[str, int]] = []
+
+    def fake_search(query: str, top_k: int) -> str:
+        calls.append((query, top_k))
+        return "chunks"
+
+    monkeypatch.setattr(runtime_app, "vector_search", fake_search)
+    events = _run({"mode": "vector_search", "query": "leaks", "top_k": "3"})
+    assert calls == [("leaks", 3)]
+    assert events[0] == {"type": "chunk", "data": "chunks"}
+
+
+def test_generic_error_does_not_leak_details(monkeypatch) -> None:
+    secret = "bolt://admin:hunter2@10.0.0.5"
+
+    def boom(_query: str) -> str:
+        raise ValueError(secret)
+
+    monkeypatch.setattr(runtime_app, "graph_query", boom)
+    events = _run({"mode": "graph_query", "query": "count aircraft"})
+    assert len(events) == 1
+    assert events[0]["type"] == "error"
+    assert secret not in events[0]["error"]
+    assert "check the server logs" in events[0]["error"]
+
+
+def test_session_id_comes_from_context(monkeypatch, caplog) -> None:
+    def no_schema() -> str:
+        raise ValueError("stop before the agent runs")
+
+    monkeypatch.setattr(runtime_app, "get_graph_schema", no_schema)
+    with caplog.at_level("INFO", logger="runtime_app"):
+        _run({"prompt": "hi", "session_id": "from-payload"}, session_id="from-header")
+    assert "session from-header" in caplog.text
+    assert "from-payload" not in caplog.text
+
+
+@pytest.mark.parametrize(("env", "expected"), [(None, 7070), ("9001", 9001)])
+def test_main_port(monkeypatch, env: str | None, expected: int) -> None:
+    ports: list[int] = []
+    monkeypatch.setattr(runtime_app.app, "run", lambda port: ports.append(port))
+    if env is None:
+        monkeypatch.delenv("AGENT_PORT", raising=False)
+    else:
+        monkeypatch.setenv("AGENT_PORT", env)
+    runtime_app.main()
+    assert ports == [expected]

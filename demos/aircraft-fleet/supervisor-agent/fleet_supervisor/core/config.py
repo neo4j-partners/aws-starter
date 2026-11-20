@@ -7,6 +7,15 @@ without code changes.
 
 import os
 
+
+class ConfigError(RuntimeError):
+    """Required configuration is missing or unusable.
+
+    The message names the setting, so it belongs in the server log. Clients
+    get a generic message instead.
+    """
+
+
 MODEL_ID = os.getenv("MODEL_ID", "global.anthropic.claude-sonnet-5-5")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 

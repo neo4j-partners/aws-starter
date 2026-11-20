@@ -1,5 +1,6 @@
 """The AgentCore entrypoint, with the runtime and supervisor stubbed."""
 
+import asyncio
 import uuid
 from types import SimpleNamespace
 
@@ -47,8 +48,109 @@ def supervisor(monkeypatch):
     monkeypatch.setattr(server, "gateway_auth", FakeGateway)
     monkeypatch.setattr(server, "get_runtime", fake_runtime)
     fake.calls = calls
-    monkeypatch.setattr(server, "build_supervisor", lambda model, tools: fake)
+    monkeypatch.setattr(server, "build_supervisor", lambda model, tools, manager=None: fake)
+    monkeypatch.setattr(server, "build_session_manager", lambda session_id, user_id: None)
     return fake
+
+
+class FakeManager:
+    def __init__(self, close_error: Exception | None = None):
+        self.close_error = close_error
+        self.closed = 0
+
+    def close(self) -> None:
+        self.closed += 1
+        if self.close_error:
+            raise self.close_error
+
+
+@pytest.fixture
+def manager(monkeypatch, supervisor):
+    """Turn memory on with a fake manager; record what the supervisor gets."""
+    fake = FakeManager()
+    built: dict = {}
+
+    def fake_build_session_manager(session_id, user_id):
+        built["session_id"], built["user_id"] = session_id, user_id
+        return fake
+
+    def fake_build_supervisor(model, tools, manager=None):
+        built["manager"] = manager
+        return supervisor
+
+    monkeypatch.setattr(server, "build_session_manager", fake_build_session_manager)
+    monkeypatch.setattr(server, "build_supervisor", fake_build_supervisor)
+    fake.built = built
+    return fake
+
+
+def test_memory_manager_goes_to_the_supervisor_and_is_closed(supervisor, manager):
+    events = collect(
+        server.invoke({"prompt": "q", "user_id": "u1"}, SimpleNamespace(session_id="s1"))
+    )
+    assert events[-1] == {"type": "complete"}
+    assert manager.built == {"session_id": "s1", "user_id": "u1", "manager": manager}
+    assert manager.closed == 1
+
+
+def test_memory_manager_is_closed_after_a_failure(supervisor, manager):
+    supervisor.error = RuntimeError("boom")
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert manager.closed == 1
+
+
+def test_memory_manager_is_closed_when_the_client_disconnects(supervisor, manager):
+    async def first_event_then_disconnect():
+        stream = server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1"))
+        first = await anext(stream)
+        await stream.aclose()
+        return first
+
+    assert asyncio.run(first_event_then_disconnect())["type"] == "agent"
+    assert manager.closed == 1
+
+
+def test_memory_manager_is_closed_when_the_request_is_cancelled(supervisor, manager):
+    async def slow_stream(prompt):
+        yield {"data": "partial"}
+        await asyncio.sleep(10)
+
+    supervisor.stream_async = slow_stream
+
+    async def cancel_mid_stream():
+        async def drain():
+            async for _ in server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")):
+                pass
+
+        task = asyncio.create_task(drain())
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(cancel_mid_stream())
+    assert manager.closed == 1
+
+
+def test_close_error_is_logged_not_sent(supervisor, manager, caplog):
+    manager.close_error = RuntimeError("bolt://user:pw@host")
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "complete"}
+    assert "pw@host" not in str(events)
+    assert "Error while closing the memory session manager" in caplog.text
+
+
+def test_no_memory_manager_when_memory_is_off(supervisor, monkeypatch):
+    seen: dict = {}
+
+    def fake_build_supervisor(model, tools, manager=None):
+        seen["manager"] = manager
+        return supervisor
+
+    monkeypatch.setattr(server, "build_supervisor", fake_build_supervisor)
+    collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert seen == {"manager": None}
 
 
 def test_streams_agent_chunk_and_complete(supervisor):

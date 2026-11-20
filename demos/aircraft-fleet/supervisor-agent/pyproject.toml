@@ -11,6 +11,9 @@ dependencies = [
     "boto3>=1.43.127",
     # Observability: ADOT for automatic tracing to CloudWatch
     "aws-opentelemetry-distro>=0.23.0",
+    # Supervisor memory in Neo4j. Pinned: the settings and session manager
+    # APIs changed between minor releases.
+    "neo4j-agent-memory[strands]==0.8.0",
 ]
 
 # Console entry points. The server runs in the foreground of its own

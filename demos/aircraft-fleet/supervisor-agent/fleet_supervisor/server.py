@@ -10,7 +10,9 @@ The model, the Gateway MCP client, and the Gateway tools are created once,
 on the first request. The client is rebuilt if its MCP session ends. A tool
 call that finds the session ended rebuilds it and retries once. See
 ``fleet_supervisor.core.gateway_tools``. The agents are built per request.
-See ``fleet_supervisor.core.agents`` for why.
+See ``fleet_supervisor.core.agents`` for why. When ``MEM_NEO4J_URI`` is set,
+each request also gets its own memory session manager on the supervisor,
+closed when the request ends. See ``fleet_supervisor.core.memory``.
 
 Local testing:
     uv run fleet-supervisor-server
@@ -31,6 +33,7 @@ from functools import cache
 from typing import Any
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from neo4j_agent_memory.integrations.strands import Neo4jSessionManager
 from strands.models import BedrockModel
 
 from fleet_supervisor.core.agents import build_supervisor
@@ -48,6 +51,7 @@ from fleet_supervisor.core.mcp import (
     build_gateway_auth,
     build_mcp_client,
 )
+from fleet_supervisor.core.memory import build_session_manager, memory_settings
 from fleet_supervisor.core.model import build_model
 
 logging.basicConfig(
@@ -195,9 +199,22 @@ def extract_prompt(payload: Any) -> str | None:
     return None
 
 
+async def _close_quietly(manager: Neo4jSessionManager) -> None:
+    """Close a memory session manager off the event loop, logging a failure.
+
+    ``close()`` blocks on Neo4j, so it runs in a thread. The shield keeps a
+    cancelled request from cancelling the close before it starts.
+    """
+    try:
+        await asyncio.shield(asyncio.to_thread(manager.close))
+    except Exception:
+        logger.exception("Error while closing the memory session manager")
+
+
 @app.entrypoint
 async def invoke(payload: Any, context):
     """Stream the supervisor's answer as SSE events."""
+    manager: Neo4jSessionManager | None = None
     # Everything runs inside the try, so no input can raise past the handler
     # and send exception text to the client.
     try:
@@ -223,7 +240,12 @@ async def invoke(payload: Any, context):
         gateway = await asyncio.to_thread(gateway_auth)
         await gateway.prepare_request()
         runtime = await get_runtime()
-        supervisor = build_supervisor(runtime.model, runtime.tools)
+        # Both calls block on Neo4j when memory is on: the agent restores the
+        # session history while it is built.
+        manager = await asyncio.to_thread(build_session_manager, session_id, user_id)
+        supervisor = await asyncio.to_thread(
+            build_supervisor, runtime.model, runtime.tools, manager
+        )
         mapper = EventMapper()
         async for event in supervisor.stream_async(prompt):
             for client_event in mapper.map(event):
@@ -234,6 +256,9 @@ async def invoke(payload: Any, context):
         # Log the details here; the client gets a generic message only.
         logger.exception("Request failed")
         yield {"type": "error", "error": GENERIC_ERROR}
+    finally:
+        if manager is not None:
+            await _close_quietly(manager)
 
 
 def main(default_port: int = LOCAL_PORT) -> None:
@@ -245,5 +270,9 @@ def main(default_port: int = LOCAL_PORT) -> None:
     ``AGENT_PORT`` overrides both.
     """
     port = int(os.environ.get("AGENT_PORT", str(default_port)))
+    # Resolve the memory settings and password before serving, so a bad
+    # secret ARN or a missing IAM grant stops startup.
+    if memory_settings() is not None:
+        logger.info("Supervisor memory is on")
     logger.info("Starting Aircraft Fleet Supervisor Agent (model %s) on port %s", MODEL_ID, port)
     app.run(port=port)

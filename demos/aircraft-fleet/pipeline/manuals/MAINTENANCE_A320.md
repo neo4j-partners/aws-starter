@@ -52,14 +52,14 @@
 
 ### 1.2 Fleet Configuration
 
-The A320-200 fleet operates across four partner carriers configured for medium-haul operations. The combined fleet of approximately 30 aircraft is distributed as follows:
+The A320-200 fleet operates across four partner carriers configured for medium-haul operations.
 
-| Operator | Aircraft Count | Primary Routes |
-|----------|---------------|----------------|
-| ExampleAir | 8 | Domestic medium-haul |
-| SkyWays | 8 | Domestic medium-haul |
-| RegionalCo | 7 | Mixed domestic/regional |
-| NorthernJet | 7 | Domestic medium-haul |
+| Operator | Primary Routes |
+|----------|----------------|
+| ExampleAir | Domestic medium-haul |
+| SkyWays | Domestic medium-haul |
+| RegionalCo | Mixed domestic/regional |
+| NorthernJet | Domestic medium-haul |
 
 Aircraft entered service between 2017 and 2023, configured in a single-class or dual-class layout for 150–180 passengers.
 

@@ -53,14 +53,14 @@
 
 ### 1.2 Fleet Configuration
 
-The B737-800 fleet operates across four partner carriers configured for short to medium-haul operations. The combined fleet of approximately 40 aircraft is distributed as follows:
+The B737-800 fleet operates across four partner carriers configured for short to medium-haul operations.
 
-| Operator | Aircraft Count | Primary Routes |
-|----------|---------------|----------------|
-| ExampleAir | 10 | Domestic short/medium-haul |
-| SkyWays | 10 | Domestic short/medium-haul |
-| RegionalCo | 10 | Mixed domestic/regional |
-| NorthernJet | 10 | Domestic short/medium-haul |
+| Operator | Primary Routes |
+|----------|----------------|
+| ExampleAir | Domestic short/medium-haul |
+| SkyWays | Domestic short/medium-haul |
+| RegionalCo | Mixed domestic/regional |
+| NorthernJet | Domestic short/medium-haul |
 
 Aircraft entered service between 2016 and 2022, configured in a single-class or dual-class layout for 162–189 passengers.
 

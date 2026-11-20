@@ -67,12 +67,12 @@ The A321neo represents the latest evolution of the A320 family with:
 
 The A321neo fleet operates across four partner carriers configured for medium to long-haul operations.
 
-| Operator | Aircraft Count | Primary Routes |
-|----------|---------------|----------------|
-| ExampleAir | 5 | Domestic medium-haul |
-| SkyWays | 5 | Domestic medium-haul |
-| RegionalCo | 5 | Mixed domestic/regional |
-| NorthernJet | 5 | Domestic medium-haul |
+| Operator | Primary Routes |
+|----------|----------------|
+| ExampleAir | Domestic medium-haul |
+| SkyWays | Domestic medium-haul |
+| RegionalCo | Mixed domestic/regional |
+| NorthernJet | Domestic medium-haul |
 
 Aircraft entered service between 2020 and 2023, configured in a single-class or dual-class layout for 180–220 passengers.
 

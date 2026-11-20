@@ -53,7 +53,7 @@
 
 ### 1.2 Fleet Configuration
 
-The E190 fleet operates across four partner carriers in regional jet service. The combined fleet of approximately 10 aircraft is distributed as follows:
+The E190 fleet operates across four partner carriers in regional jet service.
 
 | Operator | Aircraft Count | Primary Routes |
 |----------|---------------|----------------|

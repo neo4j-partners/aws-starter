@@ -14,11 +14,9 @@ from __future__ import annotations
 import random
 from datetime import timedelta
 
-import numpy as np
-
 from .config import GeneratorConfig
 from .fleet import AircraftNode, ComponentNode, SystemNode
-from .sensors import DegradationProfile, egt_values_for_system, vib_values_for_system
+from .sensors import EngineSeries
 from .specs import (
     CORRECTIVE_ACTIONS,
     ENGINE_SPECS,
@@ -59,15 +57,15 @@ def _pick_component(system: SystemNode, rng: random.Random) -> ComponentNode:
 
 def generate_maintenance_events(
     aircraft: AircraftNode,
-    engine_profiles: dict[str, DegradationProfile],  # system_id -> profile
+    engine_series: dict[str, EngineSeries],  # system_id -> written EGT/vib values
     config: GeneratorConfig,
     event_counter: list[int],  # mutable counter for global event IDs
-    rng_np: np.random.Generator,
     rng: random.Random,
 ) -> list[dict]:
     """
-    Scan each engine's sensor series for threshold exceedances and emit
-    maintenance events with realistic fault types and corrective actions.
+    Scan each engine's written sensor series, spikes included, for threshold
+    exceedances and emit maintenance events with realistic fault types and
+    corrective actions.
     """
     spec: EngineSpec = ENGINE_SPECS[aircraft.model]
     events: list[dict] = []
@@ -76,12 +74,12 @@ def generate_maintenance_events(
         if system.type != "Engine":
             continue
 
-        profile = engine_profiles.get(system.system_id)
-        if profile is None:
+        series = engine_series.get(system.system_id)
+        if series is None:
             continue
 
-        egt_vals = egt_values_for_system(aircraft, system, profile, config, rng_np)
-        vib_vals = vib_values_for_system(aircraft, system, profile, config, rng_np)
+        egt_vals = series.egt
+        vib_vals = series.vib
 
         last_event_hour: dict[str, int] = {}  # sensor_type -> last event hour
 

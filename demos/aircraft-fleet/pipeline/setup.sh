@@ -38,12 +38,12 @@ if [[ "$LOAD_FULL_DATASET" == "true" ]]; then
   DEFAULT_AIRCRAFT=100
   DEFAULT_DAYS=90
 else
-  DEFAULT_AIRCRAFT=20
-  # 90 days: degradation is time-driven, so a shorter window produces zero
-  # MaintenanceEvents (events only fire once sensor series cross model
-  # thresholds, which takes ~45+ days). 20 aircraft x 90 days yields about
-  # 110 events and 345k readings. That is small-tier friendly, and the
-  # graphrag-agent maintenance queries return data.
+  # 30 aircraft covers every tail listed in the maintenance manuals.
+  DEFAULT_AIRCRAFT=30
+  # 90 days: sensor wear grows over time, so a longer window gives more
+  # MaintenanceEvents. 30 aircraft x 90 days yields about 220 events and
+  # 520k readings. That is small-tier friendly, and the graphrag-agent
+  # maintenance queries return data.
   DEFAULT_DAYS=90
 fi
 AIRCRAFT="${GEN_AIRCRAFT:-$DEFAULT_AIRCRAFT}"

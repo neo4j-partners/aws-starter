@@ -159,10 +159,10 @@ Components are identified using the following nomenclature:
 ```
 [Aircraft ID]-[System]-[Component]
 
-Example: AC1101-S01-C03
+Example: AC1005-S01-C03
          │       │    └── Component: High-Pressure Turbine
          │       └─────── System: Engine #1
-         └─────────────── Aircraft: AC1101 (N20001)
+         └─────────────── Aircraft: AC1005 (N20001)
 ```
 
 **System Codes:**

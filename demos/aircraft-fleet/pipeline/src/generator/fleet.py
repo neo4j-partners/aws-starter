@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from itertools import count, zip_longest
 
 from .config import GeneratorConfig
 from .specs import (
     COMPONENT_TYPES_BY_SYSTEM,
+    MANUAL_FLEET_TAILS,
     MANUFACTURER,
     MODEL_DISTRIBUTION,
     OPERATORS,
@@ -22,9 +25,31 @@ def _icao24(rng: random.Random) -> str:
     return "".join(rng.choices(_ICAO_CHARS, k=6))
 
 
-def _tail_number(index: int) -> str:
-    # N + 5-digit numeric suffix, guaranteed unique
-    return f"N{index + 10000:05d}"
+def _registry_fleet() -> list[tuple[str, str]]:
+    """Return (model, tail) pairs for every manual tail, interleaved by model.
+
+    The order is round-robin across MANUAL_FLEET_TAILS, so AC1001 to AC1005
+    hold the first tail of each model. Models with more tails fill the end.
+    """
+    columns = [[(model, tail) for tail in tails] for model, tails in MANUAL_FLEET_TAILS.items()]
+    return [pair for row in zip_longest(*columns) for pair in row if pair is not None]
+
+
+def _distribute(n: int) -> list[str]:
+    """Split n aircraft across MODEL_DISTRIBUTION with largest-remainder rounding."""
+    quotas = [(model, n * fraction) for model, fraction in MODEL_DISTRIBUTION]
+    counts = {model: int(quota) for model, quota in quotas}
+    shortfall = n - sum(counts.values())
+    by_remainder = sorted(quotas, key=lambda mq: mq[1] - int(mq[1]), reverse=True)
+    for model, _ in by_remainder[:shortfall]:
+        counts[model] += 1
+    return [model for model, _ in MODEL_DISTRIBUTION for _ in range(counts[model])]
+
+
+def _generated_tails() -> Iterator[str]:
+    """Yield N10000, N10001, ... skipping every manual tail."""
+    registry_tails = {tail for _, tail in _registry_fleet()}
+    return (tail for tail in (f"N{i:05d}" for i in count(10000)) if tail not in registry_tails)
 
 
 @dataclass
@@ -127,14 +152,14 @@ def _build_system(
 
 
 def _build_aircraft(
-    index: int, model: str, operator: OperatorProfile, rng: random.Random
+    index: int, model: str, tail_number: str, operator: OperatorProfile, rng: random.Random
 ) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
     engine_names = _ENGINE_NAMES[model]
 
     aircraft = AircraftNode(
         aircraft_id=aircraft_id,
-        tail_number=_tail_number(index),
+        tail_number=tail_number,
         icao24=_icao24(rng),
         model=model,
         manufacturer=MANUFACTURER[model],
@@ -158,19 +183,18 @@ def _build_aircraft(
 
 
 def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
+    """Build the fleet: the manual registry aircraft first, then the rest.
+
+    The first aircraft carry the manual tails in a fixed order. Any aircraft
+    beyond the registry follow MODEL_DISTRIBUTION in a shuffled order.
+    """
     rng = random.Random(config.seed)
 
-    # Determine model counts from distribution
-    models: list[str] = []
-    for model, fraction in MODEL_DISTRIBUTION:
-        count = round(config.n_aircraft * fraction)
-        models.extend([model] * count)
-    # Trim or extend to exactly n_aircraft
-    models = models[: config.n_aircraft]
-    while len(models) < config.n_aircraft:
-        models.append(MODEL_DISTRIBUTION[0][0])
-
-    rng.shuffle(models)
+    registry = _registry_fleet()[: config.n_aircraft]
+    extra_models = _distribute(config.n_aircraft - len(registry))
+    rng.shuffle(extra_models)
+    tails = _generated_tails()
+    plan = [*registry, *((model, next(tails)) for model in extra_models)]
 
     # Assign operators round-robin then shuffle so each gets a similar fleet size
     n_ops = len(OPERATORS)
@@ -178,6 +202,6 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     rng.shuffle(operator_assignments)
 
     return [
-        _build_aircraft(i, model, op, rng)
-        for i, (model, op) in enumerate(zip(models, operator_assignments, strict=True))
+        _build_aircraft(i, model, tail, op, rng)
+        for i, ((model, tail), op) in enumerate(zip(plan, operator_assignments, strict=True))
     ]

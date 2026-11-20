@@ -172,12 +172,12 @@ no LLM calls and needs no keys.
 
 `LOAD_FULL_DATASET` sets the dataset size:
 
-- **`false`:** This default loads about 20 aircraft over 90 days. That is about 23 MB of readings and about 111 maintenance events. It loads in minutes and fits free or small Aura tiers.
+- **`false`:** This default loads 30 aircraft over 90 days. That covers every tail listed in the maintenance manuals. It is about 36 MB of readings and about 220 maintenance events. It loads in minutes and fits free or small Aura tiers.
 - **`true`:** This option loads about 100 aircraft over 90 days. That is about 114 MB of readings. It is slow to load and needs a larger Aura tier.
 
-The 90-day window matters. Maintenance events start only after sensor wear
-crosses model thresholds. That takes about 45 days or more. A shorter window
-creates no events, so the maintenance queries return nothing.
+The 90-day window matters. Sensor wear grows over time, and most maintenance
+events come from that wear. A shorter window creates far fewer events. For
+example, 20 aircraft over 30 days creates about 18 events.
 
 You can set `GEN_AIRCRAFT`, `GEN_DAYS`, `GEN_AIRPORTS`, and `GEN_SEED` to
 override single values.

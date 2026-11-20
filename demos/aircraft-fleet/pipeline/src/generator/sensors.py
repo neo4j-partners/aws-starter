@@ -20,6 +20,18 @@ from .specs import ENGINE_SPECS, EngineSpec
 
 
 @dataclass
+class EngineSeries:
+    """The EGT and vibration values written for one engine, spikes included.
+
+    maintenance.py scans these same values, so every event traces back to
+    readings that are in the graph.
+    """
+
+    egt: np.ndarray
+    vib: np.ndarray
+
+
+@dataclass
 class DegradationProfile:
     egt_slope: float  # °C per operational hour
     vib_slope: float  # ips per operational hour
@@ -61,12 +73,13 @@ def generate_engine_readings(
     system: SystemNode,
     config: GeneratorConfig,
     rng: np.random.Generator,
-) -> tuple[DegradationProfile, list[dict]]:
+) -> tuple[EngineSeries, list[dict]]:
     """
     Generate sensor readings for one engine system.
 
-    Returns the degradation profile (used later to correlate maintenance events)
-    and a flat list of reading dicts ready for CSV serialisation.
+    Returns the EGT and vibration series exactly as written, for the
+    maintenance module to scan, and a flat list of reading dicts ready for
+    CSV serialisation.
     """
     spec: EngineSpec = ENGINE_SPECS[aircraft.model]
     profile = _draw_profile(spec, aircraft.operator_profile.degradation_multiplier, rng)
@@ -75,6 +88,7 @@ def generate_engine_readings(
 
     # Build per-sensor time series
     sensor_series: dict[str, np.ndarray] = {}
+    series_by_type: dict[str, np.ndarray] = {}
     for sensor in system.sensors:
         if sensor.type == "EGT":
             base = spec.egt_baseline + profile.egt_slope * t
@@ -92,6 +106,7 @@ def generate_engine_readings(
             values = rng.normal(spec.fuel_baseline, spec.fuel_noise_std, config.n_hours)
 
         sensor_series[sensor.sensor_id] = values
+        series_by_type[sensor.type] = values
 
     rows: list[dict] = []
     for sensor in system.sensors:
@@ -106,33 +121,4 @@ def generate_engine_readings(
                 }
             )
 
-    return profile, rows
-
-
-def egt_values_for_system(
-    aircraft: AircraftNode,
-    system: SystemNode,
-    profile: DegradationProfile,
-    config: GeneratorConfig,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Re-generate just the EGT series for a system (used by maintenance module)."""
-    spec = ENGINE_SPECS[aircraft.model]
-    t = np.arange(config.n_hours, dtype=float)
-    base = spec.egt_baseline + profile.egt_slope * t
-    noise = rng.normal(0, spec.egt_noise_std, config.n_hours)
-    return base + noise
-
-
-def vib_values_for_system(
-    aircraft: AircraftNode,
-    system: SystemNode,
-    profile: DegradationProfile,
-    config: GeneratorConfig,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    spec = ENGINE_SPECS[aircraft.model]
-    t = np.arange(config.n_hours, dtype=float)
-    base = spec.vib_baseline + profile.vib_slope * t
-    noise = rng.normal(0, spec.vib_noise_std, config.n_hours)
-    return base + noise
+    return EngineSeries(egt=series_by_type["EGT"], vib=series_by_type["Vibration"]), rows

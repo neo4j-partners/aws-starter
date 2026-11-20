@@ -123,6 +123,29 @@ MODEL_DISTRIBUTION: list[tuple[str, float]] = [
     ("A220-300", 0.10),
 ]
 
+# Tail numbers on each manual's **Fleet** line. The generator gives these to
+# the first aircraft, so every manual tail exists in the generated data.
+# tests/test_manual_registry.py checks them against the manuals. The key
+# order sets the round-robin order of the registry aircraft.
+MANUAL_FLEET_TAILS: dict[str, list[str]] = {
+    "B737-800": ["N95040A", "N53032E", "N84110I", "N26760M", "N44342Q"],
+    "A320-200": ["N30268B", "N81338F", "N32276J", "N76758N", "N63098R"],
+    "A321neo": ["N54980C", "N86057G", "N89365K", "N65164O", "N96107S"],
+    "E190": [
+        "N10002",
+        "N10017",
+        "N10023",
+        "N10036",
+        "N10050",
+        "N10068",
+        "N10071",
+        "N10073",
+        "N10084",
+        "N10096",
+    ],
+    "A220-300": ["N20001", "N20002", "N20003", "N20004", "N20005"],
+}
+
 MANUFACTURER: dict[str, str] = {
     "B737-800": "Boeing",
     "A320-200": "Airbus",

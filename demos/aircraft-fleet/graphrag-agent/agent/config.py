@@ -27,6 +27,8 @@ class Settings:
     vector_index_name: str = "maintenanceChunkEmbeddings"
     fulltext_index_name: str = "maintenanceChunkText"
     schema_ttl_s: int = 600
+    text2cypher_timeout_s: float = 30.0
+    text2cypher_max_rows: int = 200
     embed_model_id: str = "amazon.titan-embed-text-v2:0"
     embed_dimensions: int = 1024
 
@@ -46,6 +48,12 @@ class Settings:
                 "FULLTEXT_INDEX_NAME", defaults.fulltext_index_name
             ),
             schema_ttl_s=int(os.getenv("SCHEMA_TTL_S", str(defaults.schema_ttl_s))),
+            text2cypher_timeout_s=float(
+                os.getenv("TEXT2CYPHER_TIMEOUT_S", str(defaults.text2cypher_timeout_s))
+            ),
+            text2cypher_max_rows=int(
+                os.getenv("TEXT2CYPHER_MAX_ROWS", str(defaults.text2cypher_max_rows))
+            ),
             embed_model_id=os.getenv(
                 "EMBED_MODEL_ID", defaults.embed_model_id
             ),

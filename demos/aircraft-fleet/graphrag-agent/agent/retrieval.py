@@ -33,11 +33,12 @@ import neo4j
 from neo4j import Driver, GraphDatabase
 from neo4j_graphrag.embeddings import BedrockEmbeddings
 from neo4j_graphrag.llm import BedrockLLM
-from neo4j_graphrag.retrievers import HybridCypherRetriever, Text2CypherRetriever
+from neo4j_graphrag.retrievers import HybridCypherRetriever
 from neo4j_graphrag.schema import get_schema
 from neo4j_graphrag.types import RetrieverResultItem
 
 from agent.config import settings
+from agent.text2cypher import BoundedText2CypherRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -197,14 +198,16 @@ def get_graph_schema() -> str:
 
 
 @lru_cache(maxsize=1)
-def _text2cypher_retriever() -> Text2CypherRetriever:
-    return Text2CypherRetriever(
+def _text2cypher_retriever() -> BoundedText2CypherRetriever:
+    return BoundedText2CypherRetriever(
         get_driver(),
         llm=BedrockLLM(
             model_name=settings.model_id, region_name=settings.aws_region
         ),
         neo4j_schema=get_graph_schema(),
         neo4j_database=_neo4j_database(),
+        timeout_s=settings.text2cypher_timeout_s,
+        max_rows=settings.text2cypher_max_rows,
     )
 
 
@@ -241,7 +244,13 @@ def graph_query(question: str) -> str:
     )
     if not result.items:
         return "The generated query returned no results."
-    return "\n".join(str(item.content) for item in result.items)
+    rows = "\n".join(str(item.content) for item in result.items)
+    if result.metadata and result.metadata.get("truncated"):
+        rows += (
+            f"\n(Showing the first {len(result.items)} rows. "
+            "Aggregate or filter the question to see the rest.)"
+        )
+    return rows
 
 
 def close() -> None:

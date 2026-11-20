@@ -91,7 +91,7 @@ def test_graph_query_passes_current_schema(monkeypatch) -> None:
     class FakeRetriever:
         def search(self, query_text: str, prompt_params: dict) -> SimpleNamespace:
             seen.update(query_text=query_text, prompt_params=dict(prompt_params))
-            return SimpleNamespace(items=[SimpleNamespace(content="<Record n=42>")])
+            return SimpleNamespace(items=[SimpleNamespace(content="<Record n=42>")], metadata={})
 
     monkeypatch.setattr(retrieval, "_text2cypher_retriever", FakeRetriever)
     monkeypatch.setattr(retrieval, "get_graph_schema", lambda: "fresh schema")
@@ -100,3 +100,16 @@ def test_graph_query_passes_current_schema(monkeypatch) -> None:
         "query_text": "how many aircraft?",
         "prompt_params": {"schema": "fresh schema"},
     }
+
+
+def test_graph_query_notes_truncation(monkeypatch) -> None:
+    class FakeRetriever:
+        def search(self, **_kwargs: object) -> SimpleNamespace:
+            items = [SimpleNamespace(content=f"<Record n={i}>") for i in range(2)]
+            return SimpleNamespace(items=items, metadata={"truncated": True})
+
+    monkeypatch.setattr(retrieval, "_text2cypher_retriever", FakeRetriever)
+    monkeypatch.setattr(retrieval, "get_graph_schema", lambda: "schema")
+    out = retrieval.graph_query("list everything")
+    assert out.startswith("<Record n=0>\n<Record n=1>\n")
+    assert "first 2 rows" in out

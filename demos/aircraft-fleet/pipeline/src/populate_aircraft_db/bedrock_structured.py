@@ -16,7 +16,15 @@ repair.
 
 Claude Sonnet 5.5 rejects a forced ``toolChoice`` (``tool`` or ``any``), so
 the tool is offered with ``auto`` and the system prompt instructs the model to
-call it. The reused helpers (``get_messages_v2``, ``_get_tool_config``,
+call it. Under ``auto`` the model can still answer in prose, so a reply with
+no tool call is retried once. A reply that still has no tool call, or one cut
+off at ``max_tokens``, is counted as a miss and returned as content that fails
+``Neo4jGraph`` validation. The extractor's ``OnError`` policy then decides:
+``RAISE`` raises and ``IGNORE`` logs the chunk and yields an empty graph.
+Raising here instead would bypass ``OnError``, because the extractor calls the
+LLM outside its validation ``try``.
+
+The reused helpers (``get_messages_v2``, ``_get_tool_config``,
 ``_build_converse_kwargs``, ``_parse_tool_response``) all come from the stock
 ``BedrockLLM``. This class also forwards ``additional_request_fields`` as the
 Converse ``additionalModelRequestFields``, which carries the thinking and
@@ -28,6 +36,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 from typing import Any, Union
 
 from neo4j_graphrag.exceptions import LLMGenerationError
@@ -40,10 +49,11 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-# An empty graph is valid against Neo4jGraph; used as the fallback content so
-# the extractor's on_error=IGNORE policy yields an empty chunk graph rather
-# than raising when the model declines to call the tool.
-_EMPTY_GRAPH_JSON = '{"nodes": [], "relationships": []}'
+# One call plus one retry when the reply has no emit_graph tool call.
+_MAX_ATTEMPTS = 2
+# Prefix for miss content. It is never valid JSON, so the extractor's
+# Neo4jGraph validation fails and its OnError policy applies.
+_MISS_PREFIX = "StructuredBedrockLLM miss"
 
 _TOOL_NAME = "emit_graph"
 _TOOL_DESCRIPTION = (
@@ -103,6 +113,9 @@ class StructuredBedrockLLM(BedrockLLM):
     ) -> None:
         super().__init__(*args, **kwargs)
         self.additional_request_fields = additional_request_fields or {}
+        # Chunks run concurrently through asyncio.to_thread, so guard the count.
+        self.miss_count = 0
+        self._miss_lock = threading.Lock()
 
     def _build_converse_kwargs(
         self,
@@ -189,23 +202,41 @@ class StructuredBedrockLLM(BedrockLLM):
             toolConfig=tool_config,
         )
 
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            response = self._converse(converse_kwargs)
+            if response.get("stopReason") == "max_tokens":
+                # A truncated tool input is not a complete graph. Retrying with
+                # the same max_tokens would likely truncate again.
+                return self._miss("response stopped at max_tokens", response)
+            tool_call = next(
+                (
+                    call
+                    for call in self._parse_tool_response(response).tool_calls
+                    if call.name == _TOOL_NAME
+                ),
+                None,
+            )
+            if tool_call is not None:
+                return LLMResponse(content=json.dumps(tool_call.arguments))
+            if attempt < _MAX_ATTEMPTS:
+                logger.info("StructuredBedrockLLM: no %s tool call; retrying.", _TOOL_NAME)
+        return self._miss(f"no {_TOOL_NAME} tool call after {_MAX_ATTEMPTS} attempts", response)
+
+    def _converse(self, converse_kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Call Converse and wrap client errors in ``LLMGenerationError``."""
         try:
-            response = self.client.converse(**converse_kwargs)
+            return self.client.converse(**converse_kwargs)
         except Exception as e:
             # Mirrors BedrockLLM: boto3/botocore raise a wide range of
             # exceptions; re-raise as the library's typed error, chained.
             raise LLMGenerationError(f"Error calling StructuredBedrockLLM: {e}") from e
 
-        tool_response = self._parse_tool_response(response)
-        if not tool_response.tool_calls:
-            # With toolChoice "auto" the model can still answer in prose. Fall
-            # back to an empty graph so one chunk does not abort the run, and
-            # log it so the miss is visible.
-            logger.warning(
-                "StructuredBedrockLLM: model returned no tool call; "
-                "yielding an empty graph for this chunk."
-            )
-            return LLMResponse(content=_EMPTY_GRAPH_JSON)
-
-        arguments = tool_response.tool_calls[0].arguments
-        return LLMResponse(content=json.dumps(arguments))
+    def _miss(self, reason: str, response: dict[str, Any]) -> LLMResponse:
+        """Count and log a miss, and return content that fails validation."""
+        with self._miss_lock:
+            self.miss_count += 1
+            count = self.miss_count
+        logger.warning("StructuredBedrockLLM: %s (miss %d this run).", reason, count)
+        content = response.get("output", {}).get("message", {}).get("content", [])
+        text = " ".join(block["text"] for block in content if "text" in block)
+        return LLMResponse(content=f"{_MISS_PREFIX} ({reason}): {text}")

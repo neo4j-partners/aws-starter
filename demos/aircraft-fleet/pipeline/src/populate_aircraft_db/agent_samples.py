@@ -27,7 +27,7 @@ Node labels and properties:
 - MaintenanceEvent {event_id, component_id, system_id, aircraft_id, fault, severity, reported_at, corrective_action}  (severity: MINOR, MAJOR, CRITICAL)
 - Removal {removal_id, tracking_number, component_id, aircraft_id, removal_date, reason, work_order_number, technician_id, part_number, serial_number, hours_since_install, flight_hours_at_removal, flight_cycles_at_removal, replacement_required, shop_visit_required, warranty_status, removal_priority, cost_estimate, installation_date}  (hours_since_install and flight_hours_at_removal are flight hours)
 - Document {documentId, aircraftType, title, type}
-- Chunk {text, index, embedding}
+- Chunk {chunkId, text, index, embedding}  (chunkId: "{documentId}:{index}")
 - AircraftModel {name, manufacturer}
 - SystemReference {name, systemType, aircraftType}
 - ComponentReference {name, componentType, partNumber, aircraftType}

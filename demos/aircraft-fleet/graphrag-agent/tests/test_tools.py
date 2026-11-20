@@ -5,6 +5,8 @@ Retrieval calls are monkeypatched, so these tests never reach Neo4j.
 
 from __future__ import annotations
 
+import asyncio
+
 import neo4j
 import pytest
 from neo4j_graphrag.exceptions import Text2CypherRetrievalError
@@ -18,7 +20,7 @@ def _server_error(code: str, message: str) -> neo4j.exceptions.Neo4jError:
     return neo4j.exceptions.Neo4jError._hydrate_neo4j(code=code, message=message)
 
 
-def _raise(error: Exception):
+def _raise(error: BaseException):
     def fail(*args: object) -> str:
         raise error
 
@@ -122,7 +124,37 @@ def test_vector_search_query_errors_are_not_the_models(
     assert tools.vector_search_tool("q") == tools.DATABASE_ERROR_RESULT
 
 
-def test_other_exceptions_are_not_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tools, "graph_query", _raise(RuntimeError("bedrock down")))
-    with pytest.raises(RuntimeError):
-        tools.graph_query_tool("q")
+BEDROCK_DETAIL = (
+    "AccessDeniedException: User arn:aws:sts::123456789012:assumed-role/AgentRole/s "
+    "is not authorized to perform bedrock:InvokeModel"
+)
+
+
+def test_other_exceptions_get_fixed_results(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    error = RuntimeError(BEDROCK_DETAIL)
+    monkeypatch.setattr(tools, "graph_query", _raise(error))
+    monkeypatch.setattr(tools, "vector_search", _raise(error))
+    with caplog.at_level("ERROR", logger="fleet_graphrag"):
+        results = [tools.graph_query_tool("q"), tools.vector_search_tool("q")]
+    assert results == [tools.QUERY_FAILED_RESULT, tools.SEARCH_FAILED_RESULT]
+    # No account ID or ARN text reaches the model.
+    for result in results:
+        assert "123456789012" not in result
+        assert "arn:" not in result
+    # The detail and the traceback stay in the ERROR log.
+    assert [r.levelname for r in caplog.records] == ["ERROR", "ERROR"]
+    assert all(r.exc_info for r in caplog.records)
+    assert "123456789012" in caplog.text
+
+
+@pytest.mark.parametrize("name", ["graph_query", "vector_search"])
+def test_cancellation_is_not_swallowed(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    monkeypatch.setattr(tools, name, _raise(asyncio.CancelledError()))
+    with pytest.raises(asyncio.CancelledError):
+        if name == "graph_query":
+            tools.graph_query_tool("q")
+        else:
+            tools.vector_search_tool("q")

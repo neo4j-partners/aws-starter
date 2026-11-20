@@ -33,6 +33,14 @@ UNAVAILABLE_RESULT = (
 DATABASE_ERROR_RESULT = (
     "The graph database returned an error. Tell the user the data could not be retrieved."
 )
+# Any other failure, such as a Bedrock error while generating the Cypher. Its
+# text can name the account, a role, or a model ARN, so it stays in the log.
+QUERY_FAILED_RESULT = (
+    "The query could not be generated. Tell the user the question could not be answered right now."
+)
+SEARCH_FAILED_RESULT = (
+    "The search could not be run. Tell the user the question could not be answered right now."
+)
 # Enough of a query error for the model to rephrase the question.
 _MAX_QUERY_ERROR_CHARS = 500
 
@@ -81,6 +89,10 @@ def graph_query_tool(question: str) -> str:
         return _neo4j_error_result("graph_query_tool", e)
     except neo4j.exceptions.DriverError as e:
         return _neo4j_error_result("graph_query_tool", e)
+    except Exception as e:
+        # Exception, not BaseException, so a cancelled task still stops.
+        logger.error("graph_query_tool failed", exc_info=e)
+        return QUERY_FAILED_RESULT
 
 
 @tool
@@ -102,3 +114,7 @@ def vector_search_tool(query: str, top_k: int = 5) -> str:
         return vector_search(query, top_k)
     except (neo4j.exceptions.Neo4jError, neo4j.exceptions.DriverError) as e:
         return _neo4j_error_result("vector_search_tool", e)
+    except Exception as e:
+        # The embedding call to Bedrock can fail too. Its text stays in the log.
+        logger.error("vector_search_tool failed", exc_info=e)
+        return SEARCH_FAILED_RESULT

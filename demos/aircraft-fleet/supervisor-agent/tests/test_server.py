@@ -1,9 +1,11 @@
 """The AgentCore entrypoint, with the runtime and supervisor stubbed."""
 
 import asyncio
+import threading
 import uuid
 from types import SimpleNamespace
 
+import anyio
 import pytest
 from strands.types.exceptions import ToolProviderException
 
@@ -130,6 +132,59 @@ def test_memory_manager_is_closed_when_the_request_is_cancelled(supervisor, mana
             await task
 
     asyncio.run(cancel_mid_stream())
+    assert manager.closed == 1
+
+
+def test_cancel_during_the_build_closes_the_manager_after_the_build(
+    supervisor, manager, monkeypatch
+):
+    """A disconnect cancels the request while the constructor thread runs.
+
+    Starlette cancels through an anyio cancel scope, which cancels every
+    await again. close() must still wait for the constructor, which connects
+    the manager, so the connection it opens is closed.
+    """
+    started, release = threading.Event(), threading.Event()
+    order: list[str] = []
+
+    def blocking_build(model, tools, session_manager=None):
+        started.set()
+        release.wait(5)
+        order.append("built")
+        return supervisor
+
+    def recording_close():
+        order.append("closed")
+        manager.closed += 1
+
+    monkeypatch.setattr(server, "build_supervisor", blocking_build)
+    monkeypatch.setattr(manager, "close", recording_close)
+
+    async def disconnect_during_build():
+        async def drain():
+            async for _ in server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")):
+                pass
+
+        async with anyio.create_task_group() as group:
+            group.start_soon(drain)
+            await anyio.to_thread.run_sync(started.wait)
+            group.cancel_scope.cancel()
+        release.set()
+        with anyio.fail_after(5):
+            while not manager.closed:
+                await anyio.sleep(0.01)
+
+    anyio.run(disconnect_during_build)
+    assert order == ["built", "closed"]
+
+
+def test_a_failed_build_closes_the_manager_once(supervisor, manager, monkeypatch):
+    def failing_build(model, tools, session_manager=None):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(server, "build_supervisor", failing_build)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
     assert manager.closed == 1
 
 

@@ -46,6 +46,7 @@ load_dotenv(ENV_FILE)
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 from neo4j_agent_memory.integrations.strands import Neo4jSessionManager  # noqa: E402
+from strands import Agent  # noqa: E402
 from strands.models import BedrockModel  # noqa: E402
 
 from fleet_supervisor.core.agents import build_supervisor  # noqa: E402
@@ -237,22 +238,69 @@ def extract_prompt(payload: Any) -> str | None:
     return None
 
 
-async def _close_quietly(manager: Neo4jSessionManager) -> None:
-    """Close a memory session manager off the event loop, logging a failure.
+# Cleanup tasks that outlive a cancelled request. The event loop keeps only
+# weak references to tasks, so this set keeps each one alive until it ends.
+_cleanups: set[asyncio.Task[None]] = set()
 
-    ``close()`` blocks on Neo4j, so it runs in a thread. The shield keeps a
-    cancelled request from cancelling the close before it starts.
-    """
+
+def _close_logged(manager: Neo4jSessionManager) -> None:
+    """Close a memory session manager, logging a failure. Blocks on Neo4j."""
     try:
-        await asyncio.shield(asyncio.to_thread(manager.close))
+        manager.close()
     except Exception:
         logger.exception("Error while closing the memory session manager")
+
+
+def _build_agent(
+    runtime: Runtime, session_id: str, user_id: str
+) -> tuple[Agent, Neo4jSessionManager | None]:
+    """Build the memory session manager and the supervisor. Blocks on Neo4j.
+
+    The supervisor's constructor connects the manager and restores the
+    session history. If it fails, this closes the manager before raising,
+    so the caller only closes a manager it gets back.
+    """
+    manager = build_session_manager(session_id, user_id)
+    try:
+        supervisor = build_supervisor(runtime.model, runtime.tools, manager)
+    except BaseException:
+        if manager is not None:
+            _close_logged(manager)
+        raise
+    return supervisor, manager
+
+
+async def _close_after_build(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]) -> None:
+    """Wait for the build to finish, then close the manager it returned."""
+    try:
+        _, manager = await build
+    except BaseException:
+        # _build_agent closed the manager and the request logged the error.
+        return
+    if manager is not None:
+        await asyncio.to_thread(_close_logged, manager)
+
+
+async def _release(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]) -> None:
+    """Close the request's manager once its build ends, even if cancelled.
+
+    A client disconnect cancels the request through an anyio cancel scope,
+    which cancels every await in this finally block again. So the wait for
+    the build and the close run as one task under one shield. If the request
+    is cancelled, that task finishes on its own. Closing before the build
+    ends would race the constructor, which connects the manager after the
+    close and leaves the connection open.
+    """
+    cleanup = asyncio.create_task(_close_after_build(build))
+    _cleanups.add(cleanup)
+    cleanup.add_done_callback(_cleanups.discard)
+    await asyncio.shield(cleanup)
 
 
 @app.entrypoint
 async def invoke(payload: Any, context):
     """Stream the supervisor's answer as SSE events."""
-    manager: Neo4jSessionManager | None = None
+    build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]] | None = None
     # Everything runs inside the try, so no input can raise past the handler
     # and send exception text to the client.
     try:
@@ -278,12 +326,10 @@ async def invoke(payload: Any, context):
         gateway = await asyncio.to_thread(gateway_auth)
         await gateway.prepare_request()
         runtime = await get_runtime()
-        # Both calls block on Neo4j: the agent restores the session history
-        # while it is built.
-        manager = await asyncio.to_thread(build_session_manager, session_id, user_id)
-        supervisor = await asyncio.to_thread(
-            build_supervisor, runtime.model, runtime.tools, manager
-        )
+        # The shield keeps a cancel from abandoning the build, so the finally
+        # block can wait for it before closing the manager.
+        build = asyncio.create_task(asyncio.to_thread(_build_agent, runtime, session_id, user_id))
+        supervisor, _ = await asyncio.shield(build)
         mapper = EventMapper()
         async for event in supervisor.stream_async(prompt):
             for client_event in mapper.map(event):
@@ -295,8 +341,8 @@ async def invoke(payload: Any, context):
         logger.exception("Request failed")
         yield {"type": "error", "error": GENERIC_ERROR}
     finally:
-        if manager is not None:
-            await _close_quietly(manager)
+        if build is not None:
+            await _release(build)
 
 
 def main(default_port: int = LOCAL_PORT) -> None:

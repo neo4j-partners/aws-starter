@@ -67,7 +67,8 @@ Operators: ExampleAir, SkyWays, RegionalCo, NorthernJet.
 Airport IATA codes: JFK, LAX, ORD, ATL, DFW, DEN, SFO, SEA, MIA, BOS, MSP, DTW.
 """
 
-SYSTEM_PROMPT = """\
+SYSTEM_PROMPT = (
+    """\
 You are an expert Neo4j Cypher query generator for an aircraft digital twin \
 knowledge graph. Given a natural language question, generate a single Cypher \
 query that answers it.
@@ -85,7 +86,9 @@ Rules:
 - Do not use deprecated Cypher syntax. Use modern CALL subqueries where needed.
 
 Graph schema:
-""" + GRAPH_SCHEMA
+"""
+    + GRAPH_SCHEMA
+)
 
 VECTOR_SEARCH_PROMPT = """\
 You are a query rewriter. Given a natural language question about aircraft \
@@ -250,9 +253,7 @@ def _create_llm_client(
 
         import boto3
 
-        client = boto3.client(
-            "bedrock-runtime", **({"region_name": region} if region else {})
-        )
+        client = boto3.client("bedrock-runtime", **({"region_name": region} if region else {}))
 
         def chat(system: str, user: str) -> str:
             resp = client.converse(
@@ -359,7 +360,9 @@ def _extract_cypher(raw: str) -> str:
     # If no fencing, find the first line that looks like Cypher
     for i, ln in enumerate(text.splitlines()):
         upper = ln.strip().upper()
-        if upper.startswith(("MATCH", "OPTIONAL", "WITH", "CALL", "UNWIND", "RETURN", "CREATE", "MERGE")):
+        if upper.startswith(
+            ("MATCH", "OPTIONAL", "WITH", "CALL", "UNWIND", "RETURN", "CREATE", "MERGE")
+        ):
             return "\n".join(text.splitlines()[i:]).strip()
     return text
 
@@ -373,7 +376,7 @@ def _run_text2cypher(
     question: str,
 ) -> None:
     """Send a question to the LLM, generate Cypher, and execute it."""
-    print(f"  Question: \"{question}\"\n")
+    print(f'  Question: "{question}"\n')
 
     cypher = ""
     for attempt in range(_MAX_RETRIES):
@@ -406,11 +409,11 @@ def _run_similarity_search(
     top_k: int = 5,
 ) -> None:
     """Embed the question and run a vector similarity search over chunks."""
-    print(f"  Question: \"{question}\"\n")
+    print(f'  Question: "{question}"\n')
 
     # Rewrite question into a search phrase
     search_phrase = chat_fn(VECTOR_SEARCH_PROMPT, question).strip()
-    print(f"  Search phrase: \"{search_phrase}\"\n")
+    print(f'  Search phrase: "{search_phrase}"\n')
 
     embedding = embed_fn(search_phrase)
 
@@ -434,7 +437,9 @@ LIMIT $top_k"""
 
     try:
         records, _, _ = driver.execute_query(
-            query, embedding=embedding, top_k=top_k,
+            query,
+            embedding=embedding,
+            top_k=top_k,
         )
         rows = [dict(r) for r in records]
         if rows:

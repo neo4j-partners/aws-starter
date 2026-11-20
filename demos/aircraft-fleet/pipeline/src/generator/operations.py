@@ -28,10 +28,10 @@ _DELAY_WEIGHTS = [0.30, 0.25, 0.25, 0.20]
 
 # Delay duration ranges (minutes) by cause
 _DELAY_MINUTES: dict[str, tuple[int, int]] = {
-    "Weather":     (20, 180),
+    "Weather": (20, 180),
     "Maintenance": (30, 240),
-    "NAS":         (15,  90),
-    "Carrier":     (10,  60),
+    "NAS": (15, 90),
+    "Carrier": (10, 60),
 }
 
 # Hub airports get this weight multiplier in route selection
@@ -85,16 +85,12 @@ def generate_operations(
     for aircraft in fleet:
         delay_rate = aircraft.operator_profile.delay_rate
         # Each aircraft starts at a random hub airport
-        current_airport = rng.choices(
-            [ap for ap in airports if ap.is_hub]
-        )[0]
+        current_airport = rng.choices([ap for ap in airports if ap.is_hub])[0]
 
         for day in range(config.n_days):
             n_flights = rng.randint(*_FLIGHTS_PER_DAY_RANGE)
             # Stagger first departure between 06:00 and 09:00
-            current_time = config.start_date + timedelta(
-                days=day, hours=rng.uniform(6.0, 9.0)
-            )
+            current_time = config.start_date + timedelta(days=day, hours=rng.uniform(6.0, 9.0))
 
             for _ in range(n_flights):
                 # Weighted destination selection — hubs attract more traffic
@@ -139,12 +135,8 @@ def generate_operations(
                     lo, hi = _DELAY_MINUTES[cause]
                     minutes = rng.randint(lo, hi)
                     delay_id = f"DLY{delay_counter:05d}"
-                    delay_nodes.append(
-                        {":ID(Delay)": delay_id, "cause": cause, "minutes": minutes}
-                    )
-                    rels_delay.append(
-                        {":START_ID(Flight)": flight_id, ":END_ID(Delay)": delay_id}
-                    )
+                    delay_nodes.append({":ID(Delay)": delay_id, "cause": cause, "minutes": minutes})
+                    rels_delay.append({":START_ID(Flight)": flight_id, ":END_ID(Delay)": delay_id})
 
                 current_airport = destination
                 # Turnaround time: 45–90 minutes on ground

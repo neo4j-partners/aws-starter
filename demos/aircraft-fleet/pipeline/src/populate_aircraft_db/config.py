@@ -80,7 +80,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_uri_scheme(self) -> Settings:
-        if not self.neo4j_uri.startswith(("neo4j://", "neo4j+s://", "neo4j+ssc://", "bolt://", "bolt+s://", "bolt+ssc://")):
+        if not self.neo4j_uri.startswith(
+            ("neo4j://", "neo4j+s://", "neo4j+ssc://", "bolt://", "bolt+s://", "bolt+ssc://")
+        ):
             raise ValueError(
                 f"NEO4J_URI must start with a valid scheme (neo4j+s://, bolt+s://, etc.), got: {self.neo4j_uri}"
             )

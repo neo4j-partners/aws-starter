@@ -385,7 +385,7 @@ def _vector_similarity(driver: Driver, limit: int) -> None:
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
         return
-    print(f"  Seed: \"{rows[0]['seed_text']}\u2026\"\n")
+    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
     print(f"  {'Score':<8}  Similar chunk")
     print("  " + "\u2500" * 8 + "  " + "\u2500" * 56)
     for r in rows:
@@ -414,11 +414,14 @@ def _fulltext_search(driver: Driver, limit: int) -> None:
     )
     search_terms = ["engine vibration", "hydraulic pressure", "EGT exceedance"]
     for term in search_terms:
-        print(f"  Search: \"{term}\"")
+        print(f'  Search: "{term}"')
         _cypher(_FULLTEXT_Q)
         try:
             rows, _, _ = driver.execute_query(
-                _FULLTEXT_Q, index=_FULLTEXT_INDEX, query=term, limit=limit,
+                _FULLTEXT_Q,
+                index=_FULLTEXT_INDEX,
+                query=term,
+                limit=limit,
             )
         except Exception:
             print("  (fulltext index not available \u2014 run 'setup' first)\n")
@@ -463,7 +466,10 @@ def _vector_document_context(driver: Driver, limit: int) -> None:
     _cypher(_VECTOR_DOC_Q)
     try:
         rows, _, _ = driver.execute_query(
-            _VECTOR_DOC_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1,
+            _VECTOR_DOC_Q,
+            index=_VECTOR_INDEX,
+            limit=limit,
+            top_k=limit + 1,
         )
     except Exception:
         print("  (vector index not available \u2014 run 'setup' first)\n")
@@ -471,7 +477,7 @@ def _vector_document_context(driver: Driver, limit: int) -> None:
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
         return
-    print(f"  Seed: \"{rows[0]['seed_text']}\u2026\"\n")
+    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
     _table(
         ["Score", "Doc ID", "Aircraft", "Chunk", "Preview"],
         [
@@ -521,7 +527,10 @@ def _adjacent_chunks(driver: Driver, limit: int) -> None:
     _cypher(_ADJACENT_Q)
     try:
         rows, _, _ = driver.execute_query(
-            _ADJACENT_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1,
+            _ADJACENT_Q,
+            index=_VECTOR_INDEX,
+            limit=limit,
+            top_k=limit + 1,
         )
     except Exception:
         print("  (vector index not available \u2014 run 'setup' first)\n")
@@ -529,7 +538,7 @@ def _adjacent_chunks(driver: Driver, limit: int) -> None:
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
         return
-    print(f"  Seed: \"{rows[0]['seed_text']}\u2026\"\n")
+    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
     for r in rows:
         prev = f"Chunk {r['prev_idx']}" if r["prev_idx"] is not None else "\u2014"
         nxt = f"Chunk {r['next_idx']}" if r["next_idx"] is not None else "\u2014"
@@ -582,7 +591,10 @@ def _vector_topology(driver: Driver, limit: int) -> None:
     _cypher(_VECTOR_TOPO_Q)
     try:
         rows, _, _ = driver.execute_query(
-            _VECTOR_TOPO_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1,
+            _VECTOR_TOPO_Q,
+            index=_VECTOR_INDEX,
+            limit=limit,
+            top_k=limit + 1,
         )
     except Exception:
         print("  (vector index not available \u2014 run 'setup' first)\n")
@@ -590,7 +602,7 @@ def _vector_topology(driver: Driver, limit: int) -> None:
     if not rows:
         print("  (no topology connections found \u2014 run 'setup' first)\n")
         return
-    print(f"  Seed: \"{rows[0]['seed_text']}\u2026\"\n")
+    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
     _table(
         ["Score", "Aircraft", "System", "Doc", "Chunk", "Preview"],
         [
@@ -662,16 +674,22 @@ def _hybrid_comparison(driver: Driver, limit: int) -> None:
     _cypher(_HYBRID_VECTOR_Q)
     try:
         v_rows, _, _ = driver.execute_query(
-            _HYBRID_VECTOR_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1,
+            _HYBRID_VECTOR_Q,
+            index=_VECTOR_INDEX,
+            limit=limit,
+            top_k=limit + 1,
         )
     except Exception:
         print("  (vector index not available \u2014 run 'setup' first)\n")
         return
     if v_rows:
-        print(f"  Seed: \"{v_rows[0]['seed_text']}\u2026\"\n")
+        print(f'  Seed: "{v_rows[0]["seed_text"]}\u2026"\n')
         _table(
             ["Method", "Score", "Chunk", "Preview"],
-            [[r["method"], f"{r['score']:.4f}", r["chunk_idx"], _val(r["match_text"], 50)] for r in v_rows],
+            [
+                [r["method"], f"{r['score']:.4f}", r["chunk_idx"], _val(r["match_text"], 50)]
+                for r in v_rows
+            ],
         )
     else:
         print("  (no results)\n")
@@ -681,16 +699,21 @@ def _hybrid_comparison(driver: Driver, limit: int) -> None:
     _cypher(_HYBRID_FT_Q)
     try:
         ft_rows, _, _ = driver.execute_query(
-            _HYBRID_FT_Q, ft_index=_FULLTEXT_INDEX, limit=limit,
+            _HYBRID_FT_Q,
+            ft_index=_FULLTEXT_INDEX,
+            limit=limit,
         )
     except Exception as exc:
         print(f"  (fulltext query failed: {exc})\n")
         return
     if ft_rows:
-        print(f"  Seed: \"{ft_rows[0]['seed_text']}\u2026\"\n")
+        print(f'  Seed: "{ft_rows[0]["seed_text"]}\u2026"\n')
         _table(
             ["Method", "Score", "Chunk", "Preview"],
-            [[r["method"], f"{r['score']:.4f}", r["chunk_idx"], _val(r["match_text"], 50)] for r in ft_rows],
+            [
+                [r["method"], f"{r['score']:.4f}", r["chunk_idx"], _val(r["match_text"], 50)]
+                for r in ft_rows
+            ],
         )
     else:
         print("  (no results)\n")

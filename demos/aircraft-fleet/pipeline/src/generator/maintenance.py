@@ -96,7 +96,9 @@ def generate_maintenance_events(
                         "EGT", egt, spec.egt_warning, spec.egt_critical, rng
                     )
                     events.append(
-                        _make_event(aircraft, system, fault, severity, h, config, event_counter, rng)
+                        _make_event(
+                            aircraft, system, fault, severity, h, config, event_counter, rng
+                        )
                     )
                     last_event_hour["EGT"] = h
 
@@ -110,7 +112,9 @@ def generate_maintenance_events(
                         "Vibration", vib, spec.vib_warning, spec.vib_critical, rng
                     )
                     events.append(
-                        _make_event(aircraft, system, fault, severity, h, config, event_counter, rng)
+                        _make_event(
+                            aircraft, system, fault, severity, h, config, event_counter, rng
+                        )
                     )
                     last_event_hour["Vibration"] = h
 

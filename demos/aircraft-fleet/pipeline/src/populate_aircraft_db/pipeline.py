@@ -392,8 +392,7 @@ def debug_extract_chunks(
             approximate=True,
         ),
         context=(
-            f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | "
-            f"Title: {meta.title}\n\n"
+            f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}\n\n"
         ),
     )
     schema = build_extraction_schema()
@@ -490,8 +489,7 @@ def process_all_documents(
             # with the aircraft type.  The custom EXTRACTION_PROMPT instructs
             # the LLM to read this header.
             splitter.context = (
-                f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | "
-                f"Title: {meta.title}\n\n"
+                f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}\n\n"
             )
 
             await pipeline.run_async(
@@ -566,10 +564,7 @@ def link_to_existing_graph(driver: Driver) -> None:
         MERGE (cr)-[:DESCRIBES_COMPONENT]->(c)
         RETURN count(*) AS count
     """)
-    print(
-        f"  [OK] {records[0]['count']} "
-        "ComponentReference -[:DESCRIBES_COMPONENT]-> Component"
-    )
+    print(f"  [OK] {records[0]['count']} ComponentReference -[:DESCRIBES_COMPONENT]-> Component")
 
     # Sensor -[:HAS_LIMIT]-> OperatingLimit (match parameterName + aircraftType)
     records, _, _ = driver.execute_query("""

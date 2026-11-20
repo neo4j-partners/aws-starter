@@ -113,8 +113,7 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
     if provider == "openai":
         if settings.openai_api_key is None:
             raise typer.BadParameter(
-                "OPENAI_API_KEY is required when using OpenAI. "
-                "Set it in .env or as an env var."
+                "OPENAI_API_KEY is required when using OpenAI. Set it in .env or as an env var."
             )
         openai_key = settings.openai_api_key.get_secret_value()
         llm_model = settings.openai_extraction_model
@@ -136,9 +135,7 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
         llm_model = settings.anthropic_extraction_model
         llm_max_tokens = settings.anthropic_extraction_max_tokens
     else:
-        raise typer.BadParameter(
-            f"Unknown provider: {provider!r}. Use 'openai' or 'anthropic'."
-        )
+        raise typer.BadParameter(f"Unknown provider: {provider!r}. Use 'openai' or 'anthropic'.")
 
     embedding_model = settings.openai_embedding_model
     embedding_dims = settings.openai_embedding_dimensions

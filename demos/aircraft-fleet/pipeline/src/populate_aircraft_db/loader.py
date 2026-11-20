@@ -452,9 +452,7 @@ def _print_count_section(title: str, counts: dict[str, int]) -> None:
     print(f"  Total: {sum(counts.values()):,}")
 
 
-def _has_constraint(
-    constraint_rows: list[dict[str, Any]], label: str, property_name: str
-) -> bool:
+def _has_constraint(constraint_rows: list[dict[str, Any]], label: str, property_name: str) -> bool:
     return any(
         row["type"] == "UNIQUENESS"
         and row["labelsOrTypes"] == [label]
@@ -526,16 +524,9 @@ def verify(
 
     label_counts = _get_label_counts(driver)
     relationship_counts = _get_relationship_counts(driver)
-    operational_counts = {
-        label: label_counts.get(label, 0) for label in OPERATIONAL_LABELS
-    }
-    enrichment_counts = {
-        label: label_counts.get(label, 0) for label in ENRICHMENT_LABELS
-    }
-    rel_counts = {
-        rel_type: relationship_counts.get(rel_type, 0)
-        for rel_type in RELATIONSHIP_TYPES
-    }
+    operational_counts = {label: label_counts.get(label, 0) for label in OPERATIONAL_LABELS}
+    enrichment_counts = {label: label_counts.get(label, 0) for label in ENRICHMENT_LABELS}
+    rel_counts = {rel_type: relationship_counts.get(rel_type, 0) for rel_type in RELATIONSHIP_TYPES}
 
     print()
     print("=" * 60)
@@ -716,8 +707,7 @@ def verify(
     orphan_queries = [
         (
             "Readings without Sensor",
-            "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) "
-            "RETURN count(r) AS count",
+            "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) RETURN count(r) AS count",
             {"Reading", "Sensor"},
             {"HAS_READING"},
         ),
@@ -737,15 +727,13 @@ def verify(
         ),
         (
             "Sensors without Readings",
-            "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) "
-            "RETURN count(s) AS count",
+            "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) RETURN count(s) AS count",
             {"Sensor", "Reading"},
             {"HAS_READING"},
         ),
         (
             "Documents without Chunks",
-            "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) "
-            "RETURN count(d) AS count",
+            "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) RETURN count(d) AS count",
             {"Document", "Chunk"},
             {"FROM_DOCUMENT"},
         ),

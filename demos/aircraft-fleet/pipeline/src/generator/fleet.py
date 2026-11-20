@@ -73,18 +73,18 @@ class AircraftNode:
 
 
 _SENSOR_TYPES: list[tuple[str, str, str]] = [
-    ("EGT",      "Exhaust Gas Temperature", "C"),
-    ("Vibration","Engine Vibration",         "ips"),
-    ("N1Speed",  "Fan Speed N1",             "rpm"),
-    ("FuelFlow", "Fuel Flow",                "kg/s"),
+    ("EGT", "Exhaust Gas Temperature", "C"),
+    ("Vibration", "Engine Vibration", "ips"),
+    ("N1Speed", "Fan Speed N1", "rpm"),
+    ("FuelFlow", "Fuel Flow", "kg/s"),
 ]
 
 _ENGINE_NAMES: dict[str, list[str]] = {
     "B737-800": ["CFM56-7B #1", "CFM56-7B #2"],
     "A320-200": ["CFM56-5B #1", "CFM56-5B #2"],
-    "A321neo":  ["LEAP-1A #1",  "LEAP-1A #2"],
-    "E190":     ["CF34-10E #1", "CF34-10E #2"],
-    "A220-300": ["PW1500G #1",  "PW1500G #2"],
+    "A321neo": ["LEAP-1A #1", "LEAP-1A #2"],
+    "E190": ["CF34-10E #1", "CF34-10E #2"],
+    "A220-300": ["PW1500G #1", "PW1500G #2"],
 }
 
 
@@ -105,9 +105,7 @@ def _build_system(
     )
 
     # Components
-    for comp_index, comp_type in enumerate(
-        COMPONENT_TYPES_BY_SYSTEM[system_type], start=1
-    ):
+    for comp_index, comp_type in enumerate(COMPONENT_TYPES_BY_SYSTEM[system_type], start=1):
         system.components.append(
             ComponentNode(
                 component_id=f"{system_id}-C{comp_index:02d}",
@@ -119,9 +117,7 @@ def _build_system(
 
     # Sensors (engines only)
     if system_type == "Engine":
-        for sensor_index, (s_type, s_name, s_unit) in enumerate(
-            _SENSOR_TYPES, start=1
-        ):
+        for sensor_index, (s_type, s_name, s_unit) in enumerate(_SENSOR_TYPES, start=1):
             system.sensors.append(
                 SensorNode(
                     sensor_id=f"{system_id}-SN{sensor_index:02d}",
@@ -135,7 +131,9 @@ def _build_system(
     return system
 
 
-def _build_aircraft(index: int, model: str, operator: OperatorProfile, rng: random.Random) -> AircraftNode:
+def _build_aircraft(
+    index: int, model: str, operator: OperatorProfile, rng: random.Random
+) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
     engine_names = _ENGINE_NAMES[model]
 
@@ -151,9 +149,7 @@ def _build_aircraft(index: int, model: str, operator: OperatorProfile, rng: rand
 
     # Two engines
     for i, ename in enumerate(engine_names, start=1):
-        aircraft.systems.append(
-            _build_system(aircraft_id, i, "Engine", ename, engine_index=i)
-        )
+        aircraft.systems.append(_build_system(aircraft_id, i, "Engine", ename, engine_index=i))
 
     # Avionics and Hydraulics (no sensors)
     aircraft.systems.append(

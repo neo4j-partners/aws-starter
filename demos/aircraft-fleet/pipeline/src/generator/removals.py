@@ -72,11 +72,7 @@ def generate_removals(
         multiplier = 1.0 + 0.15 * critical_by_aircraft.get(aircraft.aircraft_id, 0)
         n_removals = max(1, round(_BASE_REMOVALS_PER_YEAR * year_fraction * multiplier))
 
-        all_components = [
-            comp
-            for system in aircraft.systems
-            for comp in system.components
-        ]
+        all_components = [comp for system in aircraft.systems for comp in system.components]
 
         for _ in range(n_removals):
             removal_counter += 1
@@ -123,7 +119,10 @@ def generate_removals(
                 {":START_ID(Aircraft)": aircraft.aircraft_id, ":END_ID(RemovalEvent)": removal_id}
             )
             rels_component.append(
-                {":START_ID(Component)": component.component_id, ":END_ID(RemovalEvent)": removal_id}
+                {
+                    ":START_ID(Component)": component.component_id,
+                    ":END_ID(RemovalEvent)": removal_id,
+                }
             )
             wo_seq += 1
 

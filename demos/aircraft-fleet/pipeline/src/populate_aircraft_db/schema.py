@@ -77,8 +77,7 @@ def create_fulltext_indexes(driver: Driver) -> None:
     for name, label, props in FULLTEXT_INDEXES:
         props_clause = ", ".join(f"n.{p}" for p in props)
         driver.execute_query(
-            f"CREATE FULLTEXT INDEX {name} IF NOT EXISTS "
-            f"FOR (n:{label}) ON EACH [{props_clause}]"
+            f"CREATE FULLTEXT INDEX {name} IF NOT EXISTS FOR (n:{label}) ON EACH [{props_clause}]"
         )
         print(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
 
@@ -113,9 +112,7 @@ def drop_extraction_constraints(driver: Driver) -> None:
             property=prop,
         )
         for record in records:
-            driver.execute_query(
-                f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS"
-            )
+            driver.execute_query(f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS")
             print(f"  [OK] Dropped constraint: {label}.{prop}")
 
 
@@ -269,8 +266,7 @@ def build_extraction_schema():
                     name="procedureType",
                     type="STRING",
                     description=(
-                        "Inspection, troubleshooting, removal, replacement, "
-                        "test, or reset."
+                        "Inspection, troubleshooting, removal, replacement, test, or reset."
                     ),
                 ),
                 PropertyType(

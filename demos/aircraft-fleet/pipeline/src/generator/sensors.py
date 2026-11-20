@@ -21,13 +21,15 @@ from .specs import ENGINE_SPECS, EngineSpec
 
 @dataclass
 class DegradationProfile:
-    egt_slope: float    # °C per operational hour
-    vib_slope: float    # ips per operational hour
+    egt_slope: float  # °C per operational hour
+    vib_slope: float  # ips per operational hour
     # Fraction of readings that receive random anomaly spikes (0–1)
     anomaly_rate: float
 
 
-def _draw_profile(spec: EngineSpec, degradation_multiplier: float, rng: np.random.Generator) -> DegradationProfile:
+def _draw_profile(
+    spec: EngineSpec, degradation_multiplier: float, rng: np.random.Generator
+) -> DegradationProfile:
     egt_slope = float(rng.uniform(*spec.egt_degradation_range)) * degradation_multiplier
     vib_slope = float(rng.uniform(*spec.vib_degradation_range)) * degradation_multiplier
     # Anomaly rate correlates loosely with degradation speed
@@ -36,13 +38,12 @@ def _draw_profile(spec: EngineSpec, degradation_multiplier: float, rng: np.rando
 
 
 def _timestamps(start: datetime, n_hours: int) -> list[str]:
-    return [
-        (start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%S")
-        for h in range(n_hours)
-    ]
+    return [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%S") for h in range(n_hours)]
 
 
-def _add_spikes(values: np.ndarray, threshold: float, anomaly_rate: float, rng: np.random.Generator) -> np.ndarray:
+def _add_spikes(
+    values: np.ndarray, threshold: float, anomaly_rate: float, rng: np.random.Generator
+) -> np.ndarray:
     """Randomly spike a fraction of readings above the warning threshold."""
     n = len(values)
     n_spikes = max(1, int(n * anomaly_rate))

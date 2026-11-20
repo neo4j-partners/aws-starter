@@ -27,9 +27,16 @@ app = typer.Typer(
 console = Console()
 
 
-def _fleet_rows(fleet: list[AircraftNode]) -> tuple[
-    list[dict], list[dict], list[dict], list[dict],
-    list[dict], list[dict], list[dict],
+def _fleet_rows(
+    fleet: list[AircraftNode],
+) -> tuple[
+    list[dict],
+    list[dict],
+    list[dict],
+    list[dict],
+    list[dict],
+    list[dict],
+    list[dict],
 ]:
     """Flatten fleet topology into CSV-ready row lists."""
     aircraft_rows, system_rows, component_rows, sensor_rows = [], [], [], []
@@ -85,8 +92,13 @@ def _fleet_rows(fleet: list[AircraftNode]) -> tuple[
                 )
 
     return (
-        aircraft_rows, system_rows, component_rows, sensor_rows,
-        rels_aircraft_system, rels_system_component, rels_system_sensor,
+        aircraft_rows,
+        system_rows,
+        component_rows,
+        sensor_rows,
+        rels_aircraft_system,
+        rels_system_component,
+        rels_system_sensor,
     )
 
 
@@ -96,7 +108,9 @@ def generate(
     airports: int = typer.Option(40, "--airports", help="Number of airports (max 40)."),
     days: int = typer.Option(90, "--days", "-d", help="Days of sensor telemetry."),
     seed: int = typer.Option(42, "--seed", help="Random seed for reproducibility."),
-    output: Path = typer.Option(Path("."), "--output", "-o", help="Output directory for CSV files."),
+    output: Path = typer.Option(
+        Path("."), "--output", "-o", help="Output directory for CSV files."
+    ),
 ) -> None:
     """Generate all CSV files for the aircraft digital twin dataset."""
     airports = min(airports, 40)
@@ -115,24 +129,31 @@ def generate(
 
     t0 = time.time()
     console.print(f"\n[bold]Aircraft Digital Twin Generator[/bold]")
-    console.print(f"  Aircraft: {aircraft}  |  Airports: {airports}  |  Days: {days}  |  Seed: {seed}")
+    console.print(
+        f"  Aircraft: {aircraft}  |  Airports: {airports}  |  Days: {days}  |  Seed: {seed}"
+    )
     console.print(f"  Output:   {output.resolve()}\n")
 
     # ── 1. Fleet topology ───────────────────────────────────────────────────
     console.print("[cyan]Generating fleet topology…[/cyan]")
     fleet = generate_fleet(config)
     (
-        aircraft_rows, system_rows, component_rows, sensor_rows,
-        rels_ac_sys, rels_sys_comp, rels_sys_sens,
+        aircraft_rows,
+        system_rows,
+        component_rows,
+        sensor_rows,
+        rels_ac_sys,
+        rels_sys_comp,
+        rels_sys_sens,
     ) = _fleet_rows(fleet)
 
-    write_csv(aircraft_rows,  output / "nodes_aircraft.csv")
-    write_csv(system_rows,    output / "nodes_systems.csv")
+    write_csv(aircraft_rows, output / "nodes_aircraft.csv")
+    write_csv(system_rows, output / "nodes_systems.csv")
     write_csv(component_rows, output / "nodes_components.csv")
-    write_csv(sensor_rows,    output / "nodes_sensors.csv")
-    write_csv(rels_ac_sys,    output / "rels_aircraft_system.csv")
-    write_csv(rels_sys_comp,  output / "rels_system_component.csv")
-    write_csv(rels_sys_sens,  output / "rels_system_sensor.csv")
+    write_csv(sensor_rows, output / "nodes_sensors.csv")
+    write_csv(rels_ac_sys, output / "rels_aircraft_system.csv")
+    write_csv(rels_sys_comp, output / "rels_system_component.csv")
+    write_csv(rels_sys_sens, output / "rels_system_sensor.csv")
     console.print(
         f"  [green]✓[/green] {len(aircraft_rows)} aircraft  "
         f"{len(system_rows)} systems  "
@@ -152,6 +173,7 @@ def generate(
     readings_path = output / "nodes_readings.csv"
     with readings_path.open("w", newline="", encoding="utf-8") as rf:
         import csv as _csv
+
         rw = _csv.DictWriter(rf, fieldnames=reading_fields)
         rw.writeheader()
 
@@ -191,34 +213,48 @@ def generate(
 
     for evt in maintenance_rows:
         rels_comp_event.append(
-            {":START_ID(Component)": evt["component_id"], ":END_ID(MaintenanceEvent)": evt[":ID(MaintenanceEvent)"]}
+            {
+                ":START_ID(Component)": evt["component_id"],
+                ":END_ID(MaintenanceEvent)": evt[":ID(MaintenanceEvent)"],
+            }
         )
         rels_event_system.append(
-            {":START_ID(MaintenanceEvent)": evt[":ID(MaintenanceEvent)"], ":END_ID(System)": evt["system_id"]}
+            {
+                ":START_ID(MaintenanceEvent)": evt[":ID(MaintenanceEvent)"],
+                ":END_ID(System)": evt["system_id"],
+            }
         )
         rels_event_aircraft.append(
-            {":START_ID(MaintenanceEvent)": evt[":ID(MaintenanceEvent)"], ":END_ID(Aircraft)": evt["aircraft_id"]}
+            {
+                ":START_ID(MaintenanceEvent)": evt[":ID(MaintenanceEvent)"],
+                ":END_ID(Aircraft)": evt["aircraft_id"],
+            }
         )
 
-    write_csv(maintenance_rows,  output / "nodes_maintenance.csv")
-    write_csv(rels_comp_event,   output / "rels_component_event.csv")
+    write_csv(maintenance_rows, output / "nodes_maintenance.csv")
+    write_csv(rels_comp_event, output / "rels_component_event.csv")
     write_csv(rels_event_system, output / "rels_event_system.csv")
     write_csv(rels_event_aircraft, output / "rels_event_aircraft.csv")
 
     # ── 3. Flight operations ────────────────────────────────────────────────
     console.print("[cyan]Generating flights, airports, and delays…[/cyan]")
     (
-        airport_rows, flight_rows, delay_rows,
-        rels_ac_flight, rels_dep, rels_arr, rels_delay,
+        airport_rows,
+        flight_rows,
+        delay_rows,
+        rels_ac_flight,
+        rels_dep,
+        rels_arr,
+        rels_delay,
     ) = generate_operations(fleet, config, rng)
 
-    write_csv(airport_rows,   output / "nodes_airports.csv")
-    write_csv(flight_rows,    output / "nodes_flights.csv")
-    write_csv(delay_rows,     output / "nodes_delays.csv")
+    write_csv(airport_rows, output / "nodes_airports.csv")
+    write_csv(flight_rows, output / "nodes_flights.csv")
+    write_csv(delay_rows, output / "nodes_delays.csv")
     write_csv(rels_ac_flight, output / "rels_aircraft_flight.csv")
-    write_csv(rels_dep,       output / "rels_flight_departure.csv")
-    write_csv(rels_arr,       output / "rels_flight_arrival.csv")
-    write_csv(rels_delay,     output / "rels_flight_delay.csv")
+    write_csv(rels_dep, output / "rels_flight_departure.csv")
+    write_csv(rels_arr, output / "rels_flight_arrival.csv")
+    write_csv(rels_delay, output / "rels_flight_delay.csv")
     console.print(
         f"  [green]✓[/green] {len(airport_rows)} airports  "
         f"{len(flight_rows):,} flights  "
@@ -230,14 +266,16 @@ def generate(
     removal_rows, rels_ac_removal, rels_comp_removal = generate_removals(
         fleet, maintenance_rows, config, rng
     )
-    write_csv(removal_rows,     output / "nodes_removals.csv")
-    write_csv(rels_ac_removal,  output / "rels_aircraft_removal.csv")
+    write_csv(removal_rows, output / "nodes_removals.csv")
+    write_csv(rels_ac_removal, output / "rels_aircraft_removal.csv")
     write_csv(rels_comp_removal, output / "rels_component_removal.csv")
     console.print(f"  [green]✓[/green] {len(removal_rows)} removals")
 
     # ── Summary ─────────────────────────────────────────────────────────────
     elapsed = time.time() - t0
-    _print_summary(config, fleet, total_readings, maintenance_rows, flight_rows, delay_rows, elapsed)
+    _print_summary(
+        config, fleet, total_readings, maintenance_rows, flight_rows, delay_rows, elapsed
+    )
 
 
 def _print_summary(
@@ -256,15 +294,15 @@ def _print_summary(
     table.add_column("Entity", style="cyan")
     table.add_column("Count", justify="right")
 
-    table.add_row("Aircraft",           str(len(fleet)))
-    table.add_row("Systems",            str(sum(len(ac.systems) for ac in fleet)))
-    table.add_row("Components",         str(sum(len(s.components) for ac in fleet for s in ac.systems)))
-    table.add_row("Sensors",            str(sum(len(s.sensors) for ac in fleet for s in ac.systems)))
-    table.add_row("Sensor Readings",    f"{n_readings:,}")
+    table.add_row("Aircraft", str(len(fleet)))
+    table.add_row("Systems", str(sum(len(ac.systems) for ac in fleet)))
+    table.add_row("Components", str(sum(len(s.components) for ac in fleet for s in ac.systems)))
+    table.add_row("Sensors", str(sum(len(s.sensors) for ac in fleet for s in ac.systems)))
+    table.add_row("Sensor Readings", f"{n_readings:,}")
     table.add_row("Maintenance Events", str(len(maintenance_rows)))
-    table.add_row("Airports",           str(config.n_airports))
-    table.add_row("Flights",            f"{len(flight_rows):,}")
-    table.add_row("Delays",             f"{len(delay_rows):,}")
+    table.add_row("Airports", str(config.n_airports))
+    table.add_row("Flights", f"{len(flight_rows):,}")
+    table.add_row("Delays", f"{len(delay_rows):,}")
 
     console.print(table)
 
@@ -324,26 +362,26 @@ def validate(
                 if val and val not in valid_ids:
                     errors.append(f"{filename}:{i} — {col}={val!r} not in {label}")
 
-    aircraft_ids  = load_ids("nodes_aircraft.csv",    ":ID(Aircraft)")
-    system_ids    = load_ids("nodes_systems.csv",      ":ID(System)")
-    component_ids = load_ids("nodes_components.csv",   ":ID(Component)")
-    sensor_ids    = load_ids("nodes_sensors.csv",      ":ID(Sensor)")
-    airport_ids   = load_ids("nodes_airports.csv",     ":ID(Airport)")
-    flight_ids    = load_ids("nodes_flights.csv",      ":ID(Flight)")
-    delay_ids     = load_ids("nodes_delays.csv",       ":ID(Delay)")
-    event_ids     = load_ids("nodes_maintenance.csv",  ":ID(MaintenanceEvent)")
+    aircraft_ids = load_ids("nodes_aircraft.csv", ":ID(Aircraft)")
+    system_ids = load_ids("nodes_systems.csv", ":ID(System)")
+    component_ids = load_ids("nodes_components.csv", ":ID(Component)")
+    sensor_ids = load_ids("nodes_sensors.csv", ":ID(Sensor)")
+    airport_ids = load_ids("nodes_airports.csv", ":ID(Airport)")
+    flight_ids = load_ids("nodes_flights.csv", ":ID(Flight)")
+    delay_ids = load_ids("nodes_delays.csv", ":ID(Delay)")
+    event_ids = load_ids("nodes_maintenance.csv", ":ID(MaintenanceEvent)")
 
-    check_fk("rels_aircraft_system.csv",  ":START_ID(Aircraft)", aircraft_ids,  "Aircraft")
-    check_fk("rels_aircraft_system.csv",  ":END_ID(System)",     system_ids,    "System")
-    check_fk("rels_system_component.csv", ":START_ID(System)",   system_ids,    "System")
-    check_fk("rels_system_component.csv", ":END_ID(Component)",  component_ids, "Component")
-    check_fk("rels_system_sensor.csv",    ":START_ID(System)",   system_ids,    "System")
-    check_fk("rels_system_sensor.csv",    ":END_ID(Sensor)",     sensor_ids,    "Sensor")
-    check_fk("rels_flight_departure.csv", ":END_ID(Airport)",    airport_ids,   "Airport")
-    check_fk("rels_flight_arrival.csv",   ":END_ID(Airport)",    airport_ids,   "Airport")
-    check_fk("rels_flight_delay.csv",     ":START_ID(Flight)",   flight_ids,    "Flight")
-    check_fk("rels_flight_delay.csv",     ":END_ID(Delay)",      delay_ids,     "Delay")
-    check_fk("rels_component_event.csv",  ":END_ID(MaintenanceEvent)", event_ids, "MaintenanceEvent")
+    check_fk("rels_aircraft_system.csv", ":START_ID(Aircraft)", aircraft_ids, "Aircraft")
+    check_fk("rels_aircraft_system.csv", ":END_ID(System)", system_ids, "System")
+    check_fk("rels_system_component.csv", ":START_ID(System)", system_ids, "System")
+    check_fk("rels_system_component.csv", ":END_ID(Component)", component_ids, "Component")
+    check_fk("rels_system_sensor.csv", ":START_ID(System)", system_ids, "System")
+    check_fk("rels_system_sensor.csv", ":END_ID(Sensor)", sensor_ids, "Sensor")
+    check_fk("rels_flight_departure.csv", ":END_ID(Airport)", airport_ids, "Airport")
+    check_fk("rels_flight_arrival.csv", ":END_ID(Airport)", airport_ids, "Airport")
+    check_fk("rels_flight_delay.csv", ":START_ID(Flight)", flight_ids, "Flight")
+    check_fk("rels_flight_delay.csv", ":END_ID(Delay)", delay_ids, "Delay")
+    check_fk("rels_component_event.csv", ":END_ID(MaintenanceEvent)", event_ids, "MaintenanceEvent")
 
     if errors:
         console.print(f"[red]Found {len(errors)} referential integrity error(s):[/red]")

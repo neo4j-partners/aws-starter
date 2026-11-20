@@ -457,7 +457,8 @@ case "${1:-help}" in
             echo -e "${YELLOW}Using default question${NC}"
         fi
         echo -e "${GREEN}Invoking deployed supervisor...${NC}"
-        echo -e "${BLUE}Prompt: $PROMPT${NC}"
+        # %s prints the prompt as is, so a backslash in it is not an escape.
+        printf '%bPrompt: %s%b\n' "$BLUE" "$PROMPT" "$NC"
         echo ""
         # jq builds the JSON, so quotes in the prompt are escaped.
         agentcore invoke --runtime "$RUNTIME_NAME" --payload "$(jq -nc --arg p "$PROMPT" '{prompt: $p}')"

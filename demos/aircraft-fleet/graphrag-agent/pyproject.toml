@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Aircraft Fleet GraphRAG Agent: Strands, direct-to-Neo4j GraphRAG"
 requires-python = ">=3.12"
 dependencies = [
-    # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)
+    # Shared core: direct-to-Neo4j GraphRAG, with no MCP and no Gateway
     "bedrock-agentcore>=1.26",
     "neo4j-graphrag[bedrock]>=1.24",
     "neo4j>=6.3.1",

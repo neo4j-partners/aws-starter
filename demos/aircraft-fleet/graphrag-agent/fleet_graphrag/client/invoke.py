@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deployed-agent harness — single invocation and continuous load test.
+"""Deployed-agent harness: single invocation and continuous load test.
 
 Talks to the agent deployed on AgentCore Runtime over the boto3
 ``bedrock-agentcore`` data plane (via :mod:`client.transport`). The response

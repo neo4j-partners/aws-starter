@@ -1,4 +1,4 @@
-"""Aircraft Fleet GraphRAG Agent (Strands) — AgentCore Runtime.
+"""Aircraft Fleet GraphRAG Agent (Strands): AgentCore Runtime.
 
 A Strands-native agent that connects **directly to Neo4j** (no MCP server, no
 AgentCore Gateway). Two ``neo4j-graphrag`` retrievers are exposed as Strands
@@ -172,16 +172,16 @@ async def invoke(
     payload: dict | None,
     context: RequestContext,
 ) -> AsyncGenerator[dict, None]:
-    """AgentCore Runtime handler — direct Neo4j GraphRAG, streamed.
+    """AgentCore Runtime handler: direct Neo4j GraphRAG, streamed.
 
     The runtime serves four surfaces off the single ``/invocations``
     endpoint, selected by an optional ``mode`` field in the payload:
 
-    - ``{"mode": "schema"}`` — the live Neo4j schema string.
-    - ``{"mode": "graph_query", "query": "..."}`` — Text2Cypher directly.
-    - ``{"mode": "vector_search", "query": "...", "top_k": N}`` — the vector
+    - ``{"mode": "schema"}``: the live Neo4j schema string.
+    - ``{"mode": "graph_query", "query": "..."}``: Text2Cypher directly.
+    - ``{"mode": "vector_search", "query": "...", "top_k": N}``: the vector
       retriever directly.
-    - no ``mode`` (or ``{"prompt": "..."}``) — the full ReAct agent, streamed.
+    - no ``mode``, or ``{"prompt": "..."}``: the full ReAct agent, streamed.
 
     The three data modes emit one ``chunk`` then ``complete``, so the SSE
     parser in ``client.transport`` handles them with no special casing.

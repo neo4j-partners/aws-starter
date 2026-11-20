@@ -3,11 +3,11 @@
 This CDK app is managed by the AgentCore CLI. It deploys everything declared in `agentcore/agentcore.json` into AWS
 through the `@aws/agentcore-cdk` constructs. It is two files:
 
-- `bin/cdk.ts` — the entry point. It reads the project once (`readAgentCoreProject`), creates one stack per deployment
+- `bin/cdk.ts`: The entry point. It reads the project once (`readAgentCoreProject`), creates one stack per deployment
   target (`resolveTargetStacks`), and turns `agentcore.json` into the application's props (`transformAgentCoreJson`).
   Everything about how `agentcore.json` is interpreted lives in the library, so it changes with the library version, not
   with this file.
-- `lib/cdk-stack.ts` — `AgentCoreStack`, which instantiates one `AgentCoreApplication`. This is the file you edit.
+- `lib/cdk-stack.ts`: `AgentCoreStack` instantiates one `AgentCoreApplication`. This is the file you edit.
 
 Harness settings are read from `harness.yaml`. Inline `systemPrompt` text overrides
 the conventional `system-prompt.md` file in the harness directory.

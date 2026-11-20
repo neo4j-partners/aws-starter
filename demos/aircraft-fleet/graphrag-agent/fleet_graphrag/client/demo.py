@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GraphRAG Agent functionality showcase — console demo.
+"""GraphRAG Agent functionality showcase: console demo.
 
 Walks the agent's full surface area, section by section, in plain English:
 
@@ -10,7 +10,7 @@ Walks the agent's full surface area, section by section, in plain English:
   5. Conversation memory: a follow-up question that relies on the turn before.
 
 This is a pure client. Every section is served by a running
-``fleet_graphrag.server`` through the matching payload mode — nothing is built
+``fleet_graphrag.server`` through the matching payload mode. Nothing is built
 in-process:
 
   - section 1 -> ``{"mode": "schema"}``
@@ -81,17 +81,17 @@ def call(payload: dict) -> str:
 
 def section_schema() -> None:
     banner(
-        "SECTION 1 — What the agent knows about the database",
+        "SECTION 1: What the agent knows about the database",
         "Before answering anything, the agent loads the live Neo4j schema "
         "(node types and how they connect) once per process and puts it in "
-        "its system prompt. This is that schema — the map it reasons over.",
+        "its system prompt. This is that schema, the map it reasons over.",
     )
     show("Live graph schema", call({"mode": "schema"}))
 
 
 def section_graph_query() -> None:
     banner(
-        "SECTION 2 — graph_query retriever, used directly (Text2Cypher)",
+        "SECTION 2: graph_query retriever, used directly (Text2Cypher)",
         "This calls the structured retriever with no agent in the loop. "
         "Claude turns each plain question into a READ-ONLY Cypher query from "
         "the schema, runs it, and returns the rows. Best for exact lookups, "
@@ -116,7 +116,7 @@ def section_graph_query() -> None:
 
 def section_vector_search() -> None:
     banner(
-        "SECTION 3 — vector_search retriever, used directly (semantic search)",
+        "SECTION 3: vector_search retriever, used directly (semantic search)",
         "This calls the document retriever with no agent in the loop. The "
         "question is embedded and matched against maintenance-manual text "
         "chunks by meaning, not keywords. Best for 'what does the manual say "
@@ -136,7 +136,7 @@ def section_vector_search() -> None:
 
 def section_agent() -> None:
     banner(
-        "SECTION 4 — The full ReAct agent, choosing tools by itself",
+        "SECTION 4: The full ReAct agent, choosing tools by itself",
         "Now the real agent runs. Given only a question, Claude decides "
         "which tool to call (graph_query for structured facts, "
         "vector_search for manual text), may chain several calls, then "
@@ -216,7 +216,7 @@ def main() -> None:
     )
     print()
     print("#" * WIDTH)
-    print("#" + "AIRCRAFT FLEET GRAPHRAG AGENT — FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
+    print("#" + "AIRCRAFT FLEET GRAPHRAG AGENT: FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
     print("#" + mode_line.center(WIDTH - 2) + "#")
     print("#" * WIDTH)
 

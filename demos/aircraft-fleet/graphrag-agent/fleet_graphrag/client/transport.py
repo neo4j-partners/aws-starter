@@ -1,4 +1,4 @@
-"""One wire, two transports — the only place clients touch the network.
+"""One wire, two transports. This is the only place clients touch the network.
 
 ``fleet_graphrag.server`` serves four surfaces off ``/invocations`` and emits four
 SSE event shapes: ``{"type": "chunk", "data": ...}``,
@@ -6,8 +6,8 @@ SSE event shapes: ``{"type": "chunk", "data": ...}``,
 ``{"type": "complete"}``. Both transports below produce that same byte
 stream, so a single parser handles them:
 
-- :func:`invoke_local`    — HTTP POST to a locally running runtime (port 7070).
-- :func:`invoke_deployed` — boto3 ``bedrock-agentcore`` data plane (deployed).
+- :func:`invoke_local`: HTTP POST to a locally running runtime on port 7070.
+- :func:`invoke_deployed`: the boto3 ``bedrock-agentcore`` data plane.
 
 :func:`invoke` dispatches on ``target`` and returns the shape callers expect:
 ``{"status": "success", "response": "..."}`` or

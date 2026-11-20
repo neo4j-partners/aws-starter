@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aircraft Fleet GraphRAG Agent — terminal client.
+"""Aircraft Fleet GraphRAG Agent: terminal client.
 
 A thin client. It does not build an agent: it sends a prompt to a running
 ``fleet_graphrag.server`` and streams the answer back. ``--remote`` switches the
@@ -29,7 +29,7 @@ DEMO_COUNT = 5
 
 def ask(question: str, target: Target) -> None:
     print("=" * 70)
-    print(f"Aircraft Fleet GraphRAG Agent (Strands) — {target}")
+    print(f"Aircraft Fleet GraphRAG Agent (Strands): {target}")
     print("=" * 70)
     print(f"Question: {question}")
     print("-" * 70)

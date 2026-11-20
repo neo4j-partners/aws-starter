@@ -4,8 +4,10 @@ Nothing here builds an agent. ``fleet_graphrag.server`` is the only agent builde
 everything in this package talks to it over the wire, distinguished only by a
 ``target``:
 
-- ``"local"``    — HTTP+SSE to a locally running ``fleet_graphrag.server`` (``./agent.sh start``).
-- ``"deployed"`` — the boto3 ``bedrock-agentcore`` data plane (``./agent.sh deploy``).
+- ``"local"``: HTTP and SSE to a locally running ``fleet_graphrag.server``.
+  Start it with ``./agent.sh start``.
+- ``"deployed"``: the boto3 ``bedrock-agentcore`` data plane.
+  Deploy it with ``./agent.sh deploy``.
 
 The single transport (:mod:`client.transport`) parses the same SSE event
 shapes for both, so :mod:`client.cli`, :mod:`client.demo`, and

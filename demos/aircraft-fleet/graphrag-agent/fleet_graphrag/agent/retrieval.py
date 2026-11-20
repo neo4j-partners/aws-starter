@@ -1,4 +1,4 @@
-"""Direct-to-Neo4j GraphRAG retrieval — the agent's only path to the database.
+"""Direct-to-Neo4j GraphRAG retrieval, the agent's only path to the database.
 
 There is no MCP server and no AgentCore Gateway in this path. The agent
 connects straight to Neo4j with the driver and answers questions with two
@@ -60,7 +60,7 @@ _driver: Driver | None = None
 
 
 def get_driver() -> Driver:
-    """Process-wide Neo4j driver (a connection pool — created once)."""
+    """Return the process-wide Neo4j driver. It is a connection pool, created once."""
     global _driver
     if _driver is None:
         uri = _require_env("NEO4J_URI")
@@ -77,7 +77,7 @@ def _neo4j_database() -> str:
 
 @lru_cache(maxsize=1)
 def _embedder() -> BedrockEmbeddings:
-    """Bedrock embedder — must match what aircraft-fleet-pipeline used to populate."""
+    """Return the Bedrock embedder. It must match the one the pipeline used."""
     return BedrockEmbeddings(
         model_id=settings.embed_model_id,
         dimensions=settings.embed_dimensions,

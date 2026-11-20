@@ -109,7 +109,7 @@ sees it. The original text goes to the server log.
 | Any other error | "The graph database returned an error." |
 
 The wording matches the graphrag agent's tools. The supervisor sees only the
-error text, so `core/tool_errors.py` classifies it by the Neo4j code and the
+error text, so `fleet_supervisor/core/tool_errors.py` classifies it by the Neo4j code and the
 driver's connection messages.
 
 ## Prerequisites
@@ -146,8 +146,9 @@ the `token_url` in the credentials file. It does not use OAuth discovery, so
 the client secret only goes to that URL.
 
 The credentials file sits outside this folder on purpose. `agentcore deploy`
-zips this whole folder, and `./agent.sh deploy` refuses to run if any `.env*`
-or `.mcp-credentials*.json` file is inside it.
+zips this whole folder, and `./agent.sh deploy` refuses to run if any `.env*`,
+`.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem`
+file, or a `venv/` folder, is inside it.
 
 ## Run locally
 
@@ -218,21 +219,29 @@ Then run these commands:
 | `./agent.sh logs [30m]` | Show runtime logs from the given window |
 | `./agent.sh invoke-cloud ["question"]` | Call the deployed agent |
 | `./agent.sh load-test [N]` | Send a random test question to the deployed agent every N seconds. The default is 5. |
-| `./agent.sh destroy` | Remove the runtime, its stack, and the Gateway credential provider |
+| `./agent.sh destroy [--yes]` | Remove the runtime, its stack, and the Gateway credential provider. It asks first. `--yes` skips the question. |
 
-`invoke-cloud` and `load-test` find the runtime ARN in `AGENT_ARN`. If it is
-unset, they read it from `agentcore status --json`.
+`invoke-cloud` calls `agentcore invoke --runtime supervisor`. `load-test`
+finds the runtime ARN in `AGENT_ARN`. If it is unset, it reads the ARN from
+`agentcore status --json`.
 
-The CLI has no destroy command. `./agent.sh destroy` declares the credential
-the same way deploy does, removes the runtime from the spec, and deploys. A
-deploy with nothing to deploy deletes the stack and every declared credential
-provider. With no runtime in the spec, `cdk-stack.ts` reads no deploy
-settings. The script then asks `agentcore status` what remains, with the
-runtime and the credential declared, and restores the tracked spec. If
-anything is still deployed, it lists it and exits with an error.
+The CLI has no destroy command. `./agent.sh destroy` removes the runtime from
+the spec and deploys. A deploy with nothing to deploy deletes the target's
+stack. It also deletes each credential provider that the CLI's state records
+but the spec no longer declares, and that includes the `fleet-gateway`
+provider. So destroy does not declare the credential, and it needs neither the
+fleet credentials file nor the MCP server stack. With no runtime in the spec,
+`cdk-stack.ts` reads no deploy settings. The script then restores the tracked
+spec and checks what remains. It reads `agentcore status`, and it looks up the
+stack and the credential provider in AWS by name. If anything is still
+deployed, it lists it with the command that deletes it and exits with an
+error.
 
 The CLI's local state in `agentcore/.cli/` holds account-specific ARNs, so git
-ignores it. Losing it is safe, because destroy declares the credential again.
+ignores it. If it is lost, destroy still deletes the stack, which the CLI
+finds by name. The credential provider stays, because only that state records
+it. The AWS check then names the provider and prints the command that deletes
+it.
 
 ## Layout
 

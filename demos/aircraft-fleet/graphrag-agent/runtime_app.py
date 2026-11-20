@@ -71,6 +71,31 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 app = BedrockAgentCoreApp()
 
+GENERIC_ERROR = (
+    "Error processing your request. Please try rephrasing your question or "
+    "check the server logs."
+)
+
+# Failures to connect or authenticate. Other Neo4j errors get the generic
+# message, so a bad query is not reported as an unreachable database.
+_NEO4J_UNREACHABLE = (
+    neo4j.exceptions.ServiceUnavailable,
+    neo4j.exceptions.SessionExpired,
+    neo4j.exceptions.ConnectionPoolError,
+    neo4j.exceptions.AuthError,
+    neo4j.exceptions.DatabaseUnavailable,
+)
+
+
+def _is_transaction_timeout(error: neo4j.exceptions.ClientError) -> bool:
+    """True for a server-side transaction timeout.
+
+    The server reports ``...TransactionTimedOut`` for its own limit and
+    ``...TransactionTimedOutClientConfiguration`` for the driver's
+    ``neo4j.Query(timeout=...)``, which Text2Cypher sets.
+    """
+    return (error.code or "").startswith("Neo.ClientError.Transaction.TransactionTimedOut")
+
 model = build_bedrock_model(
     settings.model_id,
     settings.aws_region,
@@ -258,8 +283,8 @@ async def invoke(
             "type": "error",
             "error": "The agent is not configured. Check the server logs.",
         }
-    except (neo4j.exceptions.Neo4jError, neo4j.exceptions.DriverError) as e:
-        logger.error("Neo4j error: %s", e, exc_info=True)
+    except _NEO4J_UNREACHABLE as e:
+        logger.error("Neo4j connection error: %s", e, exc_info=True)
         yield {
             "type": "error",
             "error": (
@@ -267,15 +292,19 @@ async def invoke(
                 "credentials and that the instance is running."
             ),
         }
-    except Exception:
-        logger.exception("Error processing request")
+    except neo4j.exceptions.ClientError as e:
+        if not _is_transaction_timeout(e):
+            logger.exception("Neo4j error")
+            yield {"type": "error", "error": GENERIC_ERROR}
+            return
+        logger.warning("Neo4j transaction timed out: %s", e)
         yield {
             "type": "error",
-            "error": (
-                "Error processing your request. Please try rephrasing your "
-                "question or check the server logs."
-            ),
+            "error": "The query took too long. Try a narrower question.",
         }
+    except Exception:
+        logger.exception("Error processing request")
+        yield {"type": "error", "error": GENERIC_ERROR}
 
 
 def main(default_port: int = 7070) -> None:

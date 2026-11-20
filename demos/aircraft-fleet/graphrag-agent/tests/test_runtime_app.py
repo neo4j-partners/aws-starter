@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 
+import neo4j
 import pytest
 from bedrock_agentcore.runtime import RequestContext
 
@@ -135,3 +136,49 @@ def test_other_runtime_errors_get_the_generic_message(monkeypatch) -> None:
     [event] = _run({"mode": "schema"})
     assert event["type"] == "error"
     assert "internal detail" not in event["error"]
+
+
+def _raise_in_schema(monkeypatch, error: Exception) -> dict:
+    def fail() -> str:
+        raise error
+
+    monkeypatch.setattr(runtime_app, "get_graph_schema", fail)
+    [event] = _run({"mode": "schema"})
+    assert event["type"] == "error"
+    return event
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "Neo.ClientError.Transaction.TransactionTimedOut",
+        "Neo.ClientError.Transaction.TransactionTimedOutClientConfiguration",
+    ],
+)
+def test_transaction_timeout_says_the_query_took_too_long(monkeypatch, code) -> None:
+    error = neo4j.exceptions.Neo4jError._hydrate_neo4j(code=code, message="timed out")
+    event = _raise_in_schema(monkeypatch, error)
+    assert event["error"] == "The query took too long. Try a narrower question."
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        neo4j.exceptions.ServiceUnavailable("no route"),
+        neo4j.exceptions.SessionExpired("expired"),
+        neo4j.exceptions.Neo4jError._hydrate_neo4j(
+            code="Neo.ClientError.Security.Unauthorized", message="bad password"
+        ),
+    ],
+)
+def test_connection_failures_say_neo4j_is_unreachable(monkeypatch, error) -> None:
+    event = _raise_in_schema(monkeypatch, error)
+    assert event["error"].startswith("Could not reach the Neo4j database.")
+
+
+def test_other_neo4j_errors_get_the_generic_message(monkeypatch) -> None:
+    error = neo4j.exceptions.Neo4jError._hydrate_neo4j(
+        code="Neo.ClientError.Statement.SyntaxError", message="bad cypher"
+    )
+    event = _raise_in_schema(monkeypatch, error)
+    assert event["error"] == runtime_app.GENERIC_ERROR

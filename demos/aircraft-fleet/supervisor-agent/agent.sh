@@ -49,6 +49,12 @@ GATEWAY_CREDENTIAL="fleet-gateway"
 # in ~/.agentcore or the keychain, to this variable in agentcore/.env.local.
 GATEWAY_SECRET_VAR="AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET"
 ENV_LOCAL="agentcore/.env.local"
+# The stack and the credential provider names the CLI derives, so destroy
+# can check AWS for them directly. From resolveTargetStacks in
+# @aws/agentcore-cdk 1.1.0 (underscores become hyphens) and providerName in
+# @aws/agentcore 1.1.0.
+STACK_NAME="AgentCore-${PROJECT_NAME//_/-}-${TARGET//_/-}"
+GATEWAY_PROVIDER="${PROJECT_NAME}_${TARGET}_${GATEWAY_CREDENTIAL}"
 # Local Gateway credentials, written by neo4j-mcp-server/deploy.py.
 CREDENTIALS_FILE="${MCP_CREDENTIALS_FILE:-$ROOT_DIR/../.mcp-credentials.json}"
 # AgentCore deployment region. AgentCore's primary region is us-east-1
@@ -194,8 +200,9 @@ create_project() {
 # The AgentCore CLI creates or updates that provider from the credentials
 # entry in agentcore.json before CDK runs, and the construct grants the
 # runtime access to it only while the entry exists. A deploy without the entry
-# deletes the provider, so the entry is added for every deploy and destroy.
-# The tracked agentcore.json never holds it, so it carries no account details.
+# deletes the provider, so the entry is added for every deploy. destroy does
+# not add it: see the destroy command. The tracked agentcore.json never holds
+# it, so it carries no account details.
 #
 # The client ID and scope come from the fleet credentials file, and the
 # discovery URL from the MCP server stack. The secret goes to the CLI on
@@ -269,17 +276,16 @@ restore_project() {
     return "$failed"
 }
 
-# Back up the tracked spec, arm the restore, and declare the credential.
-# INT and TERM exit through the EXIT trap, so Ctrl+C restores too.
-begin_gateway_credential() {
+# Back up the tracked spec and arm the restore. INT and TERM exit through
+# the EXIT trap, so Ctrl+C restores too.
+begin_spec_restore() {
     SPEC_BACKUP=$(mktemp)
     cp "$PROJECT_SPEC" "$SPEC_BACKUP"
     trap 'restore_project || exit 1' EXIT
     trap 'exit 130' INT TERM
-    add_gateway_credential
 }
 
-end_gateway_credential() {
+end_spec_restore() {
     trap - EXIT INT TERM
     restore_project
 }
@@ -299,11 +305,49 @@ confirm_destroy() {
     esac
 }
 
-# Report every resource that `agentcore status` still shows as deployed.
-# Status lists only what agentcore.json declares, so destroy calls this with
-# the Runtime and the credential both declared.
+# The deploy target's region from agentcore/aws-targets.json. Before the
+# first deploy writes the target, it is REGION.
+target_region() {
+    local region=""
+    if [ -f agentcore/aws-targets.json ]; then
+        region=$(jq -r --arg t "$TARGET" \
+            '.[]? | select(.name == $t) | .region // empty' agentcore/aws-targets.json)
+    fi
+    echo "${region:-$REGION}"
+}
+
+# Run a read-only AWS lookup and keep its output in AWS_LOOKUP_OUTPUT.
+# Returns 0 if the resource exists and 1 if the error text contains
+# not_found. Any other failure exits, so an expired login or a missing
+# permission never reads as deleted. Call it directly, not in $(...), so
+# that exit stops the script.
+aws_lookup() {
+    local not_found="$1" output errors status=0
+    shift
+    output=$(mktemp)
+    errors=$(mktemp)
+    "$@" >"$output" 2>"$errors" || status=$?
+    AWS_LOOKUP_OUTPUT=$(cat "$output")
+    rm -f "$output"
+    if [ "$status" -eq 0 ]; then
+        rm -f "$errors"
+        return 0
+    fi
+    if grep -q -F -- "$not_found" "$errors"; then
+        rm -f "$errors"
+        return 1
+    fi
+    echo -e "${RED}Could not check AWS for remaining resources:${NC}"
+    cat "$errors"
+    rm -f "$errors"
+    exit 1
+}
+
+# Report everything destroy may have left. `agentcore status` reads the
+# CLI's deployed-state.json, so a lost state file would read as clean. The
+# stack and the credential provider are also looked up in AWS by name.
 report_remaining() {
-    local status errors remaining
+    local status errors remaining region
     errors=$(mktemp)
     if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
@@ -318,10 +362,23 @@ report_remaining() {
             | (select(.deploymentState != "local-only")
                | "  \(.resourceType) \(.name): \(.deploymentState)"),
               (.children | remaining);
-        .resources | remaining'); then
+        if (.resources | type) == "array" then .resources | remaining
+        else error("no resources array") end'); then
         echo -e "${RED}Could not read the agentcore status output:${NC}"
         echo "$status"
         exit 1
+    fi
+    region=$(target_region)
+    if aws_lookup "does not exist" aws cloudformation describe-stacks \
+        --region "$region" --stack-name "$STACK_NAME" \
+        --query 'Stacks[0].StackStatus' --output text; then
+        remaining+="${remaining:+$'\n'}  stack $STACK_NAME: $AWS_LOOKUP_OUTPUT"
+        remaining+=$'\n'"    Delete it with: aws cloudformation delete-stack --region $region --stack-name $STACK_NAME"
+    fi
+    if aws_lookup "ResourceNotFoundException" aws bedrock-agentcore-control \
+        get-oauth2-credential-provider --region "$region" --name "$GATEWAY_PROVIDER"; then
+        remaining+="${remaining:+$'\n'}  credential provider $GATEWAY_PROVIDER"
+        remaining+=$'\n'"    Delete it with: aws bedrock-agentcore-control delete-oauth2-credential-provider --region $region --name $GATEWAY_PROVIDER"
     fi
     if [ -n "$remaining" ]; then
         echo -e "${RED}Still deployed in target '$TARGET':${NC}"
@@ -447,12 +504,13 @@ case "${1:-help}" in
         ensure_project
         ensure_no_secrets_in_zip
         load_deploy_env
-        begin_gateway_credential
+        begin_spec_restore
+        add_gateway_credential
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
         agentcore deploy "${@:2}"
-        end_gateway_credential
+        end_spec_restore
         echo ""
         echo -e "${GREEN}Deployment complete!${NC}"
         echo "Run './agent.sh status' to check status"
@@ -508,22 +566,18 @@ case "${1:-help}" in
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
         # The CLI has no destroy command. A deploy of a project that declares
-        # nothing deployable removes the target's stack and every declared
-        # credential provider. So declare the credential, remove the Runtime
-        # from the spec, and deploy. With no Runtime, the stack reads no
-        # deploy settings.
-        begin_gateway_credential
-        SPEC_WITH_CREDENTIAL=$(mktemp)
-        cp "$PROJECT_SPEC" "$SPEC_WITH_CREDENTIAL"
+        # nothing deployable removes the target's stack. The same deploy
+        # deletes every credential provider that deployed-state.json records
+        # and the spec no longer declares, so the fleet-gateway provider goes
+        # without being declared. So remove the Runtime from the spec and
+        # deploy. With no Runtime, the stack reads no deploy settings, so
+        # destroy needs neither the credentials file nor the MCP server stack.
+        begin_spec_restore
         agentcore remove runtime --name "$RUNTIME_NAME"
         agentcore deploy --target "$TARGET" --yes
-        # Status lists only what the spec declares, so put the Runtime and the
-        # credential back before asking it what remains.
-        cp "$SPEC_WITH_CREDENTIAL" "$PROJECT_SPEC"
-        rm -f "$SPEC_WITH_CREDENTIAL"
+        end_spec_restore
         echo ""
         report_remaining
-        end_gateway_credential
         ;;
 
     help|--help|-h)

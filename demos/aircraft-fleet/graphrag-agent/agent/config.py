@@ -16,7 +16,8 @@ class Settings:
     The vector index + embedder MUST match what ``aircraft-fleet-pipeline``
     used to populate the graph, or vector search returns noise. They default
     to Amazon Bedrock Titan v2 (1024 dims) on the ``maintenanceChunkEmbeddings``
-    index over :Chunk(text). Every field is env-overridable.
+    index over :Chunk(text). Hybrid search also uses the ``maintenanceChunkText``
+    fulltext index. Every field is env-overridable.
     """
 
     model_id: str = DEFAULT_MODEL_ID
@@ -24,6 +25,8 @@ class Settings:
     effort: Effort = DEFAULT_EFFORT
     aws_region: str = "us-east-1"
     vector_index_name: str = "maintenanceChunkEmbeddings"
+    fulltext_index_name: str = "maintenanceChunkText"
+    schema_ttl_s: int = 600
     embed_model_id: str = "amazon.titan-embed-text-v2:0"
     embed_dimensions: int = 1024
 
@@ -39,6 +42,10 @@ class Settings:
             vector_index_name=os.getenv(
                 "VECTOR_INDEX_NAME", defaults.vector_index_name
             ),
+            fulltext_index_name=os.getenv(
+                "FULLTEXT_INDEX_NAME", defaults.fulltext_index_name
+            ),
+            schema_ttl_s=int(os.getenv("SCHEMA_TTL_S", str(defaults.schema_ttl_s))),
             embed_model_id=os.getenv(
                 "EMBED_MODEL_ID", defaults.embed_model_id
             ),
@@ -82,6 +89,8 @@ The live schema is already known. Do NOT ask for it. Use this:
 ## Response Guidelines
 
 - Cite the actual data returned; do not invent values.
+- When an answer uses document chunks, cite the document ID from the chunk's
+  [Source: ...] line.
 - Format results clearly for a human reader.
 - Be concise but thorough.
 - All access is read-only. Never claim to have modified data."""

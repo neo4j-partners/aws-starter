@@ -26,11 +26,13 @@ def graph_query_tool(question: str) -> str:
 
 @tool
 def vector_search_tool(query: str, top_k: int = 5) -> str:
-    """Semantic search over aircraft maintenance-document chunks.
+    """Search aircraft maintenance-document chunks by meaning and keywords.
 
     Use for conceptual or descriptive questions where wording varies and the
     answer lives in document text. For exact lookups or counts, use
-    graph_query_tool instead.
+    graph_query_tool instead. Each chunk starts with a [Source: ...] line that
+    names its document ID, aircraft type, and chunk number, and an Entities
+    line lists the faults, components, and limits extracted from it.
 
     Args:
         query: Natural-language search text.

@@ -393,8 +393,10 @@ def load_relationships(driver: Driver, database: str | None, data_dir: Path) -> 
         print(f"  [OK] Loaded {len(records)} {rel_type} relationships.")
 
 
-# Rows deleted per inner transaction when clearing nodes.
-_DELETE_BATCH_SIZE = 10000
+# Rows deleted per inner transaction when clearing nodes. DETACH DELETE also
+# removes every relationship on each node, so a larger batch can exceed the
+# transaction memory limit on small Aura tiers.
+_DELETE_BATCH_SIZE = 1000
 
 
 def detach_delete_nodes(driver: Driver, database: str | None, label: str | None = None) -> int:

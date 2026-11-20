@@ -37,7 +37,7 @@ from neo4j_graphrag.retrievers import HybridCypherRetriever
 from neo4j_graphrag.schema import get_schema
 from neo4j_graphrag.types import RetrieverResultItem
 
-from agent.config import settings
+from agent.config import ConfigError, settings
 from agent.text2cypher import BoundedText2CypherRetriever
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
-        raise RuntimeError(
+        raise ConfigError(
             f"{name} is not set. The GraphRAG agent connects directly to Neo4j; "
             f"set NEO4J_URI / NEO4J_USERNAME / NEO4J_PASSWORD (e.g. in the "
             f"shared aircraft-fleet root .env for local runs, or as Runtime "

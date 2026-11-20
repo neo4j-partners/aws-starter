@@ -51,6 +51,7 @@ from strands import Agent  # noqa: E402
 
 from agent import (  # noqa: E402
     SYSTEM_PROMPT_TEMPLATE,
+    ConfigError,
     get_graph_schema,
     graph_query,
     settings,
@@ -250,9 +251,13 @@ async def invoke(
         yield {"type": "complete"}
         logger.info("Request completed successfully")
 
-    except RuntimeError as e:
+    except ConfigError as e:
+        # The detail names the missing setting. Keep it in the server log.
         logger.error("Configuration error: %s", e)
-        yield {"type": "error", "error": str(e)}
+        yield {
+            "type": "error",
+            "error": "The agent is not configured. Check the server logs.",
+        }
     except (neo4j.exceptions.Neo4jError, neo4j.exceptions.DriverError) as e:
         logger.error("Neo4j error: %s", e, exc_info=True)
         yield {

@@ -13,6 +13,14 @@ DEFAULT_MAX_TOKENS = 64_000
 DEFAULT_EFFORT: Effort = "medium"
 
 
+class ConfigError(RuntimeError):
+    """Required configuration is missing or unusable.
+
+    The message names the setting, so it belongs in the server log. Clients
+    get a generic message instead.
+    """
+
+
 def _env_int(name: str, default: int) -> int:
     """Read an int env var. An unset or empty value gives ``default``."""
     raw = os.getenv(name, "").strip()

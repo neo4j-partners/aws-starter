@@ -112,3 +112,26 @@ def test_user_id_defaults_to_anonymous() -> None:
 
 def test_env_file_is_overridden_for_tests() -> None:
     assert str(runtime_app.ENV_FILE) == runtime_app.os.devnull
+
+
+def test_config_error_detail_stays_in_the_log(monkeypatch, caplog) -> None:
+    def missing() -> str:
+        raise runtime_app.ConfigError("NEO4J_PASSWORD is not set.")
+
+    monkeypatch.setattr(runtime_app, "get_graph_schema", missing)
+    with caplog.at_level("ERROR"):
+        events = _run({"mode": "schema"})
+    assert events == [
+        {"type": "error", "error": "The agent is not configured. Check the server logs."}
+    ]
+    assert "NEO4J_PASSWORD is not set." in caplog.text
+
+
+def test_other_runtime_errors_get_the_generic_message(monkeypatch) -> None:
+    def broken() -> str:
+        raise RuntimeError("internal detail")
+
+    monkeypatch.setattr(runtime_app, "get_graph_schema", broken)
+    [event] = _run({"mode": "schema"})
+    assert event["type"] == "error"
+    assert "internal detail" not in event["error"]

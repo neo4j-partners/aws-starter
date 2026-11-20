@@ -16,6 +16,7 @@ such as ``runtime_app.py`` load the local ``.env`` before importing it.
 
 from agent.config import (
     SYSTEM_PROMPT_TEMPLATE,
+    ConfigError,
     Settings,
     settings,
 )
@@ -29,6 +30,7 @@ from agent.retrieval import (
 
 __all__ = [
     "SYSTEM_PROMPT_TEMPLATE",
+    "ConfigError",
     "Settings",
     "settings",
     "close",

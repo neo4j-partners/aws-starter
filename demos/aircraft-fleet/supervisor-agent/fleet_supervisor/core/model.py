@@ -7,7 +7,7 @@ can switch to it with an import change.
 
 from strands.models import BedrockModel, CacheConfig
 
-from core.config import AWS_REGION, MAX_TOKENS, MODEL_EFFORT, MODEL_ID
+from fleet_supervisor.core.config import AWS_REGION, MAX_TOKENS, MODEL_EFFORT, MODEL_ID
 
 
 def thinking_request_fields(effort: str = MODEL_EFFORT) -> dict[str, object]:

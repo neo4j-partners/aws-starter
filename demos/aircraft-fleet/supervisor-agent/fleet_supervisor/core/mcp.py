@@ -22,8 +22,12 @@ from typing import NamedTuple
 import httpx
 from strands.tools.mcp import MCPAgentTool, MCPClient, ToolFilters
 
-from core.config import AWS_REGION
-from core.credentials import ClientCredentials, GatewayCredentials, IdentityCredentials
+from fleet_supervisor.core.config import AWS_REGION
+from fleet_supervisor.core.credentials import (
+    ClientCredentials,
+    GatewayCredentials,
+    IdentityCredentials,
+)
 
 logger = logging.getLogger(__name__)
 

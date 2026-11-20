@@ -11,7 +11,7 @@ The format matches graphrag-agent, plus one event for routing:
 from collections.abc import Iterator
 from typing import Any
 
-from core.agents import SPECIALIST_NAMES
+from fleet_supervisor.core.agents import SPECIALIST_NAMES
 
 
 class EventMapper:

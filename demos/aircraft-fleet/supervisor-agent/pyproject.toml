@@ -18,9 +18,9 @@ dependencies = [
 # question. `fleet-supervisor-invoke` is the cloud invocation and load-test
 # client.
 [project.scripts]
-fleet-supervisor-server = "server.runtime_app:main"
-fleet-supervisor-cli = "client.cli:main"
-fleet-supervisor-invoke = "client.invoke:main"
+fleet-supervisor-server = "fleet_supervisor.server:main"
+fleet-supervisor-cli = "fleet_supervisor.client.cli:main"
+fleet-supervisor-invoke = "fleet_supervisor.client.invoke:main"
 
 [dependency-groups]
 dev = [
@@ -32,15 +32,12 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Package the shared `core` plus `client`/`server` into the venv so the
-# console scripts resolve `client.*`/`server.*` and `from core import ...`
-# works without any sys.path manipulation.
+# One uniquely named package holds all the code. CodeZip installs the
+# dependencies but not this project, so in the runtime the package imports
+# because its folder sits next to main.py. Locally, uv installs it for the
+# console scripts. The runtime entrypoint is set in agentcore/agentcore.json.
 [tool.hatch.build.targets.wheel]
-packages = ["core", "client", "server"]
-
-# Read by the AgentCore CLI to find the runtime entrypoint.
-[tool.agentcore]
-entrypoint = "server/runtime_app.py"
+packages = ["fleet_supervisor"]
 
 [tool.ruff]
 target-version = "py312"

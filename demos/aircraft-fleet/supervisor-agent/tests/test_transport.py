@@ -2,8 +2,8 @@
 
 import json
 
-from client.invoke import load_queries
-from client.transport import collect, iter_events
+from fleet_supervisor.client.invoke import load_queries
+from fleet_supervisor.client.transport import collect, iter_events
 
 
 def sse(*events: dict) -> bytes:

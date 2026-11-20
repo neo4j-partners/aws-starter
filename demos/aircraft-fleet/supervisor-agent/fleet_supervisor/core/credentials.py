@@ -20,7 +20,9 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-AGENT_ROOT = Path(__file__).resolve().parent.parent
+# supervisor-agent/, the folder that holds main.py and fleet_supervisor/.
+# This file is fleet_supervisor/core/credentials.py, two levels below it.
+AGENT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CREDENTIALS_FILE = AGENT_ROOT.parent / ".mcp-credentials.json"
 
 REQUIRED_FILE_KEYS = ("gateway_url", "token_url", "client_id", "client_secret")

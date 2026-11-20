@@ -8,9 +8,9 @@ import httpx
 import pytest
 from strands.tools.mcp import MCPClient
 
-import core.mcp as mcp_module
-from core.credentials import ClientCredentials, IdentityCredentials
-from core.mcp import (
+import fleet_supervisor.core.mcp as mcp_module
+from fleet_supervisor.core.credentials import ClientCredentials, IdentityCredentials
+from fleet_supervisor.core.mcp import (
     SPECIALIST_TOOL_FILTERS,
     AccessToken,
     BearerTokenAuth,

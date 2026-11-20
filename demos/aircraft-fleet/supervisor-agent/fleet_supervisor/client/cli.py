@@ -14,7 +14,7 @@ import time
 
 import httpx
 
-from client.transport import invoke_deployed, invoke_local, print_event
+from fleet_supervisor.client.transport import invoke_deployed, invoke_local, print_event
 
 DEFAULT_PROMPT = "What are the most common maintenance faults?"
 

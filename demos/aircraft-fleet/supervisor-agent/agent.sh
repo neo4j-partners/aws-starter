@@ -23,12 +23,12 @@
 
 set -e
 
-# This script and the uv project (pyproject.toml, uv.lock, .venv) live at
-# the agent root; the runtime entrypoint lives in server/ and the client
-# tooling in client/. The local Gateway credentials file sits one level up,
-# in demos/aircraft-fleet/, outside the code zip.
+# This script, the uv project (pyproject.toml, uv.lock, .venv), and the
+# runtime entrypoint main.py live at the agent root. All the code is in the
+# fleet_supervisor/ package next to main.py. The local Gateway credentials
+# file sits one level up, in demos/aircraft-fleet/, outside the code zip.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENTRYPOINT="server/runtime_app.py"
+ENTRYPOINT="main.py"
 # The deployed runtime name is <project>_<target>_<runtime> and must be at
 # most 48 characters, so both names are short.
 PROJECT_NAME="fleetsupervisor"

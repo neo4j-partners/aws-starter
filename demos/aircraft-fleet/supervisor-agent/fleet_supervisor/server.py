@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Aircraft Fleet Supervisor Agent on AgentCore Runtime.
 
 A Strands supervisor delegates each question to one of two specialist
@@ -9,7 +8,7 @@ agents, each wrapped as a tool:
 
 The model and the Gateway MCP client are created once, on the first request.
 The client is rebuilt if its MCP session ends.
-The agents are built per request. See ``core.agents`` for why.
+The agents are built per request. See ``fleet_supervisor.core.agents`` for why.
 
 Local testing:
     uv run fleet-supervisor-server
@@ -23,29 +22,21 @@ Cloud deployment:
 import asyncio
 import logging
 import os
-import sys
 import threading
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
-# When AgentCore Runtime runs this file as a script, sys.path holds server/
-# and not the agent root, so ``core`` would not import.
-_AGENT_ROOT = str(Path(__file__).resolve().parent.parent)
-if _AGENT_ROOT not in sys.path:
-    sys.path.insert(0, _AGENT_ROOT)
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from strands.models import BedrockModel
+from strands.tools.mcp import MCPClient
 
-from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
-from strands.models import BedrockModel  # noqa: E402
-from strands.tools.mcp import MCPClient  # noqa: E402
-
-from core.agents import build_supervisor  # noqa: E402
-from core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
-from core.credentials import load_credentials  # noqa: E402
-from core.events import EventMapper  # noqa: E402
-from core.mcp import build_mcp_client, list_all_tools, remember_workload_token  # noqa: E402
-from core.model import build_model  # noqa: E402
+from fleet_supervisor.core.agents import build_supervisor
+from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID
+from fleet_supervisor.core.credentials import load_credentials
+from fleet_supervisor.core.events import EventMapper
+from fleet_supervisor.core.mcp import build_mcp_client, list_all_tools, remember_workload_token
+from fleet_supervisor.core.model import build_model
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,7 +71,7 @@ def _session_is_running(client: MCPClient) -> bool:
 
     Strands has no public health check. ``_is_session_active`` is the check
     ``list_tools_sync`` and ``call_tool`` make before they run, so it matches
-    when tool calls would start failing. tests/test_runtime_app.py pins it.
+    when tool calls would start failing. tests/test_server.py pins it.
     """
     return client._is_session_active()
 
@@ -187,20 +178,14 @@ async def invoke(payload: Any, context):
         yield {"type": "error", "error": GENERIC_ERROR}
 
 
-def main() -> None:
-    """Local dev entry point: ``uv run fleet-supervisor-server``.
+def main(default_port: int = LOCAL_PORT) -> None:
+    """Start the server in the foreground. Stop it with Ctrl+C.
 
-    Defaults to port 7071 so it can run beside graphrag-agent on 7070.
-    ``AGENT_PORT`` overrides it.
+    ``uv run fleet-supervisor-server`` calls this with the local port, 7071,
+    so the supervisor can run beside graphrag-agent on 7070. The root
+    ``main.py`` calls it with 8080, the port AgentCore Runtime expects.
+    ``AGENT_PORT`` overrides both.
     """
-    logger.info(
-        "Starting Aircraft Fleet Supervisor Agent (model %s) on port %s", MODEL_ID, LOCAL_PORT
-    )
-    app.run(port=LOCAL_PORT)
-
-
-if __name__ == "__main__":
-    # AgentCore Runtime runs this file directly and expects port 8080.
-    port = int(os.environ.get("AGENT_PORT", "8080"))
+    port = int(os.environ.get("AGENT_PORT", str(default_port)))
     logger.info("Starting Aircraft Fleet Supervisor Agent (model %s) on port %s", MODEL_ID, port)
     app.run(port=port)

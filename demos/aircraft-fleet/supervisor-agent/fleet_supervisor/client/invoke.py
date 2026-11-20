@@ -18,7 +18,7 @@ from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
 
-from client.transport import InvokeResult, invoke_deployed, print_event
+from fleet_supervisor.client.transport import InvokeResult, invoke_deployed, print_event
 
 QUERIES_FILE = Path(__file__).resolve().parent / "queries.txt"
 DOMAIN_TO_AGENT = {"Maintenance": "Maintenance Agent", "Operations": "Operations Agent"}

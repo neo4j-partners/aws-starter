@@ -46,8 +46,9 @@ uv sync
 
 ### Routing
 
-The supervisor model reads the two tool descriptions in `core/agents.py` and
-the supervisor prompt in `core/prompts.py`. A question that spans both domains
+The supervisor model reads the two tool descriptions in
+`fleet_supervisor/core/agents.py` and the supervisor prompt in
+`fleet_supervisor/core/prompts.py`. A question that spans both domains
 calls both specialists, and the supervisor combines their answers.
 
 | Question mentions | Goes to |
@@ -112,6 +113,7 @@ uv run fleet-supervisor-cli "Compare fault counts with delay counts"
 ```
 
 - **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server`. Set `AGENT_PORT` to change the port.
+- **Runtime entrypoint:** `uv run python main.py` starts the same server on 8080, the port AgentCore Runtime uses.
 - **Port:** The default port is 7071, so the supervisor can run beside `graphrag-agent` on 7070.
 
 ### Events
@@ -176,23 +178,28 @@ unset, they read it from `agentcore status --json`.
 
 | Path | Purpose |
 |------|---------|
-| `core/config.py` | Model ID, region, token limit, effort, and local port. Environment variables can override them. |
-| `core/prompts.py` | The supervisor prompt and the two specialist system prompts |
-| `core/agents.py` | The supervisor and `SpecialistTool` |
-| `core/model.py` | The Bedrock model factory |
-| `core/credentials.py` | Picks the local or cloud Gateway credentials |
-| `core/mcp.py` | The Gateway MCP client, its bearer-token auth, and the tool filter |
-| `core/events.py` | Maps Strands stream events to the client events |
-| `server/runtime_app.py` | The AgentCore entrypoint, run by `fleet-supervisor-server` |
-| `client/cli.py` | Asks the local server one question, run by `fleet-supervisor-cli` |
-| `client/invoke.py` | Cloud calls and load testing, run by `fleet-supervisor-invoke` |
-| `client/queries.txt` | 20 test questions: 10 for maintenance and 10 for operations |
+| `main.py` | AgentCore entrypoint. It calls `fleet_supervisor.server.main` on port 8080. |
+| `fleet_supervisor/server.py` | The `BedrockAgentCoreApp`, its entrypoint, and `main()`, run by `fleet-supervisor-server` |
+| `fleet_supervisor/core/config.py` | Model ID, region, token limit, effort, and local port. Environment variables can override them. |
+| `fleet_supervisor/core/prompts.py` | The supervisor prompt and the two specialist system prompts |
+| `fleet_supervisor/core/agents.py` | The supervisor and `SpecialistTool` |
+| `fleet_supervisor/core/model.py` | The Bedrock model factory |
+| `fleet_supervisor/core/credentials.py` | Picks the local or cloud Gateway credentials |
+| `fleet_supervisor/core/mcp.py` | The Gateway MCP client, its bearer-token auth, and the tool filter |
+| `fleet_supervisor/core/events.py` | Maps Strands stream events to the client events |
+| `fleet_supervisor/client/cli.py` | Asks the local server one question, run by `fleet-supervisor-cli` |
+| `fleet_supervisor/client/invoke.py` | Cloud calls and load testing, run by `fleet-supervisor-invoke` |
+| `fleet_supervisor/client/queries.txt` | 20 test questions: 10 for maintenance and 10 for operations |
 | `agentcore/` | The AgentCore CLI project and its CDK app |
 | `tests/` | Offline unit tests |
 | `agent.sh` | The command wrapper for local runs and deployment |
 
 The deployed code zip holds this whole folder except `.venv`, `agentcore/`,
-`__pycache__`, and `.pytest_cache`. The runtime runs `server/runtime_app.py`, which imports `core/`.
+`__pycache__`, and `.pytest_cache`. The runtime runs `main.py`.
+
+AgentCore runs a file, not a module, and CodeZip installs the dependencies
+but not the project. The package imports because its folder sits next to
+`main.py`. Locally, `uv sync` installs the package for the console scripts.
 
 ## Environment variables
 
@@ -229,7 +236,7 @@ To try the agent without the Gateway, run the Neo4j MCP server locally with
 - **Both:** "Compare maintenance fault counts with flight delay counts" calls both specialists.
 - **General:** "What is the database schema?" goes to the Operations Agent.
 
-See `client/queries.txt` for all 20 questions.
+See `fleet_supervisor/client/queries.txt` for all 20 questions.
 
 ## See also
 

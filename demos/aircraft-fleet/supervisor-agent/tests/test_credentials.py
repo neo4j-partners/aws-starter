@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-import core.credentials as credentials_module
-from core.credentials import (
+import fleet_supervisor.core.credentials as credentials_module
+from fleet_supervisor.core.credentials import (
     DEFAULT_CREDENTIALS_FILE,
     ClientCredentials,
     IdentityCredentials,

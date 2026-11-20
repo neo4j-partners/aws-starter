@@ -1,6 +1,6 @@
 """EventMapper turns Strands stream events into client SSE events."""
 
-from core.events import EventMapper
+from fleet_supervisor.core.events import EventMapper
 
 
 def tool_use(tool_id: str, name: str) -> dict:

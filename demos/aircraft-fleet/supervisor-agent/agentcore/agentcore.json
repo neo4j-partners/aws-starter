@@ -7,7 +7,7 @@
       "name": "supervisor",
       "description": "Aircraft fleet supervisor with Maintenance and Operations specialists",
       "build": "CodeZip",
-      "entrypoint": "server/runtime_app.py",
+      "entrypoint": "main.py",
       "codeLocation": ".",
       "runtimeVersion": "PYTHON_3_12",
       "envVars": [

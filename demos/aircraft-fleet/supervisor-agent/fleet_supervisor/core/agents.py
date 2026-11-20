@@ -20,7 +20,7 @@ from strands.session import SessionManager
 from strands.types.events import ToolResultEvent
 from strands.types.tools import AgentTool, ToolGenerator, ToolSpec, ToolUse
 
-from core.prompts import (
+from fleet_supervisor.core.prompts import (
     MAINTENANCE_SYSTEM_PROMPT,
     OPERATIONS_SYSTEM_PROMPT,
     SUPERVISOR_SYSTEM_PROMPT,

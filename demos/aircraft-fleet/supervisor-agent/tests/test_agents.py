@@ -8,7 +8,7 @@ from strands import Agent, tool
 from strands.models import Model
 from strands.types.events import ToolResultEvent
 
-from core.agents import (
+from fleet_supervisor.core.agents import (
     MAINTENANCE_TOOL,
     OPERATIONS_TOOL,
     SPECIALIST_ERROR,
@@ -16,7 +16,7 @@ from core.agents import (
     SpecialistTool,
     build_supervisor,
 )
-from core.model import build_model
+from fleet_supervisor.core.model import build_model
 
 
 @tool

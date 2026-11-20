@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from generator.main import generate
-from generator.specs import ENGINE_SPECS
+from generator.specs import ENGINE_SPECS, SENSOR_FAULT_MAP
 
 AIRCRAFT, DAYS, SEED = 20, 30, 42
 
@@ -29,15 +29,23 @@ def dataset(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return _generate(tmp_path_factory.mktemp("run_a"))
 
 
-def test_every_event_has_a_reading_at_or_above_warning(dataset: Path) -> None:
-    model = {r[":ID(Aircraft)"]: r["model"] for r in _rows(dataset / "nodes_aircraft.csv")}
-    sensor_type = {r[":ID(Sensor)"]: r["type"] for r in _rows(dataset / "nodes_sensors.csv")}
-    events = _rows(dataset / "nodes_maintenance.csv")
-    assert events, "expected at least one maintenance event"
+@pytest.fixture(scope="module")
+def large_dataset(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """30 aircraft over 90 days: about 240 events, enough to cover every fault."""
+    output = tmp_path_factory.mktemp("large")
+    generate(aircraft=30, airports=40, days=90, seed=SEED, output=output)
+    return output
+
+
+def test_event_fault_matches_the_crossing_sensor(large_dataset: Path) -> None:
+    model = {r[":ID(Aircraft)"]: r["model"] for r in _rows(large_dataset / "nodes_aircraft.csv")}
+    sensor_type = {r[":ID(Sensor)"]: r["type"] for r in _rows(large_dataset / "nodes_sensors.csv")}
+    events = _rows(large_dataset / "nodes_maintenance.csv")
+    assert len(events) > 100, f"expected a large sample, got {len(events)} events"
 
     wanted = {(e["system_id"], e["reported_at"]) for e in events}
     values: dict[tuple[str, str], dict[str, float]] = {}
-    for r in _rows(dataset / "nodes_readings.csv"):
+    for r in _rows(large_dataset / "nodes_readings.csv"):
         key = (r["sensor_id"].rsplit("-SN", 1)[0], r["ts"])
         if key in wanted:
             values.setdefault(key, {})[sensor_type[r["sensor_id"]]] = float(r["value"])
@@ -45,9 +53,20 @@ def test_every_event_has_a_reading_at_or_above_warning(dataset: Path) -> None:
     for e in events:
         spec = ENGINE_SPECS[model[e["aircraft_id"]]]
         v = values.get((e["system_id"], e["reported_at"]), {})
-        assert (
-            v.get("EGT", 0.0) >= spec.egt_warning or v.get("Vibration", 0.0) >= spec.vib_warning
-        ), f"{e[':ID(MaintenanceEvent)']} has no reading at or above warning"
+        thresholds = {
+            "EGT": (spec.egt_warning, spec.egt_critical),
+            "Vibration": (spec.vib_warning, spec.vib_critical),
+        }
+        # Some sensor crossed warning at this hour, the fault is one that
+        # sensor maps to, and a CRITICAL event's sensor is at or above critical.
+        explained = [
+            sensor
+            for sensor, (warning, critical) in thresholds.items()
+            if v.get(sensor, 0.0) >= warning
+            and (e["fault"], e["severity"]) in SENSOR_FAULT_MAP[sensor]
+            and (e["severity"] != "CRITICAL" or v[sensor] >= critical)
+        ]
+        assert explained, f"{e[':ID(MaintenanceEvent)']} {e['fault']} {e['severity']}: {v}"
 
 
 def test_reading_number_is_hour_offset(dataset: Path) -> None:

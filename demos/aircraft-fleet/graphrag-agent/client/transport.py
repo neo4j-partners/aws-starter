@@ -16,6 +16,7 @@ stream, so a single parser handles them:
 
 from __future__ import annotations
 
+import codecs
 import json
 import logging
 import subprocess
@@ -142,11 +143,15 @@ def _consume_sse(
     content_parts: list[str] = []
     errors: list[str] = []
     buffer = ""
+    # A multibyte character can straddle two chunks. The incremental decoder
+    # holds the partial bytes until the rest of the character arrives.
+    decoder = codecs.getincrementaldecoder("utf-8")()
     for raw in chunks:
-        buffer += raw.decode("utf-8")
+        buffer += decoder.decode(raw)
         while "\n\n" in buffer:
             event, buffer = buffer.split("\n\n", 1)
             _handle_sse_event(event, content_parts, errors, stream)
+    buffer += decoder.decode(b"", final=True)
     if buffer.strip():
         _handle_sse_event(buffer, content_parts, errors, stream)
     if stream:

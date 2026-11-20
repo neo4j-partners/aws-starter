@@ -36,11 +36,6 @@ def test_event_split_across_byte_chunks() -> None:
     assert content == ["split", " ok"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=UnicodeDecodeError,
-    reason="Known bug, fix pending review: each byte chunk is decoded alone.",
-)
 def test_multibyte_utf8_split_across_byte_chunks() -> None:
     # BedrockAgentCoreApp serializes with ensure_ascii=False, so non-ASCII
     # text reaches the client as raw UTF-8 that can straddle two chunks.

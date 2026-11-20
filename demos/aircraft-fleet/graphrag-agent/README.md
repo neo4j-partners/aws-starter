@@ -139,7 +139,7 @@ Deployment uses the AgentCore CLI. Install it with
 `npm install -g @aws/agentcore`. The project lives in `agentcore/`, and
 `agentcore/agentcore.json` declares the `graphrag_agent` Runtime.
 
-`./agent.sh deploy` reads the deploy settings from the shared `../.env`. A value already set in the shell wins. `agentcore/cdk/lib/cdk-stack.ts` copies them into the Runtime environment, and synth stops with a list of any that are missing:
+`./agent.sh deploy` reads the deploy settings from the shared `../.env`. A value exported in the shell wins. `agentcore/cdk/lib/cdk-stack.ts` copies them into the Runtime environment, and synth stops with a list of any that are missing:
 
 - **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE` for the fleet graph.
 - **Memory connection:** Set `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, and `MEM_NEO4J_DATABASE` for the agent memory database.
@@ -153,7 +153,7 @@ Deployment uses the AgentCore CLI. Install it with
 ```
 
 - **Deploy type:** The Runtime uses a `CodeZip` build. `agentcore deploy` zips this directory, uploads it, and runs it on a managed Python 3.12 arm64 runtime. It builds no Docker image.
-- **Packaged files:** The zip holds every file here except `agentcore/`, `.venv`, `.git`, and caches. `./agent.sh deploy` refuses to run while a `.env*` or `.mcp-credentials*.json` file is present, because the zip would include it. Local runs read the shared `../.env` instead.
+- **Packaged files:** The zip holds every file here except `agentcore/`, `.venv`, `.git`, `node_modules`, `__pycache__`, and `.pytest_cache`. It includes `.ruff_cache`. `./agent.sh deploy` refuses to run while a `.env*` or `.mcp-credentials*.json` file is present, because the zip would include it. Local runs read the shared `../.env` instead.
 - **Deployment target:** The first deploy creates the `default` target in `agentcore/aws-targets.json` from your current AWS account and region. That file and `agentcore/.cli/` hold account-specific values, so git ignores them.
 - **Fresh clone:** The deployed state lives in those ignored files. A fresh clone, or a different machine, has no record of an earlier deploy, so `./agent.sh status` reports the Runtime as not deployed even when it is running in your account.
 
@@ -174,7 +174,7 @@ connection differs:
 - **`uv run fleet-demo --remote`:** This command runs all four demo sections against the deployed agent.
 - **`uv run fleet-invoke "..."`:** This command sends one prompt and streams the answer as it arrives.
 - **`uv run fleet-invoke load-test [seconds]`:** This command sends a random query from `queries.txt` on an interval. The default interval is 5 seconds.
-- **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. When it finishes, it checks `agentcore status` and lists anything still deployed.
+- **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. It does not read `../.env`. When it finishes, it checks `agentcore status` and lists anything still deployed.
 
 ## Conversation memory
 
@@ -199,7 +199,7 @@ through its Strands `Neo4jSessionManager`.
 | `fleet_graphrag/agent/` | The agent core. `config.py` holds the model ID, region, embedder, index, and system prompt. `retrieval.py` holds the Neo4j driver and the `graph_query`, `vector_search`, and `get_graph_schema` functions. `tools.py` holds the Strands tool wrappers. `memory.py` builds the memory settings and the per-request session manager. `secrets.py` reads the passwords. |
 | `fleet_graphrag/client/` | The clients behind `fleet-cli`, `fleet-demo`, and `fleet-invoke`. `transport.py` is the only network layer. It covers local HTTP on port 7070 and the deployed agent through boto3. `cli.py` is the terminal client, `demo.py` is the showcase, and `invoke.py` is the deployed single call and load test. |
 | `agent.sh` | The wrapper for local `start`, `stop`, and `test`, and for `deploy`, `status`, `invoke-cloud`, `logs`, and `destroy` |
-| `agentcore/` | The AgentCore CLI project. `agentcore.json` declares the Runtime and its env vars. `cdk/` is the CDK app the CLI deploys. |
+| `agentcore/` | The AgentCore CLI project. `agentcore.json` declares the Runtime. `cdk/` is the CDK app the CLI deploys. Its `lib/cdk-stack.ts` adds the Neo4j env vars and the secret grant. |
 | `queries.txt` | Sample queries for discovery, fleet, maintenance, and delays |
 
 ## Commands

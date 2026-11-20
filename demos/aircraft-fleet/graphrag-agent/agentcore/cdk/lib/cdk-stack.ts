@@ -26,11 +26,17 @@ const PLAIN_VARS = [
  */
 const SECRET_ARN_VARS = ['NEO4J_PASSWORD_SECRET_ARN', 'MEM_NEO4J_PASSWORD_SECRET_ARN'] as const;
 
-/** Connection URIs the Runtime dials. A Runtime cannot reach localhost, and the cloud path must use TLS. */
+/** Connection URIs the Runtime dials. The cloud path must use TLS. */
 const URI_VARS = ['NEO4J_URI', 'MEM_NEO4J_URI'] as const;
-const TLS_NEO4J_URI = /^(neo4j|bolt)\+s:\/\/[^/\s]+/;
+/** The whole value must be scheme://host with an optional port, and nothing after it. */
+const TLS_NEO4J_URI = /^(neo4j|bolt)\+s:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/;
 
-/** A complete secret ARN ends in the six-character suffix Secrets Manager adds. */
+/**
+ * A complete secret ARN ends in the six-character suffix Secrets Manager adds. This check
+ * catches a name-only ARN, but not a partial ARN whose name happens to end in a dash and six
+ * characters, such as `aircraft-fleet/neo4j-abc123`. Such an ARN passes synth, and the
+ * Runtime then fails at startup when it reads the secret.
+ */
 const COMPLETE_SECRET_ARN = /^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:\d{12}:secret:.+-[A-Za-z0-9]{6}$/;
 
 /**
@@ -51,7 +57,7 @@ function readDeployEnv(): Record<string, string> {
   }
   for (const name of URI_VARS) {
     if (values[name] && !TLS_NEO4J_URI.test(values[name])) {
-      problems.push(`${name} must use the neo4j+s:// or bolt+s:// scheme`);
+      problems.push(`${name} must be neo4j+s://host or bolt+s://host, with an optional :port`);
     }
   }
   for (const name of SECRET_ARN_VARS) {
@@ -80,8 +86,13 @@ export class AgentCoreStack extends Stack {
     super(scope, id, props);
     this.application = new AgentCoreApplication(this, 'Application', props.application);
 
+    // `agent.sh destroy` removes the Runtime from the spec and deploys the empty project.
+    // With no Runtime there is nothing to configure, so synth needs no deploy settings.
+    const runtime = this.application.runtimes.get(RUNTIME_NAME);
+    if (!runtime) {
+      return;
+    }
     const env = readDeployEnv();
-    const runtime = this.application.runtime(RUNTIME_NAME);
     for (const [name, value] of Object.entries(env)) {
       runtime.addEnvironmentVariable(name, value);
     }

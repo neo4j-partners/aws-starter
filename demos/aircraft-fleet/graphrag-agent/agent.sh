@@ -99,7 +99,8 @@ ensure_cli() {
 }
 
 # The CodeZip build ships every file under this directory except agentcore/,
-# .venv, .git, node_modules, and Python caches. Refuse to deploy while a
+# .venv, .git, node_modules, __pycache__, and .pytest_cache. It ships
+# .ruff_cache, so the scan covers it. Refuse to deploy while a
 # secrets file is present anywhere it would be packaged. -L follows symlinks,
 # so a link to a secrets file is caught too. A find error stops the deploy
 # instead of passing the check.
@@ -107,7 +108,7 @@ refuse_secret_files() {
     local found
     if ! found=$(find -L . \
         \( -path ./agentcore -o -name .venv -o -name .git -o -name node_modules \
-           -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -prune \
+           -o -name __pycache__ -o -name .pytest_cache \) -prune \
         -o \( -name '.env*' -o -name '.mcp-credentials*.json' \) -print); then
         echo -e "${RED}ERROR: could not scan $(pwd) for secrets files${NC}"
         echo "Fix the find error above, then deploy again."
@@ -138,18 +139,30 @@ confirm_destroy() {
     esac
 }
 
+# Put the project spec back after destroy. A failure returns 1, so destroy
+# stops before it reports status from the wrong spec.
 restore_spec() {
-    cp "$SPEC_BACKUP" "$PROJECT_SPEC" && rm -f "$SPEC_BACKUP" || echo "Restore failed; backup at $SPEC_BACKUP" >&2
+    if ! cp "$SPEC_BACKUP" "$PROJECT_SPEC"; then
+        echo -e "${RED}Could not restore $PROJECT_SPEC. The backup is at $SPEC_BACKUP${NC}" >&2
+        return 1
+    fi
+    rm -f "$SPEC_BACKUP"
 }
 
 # Report every resource that `agentcore status` still shows as deployed.
 report_remaining() {
-    local status remaining
-    if ! status=$(agentcore status --json --target "$TARGET" 2>&1); then
+    local status remaining status_err
+    # stderr goes to its own file, so a CLI banner or warning cannot break
+    # the JSON. It is printed only when the call fails.
+    status_err=$(mktemp)
+    if ! status=$(agentcore status --json --target "$TARGET" 2>"$status_err"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
+        cat "$status_err"
         echo "$status"
+        rm -f "$status_err"
         exit 1
     fi
+    rm -f "$status_err"
     if ! remaining=$(printf '%s' "$status" | uv run --quiet python -c '
 import json
 import sys
@@ -189,7 +202,7 @@ DEPLOY_VARS=(
 SHARED_ENV="$ROOT_DIR/../.env"
 
 # Export DEPLOY_VARS from the shared .env, which sits outside the code zip.
-# A value already set in the shell wins. The file is parsed, not sourced, and
+# A value exported in the shell wins over the file. The file is parsed, not sourced, and
 # only these names are exported, so passwords in it stay out of the CDK
 # process.
 load_deploy_env() {
@@ -292,8 +305,8 @@ case "${1:-help}" in
         # from the spec, deploy, and put the spec back.
         echo -e "${YELLOW}Removing agent from AgentCore Runtime...${NC}"
         echo ""
-        # The deploy below synthesizes the stack, which needs the same settings.
-        load_deploy_env
+        # With the Runtime removed, synth skips the Neo4j settings, so destroy
+        # does not need ../.env.
         SPEC_BACKUP=$(mktemp)
         cp "$PROJECT_SPEC" "$SPEC_BACKUP"
         trap restore_spec EXIT
@@ -301,7 +314,7 @@ case "${1:-help}" in
         agentcore deploy --target "$TARGET" --yes
         # Status lists only what the spec declares, so restore it first.
         trap - EXIT
-        restore_spec
+        restore_spec || exit 1
         echo ""
         report_remaining
         ;;

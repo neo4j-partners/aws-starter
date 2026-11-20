@@ -259,11 +259,16 @@ def _create_extraction_llm(
             api_key=openai_api_key,
         )
     if provider == "anthropic":
-        from neo4j_graphrag.llm.anthropic_llm import AnthropicLLM
+        # Untested against the live Anthropic API; see anthropic_effort.py.
+        from .anthropic_effort import EffortAnthropicLLM
 
-        return AnthropicLLM(
+        return EffortAnthropicLLM(
             model_name=llm_model,
-            model_params={"max_tokens": llm_max_tokens},
+            model_params={
+                "max_tokens": llm_max_tokens,
+                "thinking": _BEDROCK_EXTRACTION_THINKING["thinking"],
+            },
+            effort=_BEDROCK_EXTRACTION_THINKING["output_config"]["effort"],
             api_key=anthropic_api_key,
         )
     raise ValueError(f"Unknown LLM provider: {provider!r}")

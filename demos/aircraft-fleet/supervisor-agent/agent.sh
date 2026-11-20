@@ -6,7 +6,7 @@
 # - Operations Agent: flights, delays, routes, airports
 #
 # Usage:
-#   ./agent.sh start              Start supervisor locally (port 8080)
+#   ./agent.sh start              Start supervisor locally (port 7071)
 #   ./agent.sh test               Test local supervisor
 #   ./agent.sh configure          Configure for AWS deployment
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
@@ -27,6 +27,8 @@ AGENT_NAME="aircraft_fleet_supervisor_agent"
 # (also supported in us-west-2). Set AWS_REGION to override. `configure`
 # pins it into .bedrock_agentcore.yaml, which `deploy`/`status` then read.
 REGION="${AWS_REGION:-us-east-1}"
+# Local server port. graphrag-agent uses 7070; AgentCore Runtime uses 8080.
+LOCAL_PORT="${AGENT_PORT:-7071}"
 cd "$ROOT_DIR"
 
 # Colors for output
@@ -42,7 +44,7 @@ print_usage() {
     echo "Routes queries to Maintenance and Operations specialist agents."
     echo ""
     echo "Usage:"
-    echo "  ./agent.sh start              Start supervisor locally (port 8080)"
+    echo "  ./agent.sh start              Start supervisor locally (port 7071)"
     echo "  ./agent.sh stop               Stop local supervisor"
     echo "  ./agent.sh test               Test local supervisor"
     echo "  ./agent.sh test-maintenance   Test with maintenance query"
@@ -86,14 +88,14 @@ case "${1:-help}" in
     start)
         ensure_deps
         ensure_credentials
-        echo -e "${GREEN}Starting Aircraft Fleet Supervisor Agent on port 8080...${NC}"
+        echo -e "${GREEN}Starting Aircraft Fleet Supervisor Agent on port ${LOCAL_PORT}...${NC}"
         echo -e "${BLUE}Agents: Maintenance (faults/components) + Operations (flights/delays)${NC}"
         echo ""
         echo "Test with:"
         echo "  ./agent.sh test-maintenance   # Routes to Maintenance Agent"
         echo "  ./agent.sh test-operations    # Routes to Operations Agent"
         echo ""
-        uv run fleet-supervisor-server
+        AGENT_PORT="$LOCAL_PORT" uv run fleet-supervisor-server
         ;;
 
     stop)
@@ -103,29 +105,24 @@ case "${1:-help}" in
         ;;
 
     test)
-        echo -e "${GREEN}Testing supervisor with general query...${NC}"
+        ensure_deps
+        echo -e "${GREEN}Testing supervisor with a general query...${NC}"
         echo ""
-        curl -s -X POST http://localhost:8080/invocations \
-            -H "Content-Type: application/json" \
-            -d '{"prompt": "What is the database schema?"}' | python -m json.tool
+        AGENT_PORT="$LOCAL_PORT" uv run fleet-supervisor-cli "${2:-What is the database schema?}"
         ;;
 
     test-maintenance)
+        ensure_deps
         echo -e "${GREEN}Testing Maintenance Agent routing...${NC}"
-        echo -e "${BLUE}Query: What are the most common maintenance faults?${NC}"
         echo ""
-        curl -s -X POST http://localhost:8080/invocations \
-            -H "Content-Type: application/json" \
-            -d '{"prompt": "What are the most common maintenance faults?"}' | python -m json.tool
+        AGENT_PORT="$LOCAL_PORT" uv run fleet-supervisor-cli "What are the most common maintenance faults?"
         ;;
 
     test-operations)
+        ensure_deps
         echo -e "${GREEN}Testing Operations Agent routing...${NC}"
-        echo -e "${BLUE}Query: What are the most common delay causes?${NC}"
         echo ""
-        curl -s -X POST http://localhost:8080/invocations \
-            -H "Content-Type: application/json" \
-            -d '{"prompt": "What are the most common delay causes?"}' | python -m json.tool
+        AGENT_PORT="$LOCAL_PORT" uv run fleet-supervisor-cli "What are the most common delay causes?"
         ;;
 
     configure)

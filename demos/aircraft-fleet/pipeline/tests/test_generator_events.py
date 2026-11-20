@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,19 @@ def test_every_event_has_a_reading_at_or_above_warning(dataset: Path) -> None:
         assert (
             v.get("EGT", 0.0) >= spec.egt_warning or v.get("Vibration", 0.0) >= spec.vib_warning
         ), f"{e[':ID(MaintenanceEvent)']} has no reading at or above warning"
+
+
+def test_reading_number_is_hour_offset(dataset: Path) -> None:
+    readings = _rows(dataset / "nodes_readings.csv")
+    start = {}
+    for r in readings:
+        start.setdefault(r["sensor_id"], datetime.fromisoformat(r["ts"]))
+    for r in readings:
+        sensor_id, number = r["reading_id"].rsplit("-R", 1)
+        assert sensor_id == r["sensor_id"]
+        hours = (datetime.fromisoformat(r["ts"]) - start[sensor_id]).total_seconds() / 3600
+        assert int(number) == hours, r["reading_id"]
+    assert readings[0]["reading_id"].endswith("-R00000")
 
 
 def test_same_seed_gives_identical_output(dataset: Path, tmp_path: Path) -> None:

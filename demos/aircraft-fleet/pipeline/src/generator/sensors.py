@@ -111,7 +111,8 @@ def generate_engine_readings(
     rows: list[dict] = []
     for sensor in system.sensors:
         values = sensor_series[sensor.sensor_id]
-        for h, (ts, val) in enumerate(zip(timestamps, values, strict=True), start=1):
+        # The reading number is the hour offset from the first timestamp.
+        for h, (ts, val) in enumerate(zip(timestamps, values, strict=True)):
             rows.append(
                 {
                     "reading_id": f"{sensor.sensor_id}-R{h:05d}",

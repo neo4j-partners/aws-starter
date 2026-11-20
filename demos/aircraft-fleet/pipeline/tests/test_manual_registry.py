@@ -23,7 +23,8 @@ from populate_aircraft_db.pipeline import DOCUMENTS
 MANUALS_DIR = Path(__file__).resolve().parent.parent / "manuals"
 FLEET_LINE = re.compile(r"^\*\*Fleet:\*\*\s*(.+)$", re.MULTILINE)
 EXAMPLE_AIRCRAFT = re.compile(r"Aircraft: (AC\d+) \((N\w+)\)")
-TABLE_AIRCRAFT = re.compile(r"^\| (AC\d+) \| (N\w+) \|", re.MULTILINE)
+# A fleet table row: aircraft ID, tail, and an ICAO 24 address if listed.
+TABLE_AIRCRAFT = re.compile(r"^\| (AC\d+) \| (N\w+) \|(?: ([0-9a-f]{6}) \|)?", re.MULTILINE)
 OPERATOR_LINE = re.compile(r"^\*\*Operator:\*\*\s*(.+)$", re.MULTILINE)
 _OPERATOR_NAMES = "|".join(op.name for op in OPERATORS)
 SERVICE_RANGE = re.compile(r"entered service between (\d{4}) and (\d{4})")
@@ -76,9 +77,14 @@ def test_manual_example_aircraft_matches_fleet(doc) -> None:
     examples = EXAMPLE_AIRCRAFT.findall(text)
     assert examples, f"{doc.filename} has no example aircraft ID"
     fleet = {ac.aircraft_id: ac for ac in generate_fleet(GeneratorConfig(n_aircraft=30))}
-    for aircraft_id, tail in examples + TABLE_AIRCRAFT.findall(text):
+    for aircraft_id, tail in examples:
         aircraft = fleet[aircraft_id]
         assert (aircraft.tail_number, aircraft.model) == (tail, doc.aircraft_type)
+    for aircraft_id, tail, icao in TABLE_AIRCRAFT.findall(text):
+        aircraft = fleet[aircraft_id]
+        assert (aircraft.tail_number, aircraft.model) == (tail, doc.aircraft_type)
+        if icao:
+            assert aircraft.icao24 == icao, aircraft_id
 
 
 def _manual_tail_operators(text: str, model: str) -> dict[str, str]:

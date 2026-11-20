@@ -22,12 +22,14 @@ from .specs import (
     OperatorProfile,
 )
 
-# ICAO 24-bit address characters
-_ICAO_CHARS = "0123456789abcdef"
 
+def icao24(tail_number: str) -> str:
+    """Return a 24-bit address as six hex digits, from SHA-256 of the tail.
 
-def _icao24(rng: random.Random) -> str:
-    return "".join(rng.choices(_ICAO_CHARS, k=6))
+    The address does not depend on the RNG, the seed, or the fleet size, so
+    the A220 manual can list it.
+    """
+    return hashlib.sha256(tail_number.encode()).hexdigest()[:6]
 
 
 def entry_into_service(model: str, tail_number: str) -> date:
@@ -177,7 +179,7 @@ def _build_system(
 
 
 def _build_aircraft(
-    index: int, model: str, tail_number: str, operator: OperatorProfile, rng: random.Random
+    index: int, model: str, tail_number: str, operator: OperatorProfile
 ) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
     engine_names = _ENGINE_NAMES[model]
@@ -185,7 +187,7 @@ def _build_aircraft(
     aircraft = AircraftNode(
         aircraft_id=aircraft_id,
         tail_number=tail_number,
-        icao24=_icao24(rng),
+        icao24=icao24(tail_number),
         model=model,
         manufacturer=MANUFACTURER[model],
         operator=operator.name,
@@ -235,6 +237,6 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     ]
 
     return [
-        _build_aircraft(i, model, tail, op, rng)
+        _build_aircraft(i, model, tail, op)
         for i, ((model, tail), op) in enumerate(zip(plan, operator_assignments, strict=True))
     ]

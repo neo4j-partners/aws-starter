@@ -146,6 +146,8 @@ def clients(monkeypatch):
         return client
 
     monkeypatch.setattr(server, "_runtime", None)
+    monkeypatch.setattr(server, "_attempts", 0)
+    monkeypatch.setattr(server, "_last_attempt_failed", False)
     monkeypatch.setattr(server, "build_model", lambda: "model")
     monkeypatch.setattr(server, "gateway_auth", lambda: "gateway")
     monkeypatch.setattr(server, "build_mcp_client", next_client)
@@ -377,6 +379,30 @@ def test_stop_failure_logs_the_class_at_warning_and_details_at_debug(caplog):
         "Error while stopping the MCP client (cause=RuntimeError)"
     ]
     assert any(r.levelno == logging.DEBUG and r.exc_info for r in caplog.records)
+
+
+def test_a_caller_that_waited_through_a_failed_rebuild_skips_its_own(clients):
+    old = FakeClient()
+    broken = FakeClient(fail_start=PermissionError("401"))
+    good = FakeClient(reply="rows")
+    clients.extend([old, broken, good])
+
+    async def scenario():
+        runtime, _ = await start(clients)
+        stale = runtime.connection
+        old.active = False
+        # The waiting caller read the attempt count before the failure.
+        waiting_since = server._attempts
+        with pytest.raises(ToolProviderException):
+            await server.get_runtime(stale)
+        with pytest.raises(server.RecentRebuildFailedError):
+            server._start_runtime(stale, waiting_since)
+        assert clients.built == [old, broken]  # no second connect attempt
+        # A caller that arrives after the failure tries again.
+        return await server.get_runtime()
+
+    runtime = asyncio.run(scenario())
+    assert runtime.connection.client is good
 
 
 def test_tool_missing_after_rebuild_returns_unavailable(clients):

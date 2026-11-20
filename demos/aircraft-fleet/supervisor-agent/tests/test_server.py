@@ -306,6 +306,8 @@ def clients(monkeypatch):
     """Hand out the queued FakeClients in order and stub the model."""
     queue: list[FakeClient] = []
     monkeypatch.setattr(server, "_runtime", None)
+    monkeypatch.setattr(server, "_attempts", 0)
+    monkeypatch.setattr(server, "_last_attempt_failed", False)
     monkeypatch.setattr(server, "build_model", lambda: "model")
     monkeypatch.setattr(server, "gateway_auth", lambda: "gateway")
     monkeypatch.setattr(server, "build_mcp_client", lambda gateway: queue.pop(0))

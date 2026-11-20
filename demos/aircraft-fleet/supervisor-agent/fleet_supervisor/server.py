@@ -96,6 +96,16 @@ class Runtime:
 
 _runtime: Runtime | None = None
 _runtime_lock = threading.Lock()
+# Counts build and rebuild attempts, and records whether the last one
+# failed. Both change only under _runtime_lock. A caller that waited for the
+# lock while another caller's attempt failed skips its own attempt, so a
+# Gateway outage costs one connect attempt, not one per waiting caller.
+_attempts = 0
+_last_attempt_failed = False
+
+
+class RecentRebuildFailedError(RuntimeError):
+    """Another caller's build or rebuild failed while this one waited."""
 
 
 @cache
@@ -151,43 +161,59 @@ async def reconnect(stale: GatewayConnection | None) -> GatewayConnection:
     return connection
 
 
-def _start_runtime(stale: GatewayConnection | None = None) -> Runtime:
+def _start_runtime(
+    stale: GatewayConnection | None = None, seen_attempts: int | None = None
+) -> Runtime:
     """Return a runtime with a live MCP session, building or rebuilding it.
 
     ``stale`` is a connection a caller saw fail. It is rebuilt only if it is
     still the current one, so callers that arrive after a rebuild reuse the
-    new connection instead of rebuilding again.
+    new connection instead of rebuilding again. ``seen_attempts`` is the
+    attempt count the caller read before waiting for the lock. If an attempt
+    since then failed, the caller fails fast instead of trying again. None
+    means the caller did not wait, so it always tries.
     """
-    global _runtime
+    global _runtime, _attempts, _last_attempt_failed
     with _runtime_lock:
         runtime = _runtime
         if _is_usable(runtime, stale):
             return runtime
-        if runtime is None:
-            # Build the model before the client, so a model error leaves
-            # no client thread running.
-            model = build_model()
-            connection = _connect_mcp()
-            tools = [
-                GatewayTool(tool, current_connection, reconnect)
-                for tool in connection.tools.values()
-            ]
-            _runtime = Runtime(model=model, tools=tools, connection=connection)
-            return _runtime
-
-        old = runtime.connection
-        runtime.connection = None
-        if old is not None:
-            logger.warning(
-                "Rebuilding the Gateway MCP client (session=%s)", REQUEST_SESSION_ID.get()
+        if seen_attempts is not None and _attempts != seen_attempts and _last_attempt_failed:
+            raise RecentRebuildFailedError(
+                "Another request's Gateway connect attempt just failed; not retrying yet"
             )
-            old.retire()
-        connection = _connect_mcp()
-        missing = sorted({tool.tool_name for tool in runtime.tools} - connection.tools.keys())
-        if missing:
-            logger.warning("The rebuilt Gateway client lacks tools %s", missing)
-        runtime.connection = connection
+        _attempts += 1
+        _last_attempt_failed = True
+        runtime = _build_or_rebuild(runtime)
+        _last_attempt_failed = False
         return runtime
+
+
+def _build_or_rebuild(runtime: Runtime | None) -> Runtime:
+    """Build the runtime, or rebuild its connection. Hold ``_runtime_lock``."""
+    global _runtime
+    if runtime is None:
+        # Build the model before the client, so a model error leaves
+        # no client thread running.
+        model = build_model()
+        connection = _connect_mcp()
+        tools = [
+            GatewayTool(tool, current_connection, reconnect) for tool in connection.tools.values()
+        ]
+        _runtime = Runtime(model=model, tools=tools, connection=connection)
+        return _runtime
+
+    old = runtime.connection
+    runtime.connection = None
+    if old is not None:
+        logger.warning("Rebuilding the Gateway MCP client (session=%s)", REQUEST_SESSION_ID.get())
+        old.retire()
+    connection = _connect_mcp()
+    missing = sorted({tool.tool_name for tool in runtime.tools} - connection.tools.keys())
+    if missing:
+        logger.warning("The rebuilt Gateway client lacks tools %s", missing)
+    runtime.connection = connection
+    return runtime
 
 
 async def get_runtime(stale: GatewayConnection | None = None) -> Runtime:
@@ -198,7 +224,7 @@ async def get_runtime(stale: GatewayConnection | None = None) -> Runtime:
     runtime = _runtime
     if _is_usable(runtime, stale):
         return runtime
-    return await asyncio.to_thread(_start_runtime, stale)
+    return await asyncio.to_thread(_start_runtime, stale, _attempts)
 
 
 def extract_prompt(payload: Any) -> str | None:

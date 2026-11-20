@@ -33,10 +33,19 @@ def supervisor(monkeypatch):
         ]
     )
 
+    calls: list[str] = []
+
+    class FakeGateway:
+        async def prepare_request(self):
+            calls.append("prepare_request")
+
     async def fake_runtime():
+        calls.append("get_runtime")
         return SimpleNamespace(model=object(), tools=[])
 
+    monkeypatch.setattr(server, "gateway_auth", FakeGateway)
     monkeypatch.setattr(server, "get_runtime", fake_runtime)
+    fake.calls = calls
     monkeypatch.setattr(server, "build_supervisor", lambda model, tools: fake)
     return fake
 
@@ -51,6 +60,22 @@ def test_streams_agent_chunk_and_complete(supervisor):
         {"type": "complete"},
     ]
     assert supervisor.prompts == ["How many flights?"]
+
+
+def test_gateway_token_is_prepared_on_the_request_path(supervisor):
+    collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert supervisor.calls == ["prepare_request", "get_runtime"]
+
+
+def test_gateway_token_failure_sends_generic_error(supervisor, monkeypatch, caplog):
+    class BrokenGateway:
+        async def prepare_request(self):
+            raise RuntimeError("AccessDenied for provider fleet-gateway")
+
+    monkeypatch.setattr(server, "gateway_auth", BrokenGateway)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events == [{"type": "error", "error": server.GENERIC_ERROR}]
+    assert "AccessDenied" in caplog.text
 
 
 @pytest.mark.parametrize("key", ["prompt", "message", "query", "inputText", "input"])
@@ -104,7 +129,7 @@ def test_non_string_user_id_does_not_raise(supervisor):
     assert events[-1] == {"type": "complete"}
 
 
-def test_startup_error_text_stays_in_the_log(monkeypatch, caplog):
+def test_startup_error_text_stays_in_the_log(supervisor, monkeypatch, caplog):
     async def failing_runtime():
         raise RuntimeError("bolt://user:pw@host")
 
@@ -154,8 +179,8 @@ def clients(monkeypatch):
     queue: list[FakeClient] = []
     monkeypatch.setattr(server, "_runtime", None)
     monkeypatch.setattr(server, "build_model", lambda: "model")
-    monkeypatch.setattr(server, "load_credentials", lambda: "creds")
-    monkeypatch.setattr(server, "build_mcp_client", lambda credentials: queue.pop(0))
+    monkeypatch.setattr(server, "gateway_auth", lambda: "gateway")
+    monkeypatch.setattr(server, "build_mcp_client", lambda gateway: queue.pop(0))
     return queue
 
 
@@ -228,3 +253,25 @@ def test_session_check_uses_the_strands_private_method():
     from strands.tools.mcp import MCPClient
 
     assert callable(getattr(MCPClient, "_is_session_active", None))
+
+
+def test_gateway_auth_is_built_once_and_failures_are_retried(monkeypatch):
+    built: list[str] = []
+    results = [ValueError("no credentials file"), "creds"]
+
+    def fake_load_credentials():
+        result = results.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(server, "load_credentials", fake_load_credentials)
+    monkeypatch.setattr(server, "build_gateway_auth", lambda c: built.append(c) or object())
+    server.gateway_auth.cache_clear()
+    try:
+        with pytest.raises(ValueError):
+            server.gateway_auth()
+        assert server.gateway_auth() is server.gateway_auth()
+        assert built == ["creds"]
+    finally:
+        server.gateway_auth.cache_clear()

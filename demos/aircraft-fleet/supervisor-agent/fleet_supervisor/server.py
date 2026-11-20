@@ -25,6 +25,7 @@ import os
 import threading
 import uuid
 from dataclasses import dataclass
+from functools import cache
 from typing import Any
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
@@ -35,7 +36,12 @@ from fleet_supervisor.core.agents import build_supervisor
 from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID
 from fleet_supervisor.core.credentials import load_credentials
 from fleet_supervisor.core.events import EventMapper
-from fleet_supervisor.core.mcp import build_mcp_client, list_all_tools, remember_workload_token
+from fleet_supervisor.core.mcp import (
+    GatewayAuth,
+    build_gateway_auth,
+    build_mcp_client,
+    list_all_tools,
+)
 from fleet_supervisor.core.model import build_model
 
 logging.basicConfig(
@@ -66,6 +72,16 @@ _runtime: Runtime | None = None
 _runtime_lock = threading.Lock()
 
 
+@cache
+def gateway_auth() -> GatewayAuth:
+    """Return the process-wide Gateway auth.
+
+    It outlives MCP client rebuilds, so a reconnect keeps the cached token.
+    A failure is not cached, so the next request tries again.
+    """
+    return build_gateway_auth(load_credentials())
+
+
 def _session_is_running(client: MCPClient) -> bool:
     """Report whether the MCP client's session is still up.
 
@@ -88,7 +104,7 @@ def _connect_mcp() -> tuple[MCPClient, list[Any]]:
     """Start the Gateway client and fetch the filtered tool list."""
     # One filtered client serves both specialists: they need the same
     # two tools, so per-specialist filters would be identical.
-    mcp_client = build_mcp_client(load_credentials())
+    mcp_client = build_mcp_client(gateway_auth())
     try:
         mcp_client.start()
         tools = list_all_tools(mcp_client)
@@ -163,7 +179,10 @@ async def invoke(payload: Any, context):
             user_id = "anonymous"
         logger.info("Request session=%s user=%s prompt=%s", session_id, user_id, prompt[:100])
 
-        remember_workload_token()
+        # The workload access token is valid here, on the request path, so
+        # the Gateway token is fetched here too. See GatewayAuth.
+        gateway = await asyncio.to_thread(gateway_auth)
+        await gateway.prepare_request()
         runtime = await get_runtime()
         supervisor = build_supervisor(runtime.model, runtime.tools)
         mapper = EventMapper()

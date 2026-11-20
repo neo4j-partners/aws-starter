@@ -90,6 +90,13 @@ The agent has two ways to get a Gateway token. The environment picks one.
 - **Local:** The agent reads `demos/aircraft-fleet/.mcp-credentials.json`. The path is resolved from the package, so it works from any working directory. Set `MCP_CREDENTIALS_FILE` to use another file.
 - **Cloud:** When `GATEWAY_CREDENTIAL_PROVIDER` is set, the agent gets an M2M token from that AgentCore Identity credential provider. `GATEWAY_URL` gives the Gateway endpoint. The runtime holds no client secret.
 
+On the cloud path, each request fetches the Gateway token before it starts,
+because AgentCore Identity needs that request's workload access token. The
+token is cached until shortly before the expiry in its `exp` claim. If the
+Gateway rejects a token, the agent asks Identity for a new one, bypassing the
+token vault cache, and retries once. The cache is shared by all requests,
+which is valid only because the token is M2M and not tied to a user.
+
 On the local path, the agent sends the OAuth `client_credentials` request to
 the `token_url` in the credentials file. It does not use OAuth discovery, so
 the client secret only goes to that URL.

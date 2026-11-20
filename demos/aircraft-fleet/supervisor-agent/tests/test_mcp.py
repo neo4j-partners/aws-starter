@@ -1,6 +1,9 @@
 """Gateway client setup, bearer-token auth, and tool listing. No network."""
 
 import asyncio
+import base64
+import json
+import threading
 import time
 from types import SimpleNamespace
 
@@ -11,12 +14,18 @@ from strands.tools.mcp import MCPClient
 import fleet_supervisor.core.mcp as mcp_module
 from fleet_supervisor.core.credentials import ClientCredentials, IdentityCredentials
 from fleet_supervisor.core.mcp import (
+    M2M_AUTH_FLOW,
     SPECIALIST_TOOL_FILTERS,
+    TOKEN_EXPIRY_MARGIN_S,
+    UNREADABLE_EXPIRY_MAX_AGE_S,
     AccessToken,
     BearerTokenAuth,
+    GatewayAuth,
+    IdentityTokens,
+    build_gateway_auth,
     build_mcp_client,
     client_credentials_fetcher,
-    identity_fetcher,
+    jwt_deadline,
     list_all_tools,
 )
 
@@ -41,23 +50,29 @@ def captured(monkeypatch):
 
 
 def test_local_client_uses_bearer_auth(captured):
-    build_mcp_client(LOCAL)
+    gateway = build_gateway_auth(LOCAL)
+    build_mcp_client(gateway)
     (kwargs,) = captured
     assert kwargs["url"] == LOCAL.gateway_url
-    assert isinstance(kwargs["auth_provider"], BearerTokenAuth)
+    assert kwargs["auth_provider"] is gateway.auth
     assert "auth" not in kwargs
     assert kwargs["tool_filters"] is SPECIALIST_TOOL_FILTERS
+    assert gateway.identity is None
 
 
-def test_cloud_client_uses_bearer_auth(captured, monkeypatch):
-    monkeypatch.setattr(mcp_module, "identity_fetcher", lambda credentials: None)
-    build_mcp_client(CLOUD)
-    assert isinstance(captured[0]["auth_provider"], BearerTokenAuth)
+def test_cloud_gateway_auth_uses_identity(monkeypatch):
+    import bedrock_agentcore.services.identity as identity
+
+    monkeypatch.setattr(identity, "IdentityClient", FakeIdentityClient)
+    gateway = build_gateway_auth(CLOUD)
+    assert isinstance(gateway.auth, BearerTokenAuth)
+    assert isinstance(gateway.identity, IdentityTokens)
+    assert gateway.gateway_url == CLOUD.gateway_url
 
 
 def test_custom_filters_override_default(captured):
     custom = {"allowed": ["only_this"]}
-    build_mcp_client(LOCAL, tool_filters=custom)
+    build_mcp_client(build_gateway_auth(LOCAL), tool_filters=custom)
     assert captured[0]["tool_filters"] is custom
 
 
@@ -79,14 +94,16 @@ def test_filter_allows_only_read_and_schema_tools(name, allowed):
 
 
 class TokenSource:
-    """Hands out token-1, token-2, ... and counts fetches."""
+    """Hands out token-1, token-2, ... and records each fetch's force flag."""
 
     def __init__(self, lifetime: float = 3600):
         self.count = 0
         self.lifetime = lifetime
+        self.forced: list[bool] = []
 
-    async def __call__(self) -> AccessToken:
+    async def __call__(self, force: bool) -> AccessToken:
         self.count += 1
+        self.forced.append(force)
         return AccessToken(f"token-{self.count}", time.monotonic() + self.lifetime)
 
 
@@ -121,11 +138,47 @@ def test_expired_token_is_refreshed():
     assert seen == ["Bearer token-1", "Bearer token-2"]
 
 
-def test_401_refreshes_once_and_retries():
+def test_401_forces_one_refresh_and_retries():
     source, seen = TokenSource(), []
     statuses = get_statuses(BearerTokenAuth(source), gateway({"token-2"}, seen), 1)
     assert statuses == [200]
     assert seen == ["Bearer token-1", "Bearer token-2"]
+    assert source.forced == [False, True]
+
+
+def test_auth_works_across_event_loops():
+    # A rebuilt MCP client runs a new loop; the shared auth must keep working.
+    source, seen = TokenSource(lifetime=-1), []
+    auth = BearerTokenAuth(source)
+    transport = gateway({"token-1", "token-2", "token-3"}, seen)
+    assert get_statuses(auth, transport, 1) == [200]
+    assert get_statuses(auth, transport, 1) == [200]
+    assert source.count == 2
+
+
+def test_token_set_on_the_request_path_is_used_without_a_fetch():
+    source, seen = TokenSource(), []
+    auth = BearerTokenAuth(source)
+    assert auth.needs_token()
+    auth.set_token(AccessToken("pushed", time.monotonic() + 600))
+    assert not auth.needs_token()
+    assert get_statuses(auth, gateway({"pushed"}, seen), 2) == [200, 200]
+    assert source.count == 0
+
+
+def test_rejected_pushed_token_is_replaced_by_a_forced_fetch():
+    source, seen = TokenSource(), []
+    auth = BearerTokenAuth(source)
+    auth.set_token(AccessToken("stale", time.monotonic() + 600))
+    assert get_statuses(auth, gateway({"token-1"}, seen), 1) == [200]
+    assert seen == ["Bearer stale", "Bearer token-1"]
+    assert source.forced == [True]
+
+
+def test_expired_pushed_token_needs_a_new_one():
+    auth = BearerTokenAuth(TokenSource())
+    auth.set_token(AccessToken("old", time.monotonic() - 1))
+    assert auth.needs_token()
 
 
 def test_repeated_401_is_returned_not_looped():
@@ -147,7 +200,7 @@ def test_client_credentials_posts_to_token_url_only(monkeypatch):
         "AsyncClient",
         lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw),
     )
-    token = asyncio.run(client_credentials_fetcher(LOCAL)())
+    token = asyncio.run(client_credentials_fetcher(LOCAL)(False))
     assert token.value == "jwt"
     (request,) = requests
     assert str(request.url) == LOCAL.token_url
@@ -158,47 +211,112 @@ def test_client_credentials_posts_to_token_url_only(monkeypatch):
     assert "s3cret" not in body
 
 
+def make_jwt(claims: dict) -> str:
+    def part(data: dict) -> str:
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=").decode()
+
+    return f"{part({'alg': 'RS256'})}.{part(claims)}.signature"
+
+
+def test_jwt_deadline_uses_the_exp_claim_minus_the_margin():
+    token = make_jwt({"exp": time.time() + 3600})
+    expected = time.monotonic() + 3600 - TOKEN_EXPIRY_MARGIN_S
+    assert jwt_deadline(token) == pytest.approx(expected, abs=2)
+
+
+@pytest.mark.parametrize("token", ["not-a-jwt", make_jwt({"sub": "x"}), "a.!!!.c"])
+def test_jwt_deadline_without_a_readable_exp_is_short(token):
+    expected = time.monotonic() + UNREADABLE_EXPIRY_MAX_AGE_S
+    assert jwt_deadline(token) == pytest.approx(expected, abs=2)
+
+
 class FakeIdentityClient:
     calls: list[dict] = []
+    threads: list[str] = []
 
     def __init__(self, region: str):
         pass
 
     async def get_token(self, **kwargs):
         FakeIdentityClient.calls.append(kwargs)
-        return "m2m-token"
+        FakeIdentityClient.threads.append(threading.current_thread().name)
+        return make_jwt({"exp": time.time() + 3600})
 
 
-def test_identity_fetcher_uses_latest_workload_token(monkeypatch):
-    import bedrock_agentcore.services.identity as identity
+@pytest.fixture
+def identity(monkeypatch):
+    import bedrock_agentcore.services.identity as identity_module
 
-    monkeypatch.setattr(identity, "IdentityClient", FakeIdentityClient)
-    FakeIdentityClient.calls = []
-    fetch = identity_fetcher(CLOUD)
+    monkeypatch.setattr(identity_module, "IdentityClient", FakeIdentityClient)
+    FakeIdentityClient.calls, FakeIdentityClient.threads = [], []
+    return IdentityTokens(CLOUD)
 
-    monkeypatch.setattr(mcp_module, "_workload_token", None)
+
+@pytest.fixture
+def workload_token(monkeypatch):
+    """Set what the runtime context reports as the request's workload token."""
+    from bedrock_agentcore.runtime import BedrockAgentCoreContext
+
+    current = {"token": None}
+    monkeypatch.setattr(
+        BedrockAgentCoreContext, "get_workload_access_token", lambda: current["token"]
+    )
+    return current
+
+
+def test_identity_fetch_needs_a_workload_token(identity, workload_token):
+    identity.remember_workload_token()
     with pytest.raises(RuntimeError, match="workload access token"):
-        asyncio.run(fetch())
+        asyncio.run(identity.fetch(False))
+    assert FakeIdentityClient.calls == []
 
-    monkeypatch.setattr(mcp_module, "_workload_token", "wat-1")
-    assert asyncio.run(fetch()).value == "m2m-token"
+
+def test_identity_fetch_passes_m2m_scopes_and_force(identity, workload_token):
+    workload_token["token"] = "wat-1"
+    identity.remember_workload_token()
+    token = asyncio.run(identity.fetch(True))
     (call,) = FakeIdentityClient.calls
     assert call["provider_name"] == "fleet-gateway"
     assert call["agent_identity_token"] == "wat-1"
-    assert call["auth_flow"] == "M2M"
+    assert call["auth_flow"] == M2M_AUTH_FLOW == "M2M"
     assert call["scopes"] == ["fleet/read"]
+    assert call["force_authentication"] is True
+    assert token.expires_at > time.monotonic() + 3000
+    # The blocking boto3 call runs in a worker thread, not on the caller's loop.
+    assert FakeIdentityClient.threads != [threading.current_thread().name]
 
 
-def test_remember_workload_token_copies_context(monkeypatch):
-    from bedrock_agentcore.runtime import BedrockAgentCoreContext
+def test_missing_workload_token_clears_the_previous_one(identity, workload_token, caplog):
+    workload_token["token"] = "wat-1"
+    assert identity.remember_workload_token() == "wat-1"
+    workload_token["token"] = None
+    assert identity.remember_workload_token() is None
+    assert "no workload access token" in caplog.text
+    with pytest.raises(RuntimeError, match="workload access token"):
+        asyncio.run(identity.fetch(False))
 
-    monkeypatch.setattr(mcp_module, "_workload_token", None)
-    monkeypatch.setattr(BedrockAgentCoreContext, "get_workload_access_token", lambda: None)
-    mcp_module.remember_workload_token()
-    assert mcp_module._workload_token is None
-    monkeypatch.setattr(BedrockAgentCoreContext, "get_workload_access_token", lambda: "wat-9")
-    mcp_module.remember_workload_token()
-    assert mcp_module._workload_token == "wat-9"
+
+def test_prepare_request_fetches_only_when_needed(identity, workload_token):
+    gateway = GatewayAuth(CLOUD.gateway_url, BearerTokenAuth(identity.fetch), identity)
+    workload_token["token"] = "wat-1"
+    asyncio.run(gateway.prepare_request())
+    asyncio.run(gateway.prepare_request())
+    assert len(FakeIdentityClient.calls) == 1
+    assert FakeIdentityClient.calls[0]["force_authentication"] is False
+    assert not gateway.auth.needs_token()
+
+
+def test_prepare_request_without_a_workload_token_skips_the_fetch(identity, workload_token):
+    gateway = GatewayAuth(CLOUD.gateway_url, BearerTokenAuth(identity.fetch), identity)
+    asyncio.run(gateway.prepare_request())
+    assert FakeIdentityClient.calls == []
+    assert gateway.auth.needs_token()
+
+
+def test_prepare_request_does_nothing_on_the_local_path():
+    gateway = build_gateway_auth(LOCAL)
+    asyncio.run(gateway.prepare_request())
+    assert gateway.auth.needs_token()
 
 
 class Page(list):

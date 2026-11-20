@@ -94,18 +94,30 @@ class ContextPrependingSplitter(TextSplitter):
     splitter, then prepending a short context header to *every* resulting
     chunk so the LLM always has access to the document-level aircraft type.
 
-    Set :attr:`context` before each call to ``pipeline.run_async()``.
+    It also sets ``chunkId`` to ``"{document_id}:{index}"`` in each chunk's
+    metadata. The lexical graph builder copies chunk metadata onto the
+    ``Chunk`` node, so every chunk gets a stable id for its uniqueness
+    constraint.
+
+    Set :attr:`context` and :attr:`document_id` before each call to
+    ``pipeline.run_async()``.
     """
 
-    def __init__(self, inner: TextSplitter, context: str = "") -> None:
+    def __init__(self, inner: TextSplitter, context: str = "", document_id: str = "") -> None:
         self.inner = inner
         self.context = context
+        self.document_id = document_id
 
     async def run(self, text: str) -> TextChunks:
         result = await self.inner.run(text)
-        if self.context:
-            for chunk in result.chunks:
+        for chunk in result.chunks:
+            if self.context:
                 chunk.text = self.context + chunk.text
+            if self.document_id:
+                chunk.metadata = {
+                    **(chunk.metadata or {}),
+                    "chunkId": f"{self.document_id}:{chunk.index}",
+                }
         return result
 
 
@@ -502,6 +514,7 @@ def process_all_documents(
             splitter.context = (
                 f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}\n\n"
             )
+            splitter.document_id = meta.document_id
 
             await pipeline.run_async(
                 text=text,

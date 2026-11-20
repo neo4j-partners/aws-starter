@@ -17,6 +17,7 @@ CONSTRAINTS: list[tuple[str, str]] = [
     ("MaintenanceEvent", "event_id"),
     ("Removal", "removal_id"),
     ("Document", "documentId"),
+    ("Chunk", "chunkId"),
 ]
 
 # (label, property) pairs — property indexes for common lookups.

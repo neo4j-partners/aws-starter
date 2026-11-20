@@ -388,6 +388,7 @@ _MAX_RETRIES = 2
 
 def _run_text2cypher(
     driver: Driver,
+    database: str,
     chat_fn,
     question: str,
 ) -> None:
@@ -410,7 +411,7 @@ def _run_text2cypher(
     _cypher_block(cypher)
 
     try:
-        records, _, _ = driver.execute_query(cypher)
+        records, _, _ = driver.execute_query(cypher, database_=database)
         rows = [dict(r) for r in records]
         _result_table(rows)
     except Exception as exc:
@@ -419,6 +420,7 @@ def _run_text2cypher(
 
 def _run_similarity_search(
     driver: Driver,
+    database: str,
     chat_fn,
     embed_fn,
     question: str,
@@ -456,6 +458,7 @@ LIMIT $top_k"""
             query,
             embedding=embedding,
             top_k=top_k,
+            database_=database,
         )
         rows = [dict(r) for r in records]
         if rows:
@@ -474,6 +477,7 @@ LIMIT $top_k"""
 
 def run_agent_samples(
     driver: Driver,
+    database: str,
     *,
     provider: str,
     openai_key: str | None = None,
@@ -512,9 +516,9 @@ def run_agent_samples(
             _header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
 
         if sq.tool == "text2cypher":
-            _run_text2cypher(driver, chat_fn, sq.question)
+            _run_text2cypher(driver, database, chat_fn, sq.question)
         elif sq.tool == "similarity_search":
-            _run_similarity_search(driver, chat_fn, embed_fn, sq.question)
+            _run_similarity_search(driver, database, chat_fn, embed_fn, sq.question)
 
     print(f"{'#' * _W}")
     print("  Agent simulation complete.")

@@ -431,6 +431,7 @@ def agent_samples_cmd() -> None:
     with _connect(settings) as driver:
         run_agent_samples(
             driver,
+            settings.neo4j_database,
             provider=creds.provider,
             openai_key=creds.openai_key,
             anthropic_key=creds.anthropic_key,

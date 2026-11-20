@@ -428,6 +428,9 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
 # removes every relationship on each node, so a larger batch can exceed the
 # transaction memory limit on small Aura tiers.
 _DELETE_BATCH_SIZE = 1000
+# Relationships deleted per inner transaction. Each row is one relationship,
+# so the transaction size stays bounded however dense the nodes are.
+_RELATIONSHIP_DELETE_BATCH_SIZE = 10_000
 
 
 def detach_delete_nodes(driver: Driver, database: str, label: str | None = None) -> int:
@@ -450,11 +453,32 @@ def detach_delete_nodes(driver: Driver, database: str, label: str | None = None)
     return summary.counters.nodes_deleted
 
 
+def delete_all_relationships(driver: Driver, database: str) -> int:
+    """Delete every relationship in batches and return how many were deleted.
+
+    Like ``detach_delete_nodes``, this needs an auto-commit transaction.
+    """
+    query = (
+        "MATCH ()-[r]->() "
+        "CALL (r) { DELETE r } "
+        f"IN TRANSACTIONS OF {_RELATIONSHIP_DELETE_BATCH_SIZE} ROWS"
+    )
+    with driver.session(database=database) as session:
+        summary = session.run(query).consume()
+    return summary.counters.relationships_deleted
+
+
 def clear_database(driver: Driver, database: str) -> None:
-    """Delete all nodes and relationships in batches."""
+    """Delete all relationships, then all nodes, in batches.
+
+    Deleting relationships first bounds each transaction. A detach-delete
+    batch of dense nodes, such as Sensors with thousands of readings, can
+    otherwise exceed the heap.
+    """
     print("Clearing database...")
-    deleted_total = detach_delete_nodes(driver, database)
-    print(f"  [OK] Database cleared ({deleted_total} nodes deleted).")
+    relationships = delete_all_relationships(driver, database)
+    nodes = detach_delete_nodes(driver, database)
+    print(f"  [OK] Database cleared ({relationships} relationships, {nodes} nodes deleted).")
 
 
 def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:

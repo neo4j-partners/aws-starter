@@ -1,25 +1,32 @@
-"""Build the supervisor Agent and its specialist Agents.
+"""Build the supervisor Agent and its specialist tools.
 
-The specialists become tools of the supervisor through ``Agent.as_tool``.
-The tool descriptions drive routing, so they name each specialist's domain.
+Each specialist is a :class:`SpecialistTool`. The tool descriptions drive
+routing, so they name each specialist's domain.
 
-Build a new set of agents for each request. An agent wrapped by ``as_tool``
-holds a lock while it runs, so two concurrent requests that shared one
-specialist would get an error result instead of an answer.
+A specialist ``Agent`` serves one call at a time: ``Agent.as_tool`` holds a
+lock while the agent runs and fails a second call with "already processing a
+request". The supervisor runs tool calls concurrently, so it can call the same
+specialist twice in one turn. ``SpecialistTool`` builds a fresh ``Agent`` for
+every call, so parallel calls never share one.
 """
 
-from collections.abc import Sequence
+import logging
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from strands import Agent
 from strands.models import Model
 from strands.session import SessionManager
+from strands.types.events import ToolResultEvent
+from strands.types.tools import AgentTool, ToolGenerator, ToolSpec, ToolUse
 
 from core.prompts import (
     MAINTENANCE_SYSTEM_PROMPT,
     OPERATIONS_SYSTEM_PROMPT,
     SUPERVISOR_SYSTEM_PROMPT,
 )
+
+logger = logging.getLogger(__name__)
 
 MAINTENANCE_TOOL = "maintenance_specialist"
 OPERATIONS_TOOL = "operations_specialist"
@@ -42,38 +49,98 @@ OPERATIONS_DESCRIPTION = (
     "Pass the user's full question."
 )
 
+# Sent to the supervisor model in place of a specialist's error text. The
+# error text can hold exception details, and the model may repeat it to the
+# user. The details go to the server log instead.
+SPECIALIST_ERROR = "The specialist could not answer this question."
+
+
+class SpecialistTool(AgentTool):
+    """Expose a specialist as a supervisor tool, with a fresh Agent per call.
+
+    Each call wraps a new Agent with ``Agent.as_tool`` and streams through
+    it, so the client still receives the specialist's events. Error results
+    are replaced with :data:`SPECIALIST_ERROR`.
+    """
+
+    def __init__(self, name: str, description: str, build_agent: Callable[[], Agent]) -> None:
+        super().__init__()
+        self._name = name
+        self._description = description
+        self._build_agent = build_agent
+        # Take the spec from Strands so the input schema matches ``as_tool``.
+        self._spec = self._wrap(build_agent()).tool_spec
+
+    def _wrap(self, agent: Agent) -> AgentTool:
+        return agent.as_tool(name=self._name, description=self._description)
+
+    @property
+    def tool_name(self) -> str:
+        return self._name
+
+    @property
+    def tool_spec(self) -> ToolSpec:
+        return self._spec
+
+    @property
+    def tool_type(self) -> str:
+        return "agent"
+
+    async def stream(
+        self, tool_use: ToolUse, invocation_state: dict[str, Any], **kwargs: Any
+    ) -> ToolGenerator:
+        inner = self._wrap(self._build_agent())
+        async for event in inner.stream(tool_use, invocation_state, **kwargs):
+            if isinstance(event, ToolResultEvent) and event.tool_result["status"] == "error":
+                logger.warning(
+                    "Specialist %s failed (tool_use_id=%s): %s",
+                    self._name,
+                    event.tool_use_id,
+                    event.tool_result.get("content"),
+                )
+                yield ToolResultEvent(
+                    {**event.tool_result, "content": [{"text": SPECIALIST_ERROR}]},
+                    event.exception,
+                )
+            else:
+                yield event
+
 
 def build_supervisor(
     model: Model,
     specialist_tools: Sequence[Any],
     session_manager: SessionManager | None = None,
 ) -> Agent:
-    """Build one supervisor with fresh Maintenance and Operations specialists.
+    """Build one supervisor with its Maintenance and Operations specialist tools.
 
     ``specialist_tools`` is the filtered Gateway tool list, shared by both
     specialists. ``session_manager`` attaches to the supervisor only.
     """
-    maintenance = Agent(
-        name="maintenance_agent",
-        model=model,
-        system_prompt=MAINTENANCE_SYSTEM_PROMPT,
-        tools=list(specialist_tools),
-        callback_handler=None,
-    )
-    operations = Agent(
-        name="operations_agent",
-        model=model,
-        system_prompt=OPERATIONS_SYSTEM_PROMPT,
-        tools=list(specialist_tools),
-        callback_handler=None,
-    )
+
+    def specialist(name: str, system_prompt: str) -> Callable[[], Agent]:
+        return lambda: Agent(
+            name=name,
+            model=model,
+            system_prompt=system_prompt,
+            tools=list(specialist_tools),
+            callback_handler=None,
+        )
+
     return Agent(
         name="fleet_supervisor",
         model=model,
         system_prompt=SUPERVISOR_SYSTEM_PROMPT,
         tools=[
-            maintenance.as_tool(name=MAINTENANCE_TOOL, description=MAINTENANCE_DESCRIPTION),
-            operations.as_tool(name=OPERATIONS_TOOL, description=OPERATIONS_DESCRIPTION),
+            SpecialistTool(
+                MAINTENANCE_TOOL,
+                MAINTENANCE_DESCRIPTION,
+                specialist("maintenance_agent", MAINTENANCE_SYSTEM_PROMPT),
+            ),
+            SpecialistTool(
+                OPERATIONS_TOOL,
+                OPERATIONS_DESCRIPTION,
+                specialist("operations_agent", OPERATIONS_SYSTEM_PROMPT),
+            ),
         ],
         callback_handler=None,
         session_manager=session_manager,

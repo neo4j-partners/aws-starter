@@ -213,7 +213,9 @@ async def invoke(payload: Any, context):
         if not isinstance(user_id, str) or not user_id:
             user_id = "anonymous"
         REQUEST_SESSION_ID.set(session_id)
-        logger.info("Request session=%s user=%s prompt=%s", session_id, user_id, prompt[:100])
+        # The prompt is user text, so only its length goes to INFO.
+        logger.info("Request session=%s user=%s prompt_chars=%d", session_id, user_id, len(prompt))
+        logger.debug("Request session=%s prompt=%s", session_id, prompt)
 
         # The workload access token is valid here, on the request path, so
         # the Gateway token is fetched here too. See GatewayAuth.

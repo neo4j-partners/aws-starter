@@ -104,6 +104,17 @@ def test_session_id_comes_from_context(supervisor, caplog):
     assert "session=abc-123" in caplog.text
 
 
+def test_prompt_text_is_logged_only_at_debug(supervisor, caplog):
+    caplog.set_level("DEBUG", logger="fleet_supervisor.server")
+    prompt = "Which aircraft has tail number N12345?"
+    collect(server.invoke({"prompt": prompt}, SimpleNamespace(session_id="s9")))
+    info = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
+    debug = [r.getMessage() for r in caplog.records if r.levelname == "DEBUG"]
+    assert f"Request session=s9 user=anonymous prompt_chars={len(prompt)}" in info
+    assert not [line for line in info if "N12345" in line]
+    assert f"Request session=s9 prompt={prompt}" in debug
+
+
 def test_missing_session_id_gets_a_fresh_uuid(supervisor, caplog):
     caplog.set_level("INFO")
     collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id=None)))

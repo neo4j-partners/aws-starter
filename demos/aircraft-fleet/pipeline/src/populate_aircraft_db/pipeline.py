@@ -269,6 +269,7 @@ def _create_extraction_llm(
 
 def _create_pipeline(
     driver: Driver,
+    database: str,
     *,
     provider: str,
     openai_api_key: str | None,
@@ -336,6 +337,7 @@ def _create_pipeline(
         on_error="IGNORE",
         perform_entity_resolution=True,
         prompt_template=EXTRACTION_PROMPT,
+        neo4j_database=database,
     )
     return pipeline, splitter
 
@@ -433,6 +435,7 @@ def debug_extract_chunks(
 
 def process_all_documents(
     driver: Driver,
+    database: str,
     document_dir: Path,
     *,
     provider: str,
@@ -455,6 +458,7 @@ def process_all_documents(
     """
     pipeline, splitter = _create_pipeline(
         driver,
+        database,
         provider=provider,
         openai_api_key=openai_api_key,
         anthropic_api_key=anthropic_api_key,
@@ -512,31 +516,38 @@ def process_all_documents(
 # ---------------------------------------------------------------------------
 
 
-def link_to_existing_graph(driver: Driver) -> None:
+def link_to_existing_graph(driver: Driver, database: str) -> None:
     """Create relationships between enrichment data and the operational graph."""
 
     # Document -[:APPLIES_TO]-> Aircraft (via document metadata aircraftType)
-    records, _, _ = driver.execute_query("""
+    records, _, _ = driver.execute_query(
+        """
         MATCH (d:Document) WHERE d.aircraftType IS NOT NULL
         MATCH (a:Aircraft {model: d.aircraftType})
         MERGE (d)-[:APPLIES_TO]->(a)
         RETURN count(*) AS count
-    """)
+    """,
+        database_=database,
+    )
     print(f"  [OK] {records[0]['count']} Document -[:APPLIES_TO]-> Aircraft")
 
     # AircraftModel -[:DESCRIBES_MODEL]-> Aircraft
     # (model-level manual entity to tail-level fleet)
-    records, _, _ = driver.execute_query("""
+    records, _, _ = driver.execute_query(
+        """
         MATCH (am:AircraftModel)
         MATCH (a:Aircraft {model: am.name})
         MERGE (am)-[:DESCRIBES_MODEL]->(a)
         RETURN count(*) AS count
-    """)
+    """,
+        database_=database,
+    )
     print(f"  [OK] {records[0]['count']} AircraftModel -[:DESCRIBES_MODEL]-> Aircraft")
 
     # SystemReference -[:DESCRIBES_SYSTEM]-> System
     # (conservative model + system type/name match)
-    records, _, _ = driver.execute_query("""
+    records, _, _ = driver.execute_query(
+        """
         MATCH (sr:SystemReference)
         WHERE sr.aircraftType IS NOT NULL
         WITH sr, toLower(replace(sr.name, ' - ' + sr.aircraftType, '')) AS refName
@@ -545,12 +556,15 @@ def link_to_existing_graph(driver: Driver) -> None:
            OR toLower(s.name) = refName
         MERGE (sr)-[:DESCRIBES_SYSTEM]->(s)
         RETURN count(*) AS count
-    """)
+    """,
+        database_=database,
+    )
     print(f"  [OK] {records[0]['count']} SystemReference -[:DESCRIBES_SYSTEM]-> System")
 
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
     # (model + component type/name match)
-    records, _, _ = driver.execute_query("""
+    records, _, _ = driver.execute_query(
+        """
         MATCH (cr:ComponentReference)
         WHERE cr.aircraftType IS NOT NULL
         WITH cr,
@@ -563,16 +577,21 @@ def link_to_existing_graph(driver: Driver) -> None:
            OR toLower(c.name) IN [refName, refType]
         MERGE (cr)-[:DESCRIBES_COMPONENT]->(c)
         RETURN count(*) AS count
-    """)
+    """,
+        database_=database,
+    )
     print(f"  [OK] {records[0]['count']} ComponentReference -[:DESCRIBES_COMPONENT]-> Component")
 
     # Sensor -[:HAS_LIMIT]-> OperatingLimit (match parameterName + aircraftType)
-    records, _, _ = driver.execute_query("""
+    records, _, _ = driver.execute_query(
+        """
         MATCH (a:Aircraft)-[:HAS_SYSTEM]->(sys:System)-[:HAS_SENSOR]->(s:Sensor)
         MATCH (ol:OperatingLimit {parameterName: s.type, aircraftType: a.model})
         MERGE (s)-[:HAS_LIMIT]->(ol)
         RETURN count(*) AS count
-    """)
+    """,
+        database_=database,
+    )
     print(f"  [OK] {records[0]['count']} Sensor -[:HAS_LIMIT]-> OperatingLimit")
 
 
@@ -581,7 +600,7 @@ def link_to_existing_graph(driver: Driver) -> None:
 # ---------------------------------------------------------------------------
 
 
-def clear_enrichment_data(driver: Driver) -> None:
+def clear_enrichment_data(driver: Driver, database: str) -> None:
     """Delete all Document, Chunk, and extracted entity nodes (preserves operational graph)."""
     labels_to_clear = ["Document", "Chunk"] + EXTRACTED_LABELS
     deleted_total = 0
@@ -590,7 +609,8 @@ def clear_enrichment_data(driver: Driver) -> None:
     for label in labels_to_clear:
         while True:
             records, _, _ = driver.execute_query(
-                f"MATCH (n:{label}) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted"
+                f"MATCH (n:{label}) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted",
+                database_=database,
             )
             count = records[0]["deleted"]
             deleted_total += count
@@ -601,7 +621,8 @@ def clear_enrichment_data(driver: Driver) -> None:
     for label in ["__Entity__", "__KGBuilder__"]:
         while True:
             records, _, _ = driver.execute_query(
-                f"MATCH (n:{label}) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted"
+                f"MATCH (n:{label}) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted",
+                database_=database,
             )
             count = records[0]["deleted"]
             deleted_total += count
@@ -618,11 +639,14 @@ def clear_enrichment_data(driver: Driver) -> None:
 _SAMPLE_SIZE = 5
 
 
-def _get_existing_schema_tokens(driver: Driver) -> tuple[set[str], set[str]]:
+def _get_existing_schema_tokens(driver: Driver, database: str) -> tuple[set[str], set[str]]:
     """Return labels and relationship types currently present in the graph."""
-    label_rows, _, _ = driver.execute_query("CALL db.labels() YIELD label RETURN label")
+    label_rows, _, _ = driver.execute_query(
+        "CALL db.labels() YIELD label RETURN label", database_=database
+    )
     rel_rows, _, _ = driver.execute_query(
-        "CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType"
+        "CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType",
+        database_=database,
     )
     return (
         {row["label"] for row in label_rows},
@@ -630,21 +654,24 @@ def _get_existing_schema_tokens(driver: Driver) -> tuple[set[str], set[str]]:
     )
 
 
-def validate_enrichment(driver: Driver) -> None:
+def validate_enrichment(driver: Driver, database: str) -> None:
     """Run sample queries to verify embeddings, entities, and cross-links."""
 
     print(f"\nValidation (sample size {_SAMPLE_SIZE}):")
-    labels, rel_types = _get_existing_schema_tokens(driver)
+    labels, rel_types = _get_existing_schema_tokens(driver, database)
 
     # 1. Chunks with embeddings linked to documents
     rows = []
     if {"Chunk", "Document"}.issubset(labels) and "FROM_DOCUMENT" in rel_types:
-        rows, _, _ = driver.execute_query(f"""
+        rows, _, _ = driver.execute_query(
+            f"""
             MATCH (c:Chunk)-[:FROM_DOCUMENT]->(d:Document)
             WHERE c.embedding IS NOT NULL
             RETURN DISTINCT d.documentId AS doc, elementId(c) AS chunk_id, size(c.embedding) AS dims
             LIMIT {_SAMPLE_SIZE}
-        """)
+        """,
+            database_=database,
+        )
     print(f"\n  Chunks with embeddings -> Document ({len(rows)} samples):")
     for r in rows:
         print(f"    {r['chunk_id'][:12]}...  dims={r['dims']}  doc={r['doc']}")
@@ -661,6 +688,7 @@ def validate_enrichment(driver: Driver) -> None:
         ORDER BY label
         """,
         labels=EXTRACTED_LABELS,
+        database_=database,
     )
     print("\n  Extracted manual entities:")
     for r in rows:
@@ -722,7 +750,7 @@ def validate_enrichment(driver: Driver) -> None:
         }.issubset(labels | rel_types):
             rows = []
         else:
-            rows, _, _ = driver.execute_query(query)
+            rows, _, _ = driver.execute_query(query, database_=database)
         if rows:
             pairs = ", ".join(f"{r['src']}->{r['tgt']}" for r in rows)
             print(f"    {label}: {pairs}")

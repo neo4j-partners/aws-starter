@@ -166,11 +166,11 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
     )
 
     print("Clearing existing enrichment data (safe re-run)...")
-    clear_enrichment_data(driver)
+    clear_enrichment_data(driver, settings.neo4j_database)
     print()
 
     print("Dropping extraction constraints for pipeline write phase...")
-    drop_extraction_constraints(driver)
+    drop_extraction_constraints(driver, settings.neo4j_database)
     print()
 
     if settings.enrich_sample_size:
@@ -187,6 +187,7 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
 
     process_all_documents(
         driver,
+        settings.neo4j_database,
         settings.document_dir,
         provider=creds.provider,
         openai_api_key=creds.openai_key,
@@ -202,15 +203,15 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
     )
 
     print("\nCreating extraction constraints (post entity-resolution)...")
-    create_extraction_constraints(driver)
+    create_extraction_constraints(driver, settings.neo4j_database)
 
     print("\nCreating embedding indexes...")
-    create_embedding_indexes(driver, creds.embedding_dims)
+    create_embedding_indexes(driver, settings.neo4j_database, creds.embedding_dims)
 
     print("\nLinking to existing graph...")
-    link_to_existing_graph(driver)
+    link_to_existing_graph(driver, settings.neo4j_database)
 
-    validate_enrichment(driver)
+    validate_enrichment(driver, settings.neo4j_database)
 
 
 # ---------------------------------------------------------------------------
@@ -231,16 +232,16 @@ def setup_cmd() -> None:
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
         print("Creating constraints...")
-        create_constraints(driver)
+        create_constraints(driver, settings.neo4j_database)
         print("\nCreating indexes...")
-        create_indexes(driver)
+        create_indexes(driver, settings.neo4j_database)
         print("\nCreating fulltext indexes...")
-        create_fulltext_indexes(driver)
+        create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_nodes(driver, settings.data_dir)
+        load_nodes(driver, settings.neo4j_database, settings.data_dir)
         print()
-        load_relationships(driver, settings.data_dir)
+        load_relationships(driver, settings.neo4j_database, settings.data_dir)
         print()
 
         try:
@@ -253,6 +254,7 @@ def setup_cmd() -> None:
 
         verify(
             driver,
+            settings.neo4j_database,
             expected_embedding_dimensions=creds.embedding_dims,
         )
 
@@ -275,6 +277,7 @@ def verify_cmd(
     with _connect(settings) as driver:
         passed = verify(
             driver,
+            settings.neo4j_database,
             expected_embedding_dimensions=_expected_embedding_dims(settings),
             strict=strict,
         )
@@ -290,7 +293,7 @@ def clean_cmd() -> None:
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
-        clear_database(driver)
+        clear_database(driver, settings.neo4j_database)
 
     print("\nDone.")
 
@@ -304,7 +307,7 @@ def clean_enrichment_cmd() -> None:
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
-        clear_enrichment_data(driver)
+        clear_enrichment_data(driver, settings.neo4j_database)
 
     print("\nDone.")
 
@@ -321,22 +324,22 @@ def load_operational_cmd() -> None:
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
         print("Creating constraints...")
-        create_constraints(driver)
+        create_constraints(driver, settings.neo4j_database)
         print("\nCreating indexes...")
-        create_indexes(driver)
+        create_indexes(driver, settings.neo4j_database)
         print("\nCreating fulltext indexes...")
-        create_fulltext_indexes(driver)
+        create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_nodes(driver, settings.data_dir)
+        load_nodes(driver, settings.neo4j_database, settings.data_dir)
         print()
-        load_relationships(driver, settings.data_dir)
+        load_relationships(driver, settings.neo4j_database, settings.data_dir)
         print()
 
         print("Linking existing enrichment to operational graph...")
-        link_to_existing_graph(driver)
+        link_to_existing_graph(driver, settings.neo4j_database)
 
-        validate_enrichment(driver)
+        validate_enrichment(driver, settings.neo4j_database)
 
     elapsed = time.monotonic() - start
     print(f"\nDone in {_fmt_elapsed(elapsed)}.")
@@ -412,7 +415,7 @@ def samples_cmd() -> None:
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
-        run_all_samples(driver, sample_size=settings.sample_size)
+        run_all_samples(driver, settings.neo4j_database, sample_size=settings.sample_size)
 
 
 @app.command("agent-samples")

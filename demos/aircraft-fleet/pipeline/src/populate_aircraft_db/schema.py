@@ -53,45 +53,49 @@ def _quote_identifier(identifier: str) -> str:
     return f"`{identifier.replace('`', '``')}`"
 
 
-def create_constraints(driver: Driver) -> None:
+def create_constraints(driver: Driver, database: str) -> None:
     """Create uniqueness constraints (idempotent)."""
     for label, prop in CONSTRAINTS:
         driver.execute_query(
-            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
+            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE",
+            database_=database,
         )
         print(f"  [OK] Constraint: {label}.{prop}")
 
 
-def create_indexes(driver: Driver) -> None:
+def create_indexes(driver: Driver, database: str) -> None:
     """Create property indexes (idempotent)."""
     for label, prop in INDEXES:
         index_name = f"idx_{label.lower()}_{prop.lower()}"
         driver.execute_query(
-            f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{prop})"
+            f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{prop})",
+            database_=database,
         )
         print(f"  [OK] Index: {label}.{prop}")
 
 
-def create_fulltext_indexes(driver: Driver) -> None:
+def create_fulltext_indexes(driver: Driver, database: str) -> None:
     """Create fulltext indexes for sample demo queries (idempotent)."""
     for name, label, props in FULLTEXT_INDEXES:
         props_clause = ", ".join(f"n.{p}" for p in props)
         driver.execute_query(
-            f"CREATE FULLTEXT INDEX {name} IF NOT EXISTS FOR (n:{label}) ON EACH [{props_clause}]"
+            f"CREATE FULLTEXT INDEX {name} IF NOT EXISTS FOR (n:{label}) ON EACH [{props_clause}]",
+            database_=database,
         )
         print(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
 
 
-def create_extraction_constraints(driver: Driver) -> None:
+def create_extraction_constraints(driver: Driver, database: str) -> None:
     """Create uniqueness constraints for extracted entity types (idempotent)."""
     for label, prop in EXTRACTION_CONSTRAINTS:
         driver.execute_query(
-            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
+            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE",
+            database_=database,
         )
         print(f"  [OK] Constraint: {label}.{prop}")
 
 
-def drop_extraction_constraints(driver: Driver) -> None:
+def drop_extraction_constraints(driver: Driver, database: str) -> None:
     """Drop extracted-entity uniqueness constraints before SimpleKGPipeline runs.
 
     The pipeline writes duplicate extracted nodes first and performs entity
@@ -110,13 +114,16 @@ def drop_extraction_constraints(driver: Driver) -> None:
             """,
             label=label,
             property=prop,
+            database_=database,
         )
         for record in records:
-            driver.execute_query(f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS")
+            driver.execute_query(
+                f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS", database_=database
+            )
             print(f"  [OK] Dropped constraint: {label}.{prop}")
 
 
-def create_embedding_indexes(driver: Driver, dimensions: int) -> None:
+def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> None:
     """Create vector and fulltext indexes for Chunk embeddings (idempotent).
 
     Imports neo4j_graphrag lazily so that other commands don't require it.

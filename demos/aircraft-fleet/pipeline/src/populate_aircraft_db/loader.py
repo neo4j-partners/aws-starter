@@ -89,12 +89,12 @@ def read_csv(data_dir: Path, filename: str) -> list[dict[str, Any]]:
         return list(csv.DictReader(f))
 
 
-def _run_in_batches(driver: Driver, records: list[dict], query: str) -> None:
+def _run_in_batches(driver: Driver, database: str, records: list[dict], query: str) -> None:
     """Execute a Cypher query over records in batches of BATCH_SIZE."""
     total = len(records)
     for i in range(0, total, BATCH_SIZE):
         batch = records[i : i + BATCH_SIZE]
-        driver.execute_query(query, batch=batch)
+        driver.execute_query(query, batch=batch, database_=database)
         progress = min(i + BATCH_SIZE, total)
         print(f"  Progress: {progress}/{total} ({100 * progress // total}%)", end="\r")
     print()
@@ -388,31 +388,32 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
 # ---------------------------------------------------------------------------
 
 
-def load_nodes(driver: Driver, data_dir: Path) -> None:
+def load_nodes(driver: Driver, database: str, data_dir: Path) -> None:
     """Load all 10 node types from CSV files."""
     for label, filename, query in _NODE_DEFINITIONS:
         print(f"Loading {label} nodes...")
         records = read_csv(data_dir, filename)
-        _run_in_batches(driver, records, query)
+        _run_in_batches(driver, database, records, query)
         print(f"  [OK] Loaded {len(records)} {label} nodes.")
 
 
-def load_relationships(driver: Driver, data_dir: Path) -> None:
+def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
     """Load all 13 relationship types from CSV files."""
     for rel_type, filename, query in _REL_DEFINITIONS:
         print(f"Loading {rel_type} relationships...")
         records = read_csv(data_dir, filename)
-        _run_in_batches(driver, records, query)
+        _run_in_batches(driver, database, records, query)
         print(f"  [OK] Loaded {len(records)} {rel_type} relationships.")
 
 
-def clear_database(driver: Driver) -> None:
+def clear_database(driver: Driver, database: str) -> None:
     """Delete all nodes and relationships in batches."""
     print("Clearing database...")
     deleted_total = 0
     while True:
         records, _, _ = driver.execute_query(
-            "MATCH (n) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted"
+            "MATCH (n) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted",
+            database_=database,
         )
         count = records[0]["deleted"]
         deleted_total += count
@@ -423,23 +424,25 @@ def clear_database(driver: Driver) -> None:
     print(f"\n  [OK] Database cleared ({deleted_total} nodes deleted).")
 
 
-def _get_label_counts(driver: Driver) -> dict[str, int]:
+def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:
     records, _, _ = driver.execute_query(
         """
         MATCH (n)
         UNWIND labels(n) AS label
         RETURN label, count(n) AS count
-        """
+        """,
+        database_=database,
     )
     return {record["label"]: record["count"] for record in records}
 
 
-def _get_relationship_counts(driver: Driver) -> dict[str, int]:
+def _get_relationship_counts(driver: Driver, database: str) -> dict[str, int]:
     records, _, _ = driver.execute_query(
         """
         MATCH ()-[r]->()
         RETURN type(r) AS rel_type, count(r) AS count
-        """
+        """,
+        database_=database,
     )
     return {record["rel_type"]: record["count"] for record in records}
 
@@ -479,6 +482,7 @@ def _warn_or_fail(
 
 def _verify_vector_search(
     driver: Driver,
+    database: str,
     *,
     has_chunk_embeddings: bool,
     has_vector_index: bool,
@@ -489,7 +493,8 @@ def _verify_vector_search(
         return False, "missing maintenanceChunkEmbeddings index"
 
     try:
-        records, _, _ = driver.execute_query("""
+        records, _, _ = driver.execute_query(
+            """
             MATCH (c:Chunk)
             WHERE c.embedding IS NOT NULL
             WITH c.embedding AS embedding
@@ -501,7 +506,9 @@ def _verify_vector_search(
             )
             YIELD node, score
             RETURN count(node) AS count, max(score) AS score
-        """)
+        """,
+            database_=database,
+        )
     except Neo4jError as exc:
         return False, str(exc)
 
@@ -514,6 +521,7 @@ def _verify_vector_search(
 
 def verify(
     driver: Driver,
+    database: str,
     *,
     expected_embedding_dimensions: int = 1536,
     strict: bool = False,
@@ -522,8 +530,8 @@ def verify(
     failures: list[str] = []
     warnings: list[str] = []
 
-    label_counts = _get_label_counts(driver)
-    relationship_counts = _get_relationship_counts(driver)
+    label_counts = _get_label_counts(driver, database)
+    relationship_counts = _get_relationship_counts(driver, database)
     operational_counts = {label: label_counts.get(label, 0) for label in OPERATIONAL_LABELS}
     enrichment_counts = {label: label_counts.get(label, 0) for label in ENRICHMENT_LABELS}
     rel_counts = {rel_type: relationship_counts.get(rel_type, 0) for rel_type in RELATIONSHIP_TYPES}
@@ -571,7 +579,8 @@ def verify(
                    count(c.embedding) AS with_embedding,
                    count(CASE WHEN c.embedding IS NULL THEN 1 END) AS missing_embedding,
                    collect(DISTINCT size(c.embedding)) AS dimensions
-            """
+            """,
+            database_=database,
         )
         embedding_row = embedding_records[0]
         bad_dim_records, _, _ = driver.execute_query(
@@ -582,6 +591,7 @@ def verify(
             RETURN count(c) AS count
             """,
             expected_dimensions=expected_embedding_dimensions,
+            database_=database,
         )
         bad_dimensions = bad_dim_records[0]["count"]
     else:
@@ -623,11 +633,14 @@ def verify(
         strict=strict,
     )
 
-    index_rows, _, _ = driver.execute_query("""
+    index_rows, _, _ = driver.execute_query(
+        """
         SHOW INDEXES
         YIELD name, type, state, labelsOrTypes, properties
         RETURN name, type, state, labelsOrTypes, properties
-    """)
+    """,
+        database_=database,
+    )
     index_by_name = {row["name"]: row for row in index_rows}
 
     print("\nRequired Indexes:")
@@ -652,11 +665,14 @@ def verify(
             strict=strict,
         )
 
-    constraint_rows, _, _ = driver.execute_query("""
+    constraint_rows, _, _ = driver.execute_query(
+        """
         SHOW CONSTRAINTS
         YIELD name, type, labelsOrTypes, properties
         RETURN name, type, labelsOrTypes, properties
-    """)
+    """,
+        database_=database,
+    )
     constraint_dicts = [dict(row) for row in constraint_rows]
 
     print("\nRequired Constraints:")
@@ -674,6 +690,7 @@ def verify(
 
     vector_ok, vector_detail = _verify_vector_search(
         driver,
+        database,
         has_chunk_embeddings=embedding_row["with_embedding"] > 0,
         has_vector_index="maintenanceChunkEmbeddings" in index_by_name,
     )
@@ -745,7 +762,7 @@ def verify(
         if required_labels.issubset(existing_labels) and required_relationships.issubset(
             existing_relationships
         ):
-            records, _, _ = driver.execute_query(query)
+            records, _, _ = driver.execute_query(query, database_=database)
             count = records[0]["count"]
         else:
             count = 0

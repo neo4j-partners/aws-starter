@@ -370,7 +370,7 @@ The LEAP-1A Full Authority Digital Engine Control provides:
 
 **Fault Code:** ENG-VIB-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (19% of engine events)
+**Industry Statistics:** In typical industry data, this is the most common engine fault, at about 19% of engine events.
 
 The LEAP-1A's lightweight composite fan and high bypass ratio make vibration monitoring particularly critical.
 
@@ -440,7 +440,7 @@ The LEAP-1A has experienced ice crystal icing events in high-altitude convective
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Second most common fault (12% of engine events)
+**Industry Statistics:** In typical industry data, this is the second most common engine fault, at about 12% of engine events.
 
 #### Contamination Types
 
@@ -493,7 +493,7 @@ The LEAP engine is approved for on-wing water wash to restore performance:
 
 **Fault Code:** ENG-OVH-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 15% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 15% of engine maintenance events.
 
 #### EGT Exceedance Categories
 
@@ -529,7 +529,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 **Fault Code:** ENG-ELF-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 15% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 15% of engine maintenance events.
 
 #### Common Electrical Issues
 
@@ -573,7 +573,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 **Fault Code:** ENG-FUEL-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 9% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 9% of engine maintenance events.
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
@@ -643,7 +643,7 @@ Multi-Mode Receiver providing:
 #### 5.3.1 Sensor Drift
 
 **Fault Code:** AVN-SDR-001
-**Fleet Statistics:** 11% of avionics events
+**Industry Statistics:** In typical industry data, this fault accounts for about 11% of avionics events.
 
 **Diagnostic Steps:**
 1. Compare ADIRU 1/2/3 outputs on maintenance page
@@ -655,7 +655,7 @@ Multi-Mode Receiver providing:
 #### 5.3.2 Electrical Faults (Avionics)
 
 **Fault Code:** AVN-ELF-002
-**Fleet Statistics:** 15% of avionics events
+**Industry Statistics:** In typical industry data, this fault accounts for about 15% of avionics events.
 
 **Common Causes:**
 - Power supply interruption
@@ -716,7 +716,7 @@ The A321neo flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
-**Fleet Statistics:** 50% of hydraulics events
+**Industry Statistics:** In typical industry data, this fault accounts for about 50% of hydraulics events.
 
 **Common Leak Locations:**
 
@@ -731,7 +731,7 @@ The A321neo flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
-**Fleet Statistics:** 22% of hydraulics events
+**Industry Statistics:** In typical industry data, this fault accounts for about 22% of hydraulics events.
 
 **Contamination Analysis (NAS 1638):**
 

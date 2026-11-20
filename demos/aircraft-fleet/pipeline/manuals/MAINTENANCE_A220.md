@@ -370,7 +370,7 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (21% of engine events)
+**Industry Statistics:** In typical industry data, this is the most common engine fault, at about 21% of engine events.
 
 #### Symptoms
 - Parameter disagree messages on CAS
@@ -410,7 +410,7 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 13% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 13% of engine maintenance events.
 
 #### Types of Contamination
 
@@ -455,7 +455,7 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 11% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 11% of engine maintenance events.
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings (engine and gearbox circuits)
@@ -518,7 +518,7 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 14% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 14% of engine maintenance events.
 
 #### Leak Classification
 

@@ -300,7 +300,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (24% of engine events)
+**Industry Statistics:** In typical industry data, this is the most common engine fault, at about 24% of engine events.
 
 #### Symptoms
 - Parameter disagree messages on EICAS
@@ -340,7 +340,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Second most common fault (11% of engine events)
+**Industry Statistics:** In typical industry data, this is the second most common engine fault, at about 11% of engine events.
 
 #### Types of Contamination
 
@@ -384,7 +384,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 10% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 10% of engine maintenance events.
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings
@@ -436,7 +436,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 14% of engine maintenance events
+**Industry Statistics:** In typical industry data, this fault accounts for about 14% of engine maintenance events.
 
 #### Leak Classification
 

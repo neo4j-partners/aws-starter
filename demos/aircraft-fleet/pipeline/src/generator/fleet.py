@@ -47,8 +47,12 @@ def _distribute(n: int) -> list[str]:
 
 
 def _generated_tails(registry_tails: set[str]) -> Iterator[str]:
-    """Yield N10000, N10001, ... skipping every manual tail."""
-    return (tail for tail in (f"N{i:05d}" for i in count(10000)) if tail not in registry_tails)
+    """Yield N90000, N90001, ... skipping any manual tail.
+
+    No manual uses this block, so generated tails stay apart from the
+    E190 (N100xx) and A220 (N2000x) manual tails.
+    """
+    return (tail for tail in (f"N{i}" for i in count(90000)) if tail not in registry_tails)
 
 
 @dataclass

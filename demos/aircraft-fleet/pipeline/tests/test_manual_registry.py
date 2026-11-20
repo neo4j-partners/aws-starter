@@ -41,6 +41,10 @@ def test_generated_fleet_assigns_registry_first(n_aircraft: int) -> None:
     assert len(fleet) == n_aircraft
     assert len(by_tail) == n_aircraft, "tail numbers must be unique"
     registry_size = sum(len(tails) for tails in MANUAL_FLEET_TAILS.values())
+    registry_tails = {tail for tails in MANUAL_FLEET_TAILS.values() for tail in tails}
+    for ac in fleet[registry_size:]:
+        assert ac.tail_number not in registry_tails
+        assert re.fullmatch(r"N9\d{4}", ac.tail_number), ac.tail_number
     if n_aircraft >= registry_size:
         for model, tails in MANUAL_FLEET_TAILS.items():
             for tail in tails:

@@ -66,9 +66,33 @@ Parallel calls never wait on each other.
 
 ### Gateway connection
 
-The model and the Gateway MCP client are created on the first request and
-shared by later requests. If the MCP session ends, the next request opens a
-new one.
+The model, the Gateway MCP client, and the Gateway tools are created on the
+first request and shared by later requests. If the MCP session ends, the next
+request opens a new one.
+
+### Gateway session recovery
+
+The Gateway can also end the MCP session while a request is running. Each
+Gateway tool is wrapped in `GatewayTool`, which handles both ways a call can
+fail then:
+
+- A call already in flight returns an error result while the session is down.
+- A later call raises `MCPClientInitializationError` before it is sent.
+
+In either case, the tool rebuilds the MCP client and retries the call once. A
+rebuild happens only if the failed client is still the current one. Calls that
+find the session down after another call rebuilt it reuse the new client. The
+old client stops when its last call finishes. The rebuild is logged at WARNING
+with the request's session ID and the cause class.
+
+If the retry fails too, or the rebuild fails, the specialist gets a fixed
+message: "The graph database is unavailable right now." The error details stay
+in the server log. This includes an auth failure that persists after the
+forced token refresh. The next request rebuilds the client again.
+
+The tool specs come from the first client and never change, so a rebuild never
+changes what the model sees. If a rebuilt client lacks a tool, calls to that
+tool get the same fixed message.
 
 ## Prerequisites
 
@@ -200,6 +224,7 @@ ignores it. Losing it is safe, because destroy declares the credential again.
 | `fleet_supervisor/core/model.py` | The Bedrock model factory |
 | `fleet_supervisor/core/credentials.py` | Picks the local or cloud Gateway credentials |
 | `fleet_supervisor/core/mcp.py` | The Gateway MCP client, its bearer-token auth, and the tool filter |
+| `fleet_supervisor/core/gateway_tools.py` | `GatewayTool`, which reconnects and retries once when the MCP session ends |
 | `fleet_supervisor/core/events.py` | Maps Strands stream events to the client events |
 | `fleet_supervisor/client/cli.py` | Asks the local server one question, run by `fleet-supervisor-cli` |
 | `fleet_supervisor/client/invoke.py` | Cloud calls and load testing, run by `fleet-supervisor-invoke` |

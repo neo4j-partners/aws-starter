@@ -156,7 +156,7 @@ class FakeClient:
     def list_tools_sync(self, pagination_token=None):
         if self.list_error:
             raise self.list_error
-        page = [SimpleNamespace(tool_name=t) for t in self.tools]
+        page = [SimpleNamespace(tool_name=t, tool_spec={"name": t}) for t in self.tools]
         return Page(page)
 
     def _is_session_active(self):
@@ -196,8 +196,9 @@ def test_dead_session_is_rebuilt(clients):
     first = server._start_runtime()
     old.active = False  # the Gateway dropped the session
     second = server._start_runtime()
-    assert second.mcp_client is new
+    assert second.connection.client is new
     assert second.model == first.model
+    assert second.tools == first.tools  # the tool wrappers and their specs are kept
     assert old.stopped
 
 
@@ -208,7 +209,7 @@ def test_get_runtime_rebuilds_a_dead_session(clients):
     clients.extend([old, new])
     asyncio.run(server.get_runtime())
     old.active = False
-    assert asyncio.run(server.get_runtime()).mcp_client is new
+    assert asyncio.run(server.get_runtime()).connection.client is new
 
 
 def test_startup_failure_stops_client_and_retries(clients):
@@ -218,7 +219,7 @@ def test_startup_failure_stops_client_and_retries(clients):
         server._start_runtime()
     assert bad.stopped
     assert server._runtime is None
-    assert server._start_runtime().mcp_client is good
+    assert server._start_runtime().connection.client is good
 
 
 def test_empty_tool_list_is_an_error(clients):
@@ -248,7 +249,7 @@ def test_model_error_starts_no_client(monkeypatch, clients):
 
 
 def test_session_check_uses_the_strands_private_method():
-    # _session_is_running relies on MCPClient._is_session_active. If Strands
+    # gateway_tools.session_is_running relies on MCPClient._is_session_active. If Strands
     # renames it, this test fails before the runtime does.
     from strands.tools.mcp import MCPClient
 

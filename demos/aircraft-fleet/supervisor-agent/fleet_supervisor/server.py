@@ -6,9 +6,11 @@ agents, each wrapped as a tool:
 - Maintenance Agent: reliability, faults, components, sensors
 - Operations Agent: flights, delays, routes, airports
 
-The model and the Gateway MCP client are created once, on the first request.
-The client is rebuilt if its MCP session ends.
-The agents are built per request. See ``fleet_supervisor.core.agents`` for why.
+The model, the Gateway MCP client, and the Gateway tools are created once,
+on the first request. The client is rebuilt if its MCP session ends. A tool
+call that finds the session ended rebuilds it and retries once. See
+``fleet_supervisor.core.gateway_tools``. The agents are built per request.
+See ``fleet_supervisor.core.agents`` for why.
 
 Local testing:
     uv run fleet-supervisor-server
@@ -30,12 +32,17 @@ from typing import Any
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from strands.models import BedrockModel
-from strands.tools.mcp import MCPClient
 
 from fleet_supervisor.core.agents import build_supervisor
 from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID
 from fleet_supervisor.core.credentials import load_credentials
 from fleet_supervisor.core.events import EventMapper
+from fleet_supervisor.core.gateway_tools import (
+    REQUEST_SESSION_ID,
+    GatewayConnection,
+    GatewayTool,
+    stop_quietly,
+)
 from fleet_supervisor.core.mcp import (
     GatewayAuth,
     build_gateway_auth,
@@ -61,11 +68,15 @@ app = BedrockAgentCoreApp()
 
 @dataclass
 class Runtime:
-    """Process-wide resources, created once and rebuilt if the MCP session ends."""
+    """Process-wide resources, created on the first request.
+
+    ``model`` and ``tools`` last for the process. ``connection`` is replaced
+    when its MCP session ends, and is None after a failed rebuild.
+    """
 
     model: BedrockModel
-    mcp_client: MCPClient
-    tools: list[Any]
+    tools: list[GatewayTool]
+    connection: GatewayConnection | None
 
 
 _runtime: Runtime | None = None
@@ -82,25 +93,7 @@ def gateway_auth() -> GatewayAuth:
     return build_gateway_auth(load_credentials())
 
 
-def _session_is_running(client: MCPClient) -> bool:
-    """Report whether the MCP client's session is still up.
-
-    Strands has no public health check. ``_is_session_active`` is the check
-    ``list_tools_sync`` and ``call_tool`` make before they run, so it matches
-    when tool calls would start failing. tests/test_server.py pins it.
-    """
-    return client._is_session_active()
-
-
-def _stop_quietly(client: MCPClient) -> None:
-    """Stop the client, logging a failure so it cannot hide the original error."""
-    try:
-        client.stop(None, None, None)
-    except Exception:
-        logger.exception("Error while stopping the MCP client")
-
-
-def _connect_mcp() -> tuple[MCPClient, list[Any]]:
+def _connect_mcp() -> GatewayConnection:
     """Start the Gateway client and fetch the filtered tool list."""
     # One filtered client serves both specialists: they need the same
     # two tools, so per-specialist filters would be identical.
@@ -115,38 +108,80 @@ def _connect_mcp() -> tuple[MCPClient, list[Any]]:
             )
     except Exception:
         # Stop the client's background thread; the next request retries.
-        _stop_quietly(mcp_client)
+        stop_quietly(mcp_client)
         raise
     logger.info("Gateway tools: %s", [t.tool_name for t in tools])
-    return mcp_client, tools
+    return GatewayConnection(mcp_client, tools)
 
 
-def _start_runtime() -> Runtime:
-    """Return a runtime with a live MCP session, building or rebuilding it."""
+def _is_usable(runtime: Runtime | None, stale: GatewayConnection | None) -> bool:
+    connection = None if runtime is None else runtime.connection
+    return connection is not None and connection is not stale and connection.is_running()
+
+
+def current_connection() -> GatewayConnection | None:
+    """Return the current Gateway connection for a tool call."""
+    runtime = _runtime
+    return None if runtime is None else runtime.connection
+
+
+async def reconnect(stale: GatewayConnection | None) -> GatewayConnection:
+    """Return a running connection for a tool call whose ``stale`` one failed."""
+    connection = (await get_runtime(stale)).connection
+    if connection is None:
+        # get_runtime sets the connection or raises, so this means a bug.
+        raise RuntimeError("get_runtime returned no Gateway connection")
+    return connection
+
+
+def _start_runtime(stale: GatewayConnection | None = None) -> Runtime:
+    """Return a runtime with a live MCP session, building or rebuilding it.
+
+    ``stale`` is a connection a caller saw fail. It is rebuilt only if it is
+    still the current one, so callers that arrive after a rebuild reuse the
+    new connection instead of rebuilding again.
+    """
     global _runtime
     with _runtime_lock:
-        if _runtime is not None and _session_is_running(_runtime.mcp_client):
-            return _runtime
-        if _runtime is not None:
-            logger.warning("The MCP session ended; reconnecting to the Gateway")
-            _stop_quietly(_runtime.mcp_client)
-            model = _runtime.model
-            _runtime = None
-        else:
+        runtime = _runtime
+        if _is_usable(runtime, stale):
+            return runtime
+        if runtime is None:
             # Build the model before the client, so a model error leaves
             # no client thread running.
             model = build_model()
-        mcp_client, tools = _connect_mcp()
-        _runtime = Runtime(model=model, mcp_client=mcp_client, tools=tools)
-        return _runtime
+            connection = _connect_mcp()
+            tools = [
+                GatewayTool(tool, current_connection, reconnect)
+                for tool in connection.tools.values()
+            ]
+            _runtime = Runtime(model=model, tools=tools, connection=connection)
+            return _runtime
 
-
-async def get_runtime() -> Runtime:
-    """Return the shared runtime, starting or reconnecting it when needed."""
-    runtime = _runtime
-    if runtime is not None and _session_is_running(runtime.mcp_client):
+        old = runtime.connection
+        runtime.connection = None
+        if old is not None:
+            logger.warning(
+                "Rebuilding the Gateway MCP client (session=%s)", REQUEST_SESSION_ID.get()
+            )
+            old.retire()
+        connection = _connect_mcp()
+        missing = sorted({tool.tool_name for tool in runtime.tools} - connection.tools.keys())
+        if missing:
+            logger.warning("The rebuilt Gateway client lacks tools %s", missing)
+        runtime.connection = connection
         return runtime
-    return await asyncio.to_thread(_start_runtime)
+
+
+async def get_runtime(stale: GatewayConnection | None = None) -> Runtime:
+    """Return the shared runtime, starting or reconnecting it when needed.
+
+    Pass ``stale`` when a call on that connection found the session ended.
+    """
+    runtime = _runtime
+    if _is_usable(runtime, stale):
+        return runtime
+    return await asyncio.to_thread(_start_runtime, stale)
 
 
 def extract_prompt(payload: Any) -> str | None:
@@ -177,6 +212,7 @@ async def invoke(payload: Any, context):
         user_id = payload.get("user_id")
         if not isinstance(user_id, str) or not user_id:
             user_id = "anonymous"
+        REQUEST_SESSION_ID.set(session_id)
         logger.info("Request session=%s user=%s prompt=%s", session_id, user_id, prompt[:100])
 
         # The workload access token is valid here, on the request path, so

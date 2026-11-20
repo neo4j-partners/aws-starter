@@ -114,7 +114,10 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
     ),
 }
 
-# Model allocation across the fleet (proportions must sum to 1.0)
+# Model allocation for aircraft beyond the manual registry. Proportions must
+# sum to 1.0. The first 30 aircraft are the registry in MANUAL_FLEET_TAILS,
+# so the 30-aircraft default follows the registry shape instead: E190 is 10
+# of 30, and every other model is 5 of 30.
 MODEL_DISTRIBUTION: list[tuple[str, float]] = [
     ("B737-800", 0.35),
     ("A320-200", 0.25),

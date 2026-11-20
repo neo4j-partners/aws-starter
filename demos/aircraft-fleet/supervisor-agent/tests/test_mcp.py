@@ -26,7 +26,6 @@ from fleet_supervisor.core.mcp import (
     build_mcp_client,
     client_credentials_fetcher,
     jwt_deadline,
-    list_all_tools,
 )
 
 LOCAL = ClientCredentials(
@@ -325,7 +324,21 @@ class Page(list):
         self.pagination_token = token
 
 
-def test_list_all_tools_follows_pagination():
+def test_strands_load_tools_starts_once_and_lists_every_page_with_our_filters(monkeypatch):
+    # server._connect_mcp relies on MCPClient.load_tools to start the client
+    # and follow pagination with the client's tool filters. Pin that here,
+    # with the network calls replaced on the instance.
+    client = build_mcp_client(build_gateway_auth(LOCAL))
     pages = {None: Page(["a"], "p2"), "p2": Page(["b"], "p3"), "p3": Page(["c"], None)}
-    client = SimpleNamespace(list_tools_sync=lambda pagination_token=None: pages[pagination_token])
-    assert list_all_tools(client) == ["a", "b", "c"]
+    starts: list[bool] = []
+    seen_filters: list = []
+
+    def list_tools_sync(pagination_token=None, prefix=None, tool_filters=None):
+        seen_filters.append(tool_filters)
+        return pages[pagination_token]
+
+    monkeypatch.setattr(client, "start", lambda: starts.append(True) or client)
+    monkeypatch.setattr(client, "list_tools_sync", list_tools_sync)
+    assert list(asyncio.run(client.load_tools())) == ["a", "b", "c"]
+    assert starts == [True]
+    assert seen_filters == [SPECIALIST_TOOL_FILTERS] * 3

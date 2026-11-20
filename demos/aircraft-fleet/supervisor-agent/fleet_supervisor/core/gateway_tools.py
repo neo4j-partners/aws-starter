@@ -26,7 +26,7 @@ from typing import Any
 
 from strands.tools.mcp import MCPAgentTool, MCPClient
 from strands.types.events import ToolResultEvent
-from strands.types.exceptions import MCPClientInitializationError
+from strands.types.exceptions import MCPClientInitializationError, ToolProviderException
 from strands.types.tools import AgentTool, ToolGenerator, ToolResult, ToolSpec, ToolUse
 
 from fleet_supervisor.core.tool_errors import (
@@ -59,6 +59,17 @@ def stop_quietly(client: MCPClient) -> None:
         client.stop(None, None, None)
     except Exception:
         logger.exception("Error while stopping the MCP client")
+
+
+def _cause_name(error: BaseException) -> str:
+    """Name the class of the failure behind ``error``.
+
+    ``MCPClient.load_tools`` wraps a start failure in ToolProviderException,
+    so the log names the wrapped class instead.
+    """
+    if isinstance(error, ToolProviderException) and error.__cause__ is not None:
+        return type(error.__cause__).__name__
+    return type(error).__name__
 
 
 class GatewayConnection:
@@ -200,7 +211,7 @@ class GatewayTool(AgentTool):
                 "%s: reconnecting to the Gateway failed (session=%s, cause=%s)",
                 self._name,
                 REQUEST_SESSION_ID.get(),
-                type(error).__name__,
+                _cause_name(error),
             )
             logger.debug("Reconnect failure details", exc_info=error)
             return self._unavailable(tool_use)

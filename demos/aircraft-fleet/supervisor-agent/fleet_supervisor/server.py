@@ -47,7 +47,6 @@ from fleet_supervisor.core.mcp import (
     GatewayAuth,
     build_gateway_auth,
     build_mcp_client,
-    list_all_tools,
 )
 from fleet_supervisor.core.model import build_model
 
@@ -99,8 +98,10 @@ def _connect_mcp() -> GatewayConnection:
     # two tools, so per-specialist filters would be identical.
     mcp_client = build_mcp_client(gateway_auth())
     try:
-        mcp_client.start()
-        tools = list_all_tools(mcp_client)
+        # load_tools starts the client, then lists every page with the
+        # client's tool filters applied. This runs in a worker thread with
+        # no event loop, so asyncio.run is safe here.
+        tools = list(asyncio.run(mcp_client.load_tools()))
         if not tools:
             raise RuntimeError(
                 "The Gateway returned none of the specialist tools. "

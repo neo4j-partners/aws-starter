@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 import httpx
-from strands.tools.mcp import MCPAgentTool, MCPClient, ToolFilters
+from strands.tools.mcp import MCPClient, ToolFilters
 
 from fleet_supervisor.core.config import AWS_REGION
 from fleet_supervisor.core.credentials import (
@@ -287,15 +287,3 @@ def build_mcp_client(gateway: GatewayAuth, tool_filters: ToolFilters | None = No
         auth_provider=gateway.auth,
         tool_filters=tool_filters if tool_filters is not None else SPECIALIST_TOOL_FILTERS,
     )
-
-
-def list_all_tools(client: MCPClient) -> list[MCPAgentTool]:
-    """List the filtered tools across every page the server returns."""
-    tools: list[MCPAgentTool] = []
-    token: str | None = None
-    while True:
-        page = client.list_tools_sync(pagination_token=token)
-        tools.extend(page)
-        token = page.pagination_token
-        if token is None:
-            return tools

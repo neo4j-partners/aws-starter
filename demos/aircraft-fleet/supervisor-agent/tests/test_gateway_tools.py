@@ -5,7 +5,7 @@ import logging
 
 import pytest
 from strands.types.events import ToolResultEvent
-from strands.types.exceptions import MCPClientInitializationError
+from strands.types.exceptions import MCPClientInitializationError, ToolProviderException
 
 from fleet_supervisor import server
 from fleet_supervisor.core.gateway_tools import REQUEST_SESSION_ID, GatewayTool
@@ -62,6 +62,20 @@ class FakeClient:
     def list_tools_sync(self, pagination_token=None):
         self.tools = [FakeTool(self, name, self.spec) for name in self.tool_names]
         return Page(self.tools)
+
+    async def load_tools(self):
+        """Mirror MCPClient.load_tools: start, wrap a start failure, list every page."""
+        try:
+            self.start()
+        except Exception as error:
+            raise ToolProviderException(f"Failed to start MCP client: {error}") from error
+        tools, token = [], None
+        while True:
+            page = self.list_tools_sync(pagination_token=token)
+            tools.extend(page)
+            token = page.pagination_token
+            if token is None:
+                return tools
 
     def _is_session_active(self):
         return self.active

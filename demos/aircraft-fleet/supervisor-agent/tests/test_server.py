@@ -4,6 +4,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from strands.types.exceptions import ToolProviderException
 
 from fleet_supervisor import server
 from tests.conftest import collect
@@ -169,6 +170,20 @@ class FakeClient:
             raise self.list_error
         page = [SimpleNamespace(tool_name=t, tool_spec={"name": t}) for t in self.tools]
         return Page(page)
+
+    async def load_tools(self):
+        """Mirror MCPClient.load_tools: start, wrap a start failure, list every page."""
+        try:
+            self.start()
+        except Exception as error:
+            raise ToolProviderException(f"Failed to start MCP client: {error}") from error
+        tools, token = [], None
+        while True:
+            page = self.list_tools_sync(pagination_token=token)
+            tools.extend(page)
+            token = page.pagination_token
+            if token is None:
+                return tools
 
     def _is_session_active(self):
         return self.active

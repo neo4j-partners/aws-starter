@@ -57,6 +57,7 @@ uv run fleet-demo            # terminal 2: full showcase
 ```
 
 - **Neo4j:** The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`. It opens one driver per process.
+- **Neo4j password in the cloud:** When `NEO4J_PASSWORD_SECRET_ARN` is set, the agent reads the password from that Secrets Manager secret once at startup and ignores `NEO4J_PASSWORD`. The secret value is a JSON object with a `password` key, such as `{"username": "neo4j", "password": "..."}`. Other keys are ignored.
 - **Bedrock:** The agent uses the standard AWS credential chain for Claude, Text2Cypher, and Titan.
 
 ## Prerequisites
@@ -149,7 +150,7 @@ Before the first deploy, edit the `envVars` in `agentcore/agentcore.json`:
 
 - **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE` for the fleet graph.
 - **Memory connection:** Set the `MEM_NEO4J_*` values for the agent memory database.
-- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the Secrets Manager secrets that hold the passwords. Never put a password in `agentcore.json`.
+- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the Secrets Manager secrets that hold the passwords. Never put a password in `agentcore.json`. Each secret holds a JSON object with a `password` key.
 
 ```bash
 ./agent.sh deploy            # builds the code zip and deploys the CDK stack
@@ -223,7 +224,8 @@ terminal. Press Ctrl+C to stop it.
 |----------|---------|
 | `NEO4J_URI` | Required |
 | `NEO4J_USERNAME` | `neo4j` |
-| `NEO4J_PASSWORD` | Required |
+| `NEO4J_PASSWORD` | Required unless `NEO4J_PASSWORD_SECRET_ARN` is set |
+| `NEO4J_PASSWORD_SECRET_ARN` | Unset. When set, the password comes from this secret. |
 | `NEO4J_DATABASE` | `neo4j` |
 | `MODEL_ID` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
 | `AWS_REGION` | `us-east-1` |

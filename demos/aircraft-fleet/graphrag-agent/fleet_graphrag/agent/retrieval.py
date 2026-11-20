@@ -38,6 +38,7 @@ from neo4j_graphrag.schema import get_schema
 from neo4j_graphrag.types import RetrieverResultItem
 
 from fleet_graphrag.agent.config import ConfigError, settings
+from fleet_graphrag.agent.secrets import neo4j_password
 from fleet_graphrag.agent.text2cypher import BoundedText2CypherRetriever
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ def get_driver() -> Driver:
     if _driver is None:
         uri = _require_env("NEO4J_URI")
         username = os.environ.get("NEO4J_USERNAME", "neo4j")
-        password = _require_env("NEO4J_PASSWORD")
+        password = neo4j_password()
         logger.info("Connecting to Neo4j at %s", uri)
         _driver = GraphDatabase.driver(uri, auth=(username, password))
     return _driver

@@ -57,6 +57,10 @@ from fleet_graphrag.agent import (  # noqa: E402
     vector_search,
 )
 from fleet_graphrag.agent.model import build_bedrock_model  # noqa: E402
+from fleet_graphrag.agent.secrets import (  # noqa: E402
+    NEO4J_PASSWORD_SECRET_ARN,
+    neo4j_password,
+)
 from fleet_graphrag.agent.tools import graph_query_tool, vector_search_tool  # noqa: E402
 
 logging.basicConfig(
@@ -316,6 +320,10 @@ def main(default_port: int = 7070) -> None:
     with ``opentelemetry-instrument``.
     """
     port = int(os.environ.get("AGENT_PORT", str(default_port)))
+    if os.environ.get(NEO4J_PASSWORD_SECRET_ARN):
+        # Read the secret before serving, so a bad ARN or a missing IAM grant
+        # stops startup instead of failing the first request.
+        neo4j_password()
     logger.info(
         "Starting Aircraft Fleet GraphRAG Agent with model: %s on port %s",
         settings.model_id,

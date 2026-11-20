@@ -27,6 +27,7 @@ _AGENT_VARS = (
     "NEO4J_USERNAME",
     "NEO4J_PASSWORD",
     "NEO4J_DATABASE",
+    "NEO4J_PASSWORD_SECRET_ARN",
 )
 
 os.environ["FLEET_ENV_FILE"] = os.devnull

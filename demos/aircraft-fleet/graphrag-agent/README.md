@@ -174,7 +174,7 @@ connection differs:
 - **`uv run fleet-demo --remote`:** This command runs all four demo sections against the deployed agent.
 - **`uv run fleet-invoke "..."`:** This command sends one prompt and streams the answer as it arrives.
 - **`uv run fleet-invoke load-test [seconds]`:** This command sends a random query from `queries.txt` on an interval. The default interval is 5 seconds.
-- **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. It does not read `../.env`. When it finishes, it checks `agentcore status` and lists anything still deployed.
+- **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. It does not read `../.env`. When it finishes, it lists anything `agentcore status` still reports as deployed. It also asks CloudFormation for the stack `AgentCore-AircraftFleet-default`. The status command reads local state that can be lost, so the CloudFormation answer is the one that counts. Destroy fails while the stack exists in any state other than `DELETE_COMPLETE`.
 
 ## Conversation memory
 

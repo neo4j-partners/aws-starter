@@ -150,8 +150,40 @@ restore_spec() {
 }
 
 # Report every resource that `agentcore status` still shows as deployed.
+# The CloudFormation stack the CLI deploys for $TARGET. @aws/agentcore-cdk
+# 1.1.0 (resolveTargetStacks) names it AgentCore-<project>-<target>, with each
+# underscore replaced by a dash.
+stack_name() {
+    uv run --quiet python -c '
+import json
+import sys
+from pathlib import Path
+
+name = json.loads(Path(sys.argv[1]).read_text())["name"]
+print(f"AgentCore-{name}-{sys.argv[2]}".replace("_", "-"))
+' "$PROJECT_SPEC" "$TARGET"
+}
+
+# Print the stack status, "absent" when the stack does not exist, or fail.
+stack_status() {
+    local stack="$1" region="$2" output
+    if ! command -v aws >/dev/null 2>&1; then
+        echo "The aws CLI is not installed." >&2
+        return 1
+    fi
+    if output=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" \
+            --query 'Stacks[0].StackStatus' --output text 2>&1); then
+        echo "$output"
+    elif [[ "$output" == *"does not exist"* ]]; then
+        echo "absent"
+    else
+        echo "$output" >&2
+        return 1
+    fi
+}
+
 report_remaining() {
-    local status remaining status_err
+    local status parsed region remaining status_err stack cfn_status
     # stderr goes to its own file, so a CLI banner or warning cannot break
     # the JSON. It is printed only when the call fails.
     status_err=$(mktemp)
@@ -163,34 +195,60 @@ report_remaining() {
         exit 1
     fi
     rm -f "$status_err"
-    if ! remaining=$(printf '%s' "$status" | uv run --quiet python -c '
+    # The first line is the target region. Each later line is a resource that
+    # status does not report as local-only.
+    if ! parsed=$(printf '%s' "$status" | uv run --quiet python -c '
 import json
 import sys
 
 
 def walk(resources):
-    for resource in resources if isinstance(resources, list) else []:
+    for resource in resources:
         if not isinstance(resource, dict):
             continue
         state = resource.get("deploymentState")
         if state != "local-only":
             kind, name = resource.get("resourceType"), resource.get("name")
             print(f"  {kind} {name}: {state}")
-        walk(resource.get("children"))
+        walk(resource.get("children") or [])
 
 
-walk(json.load(sys.stdin).get("resources"))
-' 2>/dev/null); then
+status = json.load(sys.stdin)
+region = status.get("region")
+resources = status.get("resources")
+if not isinstance(region, str) or not region or not isinstance(resources, list):
+    sys.exit("The status output has no region or no resources list.")
+print(region)
+walk(resources)
+' 2>&1); then
         echo -e "${RED}Could not read the agentcore status output:${NC}"
+        echo "$parsed"
         echo "$status"
         exit 1
+    fi
+    region=$(head -n 1 <<<"$parsed")
+    remaining=$(tail -n +2 <<<"$parsed")
+    # agentcore status reads agentcore/.cli/deployed-state.json. If that file
+    # is lost, every resource reads local-only while the stack still exists,
+    # so ask CloudFormation directly.
+    if ! stack=$(stack_name); then
+        echo -e "${RED}Could not read the project name from $PROJECT_SPEC.${NC}"
+        exit 1
+    fi
+    if ! cfn_status=$(stack_status "$stack" "$region"); then
+        echo -e "${RED}Could not check stack $stack in $region with CloudFormation.${NC}"
+        exit 1
+    fi
+    if [ "$cfn_status" != "absent" ] && [ "$cfn_status" != "DELETE_COMPLETE" ]; then
+        remaining="${remaining:+$remaining
+}  stack $stack: $cfn_status"
     fi
     if [ -n "$remaining" ]; then
         echo -e "${RED}Still deployed in target '$TARGET':${NC}"
         echo "$remaining"
         exit 1
     fi
-    echo -e "${GREEN}Cleanup complete. Nothing is deployed in target '$TARGET'.${NC}"
+    echo -e "${GREEN}Cleanup complete. Stack $stack does not exist in $region.${NC}"
 }
 
 # The settings agentcore/cdk/lib/cdk-stack.ts copies into the Runtime

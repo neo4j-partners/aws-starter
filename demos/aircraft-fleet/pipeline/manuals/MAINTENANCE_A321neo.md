@@ -65,7 +65,7 @@ The A321neo represents the latest evolution of the A320 family with:
 
 ### 1.3 Fleet Configuration
 
-The A321neo fleet operates across four partner carriers configured for medium to long-haul operations. The combined fleet of approximately 20 aircraft is distributed as follows:
+The A321neo fleet operates across four partner carriers configured for medium to long-haul operations.
 
 | Operator | Aircraft Count | Primary Routes |
 |----------|---------------|----------------|

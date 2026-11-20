@@ -1,7 +1,7 @@
-# AgentCore CLI state. Commit only the deployed-state binding so a target's
-# stack and credential ARNs are shared.
-agentcore/.cli/*
-!agentcore/.cli/deployed-state.json
+# AgentCore CLI state. deployed-state.json holds the account's stack and
+# credential ARNs, so it stays out of git. `agent.sh destroy` declares the
+# credential again before it deploys, so losing this file is safe.
+agentcore/.cli/
 
 # AgentCore build cache, CDK output, and CDK dependencies.
 agentcore/.cache/

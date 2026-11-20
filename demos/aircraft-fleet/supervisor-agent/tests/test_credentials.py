@@ -7,7 +7,9 @@ import pytest
 import fleet_supervisor.core.credentials as credentials_module
 from fleet_supervisor.core.credentials import (
     DEFAULT_CREDENTIALS_FILE,
+    PROVIDER_NAME_VAR,
     ClientCredentials,
+    ConfigError,
     IdentityCredentials,
     credentials_file,
     load_credentials,
@@ -26,7 +28,7 @@ VALID = {
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
     for name in (
-        "GATEWAY_CREDENTIAL_PROVIDER",
+        PROVIDER_NAME_VAR,
         "GATEWAY_URL",
         "GATEWAY_SCOPES",
         "MCP_CREDENTIALS_FILE",
@@ -85,22 +87,34 @@ def test_local_path_reads_the_file(monkeypatch, tmp_path):
 
 
 def test_provider_env_selects_identity(monkeypatch):
-    monkeypatch.setenv("GATEWAY_CREDENTIAL_PROVIDER", "fleet-gateway")
+    monkeypatch.setenv(PROVIDER_NAME_VAR, "fleetsupervisor_default_fleet-gateway")
     monkeypatch.setenv("GATEWAY_URL", "https://g/mcp")
     monkeypatch.setenv("GATEWAY_SCOPES", "a/b c/d")
     assert load_credentials() == IdentityCredentials(
-        "https://g/mcp", "fleet-gateway", ("a/b", "c/d")
+        "https://g/mcp", "fleetsupervisor_default_fleet-gateway", ("a/b", "c/d")
     )
 
 
+def test_provider_var_is_the_one_the_construct_sets():
+    # agentcore-cdk sets CREDENTIAL_<NAME>_NAME for the declared credential.
+    assert PROVIDER_NAME_VAR == "CREDENTIAL_FLEET_GATEWAY_NAME"
+
+
+def test_cloud_path_without_provider_names_the_variable(monkeypatch):
+    # GATEWAY_URL is set only in the Runtime, so the provider must be too.
+    monkeypatch.setenv("GATEWAY_URL", "https://g/mcp")
+    with pytest.raises(ConfigError, match="CREDENTIAL_FLEET_GATEWAY_NAME is not set"):
+        load_credentials()
+
+
 def test_identity_needs_gateway_url(monkeypatch):
-    monkeypatch.setenv("GATEWAY_CREDENTIAL_PROVIDER", "fleet-gateway")
-    with pytest.raises(ValueError, match="GATEWAY_URL"):
+    monkeypatch.setenv(PROVIDER_NAME_VAR, "fleetsupervisor_default_fleet-gateway")
+    with pytest.raises(ConfigError, match="GATEWAY_URL"):
         load_credentials()
 
 
 def test_identity_gateway_url_must_be_https(monkeypatch):
-    monkeypatch.setenv("GATEWAY_CREDENTIAL_PROVIDER", "fleet-gateway")
+    monkeypatch.setenv(PROVIDER_NAME_VAR, "fleetsupervisor_default_fleet-gateway")
     monkeypatch.setenv("GATEWAY_URL", "http://g/mcp")
-    with pytest.raises(ValueError, match="GATEWAY_URL must be an https URL"):
+    with pytest.raises(ConfigError, match="GATEWAY_URL must be an https URL"):
         load_credentials()

@@ -86,8 +86,13 @@ export class AgentCoreStack extends Stack {
     super(scope, id, props);
     this.application = new AgentCoreApplication(this, 'Application', props.application);
 
+    // `agent.sh destroy` removes the Runtime from the spec and deploys. With no Runtime there
+    // is nothing to configure, and the settings are not needed.
+    const runtime = this.application.runtimes.get(RUNTIME_NAME);
+    if (runtime === undefined) {
+      return;
+    }
     const env = readDeployEnv();
-    const runtime = this.application.runtime(RUNTIME_NAME);
     for (const [name, value] of Object.entries(env)) {
       runtime.addEnvironmentVariable(name, value);
     }

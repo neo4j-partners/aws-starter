@@ -1,8 +1,11 @@
 """Gateway connection settings for the cloud and local auth paths.
 
-Cloud: ``GATEWAY_CREDENTIAL_PROVIDER`` names the AgentCore Identity OAuth2
-credential provider that holds the Gateway client secret. ``GATEWAY_URL``
-gives the Gateway endpoint. No secret is read from disk.
+Cloud: ``CREDENTIAL_FLEET_GATEWAY_NAME`` names the AgentCore Identity OAuth2
+credential provider that holds the Gateway client secret. The AgentCore CDK
+construct sets it on the Runtime because ``agent.sh deploy`` declares the
+``fleet-gateway`` credential. ``GATEWAY_URL`` gives the Gateway endpoint, and
+``agentcore/cdk/lib/cdk-stack.ts`` sets it. Either variable selects this path,
+and then both must be set. No secret is read from disk.
 
 Local: the credentials file written by ``neo4j-mcp-server/deploy.py``. It
 defaults to ``demos/aircraft-fleet/.mcp-credentials.json``, resolved from this
@@ -26,6 +29,12 @@ AGENT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CREDENTIALS_FILE = AGENT_ROOT.parent / ".mcp-credentials.json"
 
 REQUIRED_FILE_KEYS = ("gateway_url", "token_url", "client_id", "client_secret")
+# The construct names this variable after the credential: CREDENTIAL_<NAME>_NAME.
+PROVIDER_NAME_VAR = "CREDENTIAL_FLEET_GATEWAY_NAME"
+
+
+class ConfigError(ValueError):
+    """A Runtime setting is missing or invalid."""
 
 
 @dataclass(frozen=True)
@@ -54,12 +63,19 @@ GatewayCredentials = IdentityCredentials | ClientCredentials
 
 def load_credentials() -> GatewayCredentials:
     """Pick the auth path from the environment and load its settings."""
-    if provider_name := os.getenv("GATEWAY_CREDENTIAL_PROVIDER", "").strip():
-        gateway_url = os.getenv("GATEWAY_URL", "").strip()
+    provider_name = os.getenv(PROVIDER_NAME_VAR, "").strip()
+    gateway_url = os.getenv("GATEWAY_URL", "").strip()
+    if provider_name or gateway_url:
+        if not provider_name:
+            raise ConfigError(
+                f"{PROVIDER_NAME_VAR} is not set. The AgentCore construct sets it when "
+                "agentcore.json declares the fleet-gateway credential. "
+                "Deploy with ./agent.sh deploy, which declares it."
+            )
         if not gateway_url:
-            raise ValueError("GATEWAY_URL must be set when GATEWAY_CREDENTIAL_PROVIDER is set")
+            raise ConfigError(f"GATEWAY_URL must be set when {PROVIDER_NAME_VAR} is set")
         if not is_https(gateway_url):
-            raise ValueError("GATEWAY_URL must be an https URL")
+            raise ConfigError("GATEWAY_URL must be an https URL")
         logger.info("Using AgentCore Identity provider %s for the Gateway", provider_name)
         return IdentityCredentials(
             gateway_url=gateway_url,

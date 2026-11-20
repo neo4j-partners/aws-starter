@@ -36,12 +36,19 @@ RUNTIME_NAME="supervisor"
 # Matches .python-version.
 RUNTIME_VERSION="PYTHON_3_12"
 # Non-secret runtime environment variables, written into agentcore.json.
-# GATEWAY_CREDENTIAL_PROVIDER names the AgentCore Identity OAuth2 provider
-# that holds the Gateway client secret. Setting it selects the cloud auth path.
 # Deployment-specific settings are not written here. See DEPLOY_VARS below.
-RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_CREDENTIAL_PROVIDER":"fleet-gateway"}'
-# Must match GATEWAY_CREDENTIAL_PROVIDER above.
+RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5"}'
+PROJECT_SPEC="agentcore/agentcore.json"
+TARGET="default"
+# The AgentCore Identity OAuth2 credential that holds the Gateway client
+# secret. deploy and destroy declare it for the one CLI run, then restore the
+# tracked agentcore.json. The construct then sets CREDENTIAL_FLEET_GATEWAY_NAME
+# on the Runtime, which selects the cloud auth path in credentials.py.
 GATEWAY_CREDENTIAL="fleet-gateway"
+# `agentcore add credentials` writes the client secret, encrypted with a key
+# in ~/.agentcore or the keychain, to this variable in agentcore/.env.local.
+GATEWAY_SECRET_VAR="AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET"
+ENV_LOCAL="agentcore/.env.local"
 # Local Gateway credentials, written by neo4j-mcp-server/deploy.py.
 CREDENTIALS_FILE="${MCP_CREDENTIALS_FILE:-$ROOT_DIR/../.mcp-credentials.json}"
 # AgentCore deployment region. AgentCore's primary region is us-east-1
@@ -172,38 +179,128 @@ create_project() {
 }
 
 # The runtime gets its Gateway token from the fleet-gateway OAuth provider.
-# The AgentCore CLI creates that provider from the credentials entry in
-# agentcore.json before CDK runs, and the CDK grants the runtime access to it
-# only when the entry exists. CDK cannot create the provider, so the entry is
-# added once with `agentcore add credentials oauth`. Its client secret goes to
-# agentcore/.env.local, which git ignores and the code zip leaves out.
-ensure_gateway_credential() {
-    local spec="agentcore/agentcore.json"
+# The AgentCore CLI creates or updates that provider from the credentials
+# entry in agentcore.json before CDK runs, and the construct grants the
+# runtime access to it only while the entry exists. A deploy without the entry
+# deletes the provider, so the entry is added for every deploy and destroy.
+# The tracked agentcore.json never holds it, so it carries no account details.
+#
+# The client ID and scope come from the fleet credentials file, and the
+# discovery URL from the MCP server stack. The secret goes to the CLI on
+# stdin, never in argv, and the CLI stores it in agentcore/.env.local. The
+# EXIT trap removes that line and restores the tracked agentcore.json.
+add_gateway_credential() {
+    ensure_credentials
     if jq -e --arg name "$GATEWAY_CREDENTIAL" \
-        '.credentials // [] | any(.name == $name)' "$spec" >/dev/null; then
-        return
+        '.credentials // [] | any(.name == $name)' "$PROJECT_SPEC" >/dev/null; then
+        echo -e "${RED}ERROR: $PROJECT_SPEC already declares the $GATEWAY_CREDENTIAL credential${NC}"
+        echo "An earlier run did not restore it. Restore the tracked spec, then run this again:"
+        echo "  git checkout -- $PROJECT_SPEC"
+        exit 1
     fi
-    echo -e "${RED}ERROR: agentcore.json does not declare the $GATEWAY_CREDENTIAL credential${NC}"
-    echo ""
-    echo "Without it the runtime cannot get a Gateway token. Add it once from"
-    echo "$ROOT_DIR, using the fleet credentials file and the MCP server stack:"
-    echo ""
-    printf '%s\n' \
-        "  creds=\"$CREDENTIALS_FILE\"" \
-        "  jq -r .client_secret \"\$creds\" | agentcore add credentials oauth \\" \
-        "      --name $GATEWAY_CREDENTIAL \\" \
-        "      --client-id \"\$(jq -r .client_id \"\$creds\")\" \\" \
-        "      --discovery-url \"\$(aws cloudformation describe-stacks --region $REGION \\" \
-        "          --stack-name \"\$(jq -r .stack_name \"\$creds\")\" \\" \
-        "          --query \"Stacks[0].Outputs[?OutputKey=='CognitoDiscoveryUrl'].OutputValue\" \\" \
-        "          --output text)\" \\" \
-        "      --scopes \"\$(jq -r .scope \"\$creds\")\" \\" \
-        "      --client-secret -"
-    exit 1
+    local client_id scope stack_name discovery_url
+    client_id=$(jq -r '.client_id // empty' "$CREDENTIALS_FILE")
+    scope=$(jq -r '.scope // empty' "$CREDENTIALS_FILE")
+    stack_name=$(jq -r '.stack_name // empty' "$CREDENTIALS_FILE")
+    if [ -z "$client_id" ] || [ -z "$scope" ] || [ -z "$stack_name" ] \
+        || ! jq -e '.client_secret | type == "string" and length > 0' "$CREDENTIALS_FILE" >/dev/null; then
+        echo -e "${RED}ERROR: $CREDENTIALS_FILE needs client_id, client_secret, scope, and stack_name${NC}"
+        echo "Regenerate it with: cd neo4j-mcp-server && ./deploy.py --env fleet credentials"
+        exit 1
+    fi
+    discovery_url=$(aws cloudformation describe-stacks --region "$REGION" \
+        --stack-name "$stack_name" \
+        --query "Stacks[0].Outputs[?OutputKey=='CognitoDiscoveryUrl'].OutputValue" \
+        --output text)
+    if [[ "$discovery_url" != https://* ]]; then
+        echo -e "${RED}ERROR: stack $stack_name has no CognitoDiscoveryUrl output in $REGION${NC}"
+        exit 1
+    fi
+    # Drop a line a killed run may have left, so the CLI writes a fresh one.
+    strip_gateway_secret
+    jq -r '.client_secret' "$CREDENTIALS_FILE" | agentcore add credentials oauth \
+        --name "$GATEWAY_CREDENTIAL" \
+        --client-id "$client_id" \
+        --discovery-url "$discovery_url" \
+        --scopes "$scope" \
+        --client-secret -
+}
+
+# Remove the client secret line, and the comment the CLI writes above it,
+# from agentcore/.env.local. Every other line is kept.
+strip_gateway_secret() {
+    [ -f "$ENV_LOCAL" ] || return 0
+    local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
+    local status=0
+    grep -v -F -e "$comment" -e "$GATEWAY_SECRET_VAR=" "$ENV_LOCAL" > "$ENV_LOCAL.tmp" || status=$?
+    # grep exits 1 when it prints nothing, which is fine. 2 is an error.
+    if [ "$status" -gt 1 ] || ! mv "$ENV_LOCAL.tmp" "$ENV_LOCAL"; then
+        rm -f "$ENV_LOCAL.tmp"
+        echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2
+        return 1
+    fi
+}
+
+# Put back the tracked agentcore.json and remove the secret line. Returns
+# nonzero if either step fails, and says what to do by hand.
+restore_project() {
+    local failed=0
+    if [ -n "${SPEC_BACKUP:-}" ]; then
+        cp "$SPEC_BACKUP" "$PROJECT_SPEC" && rm -f "$SPEC_BACKUP" \
+            || { echo "Restore failed; backup at $SPEC_BACKUP" >&2; failed=1; }
+    fi
+    strip_gateway_secret || failed=1
+    return "$failed"
+}
+
+# Back up the tracked spec, arm the restore, and declare the credential.
+# INT and TERM exit through the EXIT trap, so Ctrl+C restores too.
+begin_gateway_credential() {
+    SPEC_BACKUP=$(mktemp)
+    cp "$PROJECT_SPEC" "$SPEC_BACKUP"
+    trap 'restore_project || exit 1' EXIT
+    trap 'exit 130' INT TERM
+    add_gateway_credential
+}
+
+end_gateway_credential() {
+    trap - EXIT INT TERM
+    restore_project
+}
+
+# Report every resource that `agentcore status` still shows as deployed.
+# Status lists only what agentcore.json declares, so destroy calls this with
+# the Runtime and the credential both declared.
+report_remaining() {
+    local status errors remaining
+    errors=$(mktemp)
+    if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
+        echo -e "${RED}Could not check what remains deployed:${NC}"
+        cat "$errors"
+        rm -f "$errors"
+        exit 1
+    fi
+    rm -f "$errors"
+    if ! remaining=$(printf '%s' "$status" | jq -r '
+        def remaining: .[]? | objects
+            | (select(.deploymentState != "local-only")
+               | "  \(.resourceType) \(.name): \(.deploymentState)"),
+              (.children | remaining);
+        .resources | remaining'); then
+        echo -e "${RED}Could not read the agentcore status output:${NC}"
+        echo "$status"
+        exit 1
+    fi
+    if [ -n "$remaining" ]; then
+        echo -e "${RED}Still deployed in target '$TARGET':${NC}"
+        echo "$remaining"
+        exit 1
+    fi
+    echo -e "${GREEN}Cleanup complete. Nothing is deployed in target '$TARGET'.${NC}"
 }
 
 # Export DEPLOY_VARS from ../.env and the credentials file, which both sit
-# outside the code zip. A value already set in the shell wins. The files are
+# outside the code zip. A value exported in the shell wins. The files are
 # parsed, not sourced, and only these names are exported, so the passwords
 # and the client secret in them stay out of the CDK process.
 load_deploy_env() {
@@ -317,12 +414,13 @@ case "${1:-help}" in
     deploy)
         ensure_project
         ensure_no_secrets_in_zip
-        ensure_gateway_credential
         load_deploy_env
+        begin_gateway_credential
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
         agentcore deploy "${@:2}"
+        end_gateway_credential
         echo ""
         echo -e "${GREEN}Deployment complete!${NC}"
         echo "Run './agent.sh status' to check status"
@@ -373,16 +471,23 @@ case "${1:-help}" in
         ensure_project
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
-        # The CLI has no destroy command. Emptying the project and deploying
-        # deletes the target's stack. agentcore.json then has no runtime, so
-        # restore it from git before deploying again.
-        # The deploy below synthesizes the stack, which needs the settings.
-        load_deploy_env
-        agentcore remove all --yes
-        agentcore deploy --yes
+        # The CLI has no destroy command. A deploy of a project that declares
+        # nothing deployable removes the target's stack and every declared
+        # credential provider. So declare the credential, remove the Runtime
+        # from the spec, and deploy. With no Runtime, the stack reads no
+        # deploy settings.
+        begin_gateway_credential
+        SPEC_WITH_CREDENTIAL=$(mktemp)
+        cp "$PROJECT_SPEC" "$SPEC_WITH_CREDENTIAL"
+        agentcore remove runtime --name "$RUNTIME_NAME"
+        agentcore deploy --target "$TARGET" --yes
+        # Status lists only what the spec declares, so put the Runtime and the
+        # credential back before asking it what remains.
+        cp "$SPEC_WITH_CREDENTIAL" "$PROJECT_SPEC"
+        rm -f "$SPEC_WITH_CREDENTIAL"
         echo ""
-        echo -e "${GREEN}Cleanup complete!${NC}"
-        echo "Restore the project spec with: git checkout -- agentcore/agentcore.json"
+        report_remaining
+        end_gateway_credential
         ;;
 
     help|--help|-h)

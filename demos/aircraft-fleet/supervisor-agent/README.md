@@ -88,7 +88,7 @@ new one.
 The agent has two ways to get a Gateway token. The environment picks one.
 
 - **Local:** The agent reads `demos/aircraft-fleet/.mcp-credentials.json`. The path is resolved from the package, so it works from any working directory. Set `MCP_CREDENTIALS_FILE` to use another file.
-- **Cloud:** When `GATEWAY_CREDENTIAL_PROVIDER` is set, the agent gets an M2M token from that AgentCore Identity credential provider. `GATEWAY_URL` gives the Gateway endpoint. The runtime holds no client secret.
+- **Cloud:** When `CREDENTIAL_FLEET_GATEWAY_NAME` or `GATEWAY_URL` is set, the agent gets an M2M token from the AgentCore Identity credential provider that `CREDENTIAL_FLEET_GATEWAY_NAME` names. Both must be set. If one is missing, the agent stops with an error that names it. The AgentCore CDK construct sets `CREDENTIAL_FLEET_GATEWAY_NAME` on the runtime because `./agent.sh deploy` declares the `fleet-gateway` credential. `GATEWAY_URL` gives the Gateway endpoint. The runtime holds no client secret.
 
 On the cloud path, each request fetches the Gateway token before it starts,
 because AgentCore Identity needs that request's workload access token. The
@@ -140,30 +140,15 @@ The server streams JSON events over SSE:
 The project lives in `agentcore/`. It was created with the AgentCore CLI, and
 its runtime `codeLocation` is this folder.
 
-Before the first deploy, do two things:
+**Deploy settings:** Before the first deploy, set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env`. `./agent.sh deploy` exports them, plus `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. A value exported in the shell wins. The files are parsed, not sourced, and nothing else in them is exported. `agentcore/cdk/lib/cdk-stack.ts` copies the settings onto the runtime. Synth stops with one error that lists every missing or malformed setting. `GATEWAY_URL` must use `https://`, and `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`. `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN, and the runtime role can read only that secret.
 
-1. **Deploy settings:** Set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env`. `./agent.sh deploy` exports them, plus `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. A value already set in the shell wins. The files are parsed, not sourced, and nothing else in them is exported. `agentcore/cdk/lib/cdk-stack.ts` copies the settings onto the runtime. Synth stops with one error that lists every missing or malformed setting. `GATEWAY_URL` must use `https://`, and `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`. `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN, and the runtime role can read only that secret.
-2. **Credential provider:** Add the `fleet-gateway` OAuth credential provider that `GATEWAY_CREDENTIAL_PROVIDER` names. The client ID, scope, and secret come from the fleet credentials file. The discovery URL is an output of the MCP server stack.
+**Gateway credential provider:** `./agent.sh deploy` declares the `fleet-gateway` OAuth credential for that one deploy. It reads the client ID, scope, and secret from the fleet credentials file. It reads the discovery URL from the `CognitoDiscoveryUrl` output of the MCP server stack. The AgentCore CLI creates or updates the provider before CDK runs, because CDK cannot create it. The construct grants the runtime access to the provider, and sets `CREDENTIAL_FLEET_GATEWAY_NAME`, only while the entry exists.
 
-   ```bash
-   creds=../.mcp-credentials.json
-   jq -r .client_secret "$creds" | agentcore add credentials oauth \
-       --name fleet-gateway \
-       --client-id "$(jq -r .client_id "$creds")" \
-       --discovery-url "$(aws cloudformation describe-stacks --region us-east-1 \
-           --stack-name "$(jq -r .stack_name "$creds")" \
-           --query "Stacks[0].Outputs[?OutputKey=='CognitoDiscoveryUrl'].OutputValue" \
-           --output text)" \
-       --scopes "$(jq -r .scope "$creds")" \
-       --client-secret -
-   ```
+The script passes the secret to the CLI on stdin, never on the command line. The CLI stores it, encrypted, in `agentcore/.env.local`, which git ignores and the code zip leaves out. When the deploy ends, the script removes that line and restores the tracked `agentcore.json`. It does this on an error or Ctrl+C too. The tracked spec never declares the credential, so it holds no account-specific values.
 
-   The AgentCore CLI creates the provider from this entry on the next deploy,
-   before CDK runs. CDK cannot create it, and it grants the runtime access to
-   the provider only when the entry exists. For that reason, `./agent.sh deploy`
-   refuses to run until the entry is in `agentcore.json`. The client secret is
-   stored in `agentcore/.env.local`, which git ignores and the code zip leaves
-   out.
+Never run a bare `agentcore deploy` in this folder. Without the entry, the CLI treats the provider as orphaned and deletes it, and the runtime loses its grant. If it happens, run `./agent.sh deploy` again. That recreates the provider and the grants.
+
+The runtime role has two `secretsmanager:GetSecretValue` resources. The `bedrock-agentcore-identity!*` wildcard comes from the AgentCore construct's own grant for the credential provider, not from `cdk-stack.ts`. The other is the memory password secret.
 
 Then run these commands:
 
@@ -187,10 +172,21 @@ Then run these commands:
 | `./agent.sh logs [30m]` | Show runtime logs from the given window |
 | `./agent.sh invoke-cloud ["question"]` | Call the deployed agent |
 | `./agent.sh load-test [N]` | Send a random test question to the deployed agent every N seconds. The default is 5. |
-| `./agent.sh destroy` | Remove the runtime from AgentCore |
+| `./agent.sh destroy` | Remove the runtime, its stack, and the Gateway credential provider |
 
 `invoke-cloud` and `load-test` find the runtime ARN in `AGENT_ARN`. If it is
 unset, they read it from `agentcore status --json`.
+
+The CLI has no destroy command. `./agent.sh destroy` declares the credential
+the same way deploy does, removes the runtime from the spec, and deploys. A
+deploy with nothing to deploy deletes the stack and every declared credential
+provider. With no runtime in the spec, `cdk-stack.ts` reads no deploy
+settings. The script then asks `agentcore status` what remains, with the
+runtime and the credential declared, and restores the tracked spec. If
+anything is still deployed, it lists it and exits with an error.
+
+The CLI's local state in `agentcore/.cli/` holds account-specific ARNs, so git
+ignores it. Losing it is safe, because destroy declares the credential again.
 
 ## Layout
 
@@ -229,7 +225,7 @@ but not the project. The package imports because its folder sits next to
 | `MODEL_EFFORT` | `high` | Adaptive thinking effort |
 | `AGENT_PORT` | `7071` | Local server port |
 | `MCP_CREDENTIALS_FILE` | `../.mcp-credentials.json` | Local credentials file |
-| `GATEWAY_CREDENTIAL_PROVIDER` | unset | AgentCore Identity provider name. Setting it selects the cloud path. |
+| `CREDENTIAL_FLEET_GATEWAY_NAME` | unset | AgentCore Identity provider name. The AgentCore construct sets it on deploy. Setting it, or `GATEWAY_URL`, selects the cloud path. |
 | `GATEWAY_URL` | unset | Gateway endpoint for the cloud path. It must use `https://`. On deploy it comes from `gateway_url` in the credentials file. |
 | `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path. On deploy they come from `scope` in the credentials file. |
 

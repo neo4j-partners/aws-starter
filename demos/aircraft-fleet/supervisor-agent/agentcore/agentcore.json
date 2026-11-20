@@ -14,10 +14,6 @@
         {
           "name": "MODEL_ID",
           "value": "global.anthropic.claude-sonnet-5-5"
-        },
-        {
-          "name": "GATEWAY_CREDENTIAL_PROVIDER",
-          "value": "fleet-gateway"
         }
       ],
       "protocol": "HTTP"

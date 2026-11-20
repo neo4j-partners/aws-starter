@@ -68,11 +68,11 @@ def test_removal_hours_agree_with_install_date(dataset: Path) -> None:
     assert removals, "expected at least one removal"
     for r in removals:
         hours = float(r["time_since_install"])
-        assert hours < float(r["flight_hours_at_removal"]), r[":ID(RemovalEvent)"]
+        assert hours < float(r["flight_hours_at_removal"]), r[":ID(Removal)"]
         installed = datetime.fromisoformat(r["installation_date"])
         days = (datetime.fromisoformat(r["removal_date"]) - installed).total_seconds() / 86400
         # 8 to 10 flight hours a day, with slack for whole-second dates.
-        assert 7.99 <= hours / days <= 10.01, r[":ID(RemovalEvent)"]
+        assert 7.99 <= hours / days <= 10.01, r[":ID(Removal)"]
 
 
 def test_same_seed_gives_identical_output(dataset: Path, tmp_path: Path) -> None:

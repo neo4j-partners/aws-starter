@@ -105,7 +105,7 @@ def generate_removals(
 
             removal_nodes.append(
                 {
-                    ":ID(RemovalEvent)": removal_id,
+                    ":ID(Removal)": removal_id,
                     "RMV_TRK_NO": f"RMV{removal_date.strftime('%y%m%d')}{removal_counter:06d}",
                     "RMV_REA_TX": _fake.sentence(nb_words=8).rstrip("."),
                     "component_id": component.component_id,
@@ -127,11 +127,11 @@ def generate_removals(
                 }
             )
             rels_aircraft.append(
-                {":START_ID(Aircraft)": aircraft.aircraft_id, ":END_ID(RemovalEvent)": removal_id}
+                {":START_ID(Aircraft)": aircraft.aircraft_id, ":END_ID(Removal)": removal_id}
             )
             rels_component.append(
                 {
-                    ":START_ID(RemovalEvent)": removal_id,
+                    ":START_ID(Removal)": removal_id,
                     ":END_ID(Component)": component.component_id,
                 }
             )

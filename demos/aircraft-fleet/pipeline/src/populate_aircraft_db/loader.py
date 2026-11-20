@@ -233,7 +233,7 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
         "nodes_removals.csv",
         """
         UNWIND $batch AS row
-        MERGE (r:Removal {removal_id: row[':ID(RemovalEvent)']})
+        MERGE (r:Removal {removal_id: row[':ID(Removal)']})
         SET r.tracking_number = row['RMV_TRK_NO'],
             r.component_id = row['component_id'],
             r.aircraft_id = row['aircraft_id'],
@@ -367,7 +367,7 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         """
         UNWIND $batch AS row
         MATCH (a:Aircraft {aircraft_id: row[':START_ID(Aircraft)']})
-        MATCH (r:Removal {removal_id: row[':END_ID(RemovalEvent)']})
+        MATCH (r:Removal {removal_id: row[':END_ID(Removal)']})
         MERGE (a)-[:HAS_REMOVAL]->(r)
         """,
     ),
@@ -376,7 +376,7 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         "rels_component_removal.csv",
         """
         UNWIND $batch AS row
-        MATCH (r:Removal {removal_id: row[':START_ID(RemovalEvent)']})
+        MATCH (r:Removal {removal_id: row[':START_ID(Removal)']})
         MATCH (c:Component {component_id: row[':END_ID(Component)']})
         MERGE (r)-[:REMOVED_COMPONENT]->(c)
         """,

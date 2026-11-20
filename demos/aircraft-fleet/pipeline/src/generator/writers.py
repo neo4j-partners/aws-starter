@@ -52,7 +52,7 @@ CSV_COLUMNS: dict[str, list[str]] = {
     ],
     "nodes_delays.csv": [":ID(Delay)", "cause", "minutes"],
     "nodes_removals.csv": [
-        ":ID(RemovalEvent)",
+        ":ID(Removal)",
         "RMV_TRK_NO",
         "RMV_REA_TX",
         "component_id",
@@ -90,10 +90,10 @@ CSV_COLUMNS: dict[str, list[str]] = {
     "rels_flight_delay.csv": [":START_ID(Flight)", ":END_ID(Delay)"],
     "rels_aircraft_removal.csv": [
         ":START_ID(Aircraft)",
-        ":END_ID(RemovalEvent)",
+        ":END_ID(Removal)",
     ],
     "rels_component_removal.csv": [
-        ":START_ID(RemovalEvent)",
+        ":START_ID(Removal)",
         ":END_ID(Component)",
     ],
 }

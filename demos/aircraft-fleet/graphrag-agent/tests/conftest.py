@@ -1,6 +1,6 @@
 """Give the tests their own environment.
 
-This runs before any test module imports ``runtime_app`` or ``agent``. It
+This runs before any test module imports ``fleet_graphrag``. It
 points ``FLEET_ENV_FILE`` at an empty file so the real aircraft-fleet .env is
 never loaded. It also clears the variables the agent reads, so a developer's
 shell cannot change what the tests see.

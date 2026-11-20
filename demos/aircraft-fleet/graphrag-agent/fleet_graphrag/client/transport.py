@@ -1,6 +1,6 @@
 """One wire, two transports — the only place clients touch the network.
 
-``runtime_app.py`` serves four surfaces off ``/invocations`` and emits four
+``fleet_graphrag.server`` serves four surfaces off ``/invocations`` and emits four
 SSE event shapes: ``{"type": "chunk", "data": ...}``,
 ``{"type": "tool", "name": ...}``, ``{"type": "error", "error": ...}``,
 ``{"type": "complete"}``. Both transports below produce that same byte
@@ -32,10 +32,10 @@ from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
-# graphrag-agent/ is the parent of client/. The AgentCore CLI project lives
-# in agentcore/ under it, so `agentcore status` runs from here regardless of
-# the caller's cwd.
-AGENT_ROOT = Path(__file__).resolve().parent.parent
+# graphrag-agent/, two levels above fleet_graphrag/client/. The AgentCore CLI
+# project lives in agentcore/ under it, so `agentcore status` runs from here
+# regardless of the caller's cwd.
+AGENT_ROOT = Path(__file__).resolve().parents[2]
 LOCAL_URL = "http://localhost:7070/invocations"
 
 # A full agent turn with adaptive thinking and several tool calls can stream
@@ -233,7 +233,7 @@ def invoke_local(
     url: str = LOCAL_URL,
     timeout: int = 180,
 ) -> dict:
-    """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 7070)."""
+    """Invoke a locally running ``fleet_graphrag.server`` over HTTP+SSE (port 7070)."""
     logger.info("Local URL: %s | payload: %s", url, payload)
     try:
         with (

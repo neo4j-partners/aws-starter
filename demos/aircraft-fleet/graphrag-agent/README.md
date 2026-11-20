@@ -42,7 +42,7 @@ uv run fleet-demo            # terminal 2: full showcase
                       v
   +-------------------------------------------+        +---------------------------+
   |  AgentCore Runtime                        |        |  Amazon Bedrock           |
-  |  GraphRAG Agent (runtime_app.py)          | -----> |  Claude (LLM, Text2Cypher)|
+  |  GraphRAG Agent (fleet_graphrag.server)   | -----> |  Claude (LLM, Text2Cypher)|
   |  Strands ReAct                            | <----- |  Titan (embeddings)       |
   +-------------------------------------------+        +---------------------------+
             |                          |
@@ -100,7 +100,7 @@ uv run opentelemetry-instrument fleet-server        # the same server, with OTEL
 ```
 
 - **Config:** The server loads the shared `.env` in `demos/aircraft-fleet/`. The `agent` package loads it on import.
-- **Port:** The server runs `runtime_app.py` on port 7070. The deployed runtime uses port 8080. Local runs use 7070 to avoid a clash. Set `AGENT_PORT` to use another port.
+- **Port:** `fleet-server` runs `fleet_graphrag.server` on port 7070. The deployed runtime uses port 8080. Local runs use 7070 to avoid a clash. Set `AGENT_PORT` to use another port.
 - **Stopping:** The server runs in the foreground. Press Ctrl+C or run `./agent.sh stop` to stop it.
 - **Testing:** `./agent.sh test` sends one question to the server.
 - **Clients:** The clients below talk to the server over HTTP from a second terminal. They hold no Neo4j credentials.
@@ -185,9 +185,11 @@ connection differs:
 
 | Path | Use |
 |------|-----|
-| `agent/` | The core package, installed into the venv. `config.py` holds the model ID, region, embedder, index, and system prompt. `retrieval.py` holds the Neo4j driver and the `graph_query`, `vector_search`, and `get_graph_schema` functions. `tools.py` holds the Strands tool wrappers. |
-| `client/` | The clients behind `fleet-cli`, `fleet-demo`, and `fleet-invoke`. `transport.py` is the only network layer. It covers local HTTP on port 7070 and the deployed agent through boto3. `cli.py` is the terminal client, `demo.py` is the showcase, and `invoke.py` is the deployed single call and load test. |
-| `runtime_app.py` | The AgentCore Runtime entrypoint. `main()` is `fleet-server` on port 7070. The cloud container uses `__main__` on port 8080. It handles the `mode` field. |
+| `main.py` | The AgentCore Runtime entrypoint. It calls `fleet_graphrag.server.main` on port 8080. AgentCore runs a file, not a module, and CodeZip installs the dependencies but not the project. The package imports because its folder sits next to `main.py`. |
+| `fleet_graphrag/` | The one package, installed into the venv in editable mode. It holds `server.py`, `agent/`, and `client/`. |
+| `fleet_graphrag/server.py` | The `BedrockAgentCoreApp` and its entrypoint. It handles the `mode` field. `main()` is the only way to start the server. `fleet-server` calls it on port 7070. |
+| `fleet_graphrag/agent/` | The agent core. `config.py` holds the model ID, region, embedder, index, and system prompt. `retrieval.py` holds the Neo4j driver and the `graph_query`, `vector_search`, and `get_graph_schema` functions. `tools.py` holds the Strands tool wrappers. |
+| `fleet_graphrag/client/` | The clients behind `fleet-cli`, `fleet-demo`, and `fleet-invoke`. `transport.py` is the only network layer. It covers local HTTP on port 7070 and the deployed agent through boto3. `cli.py` is the terminal client, `demo.py` is the showcase, and `invoke.py` is the deployed single call and load test. |
 | `agent.sh` | The wrapper for local `start`, `stop`, and `test`, and for `deploy`, `status`, `invoke-cloud`, `logs`, and `destroy` |
 | `agentcore/` | The AgentCore CLI project. `agentcore.json` declares the Runtime and its env vars. `cdk/` is the CDK app the CLI deploys. |
 | `queries.txt` | Sample queries for discovery, fleet, maintenance, and delays |

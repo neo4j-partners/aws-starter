@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent.config import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, Settings
+from fleet_graphrag.agent.config import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, Settings
 
 
 def test_defaults_when_unset() -> None:

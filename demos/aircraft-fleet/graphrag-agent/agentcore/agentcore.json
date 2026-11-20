@@ -7,7 +7,7 @@
       "name": "graphrag_agent",
       "build": "CodeZip",
       "modelProvider": "Bedrock",
-      "entrypoint": "runtime_app.py",
+      "entrypoint": "main.py",
       "codeLocation": ".",
       "runtimeVersion": "PYTHON_3_12",
       "protocol": "HTTP",

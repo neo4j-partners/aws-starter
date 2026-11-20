@@ -8,8 +8,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from client import transport
-from client.transport import DeploymentNotFoundError, _consume_sse, _result, parse_status
+from fleet_graphrag.client import transport
+from fleet_graphrag.client.transport import (
+    DeploymentNotFoundError,
+    _consume_sse,
+    _result,
+    parse_status,
+)
 
 
 def _event(obj: dict) -> bytes:

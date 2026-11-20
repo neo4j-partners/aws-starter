@@ -14,7 +14,7 @@ import neo4j
 from neo4j_graphrag.llm import LLMResponse
 from neo4j_graphrag.retrievers import Text2CypherRetriever
 
-from agent.text2cypher import BoundedText2CypherRetriever
+from fleet_graphrag.agent.text2cypher import BoundedText2CypherRetriever
 
 
 class FakeLLM:

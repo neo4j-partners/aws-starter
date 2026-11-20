@@ -1,7 +1,7 @@
 [project]
 name = "aircraft-fleet-graphrag-agent"
 version = "0.1.0"
-description = "Aircraft Fleet GraphRAG Agent — Strands, direct-to-Neo4j GraphRAG over an agent/ core"
+description = "Aircraft Fleet GraphRAG Agent: Strands, direct-to-Neo4j GraphRAG"
 requires-python = ">=3.12"
 dependencies = [
     # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)
@@ -28,30 +28,26 @@ dev = [
 ]
 
 # Console entry points. The server runs in the foreground of its own
-# terminal (Ctrl+C to stop) — it is never backgrounded by a script. The
+# terminal (Ctrl+C to stop). It is never backgrounded by a script. The
 # clients are thin wire callers. `fleet-server` defaults to port 7070 for
-# local dev (AGENT_PORT still overrides); the cloud container uses
-# runtime_app's __main__ (fixed 8080).
+# local dev (AGENT_PORT still overrides). AgentCore Runtime runs the root
+# main.py, which serves 8080.
 [project.scripts]
-fleet-server = "runtime_app:main"
-fleet-cli = "client.cli:main"
-fleet-demo = "client.demo:main"
-fleet-invoke = "client.invoke:main"
+fleet-server = "fleet_graphrag.server:main"
+fleet-cli = "fleet_graphrag.client.cli:main"
+fleet-demo = "fleet_graphrag.client.demo:main"
+fleet-invoke = "fleet_graphrag.client.invoke:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Package the `agent` core plus `client` and the top-level `runtime_app`
-# module into the venv so the console scripts resolve `runtime_app:main`
-# and `client.*:main`, and runtime_app can `from agent import ...` without
-# any sys.path manipulation. The AgentCore CLI deploys a CodeZip of the
-# source tree, so packaging client here only affects the local venv.
+# One package. The editable install puts it on the venv path for the console
+# scripts and the tests. AgentCore runs main.py as a file, and CodeZip
+# installs the dependencies but not the project. fleet_graphrag imports there
+# because its folder sits next to main.py.
 [tool.hatch.build.targets.wheel]
-packages = ["agent", "client"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"runtime_app.py" = "runtime_app.py"
+packages = ["fleet_graphrag"]
 
 [tool.ruff]
 target-version = "py312"
@@ -64,6 +60,3 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Import the source runtime_app.py. The force-include above also puts a copy
-# in site-packages, and that copy is only refreshed by `uv sync`.
-pythonpath = ["."]

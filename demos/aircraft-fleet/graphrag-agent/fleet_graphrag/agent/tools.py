@@ -1,13 +1,13 @@
 """Strands-native tool wrappers over the framework-agnostic retrieval callables.
 
-Imported by ``runtime_app.py`` (the only agent builder). The wrapped callables
+Imported by ``fleet_graphrag.server`` (the only agent builder). The wrapped callables
 in :mod:`agent.retrieval` carry no Strands dependency; the ``@tool`` decorator
 and the docstrings the LLM sees live here.
 """
 
 from strands import tool
 
-from agent.retrieval import graph_query, vector_search
+from fleet_graphrag.agent.retrieval import graph_query, vector_search
 
 
 @tool

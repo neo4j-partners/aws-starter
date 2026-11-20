@@ -39,9 +39,9 @@
 
 set -e
 
-# The uv project (pyproject.toml, uv.lock, .venv), the agent core
-# (agent/), the thin clients (client/), the entrypoint (runtime_app.py), and
-# this script all live at the agent root.
+# The uv project (pyproject.toml, uv.lock, .venv), the fleet_graphrag
+# package, the AgentCore entrypoint (main.py), and this script all live at
+# the agent root.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 

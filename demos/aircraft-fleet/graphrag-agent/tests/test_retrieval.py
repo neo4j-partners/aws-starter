@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from neo4j_graphrag.types import RetrieverResultItem
 
-from agent import retrieval
+from fleet_graphrag.agent import retrieval
 
 
 @pytest.mark.parametrize(

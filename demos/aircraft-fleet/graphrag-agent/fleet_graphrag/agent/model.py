@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from strands.models import BedrockModel, CacheConfig
 
-from agent.config import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, Effort
+from fleet_graphrag.agent.config import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, Effort
 
 
 def thinking_request_fields(effort: Effort = DEFAULT_EFFORT) -> dict[str, object]:

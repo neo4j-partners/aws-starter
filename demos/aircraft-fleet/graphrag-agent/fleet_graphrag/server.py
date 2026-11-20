@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Aircraft Fleet GraphRAG Agent (Strands) — AgentCore Runtime.
 
 A Strands-native agent that connects **directly to Neo4j** (no MCP server, no
@@ -33,13 +32,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Local runs read the shared aircraft-fleet .env next to graphrag-agent/. The
-# path comes from this file, so the working directory does not matter.
+# Local runs read the shared aircraft-fleet .env next to graphrag-agent/,
+# three levels above this file. The path comes from this file, so the working
+# directory does not matter.
 # FLEET_ENV_FILE overrides it; the tests point it at an empty file. Existing
 # env vars win, so Runtime env vars are untouched. This runs before the agent
 # imports because ``agent.config`` resolves settings at import time.
 ENV_FILE = Path(
-    os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().parent.parent / ".env"
+    os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().parents[2] / ".env"
 )
 load_dotenv(ENV_FILE)
 
@@ -48,7 +48,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext  # noq
 from pydantic import BaseModel, ConfigDict, Field, ValidationError  # noqa: E402
 from strands import Agent  # noqa: E402
 
-from agent import (  # noqa: E402
+from fleet_graphrag.agent import (  # noqa: E402
     SYSTEM_PROMPT_TEMPLATE,
     ConfigError,
     get_graph_schema,
@@ -56,8 +56,8 @@ from agent import (  # noqa: E402
     settings,
     vector_search,
 )
-from agent.model import build_bedrock_model  # noqa: E402
-from agent.tools import graph_query_tool, vector_search_tool  # noqa: E402
+from fleet_graphrag.agent.model import build_bedrock_model  # noqa: E402
+from fleet_graphrag.agent.tools import graph_query_tool, vector_search_tool  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -309,10 +309,11 @@ async def invoke(
 def main(default_port: int = 7070) -> None:
     """Start the server in the foreground. Stop it with Ctrl+C.
 
-    ``uv run fleet-server`` calls this with port 7070, so local runs never
-    collide with a local service on 8080. The deployed Runtime runs this file
-    as a script and must serve 8080. ``AGENT_PORT`` overrides both. For local
-    OTEL tracing, prefix the command with ``opentelemetry-instrument``.
+    This is the only server entry point. ``uv run fleet-server`` calls it
+    with port 7070, so local runs never collide with a local service on 8080.
+    AgentCore Runtime runs the root ``main.py``, which calls it with 8080.
+    ``AGENT_PORT`` overrides both. For local OTEL tracing, prefix the command
+    with ``opentelemetry-instrument``.
     """
     port = int(os.environ.get("AGENT_PORT", str(default_port)))
     logger.info(
@@ -321,7 +322,3 @@ def main(default_port: int = 7070) -> None:
         port,
     )
     app.run(port=port)
-
-
-if __name__ == "__main__":
-    main(default_port=8080)

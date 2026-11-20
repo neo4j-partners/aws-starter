@@ -9,7 +9,7 @@ Walks the agent's full surface area, section by section, in plain English:
   4. The full Strands ReAct agent, choosing tools by itself.
 
 This is a pure client. Every section is served by a running
-``runtime_app.py`` through the matching payload mode — nothing is built
+``fleet_graphrag.server`` through the matching payload mode — nothing is built
 in-process:
 
   - section 1 -> ``{"mode": "schema"}``
@@ -31,7 +31,7 @@ import logging
 import sys
 import textwrap
 
-from client.transport import DeploymentNotFoundError, Target, invoke
+from fleet_graphrag.client.transport import DeploymentNotFoundError, Target, invoke
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -175,7 +175,7 @@ def main() -> None:
     mode_line = (
         "DEPLOYED: AgentCore runtime"
         if TARGET == "deployed"
-        else "LOCAL: runtime_app.py on port 7070"
+        else "LOCAL: fleet-server on port 7070"
     )
     print()
     print("#" * WIDTH)

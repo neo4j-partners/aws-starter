@@ -37,8 +37,8 @@ from neo4j_graphrag.retrievers import HybridCypherRetriever
 from neo4j_graphrag.schema import get_schema
 from neo4j_graphrag.types import RetrieverResultItem
 
-from agent.config import ConfigError, settings
-from agent.text2cypher import BoundedText2CypherRetriever
+from fleet_graphrag.agent.config import ConfigError, settings
+from fleet_graphrag.agent.text2cypher import BoundedText2CypherRetriever
 
 logger = logging.getLogger(__name__)
 

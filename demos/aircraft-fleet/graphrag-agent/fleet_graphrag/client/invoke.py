@@ -25,7 +25,7 @@ import re
 import sys
 import time
 
-from client.transport import AGENT_ROOT, DeploymentNotFoundError, invoke_deployed
+from fleet_graphrag.client.transport import AGENT_ROOT, DeploymentNotFoundError, invoke_deployed
 
 logging.basicConfig(
     level=logging.WARNING,

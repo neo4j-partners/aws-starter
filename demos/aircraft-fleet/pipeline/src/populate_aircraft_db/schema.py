@@ -47,6 +47,11 @@ EXTRACTION_CONSTRAINTS: list[tuple[str, str]] = [
     ("OperatingLimit", "name"),
 ]
 
+# SHOW CONSTRAINTS reports a node uniqueness constraint as UNIQUENESS on
+# older Neo4j releases and as NODE_PROPERTY_UNIQUENESS on newer ones,
+# such as the 2026.06 test container. Match either name.
+UNIQUENESS_CONSTRAINT_TYPES: list[str] = ["UNIQUENESS", "NODE_PROPERTY_UNIQUENESS"]
+
 
 def _quote_identifier(identifier: str) -> str:
     """Quote a Neo4j schema identifier."""
@@ -111,13 +116,14 @@ def drop_extraction_constraints(driver: Driver, database: str) -> None:
             """
             SHOW CONSTRAINTS
             YIELD name, type, labelsOrTypes, properties
-            WHERE type = 'UNIQUENESS'
+            WHERE type IN $types
               AND labelsOrTypes = [$label]
               AND properties = [$property]
             RETURN name
             """,
             label=label,
             property=prop,
+            types=UNIQUENESS_CONSTRAINT_TYPES,
             database_=database,
         )
         for record in records:

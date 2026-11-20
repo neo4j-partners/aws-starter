@@ -9,7 +9,7 @@ from typing import Any
 from neo4j import Driver
 from neo4j.exceptions import Neo4jError
 
-from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS
+from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
 
 BATCH_SIZE = 1000
 OPERATIONAL_LABELS = [
@@ -457,7 +457,7 @@ def _print_count_section(title: str, counts: dict[str, int]) -> None:
 
 def _has_constraint(constraint_rows: list[dict[str, Any]], label: str, property_name: str) -> bool:
     return any(
-        row["type"] == "UNIQUENESS"
+        row["type"] in UNIQUENESS_CONSTRAINT_TYPES
         and row["labelsOrTypes"] == [label]
         and row["properties"] == [property_name]
         for row in constraint_rows

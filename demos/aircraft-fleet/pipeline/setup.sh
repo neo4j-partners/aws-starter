@@ -41,9 +41,9 @@ else
   DEFAULT_AIRCRAFT=20
   # 90 days: degradation is time-driven, so a shorter window produces zero
   # MaintenanceEvents (events only fire once sensor series cross model
-  # thresholds, which takes ~45+ days). 20 aircraft x 90 days yields ~111
-  # events and keeps readings ~23M — small-tier friendly, and makes the
-  # graphrag-agent maintenance queries actually return data.
+  # thresholds, which takes ~45+ days). 20 aircraft x 90 days yields about
+  # 110 events and 345k readings. That is small-tier friendly, and the
+  # graphrag-agent maintenance queries return data.
   DEFAULT_DAYS=90
 fi
 AIRCRAFT="${GEN_AIRCRAFT:-$DEFAULT_AIRCRAFT}"

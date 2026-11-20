@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # Anthropic — only required when llm_provider is "anthropic".
     anthropic_api_key: SecretStr | None = None
-    anthropic_extraction_model: str = "claude-sonnet-4-6"
+    anthropic_extraction_model: str = "claude-sonnet-5-5"
     anthropic_extraction_max_tokens: int = 8000
 
     # Amazon Bedrock — used when llm_provider is "bedrock". Credentials come
@@ -62,8 +62,8 @@ class Settings(BaseSettings):
     # Region is the shared AWS_REGION (also read by the agent); defaults to
     # us-east-1, this repo's AgentCore region. Override via AWS_REGION.
     aws_region: str = "us-east-1"
-    # Claude Sonnet 4.6 via the cross-region "global" inference profile.
-    bedrock_llm_model: str = "global.anthropic.claude-sonnet-4-6"
+    # Claude Sonnet 5.5 via the cross-region "global" inference profile.
+    bedrock_llm_model: str = "global.anthropic.claude-sonnet-5-5"
     bedrock_llm_max_tokens: int = 8000
     bedrock_embedding_model: str = "amazon.titan-embed-text-v2:0"
     bedrock_embedding_dimensions: int = 1024

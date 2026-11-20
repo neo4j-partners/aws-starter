@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from neo4j import Driver
+from neo4j_graphrag.components.text_splitters.base import TextSplitter
+from neo4j_graphrag.components.types import TextChunks
 from neo4j_graphrag.embeddings.openai import OpenAIEmbeddings
-from neo4j_graphrag.experimental.components.text_splitters.base import TextSplitter
-from neo4j_graphrag.experimental.components.types import TextChunks
 
 # Labels for extracted entity nodes (used by clear/verify logic).
 EXTRACTED_LABELS = [
@@ -215,6 +215,14 @@ Input text:
 # ---------------------------------------------------------------------------
 
 
+# Sonnet 5.5 thinks adaptively by default at "high" effort. Extraction is a
+# well-specified, per-chunk task, so "low" effort keeps pipeline cost down.
+_BEDROCK_EXTRACTION_THINKING = {
+    "thinking": {"type": "adaptive"},
+    "output_config": {"effort": "low"},
+}
+
+
 def _create_extraction_llm(
     *,
     provider: str,
@@ -235,6 +243,7 @@ def _create_extraction_llm(
             model_name=llm_model,
             model_params={"maxTokens": llm_max_tokens},
             region_name=region,
+            additional_request_fields=_BEDROCK_EXTRACTION_THINKING,
         )
     if provider == "openai":
         from neo4j_graphrag.llm.openai_llm import OpenAILLM
@@ -273,7 +282,7 @@ def _create_pipeline(
     chunk_overlap: int,
 ):
     """Build a ``SimpleKGPipeline`` configured for maintenance-manual enrichment."""
-    from neo4j_graphrag.experimental.components.text_splitters.fixed_size_splitter import (
+    from neo4j_graphrag.components.text_splitters.fixed_size_splitter import (
         FixedSizeSplitter,
     )
     from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
@@ -346,11 +355,11 @@ def debug_extract_chunks(
     chunk_overlap: int,
 ) -> bool:
     """Run extractor validation for selected chunks without writing to Neo4j."""
-    from neo4j_graphrag.experimental.components.entity_relation_extractor import (
+    from neo4j_graphrag.components.entity_relation_extractor import (
         LLMEntityRelationExtractor,
         OnError,
     )
-    from neo4j_graphrag.experimental.components.text_splitters.fixed_size_splitter import (
+    from neo4j_graphrag.components.text_splitters.fixed_size_splitter import (
         FixedSizeSplitter,
     )
 

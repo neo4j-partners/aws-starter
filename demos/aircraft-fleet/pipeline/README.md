@@ -86,7 +86,7 @@ pipeline does all three:
 `./setup.sh` runs all five stages in order against your Neo4j database. Stage 3
 is the only stage that calls a model. It uses Bedrock Titan v2 for embeddings
 and Claude for extraction. The default Claude model is
-`global.anthropic.claude-sonnet-4-6`. Every other stage uses only Neo4j and
+`global.anthropic.claude-sonnet-5-5`. Every other stage uses only Neo4j and
 local compute.
 
 | Stage | Code | Output |
@@ -162,7 +162,7 @@ no LLM calls and needs no keys.
 
 ### Bedrock settings
 
-- **Models:** Extraction uses `global.anthropic.claude-sonnet-4-6`. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions. You can override both in `.env`.
+- **Models:** Extraction uses `global.anthropic.claude-sonnet-5-5`. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions. You can override both in `.env`.
 - **Embedding dimensions:** Each `clean` and `setup` creates the vector index at the configured dimension. If you change the embedding model, set a matching `BEDROCK_EMBEDDING_DIMENSIONS` and run the pipeline again.
 - **Region:** The pipeline and the agent share one `AWS_REGION` setting. It defaults to `us-east-1`. If you change it, enable the models in that region.
 - **Chunking:** `CHUNK_SIZE` defaults to 800 and `CHUNK_OVERLAP` defaults to 100. Set `ENRICH_SAMPLE_SIZE` to limit chunks per document for fast test runs.

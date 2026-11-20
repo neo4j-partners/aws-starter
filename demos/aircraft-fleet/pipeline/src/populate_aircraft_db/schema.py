@@ -152,7 +152,7 @@ def build_extraction_schema():
     the operational graph loaded from CSV.  Entity names are qualified with the
     aircraft type where appropriate so entity resolution stays model-scoped.
     """
-    from neo4j_graphrag.experimental.components.schema import (
+    from neo4j_graphrag.components.schema import (
         ConstraintType,
         GraphConstraintType,
         GraphSchema,

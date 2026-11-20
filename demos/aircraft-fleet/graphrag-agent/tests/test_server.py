@@ -99,6 +99,7 @@ def test_session_id_comes_from_context(monkeypatch, caplog) -> None:
 def test_main_port(monkeypatch, env: str | None, expected: int) -> None:
     ports: list[int] = []
     monkeypatch.setattr(server.app, "run", lambda port: ports.append(port))
+    monkeypatch.setattr(server, "memory_settings", lambda: None)
     if env is None:
         monkeypatch.delenv("AGENT_PORT", raising=False)
     else:
@@ -204,3 +205,109 @@ def test_other_neo4j_errors_get_the_generic_message(monkeypatch) -> None:
     )
     event = _raise_in_schema(monkeypatch, error)
     assert event["error"] == server.GENERIC_ERROR
+
+
+def test_main_builds_memory_settings_before_serving(monkeypatch) -> None:
+    def missing() -> None:
+        raise server.ConfigError("MEM_NEO4J_URI is not set.")
+
+    served: list[int] = []
+    monkeypatch.setattr(server.app, "run", lambda port: served.append(port))
+    monkeypatch.setattr(server, "memory_settings", missing)
+    with pytest.raises(server.ConfigError):
+        server.main()
+    assert served == []
+
+
+class _FakeMemory:
+    def __init__(self, session_id: str, user_id: str, *, close_error: bool = False) -> None:
+        self.session_id = session_id
+        self.user_id = user_id
+        self.closed = 0
+        self._close_error = close_error
+
+    def close(self) -> None:
+        self.closed += 1
+        if self._close_error:
+            raise RuntimeError("flush failed")
+
+
+class _FakeAgent:
+    """Stands in for ``strands.Agent``. ``fail`` raises mid-stream."""
+
+    fail = False
+
+    def __init__(self, **kwargs: object) -> None:
+        self.kwargs = kwargs
+
+    async def stream_async(self, prompt: str):
+        yield {"data": "partial "}
+        if self.fail:
+            raise RuntimeError("model blew up")
+        yield {"data": "answer"}
+
+
+def _agent_path(monkeypatch, *, fail: bool = False, close_error: bool = False):
+    made: list[_FakeMemory] = []
+    agents: list[_FakeAgent] = []
+
+    def fake_manager(session_id: str, user_id: str) -> _FakeMemory:
+        made.append(_FakeMemory(session_id, user_id, close_error=close_error))
+        return made[-1]
+
+    def fake_agent(**kwargs: object) -> _FakeAgent:
+        agents.append(_FakeAgent(**kwargs))
+        agents[-1].fail = fail
+        return agents[-1]
+
+    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
+    monkeypatch.setattr(server, "session_manager", fake_manager)
+    monkeypatch.setattr(server, "Agent", fake_agent)
+    return made, agents
+
+
+def test_agent_gets_a_per_request_memory_that_is_closed(monkeypatch) -> None:
+    made, agents = _agent_path(monkeypatch)
+    events = _run({"prompt": "hi", "user_id": "pilot-7"}, session_id="s-1")
+    assert events[-1] == {"type": "complete"}
+    [memory] = made
+    assert (memory.session_id, memory.user_id) == ("s-1", "pilot-7")
+    assert agents[0].kwargs["session_manager"] is memory
+    assert memory.closed == 1
+
+
+def test_each_request_builds_its_own_memory(monkeypatch) -> None:
+    made, _ = _agent_path(monkeypatch)
+    _run({"prompt": "one"}, session_id="s-1")
+    _run({"prompt": "two"}, session_id="s-1")
+    assert len(made) == 2
+    assert made[0] is not made[1]
+    assert [m.closed for m in made] == [1, 1]
+
+
+def test_memory_is_closed_when_the_agent_fails(monkeypatch) -> None:
+    made, _ = _agent_path(monkeypatch, fail=True)
+    events = _run({"prompt": "hi"}, session_id="s-1")
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert made[0].closed == 1
+
+
+def test_memory_is_closed_when_the_client_disconnects(monkeypatch) -> None:
+    made, _ = _agent_path(monkeypatch)
+
+    async def first_chunk_then_disconnect() -> dict:
+        stream = server.invoke({"prompt": "hi"}, RequestContext(session_id="s-1"))
+        first = await anext(stream)
+        await stream.aclose()
+        return first
+
+    assert asyncio.run(first_chunk_then_disconnect())["type"] == "chunk"
+    assert made[0].closed == 1
+
+
+def test_close_failure_is_logged_not_sent(monkeypatch, caplog) -> None:
+    made, _ = _agent_path(monkeypatch, close_error=True)
+    events = _run({"prompt": "hi"}, session_id="s-1")
+    assert events[-1] == {"type": "complete"}
+    assert made[0].closed == 1
+    assert "Could not close the memory session s-1" in caplog.text

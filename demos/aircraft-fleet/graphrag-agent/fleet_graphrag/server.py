@@ -45,6 +45,7 @@ load_dotenv(ENV_FILE)
 
 import neo4j  # noqa: E402
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext  # noqa: E402
+from neo4j_agent_memory.integrations.strands import Neo4jSessionManager  # noqa: E402
 from pydantic import (  # noqa: E402
     BaseModel,
     ConfigDict,
@@ -62,6 +63,7 @@ from fleet_graphrag.agent import (  # noqa: E402
     settings,
     vector_search,
 )
+from fleet_graphrag.agent.memory import memory_settings, session_manager  # noqa: E402
 from fleet_graphrag.agent.model import build_bedrock_model  # noqa: E402
 from fleet_graphrag.agent.neo4j_errors import (  # noqa: E402
     UNREACHABLE,
@@ -265,26 +267,35 @@ async def invoke(
         schema = await asyncio.to_thread(get_graph_schema)
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(schema=schema)
 
-        agent = Agent(
-            model=model,
-            tools=[graph_query_tool, vector_search_tool],
-            system_prompt=system_prompt,
-        )
+        # One memory manager per request, closed on every path below.
+        memory = session_manager(session_id, req.user_id)
+        try:
+            # The manager connects and restores the session history while
+            # the Agent is built. Both block, so keep them off the loop.
+            agent = await asyncio.to_thread(
+                Agent,
+                model=model,
+                tools=[graph_query_tool, vector_search_tool],
+                system_prompt=system_prompt,
+                session_manager=memory,
+            )
 
-        # Strands repeats ``current_tool_use`` on every input delta while a
-        # tool call is being assembled; dedupe by toolUseId so each call
-        # surfaces exactly once. Emitting these as ``tool`` events lets the
-        # client print a labelled boundary where a retriever tool ran.
-        last_tool_id: str | None = None
-        async for event in agent.stream_async(prompt):
-            if "data" in event:
-                yield {"type": "chunk", "data": event["data"]}
-            elif tool_use := event.get("current_tool_use"):
-                tool_id = tool_use.get("toolUseId")
-                name = tool_use.get("name")
-                if name and tool_id != last_tool_id:
-                    last_tool_id = tool_id
-                    yield {"type": "tool", "name": name}
+            # Strands repeats ``current_tool_use`` on every input delta while
+            # a tool call is being assembled; dedupe by toolUseId so each call
+            # surfaces exactly once. Emitting these as ``tool`` events lets
+            # the client print a labelled boundary where a retriever tool ran.
+            last_tool_id: str | None = None
+            async for event in agent.stream_async(prompt):
+                if "data" in event:
+                    yield {"type": "chunk", "data": event["data"]}
+                elif tool_use := event.get("current_tool_use"):
+                    tool_id = tool_use.get("toolUseId")
+                    name = tool_use.get("name")
+                    if name and tool_id != last_tool_id:
+                        last_tool_id = tool_id
+                        yield {"type": "tool", "name": name}
+        finally:
+            await _close_memory(memory)
 
         yield {"type": "complete"}
         logger.info("Request completed successfully")
@@ -320,6 +331,18 @@ async def invoke(
         yield {"type": "error", "error": GENERIC_ERROR}
 
 
+async def _close_memory(memory: Neo4jSessionManager) -> None:
+    """Flush and close a request's memory manager off the event loop.
+
+    A failure is logged, not raised. It runs after the answer has streamed or
+    while another error is already propagating, and must not replace either.
+    """
+    try:
+        await asyncio.to_thread(memory.close)
+    except Exception:
+        logger.exception("Could not close the memory session %s", memory.session_id)
+
+
 def main(default_port: int = 7070) -> None:
     """Start the server in the foreground. Stop it with Ctrl+C.
 
@@ -334,6 +357,9 @@ def main(default_port: int = 7070) -> None:
         # Read the secret before serving, so a bad ARN or a missing IAM grant
         # stops startup instead of failing the first request.
         neo4j_password()
+    # Build the memory settings before serving, so a missing MEM_NEO4J_* value
+    # or an unreadable memory secret stops startup.
+    memory_settings()
     logger.info(
         "Starting Aircraft Fleet GraphRAG Agent with model: %s on port %s",
         settings.model_id,

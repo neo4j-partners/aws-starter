@@ -26,6 +26,7 @@ from fleet_graphrag.agent.config import ConfigError
 logger = logging.getLogger(__name__)
 
 NEO4J_PASSWORD_SECRET_ARN = "NEO4J_PASSWORD_SECRET_ARN"
+MEM_NEO4J_PASSWORD_SECRET_ARN = "MEM_NEO4J_PASSWORD_SECRET_ARN"
 
 
 def password_from(secret_arn_var: str, password_var: str) -> str:
@@ -47,6 +48,11 @@ def password_from(secret_arn_var: str, password_var: str) -> str:
 def neo4j_password() -> str:
     """Return the password for the fleet graph."""
     return password_from(NEO4J_PASSWORD_SECRET_ARN, "NEO4J_PASSWORD")
+
+
+def memory_password() -> str:
+    """Return the password for the conversation memory instance."""
+    return password_from(MEM_NEO4J_PASSWORD_SECRET_ARN, "MEM_NEO4J_PASSWORD")
 
 
 @cache

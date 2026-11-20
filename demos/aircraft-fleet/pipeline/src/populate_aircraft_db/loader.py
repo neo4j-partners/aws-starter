@@ -376,8 +376,8 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         "rels_component_removal.csv",
         """
         UNWIND $batch AS row
-        MATCH (r:Removal {removal_id: row[':END_ID(RemovalEvent)']})
-        MATCH (c:Component {component_id: row[':START_ID(Component)']})
+        MATCH (r:Removal {removal_id: row[':START_ID(RemovalEvent)']})
+        MATCH (c:Component {component_id: row[':END_ID(Component)']})
         MERGE (r)-[:REMOVED_COMPONENT]->(c)
         """,
     ),

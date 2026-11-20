@@ -131,8 +131,8 @@ def generate_removals(
             )
             rels_component.append(
                 {
-                    ":START_ID(Component)": component.component_id,
-                    ":END_ID(RemovalEvent)": removal_id,
+                    ":START_ID(RemovalEvent)": removal_id,
+                    ":END_ID(Component)": component.component_id,
                 }
             )
             wo_seq += 1

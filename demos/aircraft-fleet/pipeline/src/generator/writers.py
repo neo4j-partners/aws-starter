@@ -93,8 +93,8 @@ CSV_COLUMNS: dict[str, list[str]] = {
         ":END_ID(RemovalEvent)",
     ],
     "rels_component_removal.csv": [
-        ":START_ID(Component)",
-        ":END_ID(RemovalEvent)",
+        ":START_ID(RemovalEvent)",
+        ":END_ID(Component)",
     ],
 }
 

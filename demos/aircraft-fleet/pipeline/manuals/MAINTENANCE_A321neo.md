@@ -128,7 +128,7 @@ AIRCRAFT (A321neo)
 
 #### 2.1.1 Engine Systems (LEAP-1A)
 
-The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU). In typical industry data, engine systems account for about 61% of maintenance events. Vibration exceedance and contamination are the most prevalent issues. This pattern is typical of new engine technology.
+The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU). In typical industry data, engine systems account for about 61% of maintenance events. Bearing wear, overheat conditions, and vibration exceedances are the most common issues. This pattern is typical of new engine technology.
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
@@ -370,7 +370,7 @@ The LEAP-1A Full Authority Digital Engine Control provides:
 
 **Fault Code:** ENG-VIB-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the most common engine fault, at about 19% of engine events.
+**Industry Statistics:** In typical industry data, this is the third most common fault type, at about 16% of events.
 
 The LEAP-1A's lightweight composite fan and high bypass ratio make vibration monitoring particularly critical.
 
@@ -440,7 +440,7 @@ The LEAP-1A has experienced ice crystal icing events in high-altitude convective
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the second most common engine fault, at about 12% of engine events.
+**Industry Statistics:** In typical industry data, this is the fourth most common fault type, at about 14% of events.
 
 #### Contamination Types
 

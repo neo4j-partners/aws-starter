@@ -6,9 +6,11 @@
 # the neo4j-graphrag vector and Text2Cypher retrievers.
 #
 # A thin wrapper over the AgentCore CLI (`npm install -g @aws/agentcore`)
-# plus local start/stop/test shortcuts. The Runtime and its env vars are
-# declared in agentcore/agentcore.json. Passwords never go there: the
-# Runtime reads them from Secrets Manager through the *_SECRET_ARN vars.
+# plus local start/stop/test shortcuts. agentcore/agentcore.json declares the
+# Runtime. `deploy` loads the Neo4j settings from the shared ../.env and
+# agentcore/cdk/lib/cdk-stack.ts passes them to the Runtime. Passwords never
+# reach the stack: the Runtime reads them from Secrets Manager through the
+# *_SECRET_ARN vars.
 #
 # `start` runs the local server in the foreground (port 7070). The same
 # server and the clients are also uv console scripts. See the README
@@ -33,8 +35,8 @@
 # Prerequisites:
 #   - Local runs: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD in the shared
 #     ../.env at the aircraft-fleet root
-#   - Deploy: the AgentCore CLI on PATH, and the env var values in
-#     agentcore/agentcore.json filled in for your Neo4j instances
+#   - Deploy: the AgentCore CLI on PATH, and the DEPLOY_VARS below set in
+#     ../.env or the shell
 #   - AWS credentials configured (for Bedrock access)
 
 set -e
@@ -115,15 +117,41 @@ refuse_secret_files() {
     fi
 }
 
-# TODO(deploy): fill the env var values in agentcore/agentcore.json before
-# deploying. The *_PASSWORD_SECRET_ARN values name Secrets Manager secrets
-# that hold the Neo4j passwords. Never put a password in that file.
-refuse_placeholders() {
-    if grep -q "REPLACE_ME" "$PROJECT_SPEC"; then
-        echo -e "${RED}ERROR: $PROJECT_SPEC still has REPLACE_ME placeholders${NC}"
-        echo "Set the Neo4j URIs and the password secret ARNs for your instances."
+# The settings agentcore/cdk/lib/cdk-stack.ts copies into the Runtime
+# environment. Synth fails and names any that are missing.
+DEPLOY_VARS=(
+    NEO4J_URI NEO4J_USERNAME NEO4J_DATABASE NEO4J_PASSWORD_SECRET_ARN
+    MEM_NEO4J_URI MEM_NEO4J_USERNAME MEM_NEO4J_DATABASE MEM_NEO4J_PASSWORD_SECRET_ARN
+)
+SHARED_ENV="$ROOT_DIR/../.env"
+
+# Export DEPLOY_VARS from the shared .env, which sits outside the code zip.
+# A value already set in the shell wins. The file is parsed, not sourced, and
+# only these names are exported, so passwords in it stay out of the CDK
+# process.
+load_deploy_env() {
+    ensure_deps
+    if [ ! -f "$SHARED_ENV" ]; then
+        echo -e "${RED}ERROR: $SHARED_ENV not found${NC}"
+        echo "Copy ../.env.sample to ../.env and set the deploy settings."
         exit 1
     fi
+    local exports
+    exports=$(uv run --quiet python - "$SHARED_ENV" "${DEPLOY_VARS[@]}" <<'PY'
+import os
+import shlex
+import sys
+
+from dotenv import dotenv_values
+
+values = dotenv_values(sys.argv[1])
+for name in sys.argv[2:]:
+    value = values.get(name)
+    if not os.environ.get(name) and value:
+        print(f"export {name}={shlex.quote(value)}")
+PY
+)
+    eval "$exports"
 }
 
 case "${1:-help}" in
@@ -151,7 +179,7 @@ case "${1:-help}" in
     deploy)
         ensure_cli
         refuse_secret_files
-        refuse_placeholders
+        load_deploy_env
         echo -e "${GREEN}Deploying agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
@@ -201,6 +229,8 @@ case "${1:-help}" in
         SPEC_BACKUP=$(mktemp)
         cp "$PROJECT_SPEC" "$SPEC_BACKUP"
         trap 'cp "$SPEC_BACKUP" "$PROJECT_SPEC"; rm -f "$SPEC_BACKUP"' EXIT
+        # The deploy below synthesizes the stack, which needs the same settings.
+        load_deploy_env
         agentcore remove runtime --name "$RUNTIME_NAME"
         agentcore deploy --target "$TARGET" --yes
         echo ""

@@ -136,7 +136,7 @@ Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 
 ```bash
 uv sync
-cp ../.env.sample ../.env    # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+cp ../.env.sample ../.env    # set the deploy settings listed under Deploy
 aws sso login --sso-session <your-sso-session>     # only if you use AWS SSO
 ```
 
@@ -146,11 +146,12 @@ Deployment uses the AgentCore CLI. Install it with
 `npm install -g @aws/agentcore`. The project lives in `agentcore/`, and
 `agentcore/agentcore.json` declares the `graphrag_agent` Runtime.
 
-Before the first deploy, edit the `envVars` in `agentcore/agentcore.json`:
+`./agent.sh deploy` reads the deploy settings from the shared `../.env`. A value already set in the shell wins. `agentcore/cdk/lib/cdk-stack.ts` copies them into the Runtime environment, and synth stops with a list of any that are missing:
 
 - **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE` for the fleet graph.
-- **Memory connection:** Set the `MEM_NEO4J_*` values for the agent memory database.
-- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the Secrets Manager secrets that hold the passwords. Never put a password in `agentcore.json`. Each secret holds a JSON object with a `password` key.
+- **Memory connection:** Set `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, and `MEM_NEO4J_DATABASE` for the agent memory database.
+- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the complete ARNs of the Secrets Manager secrets that hold the passwords. A complete ARN ends in the six-character suffix that Secrets Manager adds. Each secret holds a JSON object with a `password` key. The deploy never reads or sends the passwords themselves.
+- **Secret access:** The stack grants the Runtime role `secretsmanager:GetSecretValue` on exactly those two ARNs. A secret encrypted with a customer managed KMS key also needs `kms:Decrypt` on that key, which the stack does not grant.
 
 ```bash
 ./agent.sh deploy            # builds the code zip and deploys the CDK stack
@@ -160,7 +161,6 @@ Before the first deploy, edit the `envVars` in `agentcore/agentcore.json`:
 
 - **Deploy type:** The Runtime uses a `CodeZip` build. `agentcore deploy` zips this directory, uploads it, and runs it on a managed Python 3.12 arm64 runtime. It builds no Docker image.
 - **Packaged files:** The zip holds every file here except `agentcore/`, `.venv`, `.git`, and caches. `./agent.sh deploy` refuses to run while a `.env*` or `.mcp-credentials*.json` file is present, because the zip would include it. Local runs read the shared `../.env` instead.
-- **Placeholders:** `./agent.sh deploy` also refuses to run while `agentcore.json` still has `REPLACE_ME` values.
 - **Deployment target:** The first deploy creates the `default` target in `agentcore/aws-targets.json` from your current AWS account and region. That file and `agentcore/.cli/` hold account-specific values, so git ignores them.
 
 ### Call the deployed agent
@@ -224,8 +224,10 @@ terminal. Press Ctrl+C to stop it.
 |----------|---------|
 | `NEO4J_URI` | Required |
 | `NEO4J_USERNAME` | `neo4j` |
-| `NEO4J_PASSWORD` | Required unless `NEO4J_PASSWORD_SECRET_ARN` is set |
-| `NEO4J_PASSWORD_SECRET_ARN` | Unset. When set, the password comes from this secret. |
+| `NEO4J_PASSWORD` | Local runs only. Required when `NEO4J_PASSWORD_SECRET_ARN` is unset. |
+| `NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. The password comes from this secret. |
+| `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, `MEM_NEO4J_DATABASE` | The agent memory database. Required to deploy. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | The memory database password secret. Required to deploy. |
 | `NEO4J_DATABASE` | `neo4j` |
 | `MODEL_ID` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
 | `AWS_REGION` | `us-east-1` |
@@ -247,7 +249,9 @@ ADOT traces the Neo4j driver, the boto3 calls to Bedrock, and incoming requests.
 
 | Symptom | Cause and fix |
 |---------|---------------|
-| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env` in `demos/aircraft-fleet/` for local runs. For deployed runs, set them as runtime environment variables. |
+| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env` in `demos/aircraft-fleet/` for local runs. A deployed Runtime gets `NEO4J_URI` and `NEO4J_PASSWORD_SECRET_ARN` from the deploy. Set them in the shared `.env` and run `./agent.sh deploy` again. |
+| `Missing deploy settings for runtime "graphrag_agent"` | Synth found a deploy setting unset or a secret ARN that is not complete. Set the listed names in the shared `.env`. |
+| `Could not read the secret in NEO4J_PASSWORD_SECRET_ARN` in the Runtime logs | The secret does not exist in that region, or the Runtime role cannot read it. Check the ARN and that the secret is not encrypted with a KMS key the role cannot use. |
 | `vector_search` returns poor results or nothing | The agent's embedder must match the pipeline's embedder. Align `EMBED_MODEL_ID` and `EMBED_DIMENSIONS`, and confirm that the `maintenanceChunkEmbeddings` index exists. |
 | `ServiceUnavailable` or an auth error from Neo4j | The `NEO4J_URI` scheme or the credentials are wrong, or the database is unreachable. |
 | `NoCredentialsError` | AWS credentials are missing. Run `aws configure` or set credentials in the environment. |

@@ -7,10 +7,62 @@ export interface AgentCoreStackProps extends StackProps {
   application: AgentCoreApplicationProps;
 }
 
+/** Must match the Runtime name in agentcore/agentcore.json. */
+const RUNTIME_NAME = 'graphrag_agent';
+
+/** Plain connection settings, copied from the deploy shell into the Runtime environment. */
+const PLAIN_VARS = [
+  'NEO4J_URI',
+  'NEO4J_USERNAME',
+  'NEO4J_DATABASE',
+  'MEM_NEO4J_URI',
+  'MEM_NEO4J_USERNAME',
+  'MEM_NEO4J_DATABASE',
+] as const;
+
+/**
+ * Secrets Manager ARNs for the two Neo4j passwords. The Runtime gets the ARN and reads the
+ * secret at startup. The password itself never reaches the stack.
+ */
+const SECRET_ARN_VARS = ['NEO4J_PASSWORD_SECRET_ARN', 'MEM_NEO4J_PASSWORD_SECRET_ARN'] as const;
+
+/** A complete secret ARN ends in the six-character suffix Secrets Manager adds. */
+const COMPLETE_SECRET_ARN = /^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:\d{12}:secret:.+-[A-Za-z0-9]{6}$/;
+
+/**
+ * Read the named variables from the deploy environment. `agent.sh deploy` loads them from
+ * demos/aircraft-fleet/.env, which sits outside the code zip. Throws one error naming every
+ * missing or malformed variable, so synth stops before anything is deployed.
+ */
+function readDeployEnv(): Record<string, string> {
+  const values: Record<string, string> = {};
+  const problems: string[] = [];
+  for (const name of [...PLAIN_VARS, ...SECRET_ARN_VARS]) {
+    const value = process.env[name]?.trim();
+    if (!value) {
+      problems.push(`${name} is not set`);
+    } else {
+      values[name] = value;
+    }
+  }
+  for (const name of SECRET_ARN_VARS) {
+    if (values[name] && !COMPLETE_SECRET_ARN.test(values[name])) {
+      problems.push(`${name} is not a complete Secrets Manager secret ARN (it must end in the -XXXXXX suffix)`);
+    }
+  }
+  if (problems.length > 0) {
+    throw new Error(
+      `Missing deploy settings for runtime "${RUNTIME_NAME}":\n  - ${problems.join('\n  - ')}\n` +
+        'Set them in demos/aircraft-fleet/.env and deploy with ./agent.sh deploy.',
+    );
+  }
+  return values;
+}
+
 /**
  * The stack the AgentCore CLI deploys. Everything declared in agentcore/agentcore.json is
- * created by the AgentCoreApplication construct. Add your own resources below it and wire
- * them to your runtimes and harnesses through the application's accessors.
+ * created by the AgentCoreApplication construct. This stack adds the Neo4j settings to the
+ * graphrag_agent Runtime and lets its role read exactly the two password secrets.
  */
 export class AgentCoreStack extends Stack {
   public readonly application: AgentCoreApplication;
@@ -19,14 +71,14 @@ export class AgentCoreStack extends Stack {
     super(scope, id, props);
     this.application = new AgentCoreApplication(this, 'Application', props.application);
 
-    // Example: give a runtime a DynamoDB table.
-    //
-    // import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-    // const orders = new dynamodb.Table(this, 'Orders', {
-    //   partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
-    // });
-    // const checkout = this.application.runtime('checkout'); // or .harness('support')
-    // checkout.grantReadWrite(orders);
-    // checkout.addEnvironmentVariable('ORDERS_TABLE', orders.tableName);
+    const env = readDeployEnv();
+    const runtime = this.application.runtime(RUNTIME_NAME);
+    for (const [name, value] of Object.entries(env)) {
+      runtime.addEnvironmentVariable(name, value);
+    }
+    runtime.grant(
+      ['secretsmanager:GetSecretValue'],
+      SECRET_ARN_VARS.map((name) => env[name]),
+    );
   }
 }

@@ -52,8 +52,14 @@ def test_text2cypher_max_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_empty_strings_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    names = ("MODEL_ID", "AWS_REGION", "VECTOR_INDEX_NAME", "FULLTEXT_INDEX_NAME",
-             "EMBED_MODEL_ID", "EMBED_DIMENSIONS")
+    names = (
+        "MODEL_ID",
+        "AWS_REGION",
+        "VECTOR_INDEX_NAME",
+        "FULLTEXT_INDEX_NAME",
+        "EMBED_MODEL_ID",
+        "EMBED_DIMENSIONS",
+    )
     for name in names:
         monkeypatch.setenv(name, "")
     assert Settings.from_env() == Settings()

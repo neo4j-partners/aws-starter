@@ -91,8 +91,7 @@ def get_agent_config() -> tuple[str, str]:
         )
     except FileNotFoundError as e:
         raise DeploymentNotFoundError(
-            "The agentcore CLI is not installed. Install it with "
-            "'npm install -g @aws/agentcore'."
+            "The agentcore CLI is not installed. Install it with 'npm install -g @aws/agentcore'."
         ) from e
     except subprocess.TimeoutExpired as e:
         raise DeploymentNotFoundError(
@@ -125,9 +124,7 @@ def parse_status(output: str) -> tuple[str, str]:
 
     region = status.get("region")
     if not isinstance(region, str) or not region:
-        raise DeploymentNotFoundError(
-            "'agentcore status --json' did not report the target region."
-        )
+        raise DeploymentNotFoundError("'agentcore status --json' did not report the target region.")
 
     resources = status.get("resources")
     if not isinstance(resources, list):
@@ -143,9 +140,7 @@ def parse_status(output: str) -> tuple[str, str]:
         None,
     )
     if runtime is None:
-        raise DeploymentNotFoundError(
-            f"The project has no Runtime named '{RUNTIME_NAME}'."
-        )
+        raise DeploymentNotFoundError(f"The project has no Runtime named '{RUNTIME_NAME}'.")
     arn = runtime.get("arn")
     if runtime.get("deploymentState") != "deployed" or not isinstance(arn, str) or not arn:
         raise DeploymentNotFoundError(
@@ -197,9 +192,7 @@ def _normalize_newlines(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _consume_sse(
-    chunks: Iterable[bytes], stream: bool
-) -> tuple[list[str], list[str]]:
+def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list[str]]:
     """Parse ``data: {...}\\n\\n`` events off a byte iterator as they arrive.
 
     Lines may end in ``\\r\\n``, ``\\r``, or ``\\n``, as the SSE format allows.
@@ -307,10 +300,7 @@ def invoke_local(
     except httpx.ConnectError:
         return {
             "status": "error",
-            "errors": [
-                f"Could not connect to {url}. Start the agent first: "
-                f"./agent.sh start"
-            ],
+            "errors": [f"Could not connect to {url}. Start the agent first: ./agent.sh start"],
         }
 
 

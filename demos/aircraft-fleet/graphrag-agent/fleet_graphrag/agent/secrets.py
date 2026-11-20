@@ -102,7 +102,6 @@ def _parse_secret(value: str | None, secret_arn_var: str) -> str:
     password = parsed.get("password") if isinstance(parsed, dict) else None
     if not isinstance(password, str) or not password:
         raise ConfigError(
-            f"The secret in {secret_arn_var} must be a JSON object with a "
-            f"non-empty 'password' key."
+            f"The secret in {secret_arn_var} must be a JSON object with a non-empty 'password' key."
         )
     return password

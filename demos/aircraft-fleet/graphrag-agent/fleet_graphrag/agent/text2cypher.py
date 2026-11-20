@@ -98,9 +98,7 @@ class BoundedText2CypherRetriever(Text2CypherRetriever):
                 result_transformer_=lambda result: result.fetch(self.max_rows + 1),
             )
         except CypherSyntaxError as e:
-            raise Text2CypherRetrievalError(
-                f"Failed to get search result: {e.message}"
-            ) from e
+            raise Text2CypherRetrievalError(f"Failed to get search result: {e.message}") from e
 
         truncated = len(records) > self.max_rows
         if truncated:

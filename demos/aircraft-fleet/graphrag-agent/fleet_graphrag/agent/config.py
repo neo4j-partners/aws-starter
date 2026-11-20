@@ -89,17 +89,13 @@ class Settings:
             max_tokens=_env_int("MAX_TOKENS", defaults.max_tokens),
             effort=_env_effort("MODEL_EFFORT", defaults.effort),
             aws_region=os.getenv("AWS_REGION") or defaults.aws_region,
-            vector_index_name=os.getenv("VECTOR_INDEX_NAME")
-            or defaults.vector_index_name,
-            fulltext_index_name=os.getenv("FULLTEXT_INDEX_NAME")
-            or defaults.fulltext_index_name,
+            vector_index_name=os.getenv("VECTOR_INDEX_NAME") or defaults.vector_index_name,
+            fulltext_index_name=os.getenv("FULLTEXT_INDEX_NAME") or defaults.fulltext_index_name,
             schema_ttl_s=_env_int("SCHEMA_TTL_S", defaults.schema_ttl_s),
             text2cypher_timeout_s=_env_float(
                 "TEXT2CYPHER_TIMEOUT_S", defaults.text2cypher_timeout_s
             ),
-            text2cypher_max_rows=_env_int(
-                "TEXT2CYPHER_MAX_ROWS", defaults.text2cypher_max_rows
-            ),
+            text2cypher_max_rows=_env_int("TEXT2CYPHER_MAX_ROWS", defaults.text2cypher_max_rows),
             text2cypher_max_tokens=_env_int(
                 "TEXT2CYPHER_MAX_TOKENS", defaults.text2cypher_max_tokens
             ),

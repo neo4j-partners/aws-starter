@@ -48,9 +48,7 @@ def test_format_hit_without_document_or_entities() -> None:
         content="Orphan chunk.",
         metadata={"score": None, "chunk_index": 0, "entities": []},
     )
-    assert retrieval._format_hit(item) == (
-        "[Source: unknown document | chunk 0]\nOrphan chunk."
-    )
+    assert retrieval._format_hit(item) == ("[Source: unknown document | chunk 0]\nOrphan chunk.")
 
 
 def test_vector_search_with_no_tokens_skips_the_database(monkeypatch) -> None:
@@ -131,6 +129,4 @@ def test_text2cypher_llm_caps_output_tokens(monkeypatch) -> None:
         retrieval._text2cypher_retriever()
     finally:
         retrieval._text2cypher_retriever.cache_clear()
-    assert captured["model_params"] == {
-        "maxTokens": retrieval.settings.text2cypher_max_tokens
-    }
+    assert captured["model_params"] == {"maxTokens": retrieval.settings.text2cypher_max_tokens}

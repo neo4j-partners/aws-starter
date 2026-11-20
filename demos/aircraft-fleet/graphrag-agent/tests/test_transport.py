@@ -38,9 +38,7 @@ def test_chunks_join_in_order() -> None:
 
 
 def test_event_split_across_byte_chunks() -> None:
-    whole = _event({"type": "chunk", "data": "split"}) + _event(
-        {"type": "chunk", "data": " ok"}
-    )
+    whole = _event({"type": "chunk", "data": "split"}) + _event({"type": "chunk", "data": " ok"})
     raw = [whole[:7], whole[7:20], whole[20:]]
     content, _ = _consume_sse(raw, stream=False)
     assert content == ["split", " ok"]
@@ -78,7 +76,7 @@ def test_crlf_split_across_chunks_is_one_line_ending() -> None:
     # from its blank-line terminator.
     first = b'data: {"type": "chunk", "data": "a"}\r\n\r'
     second = b'\ndata: {"type": "chunk", "data": "b"}\r'
-    third = b'\n\r\n'
+    third = b"\n\r\n"
     content, errors = _consume_sse([first, second, third, COMPLETE], stream=False)
     assert content == ["a", "b"]
     assert errors == []
@@ -127,9 +125,7 @@ def test_stream_cut_inside_a_character_is_reported() -> None:
 
 
 def test_newlines_in_chunk_data_survive() -> None:
-    content, _ = _consume_sse(
-        [_event({"type": "chunk", "data": "a\n\nb"})], stream=False
-    )
+    content, _ = _consume_sse([_event({"type": "chunk", "data": "a\n\nb"})], stream=False)
     assert content == ["a\n\nb"]
 
 
@@ -145,9 +141,7 @@ def test_tool_events_are_not_content() -> None:
 
 
 def test_error_event_is_collected() -> None:
-    content, errors = _consume_sse(
-        [_event({"type": "error", "error": "boom"})], stream=False
-    )
+    content, errors = _consume_sse([_event({"type": "error", "error": "boom"})], stream=False)
     assert content == []
     assert errors == ["boom"]
     assert _result(content, errors) == {"status": "error", "errors": ["boom"]}
@@ -194,8 +188,12 @@ def _status(**overrides: object) -> str:
         "target": "default",
         "region": "us-east-1",
         "resources": [
-            {"resourceType": "runtime", "name": "graphrag_agent",
-             "deploymentState": "deployed", "arn": ARN},
+            {
+                "resourceType": "runtime",
+                "name": "graphrag_agent",
+                "deploymentState": "deployed",
+                "arn": ARN,
+            },
         ],
     }
     status.update(overrides)
@@ -209,10 +207,18 @@ def test_parse_status_returns_deployed_runtime_arn() -> None:
             "target": "default",
             "region": "us-west-2",
             "resources": [
-                {"resourceType": "credential", "name": "x", "deploymentState": "deployed",
-                 "arn": "arn:other"},
-                {"resourceType": "runtime", "name": "graphrag_agent",
-                 "deploymentState": "deployed", "arn": ARN},
+                {
+                    "resourceType": "credential",
+                    "name": "x",
+                    "deploymentState": "deployed",
+                    "arn": "arn:other",
+                },
+                {
+                    "resourceType": "runtime",
+                    "name": "graphrag_agent",
+                    "deploymentState": "deployed",
+                    "arn": ARN,
+                },
             ],
         }
     )
@@ -224,8 +230,11 @@ def test_parse_status_refuses_local_only_runtime() -> None:
         {
             "region": "us-east-1",
             "resources": [
-                {"resourceType": "runtime", "name": "graphrag_agent",
-                 "deploymentState": "local-only"},
+                {
+                    "resourceType": "runtime",
+                    "name": "graphrag_agent",
+                    "deploymentState": "local-only",
+                },
             ],
         }
     )
@@ -282,8 +291,12 @@ def test_parse_status_requires_region(region: str | None) -> None:
 
 
 def test_parse_status_matches_runtime_by_name() -> None:
-    other = {"resourceType": "runtime", "name": "other_agent",
-             "deploymentState": "deployed", "arn": "arn:other"}
+    other = {
+        "resourceType": "runtime",
+        "name": "other_agent",
+        "deploymentState": "deployed",
+        "arn": "arn:other",
+    }
     with pytest.raises(DeploymentNotFoundError, match="no Runtime named 'graphrag_agent'"):
         parse_status(_status(resources=[other]))
 
@@ -294,8 +307,7 @@ def test_parse_status_ignores_malformed_resources() -> None:
 
 
 def test_parse_status_refuses_deployed_runtime_without_arn() -> None:
-    runtime = {"resourceType": "runtime", "name": "graphrag_agent",
-               "deploymentState": "deployed"}
+    runtime = {"resourceType": "runtime", "name": "graphrag_agent", "deploymentState": "deployed"}
     with pytest.raises(DeploymentNotFoundError, match="not deployed"):
         parse_status(_status(resources=[runtime]))
 
@@ -329,9 +341,7 @@ def test_status_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
 def _local_with(monkeypatch: pytest.MonkeyPatch, seen: list[httpx.Request]) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(
-            200, content=_event({"type": "chunk", "data": "ok"}) + COMPLETE
-        )
+        return httpx.Response(200, content=_event({"type": "chunk", "data": "ok"}) + COMPLETE)
 
     real_client = httpx.Client
 

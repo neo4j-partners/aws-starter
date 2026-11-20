@@ -144,14 +144,22 @@ def section_agent() -> None:
         "manual-text question, and one that needs both.",
     )
     questions = [
-        ("Structured", "Which operator has the worst on-time performance, "
-         "and how many delays do they have?"),
-        ("Manual text", "What does the maintenance manual recommend for "
-         "hydraulic reservoir low-level warnings?"),
-        ("Needs both", "For maintenance events whose fault is 'Vibration "
-         "exceedance', what corrective actions were taken, and what does "
-         "the manual say the correct engine-vibration troubleshooting "
-         "procedure is?"),
+        (
+            "Structured",
+            "Which operator has the worst on-time performance, and how many delays do they have?",
+        ),
+        (
+            "Manual text",
+            "What does the maintenance manual recommend for "
+            "hydraulic reservoir low-level warnings?",
+        ),
+        (
+            "Needs both",
+            "For maintenance events whose fault is 'Vibration "
+            "exceedance', what corrective actions were taken, and what does "
+            "the manual say the correct engine-vibration troubleshooting "
+            "procedure is?",
+        ),
     ]
     for label, q in questions:
         print(f"User ({label}): {q}")
@@ -193,16 +201,11 @@ def section_memory() -> None:
 
 def main() -> None:
     global TARGET
-    parser = argparse.ArgumentParser(
-        description="GraphRAG Agent functionality showcase."
-    )
+    parser = argparse.ArgumentParser(description="GraphRAG Agent functionality showcase.")
     parser.add_argument(
         "--remote",
         action="store_true",
-        help=(
-            "Drive the deployed AgentCore runtime instead of the local "
-            "server on port 7070."
-        ),
+        help=("Drive the deployed AgentCore runtime instead of the local server on port 7070."),
     )
     TARGET = "deployed" if parser.parse_args().remote else "local"
 

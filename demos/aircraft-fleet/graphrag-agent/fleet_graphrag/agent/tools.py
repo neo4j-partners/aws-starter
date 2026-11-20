@@ -28,12 +28,10 @@ TIMEOUT_RESULT = (
     "for example with a filter or fewer aircraft."
 )
 UNAVAILABLE_RESULT = (
-    "The graph database is unavailable right now. Tell the user the data "
-    "could not be reached."
+    "The graph database is unavailable right now. Tell the user the data could not be reached."
 )
 DATABASE_ERROR_RESULT = (
-    "The graph database returned an error. Tell the user the data could "
-    "not be retrieved."
+    "The graph database returned an error. Tell the user the data could not be retrieved."
 )
 # Enough of a query error for the model to rephrase the question.
 _MAX_QUERY_ERROR_CHARS = 500

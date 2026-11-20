@@ -38,9 +38,7 @@ from dotenv import load_dotenv
 # FLEET_ENV_FILE overrides it; the tests point it at an empty file. Existing
 # env vars win, so Runtime env vars are untouched. This runs before the agent
 # imports because ``agent.config`` resolves settings at import time.
-ENV_FILE = Path(
-    os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().parents[2] / ".env"
-)
+ENV_FILE = Path(os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().parents[2] / ".env")
 load_dotenv(ENV_FILE)
 
 import neo4j  # noqa: E402
@@ -87,8 +85,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 app = BedrockAgentCoreApp()
 
 GENERIC_ERROR = (
-    "Error processing your request. Please try rephrasing your question or "
-    "check the server logs."
+    "Error processing your request. Please try rephrasing your question or check the server logs."
 )
 
 INVALID_PAYLOAD = "Invalid request payload."
@@ -135,13 +132,7 @@ class RequestPayload(BaseModel):
     @property
     def agent_prompt(self) -> str | None:
         """Prompt for the full ReAct agent (prompt > message > query > input)."""
-        return (
-            self.prompt
-            or self.message
-            or self.query
-            or self.input_text
-            or self.input_
-        )
+        return self.prompt or self.message or self.query or self.input_text or self.input_
 
     @property
     def data_query(self) -> str | None:
@@ -158,8 +149,7 @@ class RequestPayload(BaseModel):
 def _invalid_fields(error: ValidationError) -> str:
     """Names of the fields that failed validation, without values or messages."""
     names = dict.fromkeys(
-        ".".join(str(part) for part in detail["loc"]) or "(body)"
-        for detail in error.errors()
+        ".".join(str(part) for part in detail["loc"]) or "(body)" for detail in error.errors()
     )
     return ", ".join(names)
 
@@ -231,9 +221,7 @@ async def invoke(
             if mode is Mode.GRAPH_QUERY:
                 result = await asyncio.to_thread(graph_query, query)
             else:
-                result = await asyncio.to_thread(
-                    vector_search, query, req.top_k
-                )
+                result = await asyncio.to_thread(vector_search, query, req.top_k)
             yield {"type": "chunk", "data": result}
             yield {"type": "complete"}
             logger.info("%s request completed successfully", mode.value)
@@ -245,10 +233,7 @@ async def invoke(
             logger.warning("No prompt provided in request")
             yield {
                 "type": "error",
-                "error": (
-                    "No prompt provided. Please include 'prompt' in your "
-                    "request."
-                ),
+                "error": ("No prompt provided. Please include 'prompt' in your request."),
             }
             return
 

@@ -58,27 +58,47 @@ def test_query_error_text_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
-        (neo4j.exceptions.ServiceUnavailable(f"Couldn't connect to {ADDRESS}"),
-         tools.UNAVAILABLE_RESULT),
-        (neo4j.exceptions.SessionExpired(f"Session to {ADDRESS} expired"),
-         tools.UNAVAILABLE_RESULT),
-        (_server_error("Neo.ClientError.Security.Unauthorized", f"auth failed at {ADDRESS}"),
-         tools.UNAVAILABLE_RESULT),
-        (_server_error("Neo.ClientError.Transaction.TransactionTimedOutClientConfiguration",
-                       f"timed out on {ADDRESS}"),
-         tools.TIMEOUT_RESULT),
-        (_server_error("Neo.ClientError.Security.Forbidden", f"denied on {ADDRESS}"),
-         tools.DATABASE_ERROR_RESULT),
-        (_server_error("Neo.TransientError.General.MemoryPoolOutOfMemoryError",
-                       f"out of memory on {ADDRESS}"),
-         tools.DATABASE_ERROR_RESULT),
-        (neo4j.exceptions.ConfigurationError(f"bad routing to {ADDRESS}"),
-         tools.DATABASE_ERROR_RESULT),
+        (
+            neo4j.exceptions.ServiceUnavailable(f"Couldn't connect to {ADDRESS}"),
+            tools.UNAVAILABLE_RESULT,
+        ),
+        (
+            neo4j.exceptions.SessionExpired(f"Session to {ADDRESS} expired"),
+            tools.UNAVAILABLE_RESULT,
+        ),
+        (
+            _server_error("Neo.ClientError.Security.Unauthorized", f"auth failed at {ADDRESS}"),
+            tools.UNAVAILABLE_RESULT,
+        ),
+        (
+            _server_error(
+                "Neo.ClientError.Transaction.TransactionTimedOutClientConfiguration",
+                f"timed out on {ADDRESS}",
+            ),
+            tools.TIMEOUT_RESULT,
+        ),
+        (
+            _server_error("Neo.ClientError.Security.Forbidden", f"denied on {ADDRESS}"),
+            tools.DATABASE_ERROR_RESULT,
+        ),
+        (
+            _server_error(
+                "Neo.TransientError.General.MemoryPoolOutOfMemoryError",
+                f"out of memory on {ADDRESS}",
+            ),
+            tools.DATABASE_ERROR_RESULT,
+        ),
+        (
+            neo4j.exceptions.ConfigurationError(f"bad routing to {ADDRESS}"),
+            tools.DATABASE_ERROR_RESULT,
+        ),
     ],
 )
 def test_driver_errors_get_fixed_results(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
-    error: Exception, expected: str,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    expected: str,
 ) -> None:
     monkeypatch.setattr(tools, "graph_query", _raise(error))
     monkeypatch.setattr(tools, "vector_search", _raise(error))
@@ -90,9 +110,7 @@ def test_driver_errors_get_fixed_results(
     info = [r for r in caplog.records if r.levelname == "INFO"]
     assert all(ADDRESS not in r.getMessage() for r in info)
     # The detail stays in the WARNING and ERROR records.
-    detail = "".join(
-        caplog.handler.format(r) for r in caplog.records if r.levelno >= 30
-    )
+    detail = "".join(caplog.handler.format(r) for r in caplog.records if r.levelno >= 30)
     assert ADDRESS in detail
 
 

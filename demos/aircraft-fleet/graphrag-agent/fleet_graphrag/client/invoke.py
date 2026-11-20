@@ -118,10 +118,7 @@ def _run() -> None:
             try:
                 interval = int(sys.argv[2])
             except ValueError:
-                print(
-                    f"ERROR: Invalid interval '{sys.argv[2]}'. "
-                    f"Must be a number."
-                )
+                print(f"ERROR: Invalid interval '{sys.argv[2]}'. Must be a number.")
                 sys.exit(1)
         run_load_test(interval)
         return

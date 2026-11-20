@@ -466,3 +466,50 @@ def test_deployed_calls_without_session_get_new_ones(monkeypatch: pytest.MonkeyP
     first, second = fake.session_ids
     assert first != second
     assert len(first) >= 33
+
+
+PROMPT = "Which aircraft had an EGT exceedance last week?"
+
+
+def _client_log_lines(caplog: pytest.LogCaptureFixture, level: str) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.levelname == level]
+
+
+def test_deployed_call_logs_the_prompt_only_at_debug(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake = _deployed(monkeypatch)
+    with caplog.at_level("DEBUG", logger="fleet_graphrag.client"):
+        transport.invoke({"prompt": PROMPT}, target="deployed", stream=False, session_id="s" * 33)
+    info = _client_log_lines(caplog, "INFO")
+    assert f"session={'s' * 33} prompt_chars={len(PROMPT)}" in info[0]
+    assert not any(PROMPT in line for line in info)
+    assert any(PROMPT in line for line in _client_log_lines(caplog, "DEBUG"))
+    assert fake.session_ids == ["s" * 33]
+
+
+def test_deployed_call_logs_the_session_it_creates(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake = _deployed(monkeypatch)
+    with caplog.at_level("INFO", logger="fleet_graphrag.client"):
+        transport.invoke({"prompt": PROMPT}, target="deployed", stream=False)
+    [session_id] = fake.session_ids
+    assert f"session={session_id} " in _client_log_lines(caplog, "INFO")[0]
+
+
+@pytest.mark.parametrize(("session_id", "logged"), [(None, "session=new"), ("s-1", "session=s-1")])
+def test_local_call_logs_the_prompt_only_at_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    session_id: str | None,
+    logged: str,
+) -> None:
+    _local_with(monkeypatch, [])
+    payload = {"mode": "graph_query", "query": PROMPT}
+    with caplog.at_level("DEBUG", logger="fleet_graphrag.client"):
+        transport.invoke(payload, stream=False, session_id=session_id)
+    info = _client_log_lines(caplog, "INFO")
+    assert f"{logged} prompt_chars={len(PROMPT)}" in info[0]
+    assert not any(PROMPT in line for line in info)
+    assert any(PROMPT in line for line in _client_log_lines(caplog, "DEBUG"))

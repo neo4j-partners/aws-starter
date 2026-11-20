@@ -266,6 +266,12 @@ def _result(content_parts: list[str], errors: list[str]) -> dict:
     return {"status": "success", "response": "".join(content_parts)}
 
 
+def _prompt_chars(payload: dict) -> int:
+    """Length of the user text in a payload, for a log line without the text."""
+    text = payload.get("prompt") or payload.get("query") or ""
+    return len(text) if isinstance(text, str) else 0
+
+
 def invoke_deployed(
     payload: dict,
     stream: bool = True,
@@ -277,7 +283,17 @@ def invoke_deployed(
     one, each call starts a new session.
     """
     agent_arn, region = get_agent_config()
-    logger.info("Agent ARN: %s | region: %s | payload: %s", agent_arn, region, payload)
+    session_id = session_id or new_session_id()
+    # The payload holds the user's text. Its length goes to INFO, the payload
+    # to DEBUG.
+    logger.info(
+        "Agent ARN: %s | region: %s | session=%s prompt_chars=%d",
+        agent_arn,
+        region,
+        session_id,
+        _prompt_chars(payload),
+    )
+    logger.debug("Payload: %s", payload)
 
     client = boto3.client(
         "bedrock-agentcore",
@@ -286,7 +302,7 @@ def invoke_deployed(
     )
     response = client.invoke_agent_runtime(
         agentRuntimeArn=agent_arn,
-        runtimeSessionId=session_id or new_session_id(),
+        runtimeSessionId=session_id,
         payload=json.dumps(payload).encode(),
         qualifier="DEFAULT",
     )
@@ -306,7 +322,14 @@ def invoke_local(
     ``session_id`` goes in the AgentCore session header. Without it, the
     server starts a new session for the call.
     """
-    logger.info("Local URL: %s | payload: %s", url, payload)
+    # Without a session ID, the server starts a new session.
+    logger.info(
+        "Local URL: %s | session=%s prompt_chars=%d",
+        url,
+        session_id or "new",
+        _prompt_chars(payload),
+    )
+    logger.debug("Payload: %s", payload)
     headers = {SESSION_HEADER: session_id} if session_id else {}
     try:
         with (

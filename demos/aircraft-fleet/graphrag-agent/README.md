@@ -162,6 +162,7 @@ Deployment uses the AgentCore CLI. Install it with
 - **Deploy type:** The Runtime uses a `CodeZip` build. `agentcore deploy` zips this directory, uploads it, and runs it on a managed Python 3.12 arm64 runtime. It builds no Docker image.
 - **Packaged files:** The zip holds every file here except `agentcore/`, `.venv`, `.git`, and caches. `./agent.sh deploy` refuses to run while a `.env*` or `.mcp-credentials*.json` file is present, because the zip would include it. Local runs read the shared `../.env` instead.
 - **Deployment target:** The first deploy creates the `default` target in `agentcore/aws-targets.json` from your current AWS account and region. That file and `agentcore/.cli/` hold account-specific values, so git ignores them.
+- **Fresh clone:** The deployed state lives in those ignored files. A fresh clone, or a different machine, has no record of an earlier deploy, so `./agent.sh status` reports the Runtime as not deployed even when it is running in your account.
 
 ### Call the deployed agent
 
@@ -180,7 +181,7 @@ connection differs:
 - **`uv run fleet-demo --remote`:** This command runs all four demo sections against the deployed agent.
 - **`uv run fleet-invoke "..."`:** This command sends one prompt and streams the answer as it arrives.
 - **`uv run fleet-invoke load-test [seconds]`:** This command sends a random query from `queries.txt` on an interval. The default interval is 5 seconds.
-- **`./agent.sh destroy`:** This command removes the runtime when you finish.
+- **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. When it finishes, it checks `agentcore status` and lists anything still deployed.
 
 ## Layout
 
@@ -213,7 +214,7 @@ terminal. Press Ctrl+C to stop it.
 |---------|-------------|
 | `start` / `stop` | Start or stop the local server on port 7070 |
 | `test` | Ask the local server one question |
-| `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
+| `deploy` / `destroy [--yes]` | Deploy to or remove from AgentCore Runtime. `destroy` asks first unless you pass `--yes`. |
 | `status` | Show the deployment status |
 | `invoke-cloud "prompt"` | Call the deployed agent through `agentcore invoke` |
 | `logs [args]` | Search the Runtime logs. Add `--tail` to follow them. |

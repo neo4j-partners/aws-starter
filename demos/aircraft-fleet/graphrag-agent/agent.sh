@@ -30,7 +30,7 @@
 #   ./agent.sh status             Check deployment status
 #   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent
 #   ./agent.sh logs [args]        Search or tail the Runtime logs
-#   ./agent.sh destroy            Remove from AgentCore
+#   ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)
 #
 # Prerequisites:
 #   - Local runs: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD in the shared
@@ -72,7 +72,7 @@ print_usage() {
     echo "  ./agent.sh status             Check deployment status"
     echo "  ./agent.sh invoke-cloud \"prompt\"  Invoke deployed agent"
     echo "  ./agent.sh logs [args]        Search or tail the Runtime logs (--tail)"
-    echo "  ./agent.sh destroy            Remove from AgentCore"
+    echo "  ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)"
     echo "  ./agent.sh help               Show this help message"
 }
 
@@ -100,13 +100,19 @@ ensure_cli() {
 
 # The CodeZip build ships every file under this directory except agentcore/,
 # .venv, .git, node_modules, and Python caches. Refuse to deploy while a
-# secrets file is present anywhere it would be packaged.
+# secrets file is present anywhere it would be packaged. -L follows symlinks,
+# so a link to a secrets file is caught too. A find error stops the deploy
+# instead of passing the check.
 refuse_secret_files() {
     local found
-    found=$(find . \
+    if ! found=$(find -L . \
         \( -path ./agentcore -o -name .venv -o -name .git -o -name node_modules \
-           -o -name __pycache__ -o -name .pytest_cache \) -prune \
-        -o \( -name '.env*' -o -name '.mcp-credentials*.json' \) -print)
+           -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -prune \
+        -o \( -name '.env*' -o -name '.mcp-credentials*.json' \) -print); then
+        echo -e "${RED}ERROR: could not scan $(pwd) for secrets files${NC}"
+        echo "Fix the find error above, then deploy again."
+        exit 1
+    fi
     if [ -n "$found" ]; then
         echo -e "${RED}ERROR: secrets files would be packaged into the deployment:${NC}"
         echo "$found"
@@ -115,6 +121,63 @@ refuse_secret_files() {
         echo "Local runs read the shared ../.env at the aircraft-fleet root."
         exit 1
     fi
+}
+
+# Ask before destroying. Anything but y or yes, including no input from a
+# non-interactive shell, cancels. `destroy --yes` skips the question.
+confirm_destroy() {
+    local reply=""
+    echo -e "${YELLOW}This deletes the $RUNTIME_NAME Runtime and its stack in target '$TARGET'.${NC}"
+    read -r -p "Continue? [y/N] " reply || true
+    case "$reply" in
+        y|Y|yes|YES) ;;
+        *)
+            echo "Cancelled. Nothing was changed."
+            exit 1
+            ;;
+    esac
+}
+
+restore_spec() {
+    cp "$SPEC_BACKUP" "$PROJECT_SPEC" && rm -f "$SPEC_BACKUP" || echo "Restore failed; backup at $SPEC_BACKUP" >&2
+}
+
+# Report every resource that `agentcore status` still shows as deployed.
+report_remaining() {
+    local status remaining
+    if ! status=$(agentcore status --json --target "$TARGET" 2>&1); then
+        echo -e "${RED}Could not check what remains deployed:${NC}"
+        echo "$status"
+        exit 1
+    fi
+    if ! remaining=$(printf '%s' "$status" | uv run --quiet python -c '
+import json
+import sys
+
+
+def walk(resources):
+    for resource in resources if isinstance(resources, list) else []:
+        if not isinstance(resource, dict):
+            continue
+        state = resource.get("deploymentState")
+        if state != "local-only":
+            kind, name = resource.get("resourceType"), resource.get("name")
+            print(f"  {kind} {name}: {state}")
+        walk(resource.get("children"))
+
+
+walk(json.load(sys.stdin).get("resources"))
+' 2>/dev/null); then
+        echo -e "${RED}Could not read the agentcore status output:${NC}"
+        echo "$status"
+        exit 1
+    fi
+    if [ -n "$remaining" ]; then
+        echo -e "${RED}Still deployed in target '$TARGET':${NC}"
+        echo "$remaining"
+        exit 1
+    fi
+    echo -e "${GREEN}Cleanup complete. Nothing is deployed in target '$TARGET'.${NC}"
 }
 
 # The settings agentcore/cdk/lib/cdk-stack.ts copies into the Runtime
@@ -221,20 +284,26 @@ case "${1:-help}" in
 
     destroy)
         ensure_cli
+        if [ "${2:-}" != "--yes" ]; then
+            confirm_destroy
+        fi
         # CLI 1.1.0 has no destroy command. A deploy of a project that
         # declares nothing removes the target's stack, so remove the Runtime
         # from the spec, deploy, and put the spec back.
         echo -e "${YELLOW}Removing agent from AgentCore Runtime...${NC}"
         echo ""
-        SPEC_BACKUP=$(mktemp)
-        cp "$PROJECT_SPEC" "$SPEC_BACKUP"
-        trap 'cp "$SPEC_BACKUP" "$PROJECT_SPEC"; rm -f "$SPEC_BACKUP"' EXIT
         # The deploy below synthesizes the stack, which needs the same settings.
         load_deploy_env
+        SPEC_BACKUP=$(mktemp)
+        cp "$PROJECT_SPEC" "$SPEC_BACKUP"
+        trap restore_spec EXIT
         agentcore remove runtime --name "$RUNTIME_NAME"
         agentcore deploy --target "$TARGET" --yes
+        # Status lists only what the spec declares, so restore it first.
+        trap - EXIT
+        restore_spec
         echo ""
-        echo -e "${GREEN}Cleanup complete!${NC}"
+        report_remaining
         ;;
 
     help|--help|-h)

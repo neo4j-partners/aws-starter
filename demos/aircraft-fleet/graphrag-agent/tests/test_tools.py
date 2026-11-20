@@ -158,3 +158,24 @@ def test_cancellation_is_not_swallowed(monkeypatch: pytest.MonkeyPatch, name: st
             tools.graph_query_tool("q")
         else:
             tools.vector_search_tool("q")
+
+
+@pytest.mark.parametrize(("asked", "used"), [(0, 1), (-5, 1), (1, 1), (7, 7), (20, 20), (500, 20)])
+def test_vector_search_top_k_is_clamped(
+    monkeypatch: pytest.MonkeyPatch, asked: int, used: int
+) -> None:
+    calls: list[int] = []
+
+    def fake_search(query: str, top_k: int) -> str:
+        calls.append(top_k)
+        return "chunks"
+
+    monkeypatch.setattr(tools, "vector_search", fake_search)
+    tools.vector_search_tool("q", asked)
+    assert calls == [used]
+
+
+def test_tool_description_states_the_top_k_bounds() -> None:
+    schema = tools.vector_search_tool.tool_spec["inputSchema"]["json"]
+    description = schema["properties"]["top_k"]["description"]
+    assert f"from {tools.MIN_TOP_K} to {tools.MAX_TOP_K}" in description

@@ -91,7 +91,7 @@ def test_session_id_comes_from_context(monkeypatch, caplog) -> None:
     monkeypatch.setattr(server, "get_graph_schema", no_schema)
     with caplog.at_level("INFO", logger="fleet_graphrag.server"):
         _run({"prompt": "hi", "session_id": "from-payload"}, session_id="from-header")
-    assert "session from-header" in caplog.text
+    assert "session=from-header" in caplog.text
     assert "from-payload" not in caplog.text
 
 
@@ -120,6 +120,58 @@ def test_null_or_empty_user_id_is_anonymous(user_id: str | None) -> None:
 
 def test_user_id_is_kept() -> None:
     assert server.RequestPayload(prompt="hi", user_id="pilot-7").user_id == "pilot-7"
+
+
+@pytest.mark.parametrize("top_k", [1, 20])
+def test_top_k_bounds_are_accepted(top_k: int) -> None:
+    assert server.RequestPayload(prompt="hi", top_k=top_k).top_k == top_k
+
+
+@pytest.mark.parametrize("top_k", [0, -1, 21, 10_000])
+def test_top_k_out_of_bounds_is_rejected(top_k: int) -> None:
+    events = _run({"mode": "vector_search", "query": "leaks", "top_k": top_k})
+    assert events == [{"type": "error", "error": "Invalid request payload. Invalid fields: top_k"}]
+
+
+def _stop_before_the_agent(monkeypatch) -> None:
+    def no_schema() -> str:
+        raise ValueError("stop before the agent runs")
+
+    monkeypatch.setattr(server, "get_graph_schema", no_schema)
+
+
+def test_prompt_text_is_logged_only_at_debug(monkeypatch, caplog) -> None:
+    _stop_before_the_agent(monkeypatch)
+    prompt = "Which aircraft had an EGT exceedance?"
+    with caplog.at_level("DEBUG", logger="fleet_graphrag.server"):
+        _run({"prompt": prompt, "user_id": "pilot-7"}, session_id="s-1")
+    info = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
+    assert f"Request session=s-1 user=pilot-7 prompt_chars={len(prompt)}" in info
+    assert not any(prompt in line for line in info)
+    debug = [r.getMessage() for r in caplog.records if r.levelname == "DEBUG"]
+    assert any(prompt in line for line in debug)
+
+
+def test_direct_query_text_is_logged_only_at_debug(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(server, "graph_query", lambda query: "42")
+    query = "count the aircraft"
+    with caplog.at_level("DEBUG", logger="fleet_graphrag.server"):
+        _run({"mode": "graph_query", "query": query})
+    info = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
+    assert f"graph_query direct call query_chars={len(query)}" in info
+    assert not any(query in line for line in info)
+    assert any(query in r.getMessage() for r in caplog.records if r.levelname == "DEBUG")
+
+
+def test_user_id_control_characters_are_escaped(monkeypatch, caplog) -> None:
+    _stop_before_the_agent(monkeypatch)
+    user_id = "pilot\nINFO forged line\x1b[31m\u2028é"
+    with caplog.at_level("INFO", logger="fleet_graphrag.server"):
+        _run({"prompt": "hi", "user_id": user_id}, session_id="s-1")
+    [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Request ")]
+    assert "user=pilot\\nINFO forged line\\x1b[31m\\u2028é " in line
+    assert "\n" not in line
+    assert "\x1b" not in line
 
 
 def test_invalid_payload_names_fields_without_values(caplog) -> None:

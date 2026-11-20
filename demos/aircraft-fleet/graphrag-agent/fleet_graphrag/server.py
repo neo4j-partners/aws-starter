@@ -71,7 +71,12 @@ from fleet_graphrag.agent.secrets import (  # noqa: E402
     NEO4J_PASSWORD_SECRET_ARN,
     neo4j_password,
 )
-from fleet_graphrag.agent.tools import graph_query_tool, vector_search_tool  # noqa: E402
+from fleet_graphrag.agent.tools import (  # noqa: E402
+    MAX_TOP_K,
+    MIN_TOP_K,
+    graph_query_tool,
+    vector_search_tool,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -119,7 +124,7 @@ class RequestPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     mode: Mode | None = None
-    top_k: int = 5
+    top_k: int = Field(default=5, ge=MIN_TOP_K, le=MAX_TOP_K)
     # A missing, null, or empty user_id is "anonymous".
     user_id: str = "anonymous"
 
@@ -144,6 +149,14 @@ class RequestPayload(BaseModel):
     def _default_user_id(cls, value: object) -> object:
         """Map a missing or empty ``user_id`` to ``anonymous``."""
         return value or "anonymous"
+
+
+def _printable(text: str) -> str:
+    """Escape control characters, so a client value cannot forge log lines."""
+    return "".join(
+        char if char.isprintable() else char.encode("unicode_escape").decode("ascii")
+        for char in text
+    )
 
 
 def _invalid_fields(error: ValidationError) -> str:
@@ -217,7 +230,9 @@ async def invoke(
                     ),
                 }
                 return
-            logger.info("%s direct call: %s...", mode.value, query[:100])
+            # The query is user text. Its length goes to INFO, the text to DEBUG.
+            logger.info("%s direct call query_chars=%d", mode.value, len(query))
+            logger.debug("%s query: %s", mode.value, query)
             if mode is Mode.GRAPH_QUERY:
                 result = await asyncio.to_thread(graph_query, query)
             else:
@@ -238,12 +253,14 @@ async def invoke(
             return
 
         session_id = context.session_id or f"local-{uuid.uuid4()}"
+        # The prompt is user text. Its length goes to INFO, the text to DEBUG.
         logger.info(
-            "Processing query for user %s, session %s: %s...",
-            req.user_id,
+            "Request session=%s user=%s prompt_chars=%d",
             session_id,
-            prompt[:100],
+            _printable(req.user_id),
+            len(prompt),
         )
+        logger.debug("Prompt: %s", prompt)
         logger.info("Model: %s", settings.model_id)
 
         # First call connects to Neo4j + fetches the schema (cached after);

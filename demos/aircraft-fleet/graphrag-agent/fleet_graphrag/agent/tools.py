@@ -41,6 +41,10 @@ QUERY_FAILED_RESULT = (
 SEARCH_FAILED_RESULT = (
     "The search could not be run. Tell the user the question could not be answered right now."
 )
+# The vector search returns between these many chunks. The tool description
+# states the same bounds.
+MIN_TOP_K = 1
+MAX_TOP_K = 20
 # Enough of a query error for the model to rephrase the question.
 _MAX_QUERY_ERROR_CHARS = 500
 
@@ -107,8 +111,9 @@ def vector_search_tool(query: str, top_k: int = 5) -> str:
 
     Args:
         query: Natural-language search text.
-        top_k: Number of chunks to return (default 5).
+        top_k: Number of chunks to return, from 1 to 20 (default 5).
     """
+    top_k = min(max(top_k, MIN_TOP_K), MAX_TOP_K)
     # The search Cypher is fixed, so no error here is the model's to fix.
     try:
         return vector_search(query, top_k)

@@ -25,7 +25,7 @@ Node labels and properties:
 - Flight {flight_id, flight_number, aircraft_id, operator, origin, destination, scheduled_departure, scheduled_arrival}
 - Delay {delay_id, cause, minutes}  (cause: Weather, Maintenance, Carrier, NAS)
 - MaintenanceEvent {event_id, component_id, system_id, aircraft_id, fault, severity, reported_at, corrective_action}  (severity: MINOR, MAJOR, CRITICAL)
-- Removal {removal_id, tracking_number, component_id, aircraft_id, removal_date, reason, work_order_number, technician_id, part_number, serial_number, hours_since_install, flight_hours_at_removal, flight_cycles_at_removal, replacement_required, shop_visit_required, warranty_status, removal_priority, cost_estimate, installation_date}
+- Removal {removal_id, tracking_number, component_id, aircraft_id, removal_date, reason, work_order_number, technician_id, part_number, serial_number, hours_since_install, flight_hours_at_removal, flight_cycles_at_removal, replacement_required, shop_visit_required, warranty_status, removal_priority, cost_estimate, installation_date}  (hours_since_install and flight_hours_at_removal are flight hours)
 - Document {documentId, aircraftType, title, type}
 - Chunk {text, index, embedding}
 - AircraftModel {name, manufacturer}

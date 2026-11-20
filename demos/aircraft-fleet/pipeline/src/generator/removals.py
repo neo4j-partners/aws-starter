@@ -27,6 +27,10 @@ _WARRANTY_WEIGHTS = [0.35, 0.65]
 # Removals per aircraft per year (approx) — scaled to config.n_days
 _BASE_REMOVALS_PER_YEAR = 4
 
+# Flight hours per calendar day, used to turn days since install into
+# flight hours since install.
+_UTILIZATION_HOURS_PER_DAY = (8.0, 10.0)
+
 
 def _part_number(rng: random.Random) -> str:
     prefix = rng.choice(["P", "PN", "PT", "PNR"])
@@ -85,6 +89,12 @@ def generate_removals(
             )
             install_days_back = rng.randint(90, 900)
             install_date = removal_date - timedelta(days=install_days_back)
+            flight_hours_at_removal = rng.randint(1000, 25000)
+            # Flight hours since install, kept below the airframe total.
+            utilization = rng.uniform(*_UTILIZATION_HOURS_PER_DAY)
+            hours_since_install = min(
+                round(install_days_back * utilization), flight_hours_at_removal - 1
+            )
 
             priority = rng.choices(_PRIORITIES, weights=_PRIORITY_WEIGHTS)[0]
             warranty = rng.choices(_WARRANTY, weights=_WARRANTY_WEIGHTS)[0]
@@ -104,8 +114,8 @@ def generate_removals(
                     "technician_id": _fake.name(),
                     "part_number": _part_number(rng),
                     "serial_number": _serial_number(),
-                    "time_since_install": install_days_back * 24,
-                    "flight_hours_at_removal": rng.randint(1000, 25000),
+                    "time_since_install": hours_since_install,
+                    "flight_hours_at_removal": flight_hours_at_removal,
                     "flight_cycles_at_removal": rng.randint(200, 4000),
                     "replacement_required": rng.random() < 0.85,
                     "shop_visit_required": rng.random() < 0.60,

@@ -54,6 +54,11 @@ packages = ["agent", "client"]
 [tool.hatch.build.targets.wheel.force-include]
 "runtime_app.py" = "runtime_app.py"
 
+# The AgentCore CLI reads the Runtime entrypoint from here. It overrides the
+# entrypoint in agentcore/agentcore.json.
+[tool.agentcore]
+entrypoint = "runtime_app.py"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

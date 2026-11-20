@@ -2,21 +2,29 @@
 name = "aircraft-fleet-graphrag-agent"
 version = "0.1.0"
 description = "Aircraft Fleet GraphRAG Agent — Strands, direct-to-Neo4j GraphRAG over an agent/ core"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)
-    "bedrock-agentcore",
-    "bedrock-agentcore-starter-toolkit",
-    "neo4j-graphrag[bedrock]>=1.16.0",
-    "neo4j>=5.17.0",
-    "boto3>=1.42.0",
+    "bedrock-agentcore>=1.26",
+    "neo4j-graphrag[bedrock]>=1.24",
+    "neo4j>=6.3.1",
+    "boto3>=1.43.127",
+    "httpx>=0.28",
     "pydantic>=2",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0",
     # Observability - ADOT for automatic tracing to CloudWatch
-    "aws-opentelemetry-distro>=0.10.0",
+    "aws-opentelemetry-distro>=0.23",
     # Strands agent framework
-    "strands-agents",
+    "strands-agents>=1.65",
+    # Held below 2.x until bedrock-agentcore[strands-agents] allows mcp 2.
+    "mcp>=1.28,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14",
 ]
 
 # Console entry points. The server runs in the foreground of its own
@@ -44,3 +52,12 @@ packages = ["agent", "client"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "runtime_app.py" = "runtime_app.py"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]

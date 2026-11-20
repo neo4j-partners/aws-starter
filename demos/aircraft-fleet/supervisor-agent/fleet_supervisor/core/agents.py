@@ -40,13 +40,14 @@ SPECIALIST_NAMES = {
 MAINTENANCE_DESCRIPTION = (
     "Answers questions about aircraft maintenance and reliability: maintenance "
     "events, faults, failures, components, systems, sensors, readings, and "
-    "severity. Pass the user's full question."
+    "severity. Pass a self-contained question that resolves references from the "
+    "conversation."
 )
 OPERATIONS_DESCRIPTION = (
     "Answers questions about flight operations: flights, delays, delay causes, "
     "routes, airports, operators, schedules, and on-time performance. Also "
     "handles general questions such as the graph schema or simple counts. "
-    "Pass the user's full question."
+    "Pass a self-contained question that resolves references from the conversation."
 )
 
 # Sent to the supervisor model in place of a specialist's error text. The

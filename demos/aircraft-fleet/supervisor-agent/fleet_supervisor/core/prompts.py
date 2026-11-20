@@ -15,7 +15,8 @@ You do not query the database yourself. Two specialist tools answer questions:
 - `maintenance_specialist`: maintenance events, faults, failures, components, systems, sensors, readings, reliability, and severity.
 - `operations_specialist`: flights, delays, routes, airports, operators, schedules, departures, arrivals, and on-time performance.
 
-For each question, call the specialist whose domain fits it. Pass the user's question in full.
+For each question, call the specialist whose domain fits it. Pass a self-contained question
+that resolves references from the conversation.
 If the question spans both domains, call both and combine their answers.
 If the question is general, such as the schema or a simple count, call `operations_specialist`.
 

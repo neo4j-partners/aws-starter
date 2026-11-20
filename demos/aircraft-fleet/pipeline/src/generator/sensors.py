@@ -19,7 +19,7 @@ from .fleet import AircraftNode, SystemNode
 from .specs import ENGINE_SPECS, EngineSpec
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class EngineSeries:
     """The EGT and vibration values written for one engine, spikes included.
 

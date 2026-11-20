@@ -46,9 +46,8 @@ def _distribute(n: int) -> list[str]:
     return [model for model, _ in MODEL_DISTRIBUTION for _ in range(counts[model])]
 
 
-def _generated_tails() -> Iterator[str]:
+def _generated_tails(registry_tails: set[str]) -> Iterator[str]:
     """Yield N10000, N10001, ... skipping every manual tail."""
-    registry_tails = {tail for _, tail in _registry_fleet()}
     return (tail for tail in (f"N{i:05d}" for i in count(10000)) if tail not in registry_tails)
 
 
@@ -190,10 +189,11 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     """
     rng = random.Random(config.seed)
 
-    registry = _registry_fleet()[: config.n_aircraft]
+    full_registry = _registry_fleet()
+    registry = full_registry[: config.n_aircraft]
     extra_models = _distribute(config.n_aircraft - len(registry))
     rng.shuffle(extra_models)
-    tails = _generated_tails()
+    tails = _generated_tails({tail for _, tail in full_registry})
     plan = [*registry, *((model, next(tails)) for model in extra_models)]
 
     # Assign operators round-robin then shuffle so each gets a similar fleet size

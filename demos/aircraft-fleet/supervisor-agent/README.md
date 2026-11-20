@@ -143,16 +143,27 @@ its runtime `codeLocation` is this folder.
 Before the first deploy, do two things:
 
 1. **Gateway URL:** Set `GATEWAY_URL` in `agentcore/agentcore.json` to the fleet Gateway endpoint.
-2. **Credential provider:** Add the `fleet-gateway` OAuth credential provider that `GATEWAY_CREDENTIAL_PROVIDER` names. The client ID and secret come from the fleet credentials file.
+2. **Credential provider:** Add the `fleet-gateway` OAuth credential provider that `GATEWAY_CREDENTIAL_PROVIDER` names. The client ID, scope, and secret come from the fleet credentials file. The discovery URL is an output of the MCP server stack.
 
    ```bash
-   agentcore add credentials oauth \
+   creds=../.mcp-credentials.json
+   jq -r .client_secret "$creds" | agentcore add credentials oauth \
        --name fleet-gateway \
-       --client-id <client_id> \
-       --client-secret-reference '{"secretId":"<secret ARN>","jsonKey":"client_secret"}' \
-       --discovery-url <Cognito user pool OIDC discovery URL> \
-       --scopes <scope>
+       --client-id "$(jq -r .client_id "$creds")" \
+       --discovery-url "$(aws cloudformation describe-stacks --region us-east-1 \
+           --stack-name "$(jq -r .stack_name "$creds")" \
+           --query "Stacks[0].Outputs[?OutputKey=='CognitoDiscoveryUrl'].OutputValue" \
+           --output text)" \
+       --scopes "$(jq -r .scope "$creds")" \
+       --client-secret -
    ```
+
+   The AgentCore CLI creates the provider from this entry on the next deploy,
+   before CDK runs. CDK cannot create it, and it grants the runtime access to
+   the provider only when the entry exists. For that reason, `./agent.sh deploy`
+   refuses to run until the entry is in `agentcore.json`. The client secret is
+   stored in `agentcore/.env.local`, which git ignores and the code zip leaves
+   out.
 
 Then run these commands:
 

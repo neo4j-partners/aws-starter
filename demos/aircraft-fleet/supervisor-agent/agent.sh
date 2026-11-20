@@ -39,6 +39,8 @@ RUNTIME_VERSION="PYTHON_3_12"
 # GATEWAY_CREDENTIAL_PROVIDER names the AgentCore Identity OAuth2 provider
 # that holds the Gateway client secret. Setting it selects the cloud auth path.
 RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_URL":"REPLACE_WITH_FLEET_GATEWAY_URL","GATEWAY_CREDENTIAL_PROVIDER":"fleet-gateway"}'
+# Must match GATEWAY_CREDENTIAL_PROVIDER above.
+GATEWAY_CREDENTIAL="fleet-gateway"
 # Local Gateway credentials, written by neo4j-mcp-server/deploy.py.
 CREDENTIALS_FILE="${MCP_CREDENTIALS_FILE:-$ROOT_DIR/../.mcp-credentials.json}"
 # AgentCore deployment region. AgentCore's primary region is us-east-1
@@ -159,6 +161,37 @@ create_project() {
     mv "$spec.tmp" "$spec"
 }
 
+# The runtime gets its Gateway token from the fleet-gateway OAuth provider.
+# The AgentCore CLI creates that provider from the credentials entry in
+# agentcore.json before CDK runs, and the CDK grants the runtime access to it
+# only when the entry exists. CDK cannot create the provider, so the entry is
+# added once with `agentcore add credentials oauth`. Its client secret goes to
+# agentcore/.env.local, which git ignores and the code zip leaves out.
+ensure_gateway_credential() {
+    local spec="agentcore/agentcore.json"
+    if jq -e --arg name "$GATEWAY_CREDENTIAL" \
+        '.credentials // [] | any(.name == $name)' "$spec" >/dev/null; then
+        return
+    fi
+    echo -e "${RED}ERROR: agentcore.json does not declare the $GATEWAY_CREDENTIAL credential${NC}"
+    echo ""
+    echo "Without it the runtime cannot get a Gateway token. Add it once from"
+    echo "$ROOT_DIR, using the fleet credentials file and the MCP server stack:"
+    echo ""
+    printf '%s\n' \
+        "  creds=\"$CREDENTIALS_FILE\"" \
+        "  jq -r .client_secret \"\$creds\" | agentcore add credentials oauth \\" \
+        "      --name $GATEWAY_CREDENTIAL \\" \
+        "      --client-id \"\$(jq -r .client_id \"\$creds\")\" \\" \
+        "      --discovery-url \"\$(aws cloudformation describe-stacks --region $REGION \\" \
+        "          --stack-name \"\$(jq -r .stack_name \"\$creds\")\" \\" \
+        "          --query \"Stacks[0].Outputs[?OutputKey=='CognitoDiscoveryUrl'].OutputValue\" \\" \
+        "          --output text)\" \\" \
+        "      --scopes \"\$(jq -r .scope \"\$creds\")\" \\" \
+        "      --client-secret -"
+    exit 1
+}
+
 ensure_deps() {
     if [ ! -d ".venv" ]; then
         echo -e "${YELLOW}Installing dependencies (first run)...${NC}"
@@ -238,6 +271,7 @@ case "${1:-help}" in
     deploy)
         ensure_project
         ensure_no_secrets_in_zip
+        ensure_gateway_credential
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""

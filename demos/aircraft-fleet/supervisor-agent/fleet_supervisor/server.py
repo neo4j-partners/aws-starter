@@ -10,9 +10,9 @@ The model, the Gateway MCP client, and the Gateway tools are created once,
 on the first request. The client is rebuilt if its MCP session ends. A tool
 call that finds the session ended rebuilds it and retries once. See
 ``fleet_supervisor.core.gateway_tools``. The agents are built per request.
-See ``fleet_supervisor.core.agents`` for why. When ``MEM_NEO4J_URI`` is set,
-each request also gets its own memory session manager on the supervisor,
-closed when the request ends. See ``fleet_supervisor.core.memory``.
+See ``fleet_supervisor.core.agents`` for why. Each request also gets its own
+memory session manager on the supervisor, closed when the request ends. See
+``fleet_supervisor.core.memory``.
 
 Local testing:
     uv run fleet-supervisor-server
@@ -30,29 +30,41 @@ import threading
 import uuid
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 from typing import Any
 
-from bedrock_agentcore.runtime import BedrockAgentCoreApp
-from neo4j_agent_memory.integrations.strands import Neo4jSessionManager
-from strands.models import BedrockModel
+from dotenv import load_dotenv
 
-from fleet_supervisor.core.agents import build_supervisor
-from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID
-from fleet_supervisor.core.credentials import load_credentials
-from fleet_supervisor.core.events import EventMapper
-from fleet_supervisor.core.gateway_tools import (
+# Local runs read the shared aircraft-fleet .env next to supervisor-agent/,
+# three levels above this file. The path comes from this file, so the working
+# directory does not matter. FLEET_ENV_FILE overrides it; the tests point it
+# at an empty file. Existing env vars win, so Runtime env vars are untouched.
+# This runs before the package imports because ``core.config`` reads the
+# environment at import time.
+ENV_FILE = Path(os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().parents[2] / ".env")
+load_dotenv(ENV_FILE)
+
+from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
+from neo4j_agent_memory.integrations.strands import Neo4jSessionManager  # noqa: E402
+from strands.models import BedrockModel  # noqa: E402
+
+from fleet_supervisor.core.agents import build_supervisor  # noqa: E402
+from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
+from fleet_supervisor.core.credentials import load_credentials  # noqa: E402
+from fleet_supervisor.core.events import EventMapper  # noqa: E402
+from fleet_supervisor.core.gateway_tools import (  # noqa: E402
     REQUEST_SESSION_ID,
     GatewayConnection,
     GatewayTool,
     stop_quietly,
 )
-from fleet_supervisor.core.mcp import (
+from fleet_supervisor.core.mcp import (  # noqa: E402
     GatewayAuth,
     build_gateway_auth,
     build_mcp_client,
 )
-from fleet_supervisor.core.memory import build_session_manager, memory_settings
-from fleet_supervisor.core.model import build_model
+from fleet_supervisor.core.memory import build_session_manager, memory_settings  # noqa: E402
+from fleet_supervisor.core.model import build_model  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -240,8 +252,8 @@ async def invoke(payload: Any, context):
         gateway = await asyncio.to_thread(gateway_auth)
         await gateway.prepare_request()
         runtime = await get_runtime()
-        # Both calls block on Neo4j when memory is on: the agent restores the
-        # session history while it is built.
+        # Both calls block on Neo4j: the agent restores the session history
+        # while it is built.
         manager = await asyncio.to_thread(build_session_manager, session_id, user_id)
         supervisor = await asyncio.to_thread(
             build_supervisor, runtime.model, runtime.tools, manager
@@ -270,9 +282,8 @@ def main(default_port: int = LOCAL_PORT) -> None:
     ``AGENT_PORT`` overrides both.
     """
     port = int(os.environ.get("AGENT_PORT", str(default_port)))
-    # Resolve the memory settings and password before serving, so a bad
-    # secret ARN or a missing IAM grant stops startup.
-    if memory_settings() is not None:
-        logger.info("Supervisor memory is on")
+    # Build the memory settings and read the password before serving, so a
+    # missing setting, a bad secret ARN, or a missing IAM grant stops startup.
+    memory_settings()
     logger.info("Starting Aircraft Fleet Supervisor Agent (model %s) on port %s", MODEL_ID, port)
     app.run(port=port)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from neo4j_agent_memory.config.settings import ExtractorType
 from neo4j_agent_memory.integrations.strands import Neo4jSessionManager
+from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, BedrockProvider
 
 from fleet_supervisor.core import memory, secrets
 from fleet_supervisor.core.config import ConfigError
@@ -34,9 +35,17 @@ def memory_on(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEM_NEO4J_PASSWORD", "local-pw")
 
 
-def test_memory_is_off_without_a_uri() -> None:
-    assert memory.memory_settings() is None
-    assert memory.build_session_manager("s1", "u1") is None
+def test_missing_uri_raises() -> None:
+    with pytest.raises(ConfigError, match="MEM_NEO4J_URI is not set"):
+        memory.memory_settings()
+
+
+def test_missing_uri_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ConfigError):
+        memory.memory_settings()
+    monkeypatch.setenv("MEM_NEO4J_URI", "bolt://127.0.0.1:37687")
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "local-pw")
+    assert memory.memory_settings().neo4j.uri == "bolt://127.0.0.1:37687"
 
 
 def test_uri_without_a_password_raises(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,6 +64,23 @@ def test_settings_come_from_the_mem_vars(monkeypatch: pytest.MonkeyPatch, memory
     assert settings.neo4j.database == "memdb"
     assert settings.neo4j.password.get_secret_value() == "local-pw"
     assert settings.extraction.extractor_type is ExtractorType.LLM
+
+
+def test_bedrock_providers_are_explicit(memory_on) -> None:
+    settings = memory.memory_settings()
+    assert isinstance(settings.embedding, BedrockEmbeddingProvider)
+    assert settings.embedding.model == memory.EMBEDDING_MODEL
+    assert settings.embedding.dimensions == memory.EMBEDDING_DIMENSIONS == 1024
+    assert settings.embedding._aws_region == memory.AWS_REGION
+    assert isinstance(settings.llm, BedrockProvider)
+    assert settings.llm._aws_region == memory.AWS_REGION
+
+
+def test_memory_api_key_does_not_switch_backends(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    monkeypatch.setenv("MEMORY_API_KEY", "not-used")
+    assert memory.memory_settings().backend == "bolt"
 
 
 def test_username_and_database_default_to_neo4j(memory_on) -> None:
@@ -79,6 +105,8 @@ def test_session_manager_uses_settings_and_retrieval_config(memory_on) -> None:
         assert manager.session_id == "s1"
         assert manager._user_id == "u1"
         assert manager._retrieval_config.min_score == memory.RETRIEVAL_MIN_SCORE
+        assert manager._extract_entities is True
+        assert manager._record_tool_calls is False
     finally:
         # Never connected, so close only stops the unused bridge.
         manager.close()

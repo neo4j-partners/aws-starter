@@ -1,6 +1,6 @@
 """Supervisor memory in Neo4j, through neo4j-agent-memory.
 
-Memory is optional. It is on when ``MEM_NEO4J_URI`` is set:
+Memory is required. These variables configure it:
 
 - ``MEM_NEO4J_URI``, ``MEM_NEO4J_USERNAME``, and ``MEM_NEO4J_DATABASE`` name
   the memory database. It is a separate database from the fleet graph.
@@ -21,15 +21,19 @@ from functools import cache
 from neo4j_agent_memory import MemorySettings
 from neo4j_agent_memory.config.settings import ExtractionConfig, ExtractorType, Neo4jConfig
 from neo4j_agent_memory.integrations.strands import Neo4jRetrievalConfig, Neo4jSessionManager
+from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, BedrockProvider
 from pydantic import SecretStr
 
+from fleet_supervisor.core.config import AWS_REGION, ConfigError
 from fleet_supervisor.core.secrets import password_from
 
 MEM_NEO4J_URI = "MEM_NEO4J_URI"
 
-# Titan v2 returns 1024-dimension vectors.
 EMBEDDING_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
-# The model that extracts entities from stored messages.
+EMBEDDING_DIMENSIONS = 1024
+# The model that extracts entities from stored messages. Sonnet 5.5 rejects
+# the forced toolChoice and the temperature that the extractor sends, so
+# extraction stays on Sonnet 4.6.
 EXTRACTION_MODEL = "bedrock/global.anthropic.claude-sonnet-4-6"
 # Only memories at least this similar to the question are added to it.
 RETRIEVAL_MIN_SCORE = 0.75
@@ -41,45 +45,51 @@ def memory_password() -> str:
 
 
 @cache
-def memory_settings() -> MemorySettings | None:
-    """Return the memory settings, or None when ``MEM_NEO4J_URI`` is unset.
+def memory_settings() -> MemorySettings:
+    """Build the memory settings once per process.
 
-    Built once per process. A failure is not cached. Raises
-    :class:`~fleet_supervisor.core.config.ConfigError` when the URI is set
-    but no password resolves.
+    Raises :class:`~fleet_supervisor.core.config.ConfigError` when
+    ``MEM_NEO4J_URI`` or the password is missing, or the password secret
+    cannot be read. A failure is not cached.
     """
     uri = os.environ.get(MEM_NEO4J_URI, "").strip()
     if not uri:
-        return None
+        raise ConfigError(f"{MEM_NEO4J_URI} is not set.")
     return MemorySettings(
         # Every value comes from here, never from a .env file.
         _env_file=None,
+        # Set explicitly so a MEMORY_API_KEY in the environment cannot switch
+        # the backend to the hosted service.
         backend="bolt",
         neo4j=Neo4jConfig(
             uri=uri,
-            username=os.environ.get("MEM_NEO4J_USERNAME", "neo4j"),
+            username=os.environ.get("MEM_NEO4J_USERNAME") or "neo4j",
             password=SecretStr(memory_password()),
-            database=os.environ.get("MEM_NEO4J_DATABASE", "neo4j"),
+            database=os.environ.get("MEM_NEO4J_DATABASE") or "neo4j",
         ),
-        embedding=EMBEDDING_MODEL,
-        llm=EXTRACTION_MODEL,
+        # Provider instances, so the region and dimensions are set here and
+        # not left to package defaults.
+        embedding=BedrockEmbeddingProvider(
+            EMBEDDING_MODEL, aws_region=AWS_REGION, dimensions=EMBEDDING_DIMENSIONS
+        ),
+        llm=BedrockProvider(EXTRACTION_MODEL, aws_region=AWS_REGION),
         # The default pipeline needs spaCy and GLiNER, which are not installed.
         extraction=ExtractionConfig(extractor_type=ExtractorType.LLM),
     )
 
 
-def build_session_manager(session_id: str, user_id: str | None) -> Neo4jSessionManager | None:
-    """Return a session manager for one request, or None when memory is off.
+def build_session_manager(session_id: str, user_id: str) -> Neo4jSessionManager:
+    """Return the memory session manager for one request.
 
-    The manager opens its connection when the agent uses it. The caller must
-    call ``close()`` when the request ends, on every path.
+    It connects when the agent that owns it is built. The caller must call
+    ``close()`` when the request ends, on every path.
     """
-    settings = memory_settings()
-    if settings is None:
-        return None
     return Neo4jSessionManager(
         session_id,
-        settings=settings,
+        settings=memory_settings(),
         user_id=user_id,
         retrieval_config=Neo4jRetrievalConfig(min_score=RETRIEVAL_MIN_SCORE),
+        # Set explicitly, because defaults can change between releases.
+        extract_entities=True,
+        record_tool_calls=False,
     )

@@ -86,3 +86,28 @@ def test_missing_session_id_gets_a_fresh_uuid(supervisor, caplog):
     session = line.split("session=")[1].split()[0]
     assert uuid.UUID(session)
     assert "default" not in line
+
+
+def test_startup_failure_stops_client_and_retries(monkeypatch):
+    class FakeClient:
+        def __init__(self):
+            self.stopped = False
+
+        def start(self):
+            return self
+
+        def list_tools_sync(self):
+            raise ConnectionError("gateway down")
+
+        def stop(self, *exc_info):
+            self.stopped = True
+
+    client = FakeClient()
+    monkeypatch.setattr(runtime_app, "_runtime", None)
+    monkeypatch.setattr(runtime_app, "load_credentials", lambda: {})
+    monkeypatch.setattr(runtime_app, "build_mcp_client", lambda credentials: client)
+
+    with pytest.raises(ConnectionError):
+        runtime_app._start_runtime()
+    assert client.stopped
+    assert runtime_app._runtime is None

@@ -81,7 +81,12 @@ def _start_runtime() -> Runtime:
             credentials = load_credentials()
             mcp_client = build_mcp_client(credentials)
             mcp_client.start()
-            tools = mcp_client.list_tools_sync()
+            try:
+                tools = mcp_client.list_tools_sync()
+            except Exception:
+                # Stop the client's background thread; the next request retries.
+                mcp_client.stop(None, None, None)
+                raise
             logger.info("Gateway tools: %s", [t.tool_name for t in tools])
             _runtime = Runtime(model=build_model(), mcp_client=mcp_client, tools=tools)
         return _runtime

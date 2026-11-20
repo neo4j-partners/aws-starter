@@ -32,6 +32,11 @@ _BASE_REMOVALS_PER_YEAR = 4
 _UTILIZATION_HOURS_PER_DAY = (8.0, 10.0)
 # Fewest flight hours since install: about 90 days at 8 hours a day.
 _MIN_HOURS_SINCE_INSTALL = 720
+# Airframe flight hours at removal. Hours since install are drawn from
+# [_MIN_HOURS_SINCE_INSTALL, airframe hours - 1], so the airframe minimum
+# must be above the install minimum.
+_AIRFRAME_HOURS_AT_REMOVAL = (1000, 25000)
+assert _AIRFRAME_HOURS_AT_REMOVAL[0] > _MIN_HOURS_SINCE_INSTALL
 
 
 def _part_number(rng: random.Random) -> str:
@@ -89,7 +94,7 @@ def generate_removals(
                 days=rng.randint(0, config.n_days - 1),
                 hours=rng.randint(6, 18),
             )
-            flight_hours_at_removal = rng.randint(1000, 25000)
+            flight_hours_at_removal = rng.randint(*_AIRFRAME_HOURS_AT_REMOVAL)
             # Flight hours since install stay below the airframe total. The
             # install date follows from them at a plausible daily rate, so
             # the hours and the date always agree.

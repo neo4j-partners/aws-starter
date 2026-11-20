@@ -19,6 +19,7 @@ dependencies = [
     "strands-agents>=1.65",
     # Held below 2.x until bedrock-agentcore[strands-agents] allows mcp 2.
     "mcp>=1.28,<2",
+    "neo4j-agent-memory[strands]==0.8.0",
 ]
 
 [dependency-groups]

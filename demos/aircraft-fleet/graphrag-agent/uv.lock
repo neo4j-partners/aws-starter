@@ -18,6 +18,7 @@ dependencies = [
     { name = "httpx" },
     { name = "mcp" },
     { name = "neo4j" },
+    { name = "neo4j-agent-memory", extra = ["strands"] },
     { name = "neo4j-graphrag", extra = ["bedrock"] },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -39,6 +40,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "neo4j", specifier = ">=6.3.1" },
+    { name = "neo4j-agent-memory", extras = ["strands"], specifier = "==0.8.0" },
     { name = "neo4j-graphrag", extras = ["bedrock"], specifier = ">=1.24" },
     { name = "pydantic", specifier = ">=2" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
@@ -753,6 +755,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d1/d1/bc40a291c60b06738ce92d5f0259d348eee1f07ba10d569a881c848c8afe/neo4j-6.4.1.tar.gz", hash = "sha256:fac99b7cb9679b93ef97dc23f22a3f0e7c3feb2db223eddfd2521f27005cfeaf", size = 287897, upload-time = "2026-10-15T10:47:26.666Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/69/3036bdcacfba561c6ef4b00fe72529e0a1b6241a6b2de82572a0940a276b/neo4j-6.4.1-py3-none-any.whl", hash = "sha256:f56a281c74355522fc2642df8919bec450115431531b8f3f6fe1cc17acb57a27", size = 390684, upload-time = "2026-10-15T10:47:25.236Z" },
+]
+
+[[package]]
+name = "neo4j-agent-memory"
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "neo4j" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/14/47/bcf31c29463923d26113ed5788029a7a1f48bb40b51b93f9b1830043fd93/neo4j_agent_memory-0.8.0.tar.gz", hash = "sha256:6e5c9c4bd7ac32e6688bb6fc1619d3c15b918b6777b122e135873f2a59ab09b2", size = 509463, upload-time = "2026-10-22T18:53:24.541Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/13/170a3c9a97c2daf7d08c5a914f81e62d32cc414cb7db146116242d52e46b/neo4j_agent_memory-0.8.0-py3-none-any.whl", hash = "sha256:5ebe42298fd0380d7c5079817f39bf619efefbe474bc15fe1433801c1766482d", size = 600127, upload-time = "2026-10-22T18:53:22.988Z" },
+]
+
+[package.optional-dependencies]
+strands = [
+    { name = "boto3" },
+    { name = "strands-agents" },
 ]
 
 [[package]]

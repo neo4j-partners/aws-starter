@@ -57,11 +57,11 @@ The ExampleAir A220-300 fleet consists of five aircraft configured for short to 
 
 | Aircraft ID | Registration | ICAO 24 | Entry into Service |
 |-------------|--------------|---------|-------------------|
-| AC1101 | N20001 | a1b2c3 | March 2022 |
-| AC1102 | N20002 | d4e5f6 | June 2022 |
-| AC1103 | N20003 | 7a8b9c | October 2022 |
-| AC1104 | N20004 | 0d1e2f | February 2023 |
-| AC1105 | N20005 | 3a4b5c | May 2023 |
+| AC1005 | N20001 | a1b2c3 | March 2022 |
+| AC1010 | N20002 | d4e5f6 | June 2022 |
+| AC1015 | N20003 | 7a8b9c | October 2022 |
+| AC1020 | N20004 | 0d1e2f | February 2023 |
+| AC1025 | N20005 | 3a4b5c | May 2023 |
 
 ### 1.3 ATA Chapter Reference
 

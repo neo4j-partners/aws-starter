@@ -55,6 +55,15 @@ DEPLOY_TARGET = "default"
 
 Target = Literal["local", "deployed"]
 
+# The header the Runtime sets from runtimeSessionId. BedrockAgentCoreApp reads
+# it into RequestContext.session_id, so a local call can send it too.
+SESSION_HEADER = "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"
+
+
+def new_session_id() -> str:
+    """A fresh session ID. A UUID meets the Runtime's 33-character minimum."""
+    return str(uuid.uuid4())
+
 
 class DeploymentNotFoundError(RuntimeError):
     """The deployed Runtime ARN could not be read from ``agentcore status``."""
@@ -229,8 +238,16 @@ def _result(content_parts: list[str], errors: list[str]) -> dict:
     return {"status": "success", "response": "".join(content_parts)}
 
 
-def invoke_deployed(payload: dict, stream: bool = True) -> dict:
-    """Invoke the deployed runtime via the boto3 ``bedrock-agentcore`` data plane."""
+def invoke_deployed(
+    payload: dict,
+    stream: bool = True,
+    session_id: str | None = None,
+) -> dict:
+    """Invoke the deployed runtime via the boto3 ``bedrock-agentcore`` data plane.
+
+    Calls that pass the same ``session_id`` share conversation memory. Without
+    one, each call starts a new session.
+    """
     agent_arn, region = get_agent_config()
     logger.info("Agent ARN: %s | region: %s | payload: %s", agent_arn, region, payload)
 
@@ -241,7 +258,7 @@ def invoke_deployed(payload: dict, stream: bool = True) -> dict:
     )
     response = client.invoke_agent_runtime(
         agentRuntimeArn=agent_arn,
-        runtimeSessionId=str(uuid.uuid4()),
+        runtimeSessionId=session_id or new_session_id(),
         payload=json.dumps(payload).encode(),
         qualifier="DEFAULT",
     )
@@ -254,13 +271,19 @@ def invoke_local(
     stream: bool = True,
     url: str = LOCAL_URL,
     timeout: int = 180,
+    session_id: str | None = None,
 ) -> dict:
-    """Invoke a locally running ``fleet_graphrag.server`` over HTTP+SSE (port 7070)."""
+    """Invoke a locally running ``fleet_graphrag.server`` over HTTP+SSE (port 7070).
+
+    ``session_id`` goes in the AgentCore session header. Without it, the
+    server starts a new session for the call.
+    """
     logger.info("Local URL: %s | payload: %s", url, payload)
+    headers = {SESSION_HEADER: session_id} if session_id else {}
     try:
         with (
             httpx.Client(timeout=timeout) as c,
-            c.stream("POST", url, json=payload) as r,
+            c.stream("POST", url, json=payload, headers=headers) as r,
         ):
             if r.status_code != 200:
                 r.read()
@@ -285,13 +308,15 @@ def invoke(
     *,
     target: Target = "local",
     stream: bool = True,
+    session_id: str | None = None,
 ) -> dict:
     """Invoke the runtime, choosing the transport by ``target``.
 
     ``payload`` is passed through verbatim, so ``{"prompt": "..."}`` runs the
     full agent and ``{"mode": "schema" | "graph_query" | "vector_search", ...}``
-    hits the direct surfaces of the same runtime.
+    hits the direct surfaces of the same runtime. Calls with the same
+    ``session_id`` share conversation memory.
     """
     if target == "deployed":
-        return invoke_deployed(payload, stream=stream)
-    return invoke_local(payload, stream=stream)
+        return invoke_deployed(payload, stream=stream, session_id=session_id)
+    return invoke_local(payload, stream=stream, session_id=session_id)

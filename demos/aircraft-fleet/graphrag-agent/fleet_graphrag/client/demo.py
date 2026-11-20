@@ -7,6 +7,7 @@ Walks the agent's full surface area, section by section, in plain English:
   2. The ``graph_query`` retriever on its own (Text2Cypher).
   3. The ``vector_search`` retriever on its own (semantic search).
   4. The full Strands ReAct agent, choosing tools by itself.
+  5. Conversation memory: a follow-up question that relies on the turn before.
 
 This is a pure client. Every section is served by a running
 ``fleet_graphrag.server`` through the matching payload mode — nothing is built
@@ -16,6 +17,7 @@ in-process:
   - section 2 -> ``{"mode": "graph_query", "query": ...}``
   - section 3 -> ``{"mode": "vector_search", "query": ..., "top_k": 2}``
   - section 4 -> ``{"prompt": ...}``  (the full agent)
+  - section 5 -> two ``{"prompt": ..., "user_id": ...}`` calls in one session
 
 The per-section questions below are hand-written narration for the showcase;
 they are intentionally separate from ``queries.txt`` (the load/demo list).
@@ -31,7 +33,12 @@ import logging
 import sys
 import textwrap
 
-from fleet_graphrag.client.transport import DeploymentNotFoundError, Target, invoke
+from fleet_graphrag.client.transport import (
+    DeploymentNotFoundError,
+    Target,
+    invoke,
+    new_session_id,
+)
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -157,6 +164,33 @@ def section_agent() -> None:
         print()
 
 
+def section_memory() -> None:
+    banner(
+        "SECTION 5 - Conversation memory across turns",
+        "Both questions below go to the same session. The second one says "
+        "'that fault' without naming it. The agent restores the first turn "
+        "from Neo4j Agent Memory, so it knows the fault means the EGT events "
+        "from the first answer.",
+    )
+    session_id = new_session_id()
+    turns = [
+        "Which aircraft had the most EGT events?",
+        "What does the manual say about that fault?",
+    ]
+    for turn, q in enumerate(turns, start=1):
+        print(f"User (turn {turn}): {q}")
+        print("--- Agent answer ---")
+        result = invoke(
+            {"prompt": q, "user_id": "fleet-demo"},
+            target=TARGET,
+            stream=True,
+            session_id=session_id,
+        )
+        if result.get("status") != "success":
+            print(f"[error] {result.get('errors', ['Unknown error'])}")
+        print()
+
+
 def main() -> None:
     global TARGET
     parser = argparse.ArgumentParser(
@@ -188,14 +222,15 @@ def main() -> None:
         section_graph_query()
         section_vector_search()
         section_agent()
+        section_memory()
     except DeploymentNotFoundError as e:
         print(f"ERROR: {e}")
         sys.exit(1)
     banner(
         "DONE",
         "You have seen the schema the agent reasons over, each GraphRAG "
-        "retriever on its own, and the full agent choosing tools "
-        "end to end.",
+        "retriever on its own, the full agent choosing tools "
+        "end to end, and a follow-up that uses conversation memory.",
     )
 
 

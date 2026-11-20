@@ -6,6 +6,7 @@ import json
 import subprocess
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from fleet_graphrag.client import transport
@@ -291,3 +292,66 @@ def test_status_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(DeploymentNotFoundError, match="throttled"):
         transport.get_agent_config()
     assert transport.get_agent_config() == (ARN, "us-east-1")
+
+
+def _local_with(monkeypatch: pytest.MonkeyPatch, seen: list[httpx.Request]) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200, content=b'data: {"type": "chunk", "data": "ok"}\n\n'
+        )
+
+    real_client = httpx.Client
+
+    def client(**kwargs: object) -> httpx.Client:
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(transport.httpx, "Client", client)
+
+
+def test_local_call_sends_the_session_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[httpx.Request] = []
+    _local_with(monkeypatch, seen)
+    result = transport.invoke({"prompt": "hi"}, stream=False, session_id="s" * 36)
+    assert result == {"status": "success", "response": "ok"}
+    assert seen[0].headers[transport.SESSION_HEADER] == "s" * 36
+
+
+def test_local_call_without_session_sends_no_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[httpx.Request] = []
+    _local_with(monkeypatch, seen)
+    transport.invoke({"prompt": "hi"}, stream=False)
+    assert transport.SESSION_HEADER not in seen[0].headers
+
+
+class _FakeAgentCore:
+    def __init__(self) -> None:
+        self.session_ids: list[str] = []
+
+    def invoke_agent_runtime(self, **kwargs: object) -> dict:
+        self.session_ids.append(str(kwargs["runtimeSessionId"]))
+        return {"response": [b'data: {"type": "chunk", "data": "ok"}\n\n']}
+
+
+def _deployed(monkeypatch: pytest.MonkeyPatch) -> _FakeAgentCore:
+    fake = _FakeAgentCore()
+    monkeypatch.setattr(transport, "get_agent_config", lambda: ("arn", "us-east-1"))
+    monkeypatch.setattr(transport.boto3, "client", lambda *a, **k: fake)
+    return fake
+
+
+def test_deployed_calls_reuse_the_given_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _deployed(monkeypatch)
+    session_id = transport.new_session_id()
+    for _ in range(2):
+        transport.invoke({"prompt": "hi"}, target="deployed", stream=False, session_id=session_id)
+    assert fake.session_ids == [session_id, session_id]
+
+
+def test_deployed_calls_without_session_get_new_ones(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _deployed(monkeypatch)
+    for _ in range(2):
+        transport.invoke({"prompt": "hi"}, target="deployed", stream=False)
+    first, second = fake.session_ids
+    assert first != second
+    assert len(first) >= 33

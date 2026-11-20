@@ -35,9 +35,7 @@ class Settings(BaseSettings):
     neo4j_uri: str
     neo4j_username: str = "neo4j"
     neo4j_password: SecretStr
-    # None sends every query to the server's home database. The driver and
-    # neo4j-graphrag both treat a None database as "use the home database".
-    neo4j_database: str | None = None
+    neo4j_database: str = "neo4j"
 
     data_dir: DirectoryPath = _DATA_DIR  # type: ignore[assignment]
     document_dir: DirectoryPath = _DOCUMENT_DIR  # type: ignore[assignment]

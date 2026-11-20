@@ -388,7 +388,7 @@ _MAX_RETRIES = 2
 
 def _run_text2cypher(
     driver: Driver,
-    database: str | None,
+    database: str,
     chat_fn,
     question: str,
 ) -> None:
@@ -420,7 +420,7 @@ def _run_text2cypher(
 
 def _run_similarity_search(
     driver: Driver,
-    database: str | None,
+    database: str,
     chat_fn,
     embed_fn,
     question: str,
@@ -481,7 +481,7 @@ LIMIT $top_k"""
 
 def run_agent_samples(
     driver: Driver,
-    database: str | None,
+    database: str,
     *,
     provider: str,
     openai_key: str | None = None,

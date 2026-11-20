@@ -289,7 +289,7 @@ def _create_extraction_llm(
 
 def _create_pipeline(
     driver: Driver,
-    database: str | None,
+    database: str,
     *,
     provider: str,
     openai_api_key: str | None,
@@ -455,7 +455,7 @@ def debug_extract_chunks(
 
 def process_all_documents(
     driver: Driver,
-    database: str | None,
+    database: str,
     document_dir: Path,
     *,
     provider: str,
@@ -537,7 +537,7 @@ def process_all_documents(
 # ---------------------------------------------------------------------------
 
 
-def link_to_existing_graph(driver: Driver, database: str | None) -> None:
+def link_to_existing_graph(driver: Driver, database: str) -> None:
     """Create relationships between enrichment data and the operational graph."""
 
     # Document -[:APPLIES_TO]-> Aircraft (via document metadata aircraftType)
@@ -621,7 +621,7 @@ def link_to_existing_graph(driver: Driver, database: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def clear_enrichment_data(driver: Driver, database: str | None) -> None:
+def clear_enrichment_data(driver: Driver, database: str) -> None:
     """Delete all Document, Chunk, and extracted entity nodes (preserves operational graph)."""
     # __Entity__ and __KGBuilder__ are labels the KG pipeline adds to its nodes.
     labels_to_clear = ["Document", "Chunk", *EXTRACTED_LABELS, "__Entity__", "__KGBuilder__"]
@@ -639,7 +639,7 @@ def clear_enrichment_data(driver: Driver, database: str | None) -> None:
 _SAMPLE_SIZE = 5
 
 
-def _get_existing_schema_tokens(driver: Driver, database: str | None) -> tuple[set[str], set[str]]:
+def _get_existing_schema_tokens(driver: Driver, database: str) -> tuple[set[str], set[str]]:
     """Return labels and relationship types currently present in the graph."""
     label_rows, _, _ = driver.execute_query(
         "CALL db.labels() YIELD label RETURN label", database_=database
@@ -654,7 +654,7 @@ def _get_existing_schema_tokens(driver: Driver, database: str | None) -> tuple[s
     )
 
 
-def validate_enrichment(driver: Driver, database: str | None) -> None:
+def validate_enrichment(driver: Driver, database: str) -> None:
     """Run sample queries to verify embeddings, entities, and cross-links."""
 
     print(f"\nValidation (sample size {_SAMPLE_SIZE}):")

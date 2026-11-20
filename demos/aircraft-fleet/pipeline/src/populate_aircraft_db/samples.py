@@ -77,7 +77,7 @@ RETURN a.tail_number AS tail, a.model AS model,
 ORDER BY a.tail_number"""
 
 
-def _aircraft_fleet(driver: Driver, database: str | None) -> None:
+def _aircraft_fleet(driver: Driver, database: str) -> None:
     _header(
         "1. Aircraft Fleet Overview",
         "Each aircraft with its model, manufacturer, and system/component counts.",
@@ -103,7 +103,7 @@ RETURN a.tail_number AS tail, a.model AS model, systems
 LIMIT 1"""
 
 
-def _system_hierarchy(driver: Driver, database: str | None) -> None:
+def _system_hierarchy(driver: Driver, database: str) -> None:
     _header(
         "2. System \u2192 Component Hierarchy",
         "Full hierarchy for one aircraft showing Systems and their Components.",
@@ -139,7 +139,7 @@ ORDER BY flights DESC
 LIMIT $limit"""
 
 
-def _flight_operations(driver: Driver, database: str | None, limit: int) -> None:
+def _flight_operations(driver: Driver, database: str, limit: int) -> None:
     _header(
         "3. Flight Operations \u2014 Top Routes",
         "Most frequent routes by flight count.",
@@ -167,7 +167,7 @@ ORDER BY me.reported_at DESC
 LIMIT $limit"""
 
 
-def _maintenance_events(driver: Driver, database: str | None, limit: int) -> None:
+def _maintenance_events(driver: Driver, database: str, limit: int) -> None:
     _header(
         "4. Maintenance Events",
         "Recent maintenance events with fault codes and affected systems.",
@@ -202,7 +202,7 @@ ORDER BY a.tail_number, sys.name
 LIMIT $limit"""
 
 
-def _sensors(driver: Driver, database: str | None, limit: int) -> None:
+def _sensors(driver: Driver, database: str, limit: int) -> None:
     _header(
         "5. Sensors",
         "Sensors installed across the fleet with their type and unit.",
@@ -239,7 +239,7 @@ RETURN d.documentId AS doc, c.index AS idx,
        next.index AS next_idx"""
 
 
-def _document_chunks(driver: Driver, database: str | None, limit: int) -> None:
+def _document_chunks(driver: Driver, database: str, limit: int) -> None:
     _header(
         "6. Document-Chunk Structure",
         "Maintenance manuals loaded as Document \u2192 Chunk graphs with embedding stats.",
@@ -277,7 +277,7 @@ CALL (label) {
 RETURN label AS entity_type, collect(name) AS samples"""
 
 
-def _extracted_entities(driver: Driver, database: str | None, limit: int) -> None:
+def _extracted_entities(driver: Driver, database: str, limit: int) -> None:
     _header(
         "7. Extracted Entities",
         "Entity types extracted from maintenance manuals via SimpleKGPipeline.",
@@ -334,7 +334,7 @@ LIMIT $limit""",
 ]
 
 
-def _cross_links(driver: Driver, database: str | None, limit: int) -> None:
+def _cross_links(driver: Driver, database: str, limit: int) -> None:
     _header(
         "8. Cross-Links: Knowledge Graph \u2194 Operational Graph",
         "Relationships connecting extracted entities to the operational aircraft graph.",
@@ -372,7 +372,7 @@ RETURN substring(seed.text, 0, 100) AS seed_text,
        substring(node.text, 0, 100) AS match_text"""
 
 
-def _vector_similarity(driver: Driver, database: str | None, limit: int) -> None:
+def _vector_similarity(driver: Driver, database: str, limit: int) -> None:
     _header(
         "9. Vector Similarity Search",
         "Picks a random chunk and finds the most similar chunks using the\n"
@@ -410,7 +410,7 @@ ORDER BY score DESC
 LIMIT $limit"""
 
 
-def _fulltext_search(driver: Driver, database: str | None, limit: int) -> None:
+def _fulltext_search(driver: Driver, database: str, limit: int) -> None:
     _header(
         "10. Full-Text Search",
         "Keyword search over maintenance chunks using the fulltext index.\n"
@@ -458,7 +458,7 @@ RETURN substring(seed.text, 0, 80) AS seed_text,
        substring(node.text, 0, 80) AS match_text"""
 
 
-def _vector_document_context(driver: Driver, database: str | None, limit: int) -> None:
+def _vector_document_context(driver: Driver, database: str, limit: int) -> None:
     _header(
         "11. Vector Search \u2192 Document Context",
         "Semantic search enriched with source document metadata.\n"
@@ -516,7 +516,7 @@ RETURN substring(seed.text, 0, 80) AS seed_text,
        substring(node.text, 0, 80) AS match_text"""
 
 
-def _adjacent_chunks(driver: Driver, database: str | None, limit: int) -> None:
+def _adjacent_chunks(driver: Driver, database: str, limit: int) -> None:
     _header(
         "12. Adjacent Chunk Retrieval",
         "Vector search with surrounding context via NEXT_CHUNK traversal.\n"
@@ -577,7 +577,7 @@ RETURN substring(seed.text, 0, 80) AS seed_text,
        substring(node.text, 0, 60) AS match_text"""
 
 
-def _vector_topology(driver: Driver, database: str | None, limit: int) -> None:
+def _vector_topology(driver: Driver, database: str, limit: int) -> None:
     _header(
         "13. Vector Search \u2192 Aircraft Topology",
         "Semantic search connected to the operational graph (Aircraft \u2192 System).\n"
@@ -654,7 +654,7 @@ RETURN 'fulltext' AS method,
        substring(node.text, 0, 80) AS match_text"""
 
 
-def _hybrid_comparison(driver: Driver, database: str | None, limit: int) -> None:
+def _hybrid_comparison(driver: Driver, database: str, limit: int) -> None:
     _header(
         "14. Hybrid Search Comparison",
         "Side-by-side vector vs fulltext results for the same seed chunk.\n"
@@ -721,7 +721,7 @@ def _hybrid_comparison(driver: Driver, database: str | None, limit: int) -> None
 # ---------------------------------------------------------------------------
 
 
-def run_all_samples(driver: Driver, database: str | None, sample_size: int = 10) -> None:
+def run_all_samples(driver: Driver, database: str, sample_size: int = 10) -> None:
     """Run all sample queries with formatted output."""
     print(f"\n{'#' * _W}")
     print("  Aircraft Digital Twin \u2014 Sample Queries")

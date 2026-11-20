@@ -103,6 +103,25 @@ def test_stream_false_prints_nothing(capsys) -> None:
 ARN = "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/AircraftFleet_graphrag_agent-abc"
 
 
+@pytest.fixture(autouse=True)
+def _clear_status_cache() -> None:
+    transport.get_agent_config.cache_clear()
+
+
+def _status(**overrides: object) -> str:
+    status: dict[str, object] = {
+        "projectName": "AircraftFleet",
+        "target": "default",
+        "region": "us-east-1",
+        "resources": [
+            {"resourceType": "runtime", "name": "graphrag_agent",
+             "deploymentState": "deployed", "arn": ARN},
+        ],
+    }
+    status.update(overrides)
+    return json.dumps(status)
+
+
 def test_parse_status_returns_deployed_runtime_arn() -> None:
     output = json.dumps(
         {
@@ -168,3 +187,60 @@ def test_status_timeout_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(transport.subprocess, "run", fake_run)
     with pytest.raises(DeploymentNotFoundError, match="did not finish"):
         transport.get_agent_config()
+
+
+@pytest.mark.parametrize("output", ["[]", "null", '"text"', "42"])
+def test_parse_status_refuses_non_object(output: str) -> None:
+    with pytest.raises(DeploymentNotFoundError, match="did not return an object"):
+        parse_status(output)
+
+
+@pytest.mark.parametrize("region", [None, ""])
+def test_parse_status_requires_region(region: str | None) -> None:
+    with pytest.raises(DeploymentNotFoundError, match="region"):
+        parse_status(_status(region=region))
+
+
+def test_parse_status_matches_runtime_by_name() -> None:
+    other = {"resourceType": "runtime", "name": "other_agent",
+             "deploymentState": "deployed", "arn": "arn:other"}
+    with pytest.raises(DeploymentNotFoundError, match="no Runtime named 'graphrag_agent'"):
+        parse_status(_status(resources=[other]))
+
+
+def test_parse_status_ignores_malformed_resources() -> None:
+    with pytest.raises(DeploymentNotFoundError, match="no Runtime named"):
+        parse_status(_status(resources={"runtime": ARN}))
+
+
+def test_parse_status_refuses_deployed_runtime_without_arn() -> None:
+    runtime = {"resourceType": "runtime", "name": "graphrag_agent",
+               "deploymentState": "deployed"}
+    with pytest.raises(DeploymentNotFoundError, match="not deployed"):
+        parse_status(_status(resources=[runtime]))
+
+
+def test_status_names_target_and_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout=_status(), stderr="")
+
+    monkeypatch.setattr(transport.subprocess, "run", fake_run)
+    assert transport.get_agent_config() == (ARN, "us-east-1")
+    assert transport.get_agent_config() == (ARN, "us-east-1")
+    assert calls == [["agentcore", "status", "--json", "--target", "default"]]
+
+
+def test_status_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    results = iter(
+        [
+            SimpleNamespace(returncode=1, stdout="", stderr="Error: throttled"),
+            SimpleNamespace(returncode=0, stdout=_status(), stderr=""),
+        ]
+    )
+    monkeypatch.setattr(transport.subprocess, "run", lambda *a, **k: next(results))
+    with pytest.raises(DeploymentNotFoundError, match="throttled"):
+        transport.get_agent_config()
+    assert transport.get_agent_config() == (ARN, "us-east-1")

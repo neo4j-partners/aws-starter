@@ -22,6 +22,7 @@ import logging
 import subprocess
 import uuid
 from collections.abc import Iterable
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -44,6 +45,11 @@ DEPLOYED_READ_TIMEOUT_S = 300
 # `agentcore status` reads CloudFormation outputs. It returns in a few seconds.
 STATUS_TIMEOUT_S = 60
 
+# The Runtime name in agentcore/agentcore.json and the aws-targets.json entry
+# that ./agent.sh deploy uses.
+RUNTIME_NAME = "graphrag_agent"
+DEPLOY_TARGET = "default"
+
 Target = Literal["local", "deployed"]
 
 
@@ -51,16 +57,19 @@ class DeploymentNotFoundError(RuntimeError):
     """The deployed Runtime ARN could not be read from ``agentcore status``."""
 
 
+@lru_cache(maxsize=1)
 def get_agent_config() -> tuple[str, str]:
     """Read ``(agent_arn, region)`` from ``agentcore status --json``.
 
-    The AgentCore CLI resolves the Runtime ARN from the deployed stack.
+    The AgentCore CLI resolves the Runtime ARN from the deployed stack of
+    :data:`DEPLOY_TARGET`. The result is cached for the life of the process,
+    so a load test runs the CLI once. A failure is not cached.
     Raises :class:`DeploymentNotFoundError` when the CLI is missing, the
     status call fails, or the Runtime is not deployed.
     """
     try:
         proc = subprocess.run(
-            ["agentcore", "status", "--json"],
+            ["agentcore", "status", "--json", "--target", DEPLOY_TARGET],
             cwd=AGENT_ROOT,
             capture_output=True,
             text=True,
@@ -84,20 +93,53 @@ def get_agent_config() -> tuple[str, str]:
 
 
 def parse_status(output: str) -> tuple[str, str]:
-    """Return ``(agent_arn, region)`` for the deployed Runtime in status JSON."""
+    """Return ``(agent_arn, region)`` for :data:`RUNTIME_NAME` in status JSON.
+
+    The Runtime must be listed by name with ``deploymentState`` "deployed"
+    and an ARN. The region comes from the status output, which reports the
+    target's region.
+    """
     try:
         status = json.loads(output)
     except json.JSONDecodeError as e:
         raise DeploymentNotFoundError(
             f"'agentcore status --json' did not return JSON: {output.strip()}"
         ) from e
+    if not isinstance(status, dict):
+        raise DeploymentNotFoundError(
+            f"'agentcore status --json' did not return an object: {output.strip()}"
+        )
 
-    for resource in status.get("resources", []):
-        if resource.get("resourceType") == "runtime" and resource.get("arn"):
-            return resource["arn"], status.get("region", "us-east-1")
-    raise DeploymentNotFoundError(
-        "The Runtime is not deployed. Run './agent.sh deploy' first."
+    region = status.get("region")
+    if not isinstance(region, str) or not region:
+        raise DeploymentNotFoundError(
+            "'agentcore status --json' did not report the target region."
+        )
+
+    resources = status.get("resources")
+    if not isinstance(resources, list):
+        resources = []
+    runtime = next(
+        (
+            resource
+            for resource in resources
+            if isinstance(resource, dict)
+            and resource.get("resourceType") == "runtime"
+            and resource.get("name") == RUNTIME_NAME
+        ),
+        None,
     )
+    if runtime is None:
+        raise DeploymentNotFoundError(
+            f"The project has no Runtime named '{RUNTIME_NAME}'."
+        )
+    arn = runtime.get("arn")
+    if runtime.get("deploymentState") != "deployed" or not isinstance(arn, str) or not arn:
+        raise DeploymentNotFoundError(
+            f"Runtime '{RUNTIME_NAME}' is not deployed to target "
+            f"'{DEPLOY_TARGET}'. Run './agent.sh deploy' first."
+        )
+    return arn, region
 
 
 def _handle_sse_event(

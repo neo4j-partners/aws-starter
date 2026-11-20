@@ -137,6 +137,7 @@ def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> 
         embedding_property="embedding",
         dimensions=dimensions,
         similarity_fn="cosine",
+        neo4j_database=database,
     )
     print("  [OK] Vector index: maintenanceChunkEmbeddings")
 
@@ -145,6 +146,7 @@ def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> 
         name="maintenanceChunkText",
         label="Chunk",
         node_properties=["text"],
+        neo4j_database=database,
     )
     print("  [OK] Fulltext index: maintenanceChunkText")
 

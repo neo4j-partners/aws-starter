@@ -76,7 +76,7 @@ def read_csv(data_dir: Path, filename: str) -> list[dict[str, Any]]:
         return list(csv.DictReader(f))
 
 
-def _run_in_batches(driver: Driver, database: str, records: list[dict], query: str) -> None:
+def _run_in_batches(driver: Driver, database: str | None, records: list[dict], query: str) -> None:
     """Execute a Cypher query over records in batches of BATCH_SIZE."""
     total = len(records)
     for i in range(0, total, BATCH_SIZE):
@@ -375,7 +375,7 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
 # ---------------------------------------------------------------------------
 
 
-def load_nodes(driver: Driver, database: str, data_dir: Path) -> None:
+def load_nodes(driver: Driver, database: str | None, data_dir: Path) -> None:
     """Load every operational node type from its CSV file."""
     for label, filename, query in _NODE_DEFINITIONS:
         print(f"Loading {label} nodes...")
@@ -384,7 +384,7 @@ def load_nodes(driver: Driver, database: str, data_dir: Path) -> None:
         print(f"  [OK] Loaded {len(records)} {label} nodes.")
 
 
-def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
+def load_relationships(driver: Driver, database: str | None, data_dir: Path) -> None:
     """Load every operational relationship type from its CSV file."""
     for rel_type, filename, query in _REL_DEFINITIONS:
         print(f"Loading {rel_type} relationships...")
@@ -397,7 +397,7 @@ def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
 _DELETE_BATCH_SIZE = 10000
 
 
-def detach_delete_nodes(driver: Driver, database: str, label: str | None = None) -> int:
+def detach_delete_nodes(driver: Driver, database: str | None, label: str | None = None) -> int:
     """Detach-delete every node, or every node with ``label``, in batches.
 
     ``CALL ... IN TRANSACTIONS`` must run in an auto-commit transaction, so
@@ -417,14 +417,14 @@ def detach_delete_nodes(driver: Driver, database: str, label: str | None = None)
     return summary.counters.nodes_deleted
 
 
-def clear_database(driver: Driver, database: str) -> None:
+def clear_database(driver: Driver, database: str | None) -> None:
     """Delete all nodes and relationships in batches."""
     print("Clearing database...")
     deleted_total = detach_delete_nodes(driver, database)
     print(f"  [OK] Database cleared ({deleted_total} nodes deleted).")
 
 
-def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:
+def _get_label_counts(driver: Driver, database: str | None) -> dict[str, int]:
     records, _, _ = driver.execute_query(
         """
         MATCH (n)
@@ -436,7 +436,7 @@ def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:
     return {record["label"]: record["count"] for record in records}
 
 
-def _get_relationship_counts(driver: Driver, database: str) -> dict[str, int]:
+def _get_relationship_counts(driver: Driver, database: str | None) -> dict[str, int]:
     records, _, _ = driver.execute_query(
         """
         MATCH ()-[r]->()
@@ -482,7 +482,7 @@ def _warn_or_fail(
 
 def _verify_vector_search(
     driver: Driver,
-    database: str,
+    database: str | None,
     *,
     has_chunk_embeddings: bool,
     has_vector_index: bool,
@@ -521,7 +521,7 @@ def _verify_vector_search(
 
 def verify(
     driver: Driver,
-    database: str,
+    database: str | None,
     *,
     expected_embedding_dimensions: int = 1536,
     strict: bool = False,

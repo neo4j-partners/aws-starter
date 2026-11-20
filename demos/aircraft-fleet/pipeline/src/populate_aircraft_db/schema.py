@@ -58,7 +58,7 @@ def _quote_identifier(identifier: str) -> str:
     return f"`{identifier.replace('`', '``')}`"
 
 
-def create_constraints(driver: Driver, database: str) -> None:
+def create_constraints(driver: Driver, database: str | None) -> None:
     """Create uniqueness constraints (idempotent)."""
     for label, prop in CONSTRAINTS:
         driver.execute_query(
@@ -69,7 +69,7 @@ def create_constraints(driver: Driver, database: str) -> None:
         print(f"  [OK] Constraint: {label}.{prop}")
 
 
-def create_indexes(driver: Driver, database: str) -> None:
+def create_indexes(driver: Driver, database: str | None) -> None:
     """Create property indexes (idempotent)."""
     for label, prop in INDEXES:
         index_name = f"idx_{label.lower()}_{prop.lower()}"
@@ -81,7 +81,7 @@ def create_indexes(driver: Driver, database: str) -> None:
         print(f"  [OK] Index: {label}.{prop}")
 
 
-def create_fulltext_indexes(driver: Driver, database: str) -> None:
+def create_fulltext_indexes(driver: Driver, database: str | None) -> None:
     """Create fulltext indexes for sample demo queries (idempotent)."""
     for name, label, props in FULLTEXT_INDEXES:
         props_clause = ", ".join(f"n.{_quote_identifier(p)}" for p in props)
@@ -93,7 +93,7 @@ def create_fulltext_indexes(driver: Driver, database: str) -> None:
         print(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
 
 
-def create_extraction_constraints(driver: Driver, database: str) -> None:
+def create_extraction_constraints(driver: Driver, database: str | None) -> None:
     """Create uniqueness constraints for extracted entity types (idempotent)."""
     for label, prop in EXTRACTION_CONSTRAINTS:
         driver.execute_query(
@@ -104,7 +104,7 @@ def create_extraction_constraints(driver: Driver, database: str) -> None:
         print(f"  [OK] Constraint: {label}.{prop}")
 
 
-def drop_extraction_constraints(driver: Driver, database: str) -> None:
+def drop_extraction_constraints(driver: Driver, database: str | None) -> None:
     """Drop extracted-entity uniqueness constraints before SimpleKGPipeline runs.
 
     The pipeline writes duplicate extracted nodes first and performs entity
@@ -133,7 +133,7 @@ def drop_extraction_constraints(driver: Driver, database: str) -> None:
             print(f"  [OK] Dropped constraint: {label}.{prop}")
 
 
-def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> None:
+def create_embedding_indexes(driver: Driver, database: str | None, dimensions: int) -> None:
     """Create vector and fulltext indexes for Chunk embeddings (idempotent).
 
     Imports neo4j_graphrag lazily so that other commands don't require it.

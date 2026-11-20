@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from itertools import batched
 from pathlib import Path
 from typing import Any
@@ -521,20 +522,21 @@ def _has_constraint(constraint_rows: list[dict[str, Any]], label: str, property_
     )
 
 
-def _warn_or_fail(
-    failures: list[str],
-    warnings: list[str],
-    condition: bool,
-    message: str,
-    *,
-    strict: bool,
-) -> None:
-    if condition:
-        return
-    if strict:
-        failures.append(message)
-    else:
-        warnings.append(message)
+@dataclass
+class _VerifyResult:
+    """Failed checks, collected as failures in strict mode and warnings otherwise."""
+
+    strict: bool
+    failures: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def check(self, condition: bool, message: str) -> None:
+        if condition:
+            return
+        if self.strict:
+            self.failures.append(message)
+        else:
+            self.warnings.append(message)
 
 
 def _verify_vector_search(
@@ -576,59 +578,68 @@ def _verify_vector_search(
     return True, f"{count} result(s), best score={score:.4f}"
 
 
-def verify(
-    driver: Driver,
-    database: str,
-    *,
-    expected_embedding_dimensions: int = 1536,
-    strict: bool = False,
-) -> bool:
-    """Print comprehensive graph verification and return whether it passed."""
-    failures: list[str] = []
-    warnings: list[str] = []
+# (name, query, labels it needs, relationship types it needs). A check whose
+# labels or relationship types are absent counts 0 without running.
+_ORPHAN_CHECKS = [
+    (
+        "Readings without Sensor",
+        "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) RETURN count(r) AS count",
+        {"Reading", "Sensor"},
+        {"HAS_READING"},
+    ),
+    (
+        "Flights without Aircraft",
+        "MATCH (f:Flight) WHERE NOT (f)<-[:OPERATES_FLIGHT]-(:Aircraft) RETURN count(f) AS count",
+        {"Flight", "Aircraft"},
+        {"OPERATES_FLIGHT"},
+    ),
+    (
+        "Components without System",
+        "MATCH (c:Component) WHERE NOT (c)<-[:HAS_COMPONENT]-(:System) RETURN count(c) AS count",
+        {"Component", "System"},
+        {"HAS_COMPONENT"},
+    ),
+    (
+        "Sensors without Readings",
+        "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) RETURN count(s) AS count",
+        {"Sensor", "Reading"},
+        {"HAS_READING"},
+    ),
+    (
+        "Documents without Chunks",
+        "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) RETURN count(d) AS count",
+        {"Document", "Chunk"},
+        {"FROM_DOCUMENT"},
+    ),
+]
 
-    label_counts = _get_label_counts(driver, database)
-    relationship_counts = _get_relationship_counts(driver, database)
+
+def _check_counts(
+    label_counts: dict[str, int], rel_counts: dict[str, int], result: _VerifyResult
+) -> None:
     operational_counts = {label: label_counts.get(label, 0) for label in OPERATIONAL_LABELS}
     enrichment_counts = {label: label_counts.get(label, 0) for label in ENRICHMENT_LABELS}
-    rel_counts = {rel_type: relationship_counts.get(rel_type, 0) for rel_type in RELATIONSHIP_TYPES}
-
-    print()
-    print("=" * 60)
-    print("Verification")
-    print("=" * 60)
     _print_count_section("Operational Node Counts", operational_counts)
     _print_count_section("Enrichment Node Counts", enrichment_counts)
     _print_count_section("Relationship Counts", rel_counts)
 
     for label in OPERATIONAL_LABELS:
-        _warn_or_fail(
-            failures,
-            warnings,
-            operational_counts[label] > 0,
-            f"{label} has no nodes",
-            strict=strict,
-        )
-
+        result.check(operational_counts[label] > 0, f"{label} has no nodes")
     for rel_type in OPERATIONAL_RELATIONSHIP_TYPES:
-        _warn_or_fail(
-            failures,
-            warnings,
-            rel_counts[rel_type] > 0,
-            f"{rel_type} has no relationships",
-            strict=strict,
-        )
-
+        result.check(rel_counts[rel_type] > 0, f"{rel_type} has no relationships")
     for label in ("Document", "Chunk", "AircraftModel", "OperatingLimit"):
-        _warn_or_fail(
-            failures,
-            warnings,
-            enrichment_counts[label] > 0,
-            f"{label} has no enrichment nodes",
-            strict=strict,
-        )
+        result.check(enrichment_counts[label] > 0, f"{label} has no enrichment nodes")
 
-    if enrichment_counts["Chunk"] > 0:
+
+def _check_embeddings(
+    driver: Driver,
+    database: str,
+    chunk_count: int,
+    expected_dimensions: int,
+    result: _VerifyResult,
+) -> int:
+    """Check chunk embeddings and return how many chunks have one."""
+    if chunk_count > 0:
         embedding_records, _, _ = driver.execute_query(
             """
             MATCH (c:Chunk)
@@ -647,7 +658,7 @@ def verify(
               AND size(c.embedding) <> $expected_dimensions
             RETURN count(c) AS count
             """,
-            expected_dimensions=expected_embedding_dimensions,
+            expected_dimensions=expected_dimensions,
             database_=database,
         )
         bad_dimensions = bad_dim_records[0]["count"]
@@ -668,28 +679,17 @@ def verify(
     print(f"  Dimensions found: {dimensions}")
     print(f"  Wrong-dimension embeddings: {bad_dimensions:,}")
 
-    _warn_or_fail(
-        failures,
-        warnings,
-        embedding_row["with_embedding"] > 0,
-        "no chunk embeddings found",
-        strict=strict,
-    )
-    _warn_or_fail(
-        failures,
-        warnings,
-        embedding_row["missing_embedding"] == 0,
-        "some chunks are missing embeddings",
-        strict=strict,
-    )
-    _warn_or_fail(
-        failures,
-        warnings,
+    result.check(embedding_row["with_embedding"] > 0, "no chunk embeddings found")
+    result.check(embedding_row["missing_embedding"] == 0, "some chunks are missing embeddings")
+    result.check(
         bad_dimensions == 0,
-        f"some embeddings do not have {expected_embedding_dimensions} dimensions",
-        strict=strict,
+        f"some embeddings do not have {expected_dimensions} dimensions",
     )
+    return embedding_row["with_embedding"]
 
+
+def _check_indexes(driver: Driver, database: str, result: _VerifyResult) -> set[str]:
+    """Check the required indexes and return the names of all indexes."""
     index_rows, _, _ = driver.execute_query(
         """
         SHOW INDEXES
@@ -705,23 +705,14 @@ def verify(
         row = index_by_name.get(name)
         if row is None:
             print(f"  [MISSING] {name}")
-            _warn_or_fail(
-                failures,
-                warnings,
-                False,
-                f"missing index {name}",
-                strict=strict,
-            )
+            result.check(False, f"missing index {name}")
             continue
         print(f"  [OK] {name}: {row['type']} {row['state']}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            row["state"] == "ONLINE",
-            f"index {name} is {row['state']}",
-            strict=strict,
-        )
+        result.check(row["state"] == "ONLINE", f"index {name} is {row['state']}")
+    return set(index_by_name)
 
+
+def _check_constraints(driver: Driver, database: str, result: _VerifyResult) -> None:
     constraint_rows, _, _ = driver.execute_query(
         """
         SHOW CONSTRAINTS
@@ -737,30 +728,29 @@ def verify(
         exists = _has_constraint(constraint_dicts, label, property_name)
         status = "[OK]" if exists else "[MISSING]"
         print(f"  {status} {label}.{property_name}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            exists,
-            f"missing uniqueness constraint {label}.{property_name}",
-            strict=strict,
-        )
+        result.check(exists, f"missing uniqueness constraint {label}.{property_name}")
 
+
+def _check_vector_search(
+    driver: Driver,
+    database: str,
+    *,
+    has_chunk_embeddings: bool,
+    has_vector_index: bool,
+    result: _VerifyResult,
+) -> None:
     vector_ok, vector_detail = _verify_vector_search(
         driver,
         database,
-        has_chunk_embeddings=embedding_row["with_embedding"] > 0,
-        has_vector_index="maintenanceChunkEmbeddings" in index_by_name,
+        has_chunk_embeddings=has_chunk_embeddings,
+        has_vector_index=has_vector_index,
     )
     print("\nVector Search Smoke Test:")
     print(f"  {'[OK]' if vector_ok else '[FAIL]'} {vector_detail}")
-    _warn_or_fail(
-        failures,
-        warnings,
-        vector_ok,
-        f"vector search smoke test failed: {vector_detail}",
-        strict=strict,
-    )
+    result.check(vector_ok, f"vector search smoke test failed: {vector_detail}")
 
+
+def _check_cross_links(rel_counts: dict[str, int], result: _VerifyResult) -> None:
     cross_link_checks = [
         ("Document -> Aircraft", rel_counts["APPLIES_TO"]),
         ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"]),
@@ -770,83 +760,80 @@ def verify(
     print("\nCross-Link Checks:")
     for label, count in cross_link_checks:
         print(f"  {label}: {count:,}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            count > 0,
-            f"{label} has no links",
-            strict=strict,
-        )
+        result.check(count > 0, f"{label} has no links")
 
-    orphan_queries = [
-        (
-            "Readings without Sensor",
-            "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) RETURN count(r) AS count",
-            {"Reading", "Sensor"},
-            {"HAS_READING"},
-        ),
-        (
-            "Flights without Aircraft",
-            "MATCH (f:Flight) WHERE NOT (f)<-[:OPERATES_FLIGHT]-(:Aircraft) "
-            "RETURN count(f) AS count",
-            {"Flight", "Aircraft"},
-            {"OPERATES_FLIGHT"},
-        ),
-        (
-            "Components without System",
-            "MATCH (c:Component) WHERE NOT (c)<-[:HAS_COMPONENT]-(:System) "
-            "RETURN count(c) AS count",
-            {"Component", "System"},
-            {"HAS_COMPONENT"},
-        ),
-        (
-            "Sensors without Readings",
-            "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) RETURN count(s) AS count",
-            {"Sensor", "Reading"},
-            {"HAS_READING"},
-        ),
-        (
-            "Documents without Chunks",
-            "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) RETURN count(d) AS count",
-            {"Document", "Chunk"},
-            {"FROM_DOCUMENT"},
-        ),
-    ]
+
+def _check_data_quality(
+    driver: Driver,
+    database: str,
+    existing_labels: set[str],
+    existing_relationships: set[str],
+    result: _VerifyResult,
+) -> None:
     print("\nData Quality Checks:")
-    existing_labels = set(label_counts)
-    existing_relationships = set(relationship_counts)
-    for label, query, required_labels, required_relationships in orphan_queries:
-        if required_labels.issubset(existing_labels) and required_relationships.issubset(
-            existing_relationships
-        ):
+    for label, query, required_labels, required_relationships in _ORPHAN_CHECKS:
+        if required_labels <= existing_labels and required_relationships <= existing_relationships:
             records, _, _ = driver.execute_query(query, database_=database)
             count = records[0]["count"]
         else:
             count = 0
         print(f"  {label}: {count:,}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            count == 0,
-            f"{label}: {count:,}",
-            strict=strict,
-        )
+        result.check(count == 0, f"{label}: {count:,}")
 
-    if warnings:
+
+def _print_summary(result: _VerifyResult) -> bool:
+    """Print warnings and failures and return whether verification passed."""
+    if result.warnings:
         print("\nWarnings:")
-        for warning in warnings:
+        for warning in result.warnings:
             print(f"  [WARN] {warning}")
 
-    if failures:
+    if result.failures:
         print("\nFailures:")
-        for failure in failures:
+        for failure in result.failures:
             print(f"  [FAIL] {failure}")
         print("=" * 60)
         return False
 
-    if warnings:
+    if result.warnings:
         print("\n[OK] Verification completed with warnings.")
     else:
         print("\n[OK] Verification passed.")
     print("=" * 60)
     return True
+
+
+def verify(
+    driver: Driver,
+    database: str,
+    *,
+    expected_embedding_dimensions: int = 1536,
+    strict: bool = False,
+) -> bool:
+    """Print comprehensive graph verification and return whether it passed."""
+    result = _VerifyResult(strict=strict)
+
+    label_counts = _get_label_counts(driver, database)
+    relationship_counts = _get_relationship_counts(driver, database)
+    rel_counts = {rel_type: relationship_counts.get(rel_type, 0) for rel_type in RELATIONSHIP_TYPES}
+
+    print()
+    print("=" * 60)
+    print("Verification")
+    print("=" * 60)
+    _check_counts(label_counts, rel_counts, result)
+    with_embedding = _check_embeddings(
+        driver, database, label_counts.get("Chunk", 0), expected_embedding_dimensions, result
+    )
+    index_names = _check_indexes(driver, database, result)
+    _check_constraints(driver, database, result)
+    _check_vector_search(
+        driver,
+        database,
+        has_chunk_embeddings=with_embedding > 0,
+        has_vector_index="maintenanceChunkEmbeddings" in index_names,
+        result=result,
+    )
+    _check_cross_links(rel_counts, result)
+    _check_data_quality(driver, database, set(label_counts), set(relationship_counts), result)
+    return _print_summary(result)

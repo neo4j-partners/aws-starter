@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from .config import GeneratorConfig
-from .fleet import AircraftNode, SensorNode, SystemNode
+from .fleet import AircraftNode, SystemNode
 from .specs import ENGINE_SPECS, EngineSpec
 
 
@@ -96,7 +96,7 @@ def generate_engine_readings(
     rows: list[dict] = []
     for sensor in system.sensors:
         values = sensor_series[sensor.sensor_id]
-        for h, (ts, val) in enumerate(zip(timestamps, values), start=1):
+        for h, (ts, val) in enumerate(zip(timestamps, values, strict=True), start=1):
             rows.append(
                 {
                     "reading_id": f"{sensor.sensor_id}-R{h:05d}",

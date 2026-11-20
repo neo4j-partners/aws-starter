@@ -17,7 +17,7 @@ from .maintenance import generate_maintenance_events
 from .operations import generate_operations
 from .removals import generate_removals
 from .sensors import generate_engine_readings
-from .writers import write_csv, write_csv_streaming
+from .writers import write_csv
 
 app = typer.Typer(
     name="generate-data",
@@ -128,7 +128,7 @@ def generate(
     rng_np = np.random.default_rng(seed)
 
     t0 = time.time()
-    console.print(f"\n[bold]Aircraft Digital Twin Generator[/bold]")
+    console.print("\n[bold]Aircraft Digital Twin Generator[/bold]")
     console.print(
         f"  Aircraft: {aircraft}  |  Airports: {airports}  |  Days: {days}  |  Seed: {seed}"
     )

@@ -9,11 +9,11 @@ non-trivial rankings.
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
-from .specs import AIRPORTS, AirportSpec
+from .specs import AIRPORTS
 
 # Flights per aircraft per day — drawn uniformly from this range
 _FLIGHTS_PER_DAY_RANGE = (3, 6)
@@ -38,10 +38,6 @@ _DELAY_MINUTES: dict[str, tuple[int, int]] = {
 _HUB_WEIGHT = 4.0
 
 
-def _build_route_weights(airports: list[AirportSpec]) -> list[float]:
-    return [_HUB_WEIGHT if ap.is_hub else 1.0 for ap in airports]
-
-
 def generate_operations(
     fleet: list[AircraftNode],
     config: GeneratorConfig,
@@ -55,8 +51,6 @@ def generate_operations(
     Actually returns six lists — see return statement.
     """
     airports = AIRPORTS[: config.n_airports]
-    airport_weights = _build_route_weights(airports)
-    iata_to_id = {ap.iata: ap.airport_id for ap in airports}
 
     airport_nodes = [
         {

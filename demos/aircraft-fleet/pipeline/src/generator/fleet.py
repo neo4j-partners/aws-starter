@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from itertools import islice
 
 from .config import GeneratorConfig
 from .specs import (
     COMPONENT_TYPES_BY_SYSTEM,
-    ENGINE_SPECS,
     MANUFACTURER,
     MODEL_DISTRIBUTION,
     OPERATORS,
@@ -18,9 +16,6 @@ from .specs import (
 
 # ICAO 24-bit address characters
 _ICAO_CHARS = "0123456789abcdef"
-
-# US tail number prefix pool
-_TAIL_PREFIXES = list("NNNNN")  # all start with N for US registration
 
 
 def _icao24(rng: random.Random) -> str:
@@ -184,5 +179,5 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
 
     return [
         _build_aircraft(i, model, op, rng)
-        for i, (model, op) in enumerate(zip(models, operator_assignments))
+        for i, (model, op) in enumerate(zip(models, operator_assignments, strict=True))
     ]

@@ -42,7 +42,8 @@ LOCAL_URL = "http://localhost:7070/invocations"
 # for minutes. botocore's 60 s default read timeout would cut it off.
 DEPLOYED_READ_TIMEOUT_S = 300
 
-# Reported when the stream stops partway through a character.
+# Reported when the stream ends with neither a complete nor an error event,
+# or partway through a character.
 TRUNCATED_STREAM = "The response stream was cut off before it finished."
 
 # `agentcore status` reads CloudFormation outputs. It returns in a few seconds.
@@ -159,21 +160,22 @@ def _handle_sse_event(
     content_parts: list[str],
     errors: list[str],
     stream: bool = True,
-) -> None:
+) -> str | None:
     """Dispatch one SSE event, printing ``chunk`` text live when streaming.
 
     ``json.loads`` already yields real newlines, so no unescaping is needed;
-    anything that is not one of the four known shapes is ignored.
+    anything that is not one of the four known shapes is ignored. Returns the
+    event's ``type``, or None when the event is not JSON.
     """
     event = event.strip()
     if not event:
-        return
+        return None
     if event.startswith("data: "):
         event = event[6:]
     try:
         data = json.loads(event)
     except json.JSONDecodeError:
-        return
+        return None
     if data.get("type") == "chunk":
         text = data.get("data", "")
         if stream:
@@ -188,6 +190,7 @@ def _handle_sse_event(
             print(f"\n\n  → {name}\n", end="\n", flush=True)
     elif data.get("type") == "error":
         errors.append(data.get("error", "Unknown error"))
+    return data.get("type")
 
 
 def _normalize_newlines(text: str) -> str:
@@ -203,6 +206,9 @@ def _consume_sse(
     """
     content_parts: list[str] = []
     errors: list[str] = []
+    # The server ends every response with a complete or an error event. A
+    # stream that ends with neither was cut off, even between two events.
+    completed = False
     buffer = ""
     # A trailing \r may be the first half of a \r\n split across two chunks,
     # so it waits for the next chunk before it is normalized.
@@ -217,15 +223,20 @@ def _consume_sse(
         buffer += _normalize_newlines(text.removesuffix(held_cr))
         while "\n\n" in buffer:
             event, buffer = buffer.split("\n\n", 1)
-            _handle_sse_event(event, content_parts, errors, stream)
+            kind = _handle_sse_event(event, content_parts, errors, stream)
+            completed = completed or kind == "complete"
     # Bytes still pending here are the start of a character the stream never
     # finished, so the response was cut off.
     pending_bytes, _ = decoder.getstate()
     buffer += _normalize_newlines(held_cr + decoder.decode(b"", final=True))
     if buffer.strip():
-        _handle_sse_event(buffer, content_parts, errors, stream)
+        kind = _handle_sse_event(buffer, content_parts, errors, stream)
+        completed = completed or kind == "complete"
     if pending_bytes:
         logger.warning("Response stream ended inside a UTF-8 character")
+    elif not (completed or errors):
+        logger.warning("Response stream ended before the complete event")
+    if pending_bytes or not (completed or errors):
         errors.append(TRUNCATED_STREAM)
     if stream:
         print()  # terminate the streamed line

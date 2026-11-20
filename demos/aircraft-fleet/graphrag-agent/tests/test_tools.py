@@ -82,10 +82,18 @@ def test_driver_errors_get_fixed_results(
 ) -> None:
     monkeypatch.setattr(tools, "graph_query", _raise(error))
     monkeypatch.setattr(tools, "vector_search", _raise(error))
-    assert tools.graph_query_tool("q") == expected
-    assert tools.vector_search_tool("q") == expected
-    # The detail, address included, stays in the log.
-    assert ADDRESS in caplog.text
+    with caplog.at_level("INFO", logger="fleet_graphrag"):
+        results = [tools.graph_query_tool("q"), tools.vector_search_tool("q")]
+    assert results == [expected, expected]
+    # The model never sees the address, and INFO records do not carry it.
+    assert all(ADDRESS not in result for result in results)
+    info = [r for r in caplog.records if r.levelname == "INFO"]
+    assert all(ADDRESS not in r.getMessage() for r in info)
+    # The detail stays in the WARNING and ERROR records.
+    detail = "".join(
+        caplog.handler.format(r) for r in caplog.records if r.levelno >= 30
+    )
+    assert ADDRESS in detail
 
 
 def test_vector_search_query_errors_are_not_the_models(

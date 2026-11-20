@@ -120,23 +120,43 @@ def test_bad_arn(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
         password_from(ARN_VAR, PASSWORD_VAR)
 
 
+ROLE = "arn:aws:sts::123456789012:assumed-role/graphrag-runtime/session"
+
+
 @pytest.mark.parametrize(
-    "error",
+    ("error", "failure"),
     [
-        ClientError(
-            {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
-            "GetSecretValue",
+        (
+            ClientError(
+                {
+                    "Error": {
+                        "Code": "AccessDeniedException",
+                        "Message": f"User: {ROLE} is not authorized on {ARN}",
+                    }
+                },
+                "GetSecretValue",
+            ),
+            "AccessDeniedException",
         ),
-        NoCredentialsError(),
+        (NoCredentialsError(), "NoCredentialsError"),
     ],
 )
 def test_aws_errors_become_config_errors(
-    monkeypatch: pytest.MonkeyPatch, error: Exception
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    failure: str,
 ) -> None:
     monkeypatch.setenv(ARN_VAR, ARN)
     _fake_secrets_manager(monkeypatch, error=error)
-    with pytest.raises(ConfigError, match=f"Could not read the secret in {ARN_VAR}"):
+    with pytest.raises(ConfigError) as raised:
         password_from(ARN_VAR, PASSWORD_VAR)
+    message = str(raised.value)
+    assert message == f"Could not read the secret in {ARN_VAR} ({failure})."
+    assert ROLE not in message
+    assert ARN not in message
+    # The botocore detail stays in the log.
+    assert str(error) in caplog.text
 
 
 def test_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:

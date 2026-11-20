@@ -123,9 +123,8 @@ class RequestPayload(BaseModel):
 
     mode: Mode | None = None
     top_k: int = 5
-    # The validator also runs on the default, so a missing user_id is
-    # "anonymous" too.
-    user_id: str | None = Field(default=None, validate_default=True)
+    # A missing, null, or empty user_id is "anonymous".
+    user_id: str = "anonymous"
 
     prompt: str | None = None
     message: str | None = None
@@ -149,9 +148,9 @@ class RequestPayload(BaseModel):
         """Query text for the direct data surfaces (query > prompt > message)."""
         return self.query or self.prompt or self.message
 
-    @field_validator("user_id")
+    @field_validator("user_id", mode="before")
     @classmethod
-    def _default_user_id(cls, value: str | None) -> str:
+    def _default_user_id(cls, value: object) -> object:
         """Map a missing or empty ``user_id`` to ``anonymous``."""
         return value or "anonymous"
 

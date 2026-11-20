@@ -189,6 +189,8 @@ def test_transaction_timeout_says_the_query_took_too_long(monkeypatch, code) -> 
     [
         neo4j.exceptions.ServiceUnavailable("no route"),
         neo4j.exceptions.SessionExpired("expired"),
+        # Pool exhaustion. It subclasses ConnectionPoolError.
+        neo4j.exceptions.ConnectionAcquisitionTimeoutError("pool exhausted"),
         neo4j.exceptions.Neo4jError._hydrate_neo4j(
             code="Neo.ClientError.Security.Unauthorized", message="bad password"
         ),

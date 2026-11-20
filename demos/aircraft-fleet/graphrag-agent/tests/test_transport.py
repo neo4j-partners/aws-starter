@@ -22,6 +22,10 @@ def _event(obj: dict) -> bytes:
     return f"data: {json.dumps(obj)}\n\n".encode()
 
 
+# The server ends every successful response with this event.
+COMPLETE = _event({"type": "complete"})
+
+
 def test_chunks_join_in_order() -> None:
     raw = [
         _event({"type": "chunk", "data": "Hello"}),
@@ -56,7 +60,12 @@ def test_multibyte_utf8_split_across_byte_chunks() -> None:
 @pytest.mark.parametrize("separator", [b"\n\n", b"\r\n\r\n", b"\r\r"])
 def test_each_line_ending_separates_events(separator: bytes) -> None:
     raw = separator.join(
-        [b'data: {"type": "chunk", "data": "a"}', b'data: {"type": "chunk", "data": "b"}', b""]
+        [
+            b'data: {"type": "chunk", "data": "a"}',
+            b'data: {"type": "chunk", "data": "b"}',
+            b'data: {"type": "complete"}',
+            b"",
+        ]
     )
     content, errors = _consume_sse([raw], stream=False)
     assert content == ["a", "b"]
@@ -70,7 +79,7 @@ def test_crlf_split_across_chunks_is_one_line_ending() -> None:
     first = b'data: {"type": "chunk", "data": "a"}\r\n\r'
     second = b'\ndata: {"type": "chunk", "data": "b"}\r'
     third = b'\n\r\n'
-    content, errors = _consume_sse([first, second, third], stream=False)
+    content, errors = _consume_sse([first, second, third, COMPLETE], stream=False)
     assert content == ["a", "b"]
     assert errors == []
 
@@ -82,10 +91,32 @@ def test_trailing_cr_at_end_of_stream_ends_the_event() -> None:
 
 
 def test_invalid_utf8_is_replaced_not_fatal() -> None:
-    raw = [b'data: {"type": "chunk", "data": "ok \xff"}\n\n']
+    raw = [b'data: {"type": "chunk", "data": "ok \xff"}\n\n', COMPLETE]
     content, errors = _consume_sse(raw, stream=False)
     assert content == ["ok \ufffd"]
     assert errors == []
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # Cut between two events.
+        [_event({"type": "chunk", "data": "partial"})],
+        # Cut inside an event's JSON, at an ASCII byte.
+        [_event({"type": "chunk", "data": "partial"}), b'data: {"type": "chu'],
+    ],
+)
+def test_stream_cut_at_an_ascii_boundary_is_reported(raw: list[bytes]) -> None:
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["partial"]
+    assert errors == [transport.TRUNCATED_STREAM]
+    assert _result(content, errors)["status"] == "error"
+
+
+def test_error_event_without_complete_is_not_truncation() -> None:
+    raw = [_event({"type": "chunk", "data": "partial"}), _event({"type": "error", "error": "boom"})]
+    _, errors = _consume_sse(raw, stream=False)
+    assert errors == ["boom"]
 
 
 def test_stream_cut_inside_a_character_is_reported() -> None:
@@ -106,6 +137,7 @@ def test_tool_events_are_not_content() -> None:
     raw = [
         _event({"type": "tool", "name": "graph_query_tool"}),
         _event({"type": "chunk", "data": "42"}),
+        COMPLETE,
     ]
     content, errors = _consume_sse(raw, stream=False)
     assert content == ["42"]
@@ -133,7 +165,7 @@ def test_bare_json_without_data_prefix() -> None:
 
 
 def test_non_json_and_blank_events_are_ignored() -> None:
-    raw = [b"\n\n", b": keep-alive\n\n", _event({"type": "chunk", "data": "y"})]
+    raw = [b"\n\n", b": keep-alive\n\n", _event({"type": "chunk", "data": "y"}), COMPLETE]
     content, errors = _consume_sse(raw, stream=False)
     assert content == ["y"]
     assert errors == []
@@ -298,7 +330,7 @@ def _local_with(monkeypatch: pytest.MonkeyPatch, seen: list[httpx.Request]) -> N
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         return httpx.Response(
-            200, content=b'data: {"type": "chunk", "data": "ok"}\n\n'
+            200, content=_event({"type": "chunk", "data": "ok"}) + COMPLETE
         )
 
     real_client = httpx.Client
@@ -330,7 +362,7 @@ class _FakeAgentCore:
 
     def invoke_agent_runtime(self, **kwargs: object) -> dict:
         self.session_ids.append(str(kwargs["runtimeSessionId"]))
-        return {"response": [b'data: {"type": "chunk", "data": "ok"}\n\n']}
+        return {"response": [_event({"type": "chunk", "data": "ok"}), COMPLETE]}
 
 
 def _deployed(monkeypatch: pytest.MonkeyPatch) -> _FakeAgentCore:

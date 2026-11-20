@@ -125,6 +125,8 @@ driver's connection messages.
    ./deploy.py --env fleet credentials
    ```
 
+5. **Memory database:** You need a second Neo4j database or instance for the supervisor's conversation memory. It can be empty. The agent creates its schema on first connect. Keep it separate from the fleet graph.
+
 ## Gateway credentials
 
 The agent has two ways to get a Gateway token. The environment picks one.
@@ -161,6 +163,8 @@ uv sync
 uv run fleet-supervisor-cli "Compare fault counts with delay counts"
 ```
 
+- **Memory settings:** Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `demos/aircraft-fleet/.env`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. They point at the memory database, not the fleet graph. The server stops at startup if the URI or the password is missing.
+- **Shared .env:** The server loads `demos/aircraft-fleet/.env` at startup. The path comes from the package, so it works from any working directory. Set `FLEET_ENV_FILE` to use another file. A value already set in the environment wins.
 - **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server`. Set `AGENT_PORT` to change the port.
 - **Runtime entrypoint:** `uv run python main.py` starts the same server on 8080, the port AgentCore Runtime uses.
 - **Port:** The default port is 7071, so the supervisor can run beside `graphrag-agent` on 7070.
@@ -272,6 +276,12 @@ but not the project. The package imports because its folder sits next to
 | `CREDENTIAL_FLEET_GATEWAY_NAME` | unset | AgentCore Identity provider name. The AgentCore construct sets it on deploy. Setting it, or `GATEWAY_URL`, selects the cloud path. |
 | `GATEWAY_URL` | unset | Gateway endpoint for the cloud path. It must use `https://`. On deploy it comes from `gateway_url` in the credentials file. |
 | `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path. On deploy they come from `scope` in the credentials file. |
+| `MEM_NEO4J_URI` | unset, required | Memory database URI. The deploy requires `neo4j+s://` or `bolt+s://`. |
+| `MEM_NEO4J_USERNAME` | `neo4j` | Memory database user |
+| `MEM_NEO4J_DATABASE` | `neo4j` | Memory database name |
+| `MEM_NEO4J_PASSWORD` | unset | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Unset locally. Set by the deploy. The memory password comes from this secret, a JSON object with a `password` key. |
+| `FLEET_ENV_FILE` | `../.env` | The shared env file the server loads at startup |
 
 ## Tests
 

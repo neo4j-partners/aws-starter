@@ -25,7 +25,10 @@ case "$1" in
             agentcore/agentcore.json > agentcore/agentcore.json.stub
         mv agentcore/agentcore.json.stub agentcore/agentcore.json
         ;;
-    deploy) exit "${STUB_DEPLOY_EXIT:-0}" ;;
+    deploy)
+        if [ -n "$STUB_DEPLOY_SIGNAL" ]; then kill -s "$STUB_DEPLOY_SIGNAL" "$PPID"; fi
+        exit "${STUB_DEPLOY_EXIT:-0}"
+        ;;
     *) exit 99 ;;
 esac
 """
@@ -163,3 +166,15 @@ def test_destroy_needs_no_credentials_file_and_restores_the_spec(project: Path) 
     assert "agentcore remove runtime --name supervisor" in logged
     assert "agentcore deploy --target default --yes" in logged
     assert spec.read_bytes() == tracked
+
+
+def test_an_interrupt_during_deploy_restores_the_spec_once(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_DEPLOY_SIGNAL="INT")
+
+    assert result.returncode == 130
+    assert spec.read_bytes() == tracked
+    assert "Could not restore" not in result.stderr
+    assert "Cleanup complete" not in result.stdout

@@ -267,6 +267,8 @@ restore_project() {
     if [ -n "${SPEC_BACKUP:-}" ]; then
         if cp "$SPEC_BACKUP" "$PROJECT_SPEC"; then
             rm -f "$SPEC_BACKUP"
+            # A second run, from the EXIT trap after an interrupt, skips it.
+            SPEC_BACKUP=""
         else
             echo -e "${RED}Could not restore $PROJECT_SPEC. The backup is at $SPEC_BACKUP${NC}" >&2
             failed=1
@@ -277,17 +279,22 @@ restore_project() {
 }
 
 # Back up the tracked spec and arm the restore. INT and TERM exit through
-# the EXIT trap, so Ctrl+C restores too.
+# the EXIT trap, so Ctrl+C restores too. The EXIT trap ignores INT and TERM
+# first, so a second Ctrl+C cannot stop the restore halfway.
 begin_spec_restore() {
     SPEC_BACKUP=$(mktemp)
     cp "$PROJECT_SPEC" "$SPEC_BACKUP"
-    trap 'restore_project || exit 1' EXIT
+    trap "trap '' INT TERM; restore_project || exit 1" EXIT
     trap 'exit 130' INT TERM
 }
 
+# Restore while the traps are still armed, so an interrupt during the
+# restore still finishes it through the EXIT trap. Then clear them.
 end_spec_restore() {
+    local status=0
+    restore_project || status=$?
     trap - EXIT INT TERM
-    restore_project
+    return "$status"
 }
 
 # Ask before destroying. Anything but y or yes, including no input from a

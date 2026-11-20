@@ -45,7 +45,13 @@ load_dotenv(ENV_FILE)
 
 import neo4j  # noqa: E402
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext  # noqa: E402
-from pydantic import BaseModel, ConfigDict, Field, ValidationError  # noqa: E402
+from pydantic import (  # noqa: E402
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+)
 from strands import Agent  # noqa: E402
 
 from fleet_graphrag.agent import (  # noqa: E402
@@ -57,6 +63,10 @@ from fleet_graphrag.agent import (  # noqa: E402
     vector_search,
 )
 from fleet_graphrag.agent.model import build_bedrock_model  # noqa: E402
+from fleet_graphrag.agent.neo4j_errors import (  # noqa: E402
+    UNREACHABLE,
+    is_transaction_timeout,
+)
 from fleet_graphrag.agent.secrets import (  # noqa: E402
     NEO4J_PASSWORD_SECRET_ARN,
     neo4j_password,
@@ -79,25 +89,7 @@ GENERIC_ERROR = (
     "check the server logs."
 )
 
-# Failures to connect or authenticate. Other Neo4j errors get the generic
-# message, so a bad query is not reported as an unreachable database.
-_NEO4J_UNREACHABLE = (
-    neo4j.exceptions.ServiceUnavailable,
-    neo4j.exceptions.SessionExpired,
-    neo4j.exceptions.ConnectionPoolError,
-    neo4j.exceptions.AuthError,
-    neo4j.exceptions.DatabaseUnavailable,
-)
-
-
-def _is_transaction_timeout(error: neo4j.exceptions.ClientError) -> bool:
-    """True for a server-side transaction timeout.
-
-    The server reports ``...TransactionTimedOut`` for its own limit and
-    ``...TransactionTimedOutClientConfiguration`` for the driver's
-    ``neo4j.Query(timeout=...)``, which Text2Cypher sets.
-    """
-    return (error.code or "").startswith("Neo.ClientError.Transaction.TransactionTimedOut")
+INVALID_PAYLOAD = "Invalid request payload."
 
 model = build_bedrock_model(
     settings.model_id,
@@ -129,7 +121,9 @@ class RequestPayload(BaseModel):
 
     mode: Mode | None = None
     top_k: int = 5
-    user_id: str = "anonymous"
+    # The validator also runs on the default, so a missing user_id is
+    # "anonymous" too.
+    user_id: str | None = Field(default=None, validate_default=True)
 
     prompt: str | None = None
     message: str | None = None
@@ -152,6 +146,21 @@ class RequestPayload(BaseModel):
     def data_query(self) -> str | None:
         """Query text for the direct data surfaces (query > prompt > message)."""
         return self.query or self.prompt or self.message
+
+    @field_validator("user_id")
+    @classmethod
+    def _default_user_id(cls, value: str | None) -> str:
+        """Map a missing or empty ``user_id`` to ``anonymous``."""
+        return value or "anonymous"
+
+
+def _invalid_fields(error: ValidationError) -> str:
+    """Names of the fields that failed validation, without values or messages."""
+    names = dict.fromkeys(
+        ".".join(str(part) for part in detail["loc"]) or "(body)"
+        for detail in error.errors()
+    )
+    return ", ".join(names)
 
 
 @app.entrypoint
@@ -181,10 +190,11 @@ async def invoke(
     try:
         req = RequestPayload.model_validate(raw)
     except ValidationError as e:
+        # The full detail echoes the rejected values. Keep it in the log.
         logger.warning("Invalid request payload: %s", e)
         yield {
             "type": "error",
-            "error": f"Invalid request payload: {e}",
+            "error": f"{INVALID_PAYLOAD} Invalid fields: {_invalid_fields(e)}",
         }
         return
 
@@ -286,7 +296,7 @@ async def invoke(
             "type": "error",
             "error": "The agent is not configured. Check the server logs.",
         }
-    except _NEO4J_UNREACHABLE as e:
+    except UNREACHABLE as e:
         logger.error("Neo4j connection error: %s", e, exc_info=True)
         yield {
             "type": "error",
@@ -296,7 +306,7 @@ async def invoke(
             ),
         }
     except neo4j.exceptions.ClientError as e:
-        if not _is_transaction_timeout(e):
+        if not is_transaction_timeout(e):
             logger.exception("Neo4j error")
             yield {"type": "error", "error": GENERIC_ERROR}
             return

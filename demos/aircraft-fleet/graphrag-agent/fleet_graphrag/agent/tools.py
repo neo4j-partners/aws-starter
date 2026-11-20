@@ -5,9 +5,57 @@ in :mod:`agent.retrieval` carry no Strands dependency; the ``@tool`` decorator
 and the docstrings the LLM sees live here.
 """
 
+import logging
+
+import neo4j
+from neo4j_graphrag.exceptions import Text2CypherRetrievalError
 from strands import tool
 
+from fleet_graphrag.agent.neo4j_errors import (
+    UNREACHABLE,
+    is_query_error,
+    is_transaction_timeout,
+)
 from fleet_graphrag.agent.retrieval import graph_query, vector_search
+
+logger = logging.getLogger(__name__)
+
+# Strands sends a tool's exception text to the model, and a driver message can
+# name the server address. These fixed results replace it. The details go to
+# the log.
+TIMEOUT_RESULT = (
+    "The query took too long and was stopped. Try a narrower question, "
+    "for example with a filter or fewer aircraft."
+)
+UNAVAILABLE_RESULT = (
+    "The graph database is unavailable right now. Tell the user the data "
+    "could not be reached."
+)
+DATABASE_ERROR_RESULT = (
+    "The graph database returned an error. Tell the user the data could "
+    "not be retrieved."
+)
+# Enough of a query error for the model to rephrase the question.
+_MAX_QUERY_ERROR_CHARS = 500
+
+
+def _neo4j_error_result(tool_name: str, error: Exception) -> str:
+    """Log a driver error and return the fixed result the model sees."""
+    if isinstance(error, UNREACHABLE):
+        logger.error("%s: Neo4j unreachable", tool_name, exc_info=error)
+        return UNAVAILABLE_RESULT
+    if isinstance(error, neo4j.exceptions.Neo4jError) and is_transaction_timeout(error):
+        logger.warning("%s: Neo4j transaction timed out: %s", tool_name, error)
+        return TIMEOUT_RESULT
+    logger.error("%s: Neo4j error", tool_name, exc_info=error)
+    return DATABASE_ERROR_RESULT
+
+
+def _query_error_result(message: str) -> str:
+    return (
+        f"The generated Cypher query failed: {message[:_MAX_QUERY_ERROR_CHARS]}\n"
+        "Rephrase the question to fit the schema and try again."
+    )
 
 
 @tool
@@ -21,7 +69,20 @@ def graph_query_tool(question: str) -> str:
     Args:
         question: Natural-language question about the graph.
     """
-    return graph_query(question)
+    try:
+        return graph_query(question)
+    except Text2CypherRetrievalError as e:
+        # Raised for a syntax error or a refused write query. The text holds
+        # the server's message or the query, never the server address.
+        logger.warning("graph_query_tool: %s", e)
+        return _query_error_result(str(e))
+    except neo4j.exceptions.Neo4jError as e:
+        if is_query_error(e):
+            logger.warning("graph_query_tool: query error %s: %s", e.code, e.message)
+            return _query_error_result(f"{e.code}: {e.message}")
+        return _neo4j_error_result("graph_query_tool", e)
+    except neo4j.exceptions.DriverError as e:
+        return _neo4j_error_result("graph_query_tool", e)
 
 
 @tool
@@ -38,4 +99,8 @@ def vector_search_tool(query: str, top_k: int = 5) -> str:
         query: Natural-language search text.
         top_k: Number of chunks to return (default 5).
     """
-    return vector_search(query, top_k)
+    # The search Cypher is fixed, so no error here is the model's to fix.
+    try:
+        return vector_search(query, top_k)
+    except (neo4j.exceptions.Neo4jError, neo4j.exceptions.DriverError) as e:
+        return _neo4j_error_result("vector_search_tool", e)

@@ -85,16 +85,14 @@ class Settings:
         """Build settings from the environment, falling back to the defaults."""
         defaults = cls()
         return cls(
-            model_id=os.getenv("MODEL_ID", defaults.model_id),
+            model_id=os.getenv("MODEL_ID") or defaults.model_id,
             max_tokens=_env_int("MAX_TOKENS", defaults.max_tokens),
             effort=_env_effort("MODEL_EFFORT", defaults.effort),
-            aws_region=os.getenv("AWS_REGION", defaults.aws_region),
-            vector_index_name=os.getenv(
-                "VECTOR_INDEX_NAME", defaults.vector_index_name
-            ),
-            fulltext_index_name=os.getenv(
-                "FULLTEXT_INDEX_NAME", defaults.fulltext_index_name
-            ),
+            aws_region=os.getenv("AWS_REGION") or defaults.aws_region,
+            vector_index_name=os.getenv("VECTOR_INDEX_NAME")
+            or defaults.vector_index_name,
+            fulltext_index_name=os.getenv("FULLTEXT_INDEX_NAME")
+            or defaults.fulltext_index_name,
             schema_ttl_s=_env_int("SCHEMA_TTL_S", defaults.schema_ttl_s),
             text2cypher_timeout_s=_env_float(
                 "TEXT2CYPHER_TIMEOUT_S", defaults.text2cypher_timeout_s
@@ -105,12 +103,8 @@ class Settings:
             text2cypher_max_tokens=_env_int(
                 "TEXT2CYPHER_MAX_TOKENS", defaults.text2cypher_max_tokens
             ),
-            embed_model_id=os.getenv(
-                "EMBED_MODEL_ID", defaults.embed_model_id
-            ),
-            embed_dimensions=int(
-                os.getenv("EMBED_DIMENSIONS", str(defaults.embed_dimensions))
-            ),
+            embed_model_id=os.getenv("EMBED_MODEL_ID") or defaults.embed_model_id,
+            embed_dimensions=_env_int("EMBED_DIMENSIONS", defaults.embed_dimensions),
         )
 
 

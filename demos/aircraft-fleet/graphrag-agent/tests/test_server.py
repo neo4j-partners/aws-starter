@@ -111,6 +111,28 @@ def test_user_id_defaults_to_anonymous() -> None:
     assert server.RequestPayload(prompt="hi").user_id == "anonymous"
 
 
+@pytest.mark.parametrize("user_id", [None, ""])
+def test_null_or_empty_user_id_is_anonymous(user_id: str | None) -> None:
+    payload = server.RequestPayload.model_validate({"prompt": "hi", "user_id": user_id})
+    assert payload.user_id == "anonymous"
+
+
+def test_user_id_is_kept() -> None:
+    assert server.RequestPayload(prompt="hi", user_id="pilot-7").user_id == "pilot-7"
+
+
+def test_invalid_payload_names_fields_without_values(caplog) -> None:
+    events = _run({"mode": "drop_database", "top_k": "lots", "inputText": 42})
+    assert events == [
+        {
+            "type": "error",
+            "error": "Invalid request payload. Invalid fields: mode, top_k, inputText",
+        }
+    ]
+    # The rejected values stay in the server log.
+    assert "drop_database" in caplog.text
+
+
 def test_env_file_is_overridden_for_tests() -> None:
     assert str(server.ENV_FILE) == server.os.devnull
 

@@ -42,6 +42,9 @@ LOCAL_URL = "http://localhost:7070/invocations"
 # for minutes. botocore's 60 s default read timeout would cut it off.
 DEPLOYED_READ_TIMEOUT_S = 300
 
+# Reported when the stream stops partway through a character.
+TRUNCATED_STREAM = "The response stream was cut off before it finished."
+
 # `agentcore status` reads CloudFormation outputs. It returns in a few seconds.
 STATUS_TIMEOUT_S = 60
 
@@ -178,24 +181,43 @@ def _handle_sse_event(
         errors.append(data.get("error", "Unknown error"))
 
 
+def _normalize_newlines(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _consume_sse(
     chunks: Iterable[bytes], stream: bool
 ) -> tuple[list[str], list[str]]:
-    """Parse ``data: {...}\\n\\n`` events off a byte iterator as they arrive."""
+    """Parse ``data: {...}\\n\\n`` events off a byte iterator as they arrive.
+
+    Lines may end in ``\\r\\n``, ``\\r``, or ``\\n``, as the SSE format allows.
+    """
     content_parts: list[str] = []
     errors: list[str] = []
     buffer = ""
+    # A trailing \r may be the first half of a \r\n split across two chunks,
+    # so it waits for the next chunk before it is normalized.
+    held_cr = ""
     # A multibyte character can straddle two chunks. The incremental decoder
-    # holds the partial bytes until the rest of the character arrives.
-    decoder = codecs.getincrementaldecoder("utf-8")()
+    # holds the partial bytes until the rest of the character arrives. Invalid
+    # bytes become U+FFFD instead of ending the stream.
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     for raw in chunks:
-        buffer += decoder.decode(raw)
+        text = held_cr + decoder.decode(raw)
+        held_cr = "\r" if text.endswith("\r") else ""
+        buffer += _normalize_newlines(text.removesuffix(held_cr))
         while "\n\n" in buffer:
             event, buffer = buffer.split("\n\n", 1)
             _handle_sse_event(event, content_parts, errors, stream)
-    buffer += decoder.decode(b"", final=True)
+    # Bytes still pending here are the start of a character the stream never
+    # finished, so the response was cut off.
+    pending_bytes, _ = decoder.getstate()
+    buffer += _normalize_newlines(held_cr + decoder.decode(b"", final=True))
     if buffer.strip():
         _handle_sse_event(buffer, content_parts, errors, stream)
+    if pending_bytes:
+        logger.warning("Response stream ended inside a UTF-8 character")
+        errors.append(TRUNCATED_STREAM)
     if stream:
         print()  # terminate the streamed line
     return content_parts, errors

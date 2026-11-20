@@ -49,3 +49,17 @@ def test_text2cypher_max_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
     assert Settings.from_env().text2cypher_max_tokens == 2048
     monkeypatch.setenv("TEXT2CYPHER_MAX_TOKENS", "512")
     assert Settings.from_env().text2cypher_max_tokens == 512
+
+
+def test_empty_strings_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    names = ("MODEL_ID", "AWS_REGION", "VECTOR_INDEX_NAME", "FULLTEXT_INDEX_NAME",
+             "EMBED_MODEL_ID", "EMBED_DIMENSIONS")
+    for name in names:
+        monkeypatch.setenv(name, "")
+    assert Settings.from_env() == Settings()
+
+
+def test_bad_embed_dimensions_names_the_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("EMBED_DIMENSIONS", "big")
+    with pytest.raises(ValueError, match="EMBED_DIMENSIONS must be an integer"):
+        Settings.from_env()

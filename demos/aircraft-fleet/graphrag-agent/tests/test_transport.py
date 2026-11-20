@@ -52,6 +52,48 @@ def test_multibyte_utf8_split_across_byte_chunks() -> None:
     assert content == [text]
 
 
+@pytest.mark.parametrize("separator", [b"\n\n", b"\r\n\r\n", b"\r\r"])
+def test_each_line_ending_separates_events(separator: bytes) -> None:
+    raw = separator.join(
+        [b'data: {"type": "chunk", "data": "a"}', b'data: {"type": "chunk", "data": "b"}', b""]
+    )
+    content, errors = _consume_sse([raw], stream=False)
+    assert content == ["a", "b"]
+    assert errors == []
+
+
+def test_crlf_split_across_chunks_is_one_line_ending() -> None:
+    # \r ends one chunk and \n starts the next. Read as two line endings,
+    # they would end the event early and split the second event's data line
+    # from its blank-line terminator.
+    first = b'data: {"type": "chunk", "data": "a"}\r\n\r'
+    second = b'\ndata: {"type": "chunk", "data": "b"}\r'
+    third = b'\n\r\n'
+    content, errors = _consume_sse([first, second, third], stream=False)
+    assert content == ["a", "b"]
+    assert errors == []
+
+
+def test_trailing_cr_at_end_of_stream_ends_the_event() -> None:
+    raw = [b'data: {"type": "chunk", "data": "a"}\r', b"\r"]
+    content, _ = _consume_sse(raw, stream=False)
+    assert content == ["a"]
+
+
+def test_invalid_utf8_is_replaced_not_fatal() -> None:
+    raw = [b'data: {"type": "chunk", "data": "ok \xff"}\n\n']
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["ok \ufffd"]
+    assert errors == []
+
+
+def test_stream_cut_inside_a_character_is_reported() -> None:
+    whole = _event({"type": "chunk", "data": "fine"}) + "→".encode()
+    content, errors = _consume_sse([whole[:-1]], stream=False)
+    assert content == ["fine"]
+    assert errors == [transport.TRUNCATED_STREAM]
+
+
 def test_newlines_in_chunk_data_survive() -> None:
     content, _ = _consume_sse(
         [_event({"type": "chunk", "data": "a\n\nb"})], stream=False

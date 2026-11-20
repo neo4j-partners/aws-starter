@@ -54,6 +54,20 @@ OPERATIONS_DESCRIPTION = (
 # user. The details go to the server log instead.
 SPECIALIST_ERROR = "The specialist could not answer this question."
 
+# ``as_tool``'s spec depends only on the tool name and description, and the
+# supervisor is built per request. So each spec is taken from Strands once,
+# keyed by name and description, and reused. Two threads that miss together
+# both store the same value.
+_SPEC_CACHE: dict[tuple[str, str], ToolSpec] = {}
+
+
+def _as_tool_spec(name: str, description: str, build_agent: Callable[[], Agent]) -> ToolSpec:
+    key = (name, description)
+    if (spec := _SPEC_CACHE.get(key)) is None:
+        spec = build_agent().as_tool(name=name, description=description).tool_spec
+        _SPEC_CACHE[key] = spec
+    return spec
+
 
 class SpecialistTool(AgentTool):
     """Expose a specialist as a supervisor tool, with a fresh Agent per call.
@@ -69,7 +83,7 @@ class SpecialistTool(AgentTool):
         self._description = description
         self._build_agent = build_agent
         # Take the spec from Strands so the input schema matches ``as_tool``.
-        self._spec = self._wrap(build_agent()).tool_spec
+        self._spec = _as_tool_spec(name, description, build_agent)
 
     def _wrap(self, agent: Agent) -> AgentTool:
         return agent.as_tool(name=self._name, description=self._description)

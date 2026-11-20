@@ -4,10 +4,12 @@ import asyncio
 from collections.abc import AsyncIterator
 from typing import Any
 
+import pytest
 from strands import Agent, tool
 from strands.models import Model
 from strands.types.events import ToolResultEvent
 
+from fleet_supervisor.core import agents
 from fleet_supervisor.core.agents import (
     MAINTENANCE_TOOL,
     OPERATIONS_TOOL,
@@ -51,6 +53,11 @@ class FakeModel(Model):
         yield {"contentBlockDelta": {"delta": {"text": self.text}}}
         yield {"contentBlockStop": {}}
         yield {"messageStop": {"stopReason": "end_turn"}}
+
+
+@pytest.fixture(autouse=True)
+def empty_spec_cache(monkeypatch):
+    monkeypatch.setattr(agents, "_SPEC_CACHE", {})
 
 
 def specialist_tool(model: Model) -> SpecialistTool:
@@ -114,6 +121,43 @@ def test_each_call_builds_a_fresh_agent():
     asyncio.run(final_result(specialist, "b"))
     # One agent for the spec, then one per call.
     assert len({id(a) for a in built}) == 3
+
+
+def test_spec_agent_is_built_once_across_requests():
+    built: list[Agent] = []
+    model = FakeModel()
+
+    def build() -> Agent:
+        agent = Agent(model=model, tools=[], callback_handler=None)
+        built.append(agent)
+        return agent
+
+    first = SpecialistTool(MAINTENANCE_TOOL, "test", build)
+    second = SpecialistTool(MAINTENANCE_TOOL, "test", build)
+    assert len(built) == 1
+    assert second.tool_spec is first.tool_spec
+    # A different description is a different spec.
+    other = SpecialistTool(MAINTENANCE_TOOL, "other", build)
+    assert len(built) == 2
+    assert other.tool_spec["description"] == "other"
+
+
+def test_supervisors_built_per_request_reuse_the_specs(monkeypatch):
+    built: list[str] = []
+    real_agent = agents.Agent
+
+    def counting_agent(*args, **kwargs):
+        built.append(kwargs.get("name", ""))
+        return real_agent(*args, **kwargs)
+
+    monkeypatch.setattr(agents, "Agent", counting_agent)
+    model = FakeModel()
+    build_supervisor(model, [read_neo4j_cypher])
+    build_supervisor(model, [read_neo4j_cypher])
+    # Two spec agents on the first request, then only the supervisors.
+    assert sorted(built) == sorted(
+        ["maintenance_agent", "operations_agent", "fleet_supervisor", "fleet_supervisor"]
+    )
 
 
 def test_specialist_error_text_is_generic(caplog):

@@ -104,3 +104,11 @@ def test_main_port(monkeypatch, env: str | None, expected: int) -> None:
         monkeypatch.setenv("AGENT_PORT", env)
     runtime_app.main()
     assert ports == [expected]
+
+
+def test_user_id_defaults_to_anonymous() -> None:
+    assert runtime_app.RequestPayload(prompt="hi").user_id == "anonymous"
+
+
+def test_env_file_is_overridden_for_tests() -> None:
+    assert str(runtime_app.ENV_FILE) == runtime_app.os.devnull

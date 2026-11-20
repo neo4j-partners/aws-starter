@@ -69,3 +69,6 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Import the source runtime_app.py. The force-include above also puts a copy
+# in site-packages, and that copy is only refreshed by `uv sync`.
+pythonpath = ["."]

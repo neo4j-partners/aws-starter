@@ -4,9 +4,46 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import cast
+from typing import Literal, cast, get_args
 
-from agent.model import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, Effort
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
+DEFAULT_MODEL_ID = "global.anthropic.claude-sonnet-5-5"
+DEFAULT_MAX_TOKENS = 64_000
+DEFAULT_EFFORT: Effort = "medium"
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read an int env var. An unset or empty value gives ``default``."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be an integer, got {raw!r}") from None
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float env var. An unset or empty value gives ``default``."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a number, got {raw!r}") from None
+
+
+def _env_effort(name: str, default: Effort) -> Effort:
+    """Read the effort level. An unset or empty value gives ``default``."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    allowed = get_args(Effort)
+    if raw not in allowed:
+        raise ValueError(f"{name} must be one of {', '.join(allowed)}, got {raw!r}")
+    return cast(Effort, raw)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,8 +75,8 @@ class Settings:
         defaults = cls()
         return cls(
             model_id=os.getenv("MODEL_ID", defaults.model_id),
-            max_tokens=int(os.getenv("MAX_TOKENS", str(defaults.max_tokens))),
-            effort=cast(Effort, os.getenv("MODEL_EFFORT", defaults.effort)),
+            max_tokens=_env_int("MAX_TOKENS", defaults.max_tokens),
+            effort=_env_effort("MODEL_EFFORT", defaults.effort),
             aws_region=os.getenv("AWS_REGION", defaults.aws_region),
             vector_index_name=os.getenv(
                 "VECTOR_INDEX_NAME", defaults.vector_index_name
@@ -47,12 +84,12 @@ class Settings:
             fulltext_index_name=os.getenv(
                 "FULLTEXT_INDEX_NAME", defaults.fulltext_index_name
             ),
-            schema_ttl_s=int(os.getenv("SCHEMA_TTL_S", str(defaults.schema_ttl_s))),
-            text2cypher_timeout_s=float(
-                os.getenv("TEXT2CYPHER_TIMEOUT_S", str(defaults.text2cypher_timeout_s))
+            schema_ttl_s=_env_int("SCHEMA_TTL_S", defaults.schema_ttl_s),
+            text2cypher_timeout_s=_env_float(
+                "TEXT2CYPHER_TIMEOUT_S", defaults.text2cypher_timeout_s
             ),
-            text2cypher_max_rows=int(
-                os.getenv("TEXT2CYPHER_MAX_ROWS", str(defaults.text2cypher_max_rows))
+            text2cypher_max_rows=_env_int(
+                "TEXT2CYPHER_MAX_ROWS", defaults.text2cypher_max_rows
             ),
             embed_model_id=os.getenv(
                 "EMBED_MODEL_ID", defaults.embed_model_id

@@ -1,7 +1,4 @@
-"""Strands ``BedrockModel`` factory shared by the fleet agents.
-
-The supervisor agent imports :func:`build_bedrock_model` so both agents send
-the same request shape to Bedrock Converse.
+"""Strands ``BedrockModel`` factory for the GraphRAG agent.
 
 Claude Sonnet 5.5 rejects any ``temperature`` value and rejects
 ``{"type": "disabled"}`` thinking, so neither is sent. Adaptive thinking and
@@ -10,15 +7,9 @@ the effort level are set explicitly in ``additionalModelRequestFields``.
 
 from __future__ import annotations
 
-from typing import Literal
-
 from strands.models import BedrockModel, CacheConfig
 
-Effort = Literal["low", "medium", "high", "xhigh", "max"]
-
-DEFAULT_MODEL_ID = "global.anthropic.claude-sonnet-5-5"
-DEFAULT_MAX_TOKENS = 64_000
-DEFAULT_EFFORT: Effort = "medium"
+from agent.config import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, Effort
 
 
 def thinking_request_fields(effort: Effort = DEFAULT_EFFORT) -> dict[str, object]:

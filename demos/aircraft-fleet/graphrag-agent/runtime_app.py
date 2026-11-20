@@ -30,14 +30,19 @@ import os
 import uuid
 from collections.abc import AsyncGenerator
 from enum import StrEnum
+from pathlib import Path
 
-from dotenv import find_dotenv, load_dotenv
+from dotenv import load_dotenv
 
-# Local runs read the shared aircraft-fleet .env, found by walking up from the
-# working directory. Existing env vars win, so Runtime env vars are untouched.
-# This runs before the agent imports because ``agent.config`` resolves
-# settings at import time.
-load_dotenv(find_dotenv(usecwd=True))
+# Local runs read the shared aircraft-fleet .env next to graphrag-agent/. The
+# path comes from this file, so the working directory does not matter.
+# FLEET_ENV_FILE overrides it; the tests point it at an empty file. Existing
+# env vars win, so Runtime env vars are untouched. This runs before the agent
+# imports because ``agent.config`` resolves settings at import time.
+ENV_FILE = Path(
+    os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().parent.parent / ".env"
+)
+load_dotenv(ENV_FILE)
 
 import neo4j  # noqa: E402
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext  # noqa: E402
@@ -95,7 +100,7 @@ class RequestPayload(BaseModel):
 
     mode: Mode | None = None
     top_k: int = 5
-    user_id: str | None = None
+    user_id: str = "anonymous"
 
     prompt: str | None = None
     message: str | None = None

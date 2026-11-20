@@ -57,7 +57,8 @@ def create_constraints(driver: Driver, database: str) -> None:
     """Create uniqueness constraints (idempotent)."""
     for label, prop in CONSTRAINTS:
         driver.execute_query(
-            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE",
+            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{_quote_identifier(label)}) "
+            f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
             database_=database,
         )
         print(f"  [OK] Constraint: {label}.{prop}")
@@ -68,7 +69,8 @@ def create_indexes(driver: Driver, database: str) -> None:
     for label, prop in INDEXES:
         index_name = f"idx_{label.lower()}_{prop.lower()}"
         driver.execute_query(
-            f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{prop})",
+            f"CREATE INDEX {_quote_identifier(index_name)} IF NOT EXISTS "
+            f"FOR (n:{_quote_identifier(label)}) ON (n.{_quote_identifier(prop)})",
             database_=database,
         )
         print(f"  [OK] Index: {label}.{prop}")
@@ -77,9 +79,10 @@ def create_indexes(driver: Driver, database: str) -> None:
 def create_fulltext_indexes(driver: Driver, database: str) -> None:
     """Create fulltext indexes for sample demo queries (idempotent)."""
     for name, label, props in FULLTEXT_INDEXES:
-        props_clause = ", ".join(f"n.{p}" for p in props)
+        props_clause = ", ".join(f"n.{_quote_identifier(p)}" for p in props)
         driver.execute_query(
-            f"CREATE FULLTEXT INDEX {name} IF NOT EXISTS FOR (n:{label}) ON EACH [{props_clause}]",
+            f"CREATE FULLTEXT INDEX {_quote_identifier(name)} IF NOT EXISTS "
+            f"FOR (n:{_quote_identifier(label)}) ON EACH [{props_clause}]",
             database_=database,
         )
         print(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
@@ -89,7 +92,8 @@ def create_extraction_constraints(driver: Driver, database: str) -> None:
     """Create uniqueness constraints for extracted entity types (idempotent)."""
     for label, prop in EXTRACTION_CONSTRAINTS:
         driver.execute_query(
-            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE",
+            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{_quote_identifier(label)}) "
+            f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
             database_=database,
         )
         print(f"  [OK] Constraint: {label}.{prop}")

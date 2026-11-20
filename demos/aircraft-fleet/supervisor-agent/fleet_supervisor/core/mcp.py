@@ -19,6 +19,7 @@ import logging
 import re
 import threading
 import time
+import weakref
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -102,10 +103,15 @@ class BearerTokenAuth(httpx.Auth):
         # Guards _token: set_token runs on a request thread, the auth flow on
         # the MCP client's thread.
         self._token_lock = threading.Lock()
-        # Serializes fetches on the MCP client's event loop. The auth outlives
-        # client rebuilds, and each new client runs a new loop, so the lock is
-        # recreated when the loop changes.
-        self._fetch_lock: tuple[asyncio.AbstractEventLoop, asyncio.Lock] | None = None
+        # Serializes fetches on each MCP client's event loop. The auth outlives
+        # client rebuilds, and each client runs its own loop, so there is one
+        # lock per loop. During a rebuild the old and new loops both run, and
+        # each keeps its own lock. A loop's entry goes away with the loop.
+        self._fetch_locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
+            weakref.WeakKeyDictionary()
+        )
+        # Guards _fetch_locks, which the client loops' threads share.
+        self._fetch_locks_guard = threading.Lock()
 
     def set_token(self, token: AccessToken) -> None:
         """Use ``token`` from now on."""
@@ -120,9 +126,11 @@ class BearerTokenAuth(httpx.Auth):
 
     def _lock_for_this_loop(self) -> asyncio.Lock:
         loop = asyncio.get_running_loop()
-        if self._fetch_lock is None or self._fetch_lock[0] is not loop:
-            self._fetch_lock = (loop, asyncio.Lock())
-        return self._fetch_lock[1]
+        with self._fetch_locks_guard:
+            lock = self._fetch_locks.get(loop)
+            if lock is None:
+                lock = self._fetch_locks[loop] = asyncio.Lock()
+            return lock
 
     async def _get_token(self, rejected: str | None = None) -> str:
         async with self._lock_for_this_loop():

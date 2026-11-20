@@ -155,6 +155,26 @@ def test_auth_works_across_event_loops():
     assert source.count == 2
 
 
+def test_each_running_loop_keeps_its_own_fetch_lock():
+    # During a rebuild the old and new client loops both run. A call on one
+    # loop must not replace the lock a call on the other loop holds.
+    auth = BearerTokenAuth(TokenSource())
+    old_loop, new_loop = asyncio.new_event_loop(), asyncio.new_event_loop()
+
+    async def lock():
+        return auth._lock_for_this_loop()
+
+    try:
+        first_old = old_loop.run_until_complete(lock())
+        first_new = new_loop.run_until_complete(lock())
+        assert first_old is not first_new
+        assert old_loop.run_until_complete(lock()) is first_old
+        assert new_loop.run_until_complete(lock()) is first_new
+    finally:
+        old_loop.close()
+        new_loop.close()
+
+
 def test_token_set_on_the_request_path_is_used_without_a_fetch():
     source, seen = TokenSource(), []
     auth = BearerTokenAuth(source)

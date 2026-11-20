@@ -224,7 +224,9 @@ the Neo4j connection to the runtime.
 
 ## Observability
 
-The agent uses AWS Distro for OpenTelemetry.
+The agent uses AWS Distro for OpenTelemetry auto-instrumentation. It does not use `StrandsTelemetry`.
+
+ADOT traces the Neo4j driver, the boto3 calls to Bedrock, and incoming requests. Strands writes its agent, model, and tool spans through the global OpenTelemetry tracer, so ADOT exports those spans too. `StrandsTelemetry` would install a second tracer provider that only covers the Strands spans. The AgentCore CLI also turns on OpenTelemetry for each runtime by default through `instrumentation.enableOtel`.
 
 - **Local tracing:** Run `uv run opentelemetry-instrument fleet-server`. This traces the Neo4j driver, the boto3 calls to Bedrock, and incoming requests.
 - **Deployed tracing:** Enable Tracing on the runtime in the CloudWatch console under Bedrock AgentCore. Traces then appear in the Bedrock AgentCore Observability dashboard. Without this step, AgentCore records no traces.

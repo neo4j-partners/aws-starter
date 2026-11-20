@@ -84,20 +84,26 @@ def iter_csv_batches(data_dir: Path, filename: str) -> Iterator[list[dict[str, s
 
 def _run_in_batches(
     driver: Driver, database: str, batches: Iterator[list[dict[str, str]]], query: str
-) -> int:
-    """Execute a Cypher query once per batch and return the total row count."""
-    total = 0
+) -> tuple[int, int]:
+    """Execute a Cypher query once per batch.
+
+    Returns the total row count and the number of skipped rows. A query
+    reports skipped rows by returning a ``skipped`` column.
+    """
+    total = skipped = 0
     for batch in batches:
-        driver.execute_query(query, batch=batch, database_=database)
+        records, _, _ = driver.execute_query(query, batch=batch, database_=database)
+        skipped += sum(record.get("skipped", 0) for record in records)
         total += len(batch)
         print(f"  Progress: {total:,} rows", end="\r")
     print()
-    return total
+    return total, skipped
 
 
 # ---------------------------------------------------------------------------
 # Node loading. Reading rows also create their HAS_READING relationship,
-# so the large readings CSV is read only once.
+# so the large readings CSV is read only once. A reading whose sensor_id
+# matches no Sensor is skipped and counted.
 # ---------------------------------------------------------------------------
 
 _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
@@ -153,13 +159,17 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
         "nodes_readings.csv",
         """
         UNWIND $batch AS row
-        MERGE (r:Reading {reading_id: row['reading_id']})
-        SET r.sensor_id = row['sensor_id'],
-            r.timestamp = row['ts'],
-            r.value = toFloat(row['value'])
-        WITH r, row
-        MATCH (s:Sensor {sensor_id: row['sensor_id']})
-        MERGE (s)-[:HAS_READING]->(r)
+        OPTIONAL MATCH (s:Sensor {sensor_id: row['sensor_id']})
+        CALL (row, s) {
+            WITH row, s
+            WHERE s IS NOT NULL
+            MERGE (r:Reading {reading_id: row['reading_id']})
+            SET r.sensor_id = row['sensor_id'],
+                r.timestamp = row['ts'],
+                r.value = toFloat(row['value'])
+            MERGE (s)-[:HAS_READING]->(r)
+        }
+        RETURN count(*) - count(s) AS skipped
         """,
     ),
     (
@@ -377,20 +387,41 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
 # ---------------------------------------------------------------------------
 
 
-def load_nodes(driver: Driver, database: str, data_dir: Path) -> None:
-    """Load every operational node type from its CSV file."""
+def load_nodes(driver: Driver, database: str, data_dir: Path) -> int:
+    """Load every operational node type from its CSV file.
+
+    Returns the number of skipped rows, which are readings with an unknown
+    sensor_id.
+    """
+    skipped_total = 0
     for label, filename, query in _NODE_DEFINITIONS:
         print(f"Loading {label} nodes...")
-        count = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
-        print(f"  [OK] Loaded {count} {label} nodes.")
+        count, skipped = _run_in_batches(
+            driver, database, iter_csv_batches(data_dir, filename), query
+        )
+        skipped_total += skipped
+        print(f"  [OK] Loaded {count - skipped} {label} nodes.")
+    return skipped_total
 
 
 def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
     """Load every operational relationship type from its CSV file."""
     for rel_type, filename, query in _REL_DEFINITIONS:
         print(f"Loading {rel_type} relationships...")
-        count = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
+        count, _ = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
         print(f"  [OK] Loaded {count} {rel_type} relationships.")
+
+
+def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
+    """Load all operational nodes, then all relationships, then report skips."""
+    skipped = load_nodes(driver, database, data_dir)
+    print()
+    load_relationships(driver, database, data_dir)
+    print()
+    if skipped:
+        print(f"[WARN] Skipped {skipped:,} readings whose sensor_id matches no Sensor.")
+    else:
+        print("[OK] No readings skipped.")
 
 
 # Rows deleted per inner transaction when clearing nodes. DETACH DELETE also

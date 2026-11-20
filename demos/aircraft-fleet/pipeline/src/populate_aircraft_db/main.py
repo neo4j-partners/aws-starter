@@ -14,7 +14,7 @@ from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 
 from .config import Settings
-from .loader import clear_database, load_nodes, load_relationships, verify
+from .loader import clear_database, load_operational_graph, verify
 from .schema import (
     create_constraints,
     create_embedding_indexes,
@@ -245,9 +245,7 @@ def setup_cmd() -> None:
         create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_nodes(driver, settings.neo4j_database, settings.data_dir)
-        print()
-        load_relationships(driver, settings.neo4j_database, settings.data_dir)
+        load_operational_graph(driver, settings.neo4j_database, settings.data_dir)
         print()
 
         try:
@@ -337,9 +335,7 @@ def load_operational_cmd() -> None:
         create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_nodes(driver, settings.neo4j_database, settings.data_dir)
-        print()
-        load_relationships(driver, settings.neo4j_database, settings.data_dir)
+        load_operational_graph(driver, settings.neo4j_database, settings.data_dir)
         print()
 
         print("Linking existing enrichment to operational graph...")

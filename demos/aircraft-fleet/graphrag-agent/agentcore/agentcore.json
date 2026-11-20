@@ -10,7 +10,23 @@
       "entrypoint": "runtime_app.py",
       "codeLocation": ".",
       "runtimeVersion": "PYTHON_3_12",
-      "protocol": "HTTP"
+      "protocol": "HTTP",
+      "envVars": [
+        { "name": "NEO4J_URI", "value": "neo4j+s://REPLACE_ME.databases.neo4j.io" },
+        { "name": "NEO4J_USERNAME", "value": "neo4j" },
+        { "name": "NEO4J_DATABASE", "value": "neo4j" },
+        {
+          "name": "NEO4J_PASSWORD_SECRET_ARN",
+          "value": "arn:aws:secretsmanager:us-east-1:000000000000:secret:REPLACE_ME"
+        },
+        { "name": "MEM_NEO4J_URI", "value": "neo4j+s://REPLACE_ME.databases.neo4j.io" },
+        { "name": "MEM_NEO4J_USERNAME", "value": "neo4j" },
+        { "name": "MEM_NEO4J_DATABASE", "value": "neo4j" },
+        {
+          "name": "MEM_NEO4J_PASSWORD_SECRET_ARN",
+          "value": "arn:aws:secretsmanager:us-east-1:000000000000:secret:REPLACE_ME"
+        }
+      ]
     }
   ]
 }

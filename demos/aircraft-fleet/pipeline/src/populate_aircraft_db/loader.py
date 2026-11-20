@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterator
+from itertools import batched
 from pathlib import Path
 from typing import Any
 
@@ -69,26 +71,33 @@ REQUIRED_CONSTRAINTS = [*CONSTRAINTS, *EXTRACTION_CONSTRAINTS]
 # ---------------------------------------------------------------------------
 
 
-def read_csv(data_dir: Path, filename: str) -> list[dict[str, Any]]:
-    """Read a CSV file and return a list of row dicts."""
-    path = data_dir / filename
-    with open(path, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def iter_csv_batches(data_dir: Path, filename: str) -> Iterator[list[dict[str, str]]]:
+    """Stream a CSV file as lists of at most BATCH_SIZE row dicts.
+
+    Only one batch is held in memory at a time. Full-mode readings reach
+    about 1.7M rows, so reading the whole file at once is too costly.
+    """
+    with (data_dir / filename).open(newline="", encoding="utf-8") as f:
+        for batch in batched(csv.DictReader(f), BATCH_SIZE):
+            yield list(batch)
 
 
-def _run_in_batches(driver: Driver, database: str | None, records: list[dict], query: str) -> None:
-    """Execute a Cypher query over records in batches of BATCH_SIZE."""
-    total = len(records)
-    for i in range(0, total, BATCH_SIZE):
-        batch = records[i : i + BATCH_SIZE]
+def _run_in_batches(
+    driver: Driver, database: str | None, batches: Iterator[list[dict[str, str]]], query: str
+) -> int:
+    """Execute a Cypher query once per batch and return the total row count."""
+    total = 0
+    for batch in batches:
         driver.execute_query(query, batch=batch, database_=database)
-        progress = min(i + BATCH_SIZE, total)
-        print(f"  Progress: {progress}/{total} ({100 * progress // total}%)", end="\r")
+        total += len(batch)
+        print(f"  Progress: {total:,} rows", end="\r")
     print()
+    return total
 
 
 # ---------------------------------------------------------------------------
-# Node loading — matches notebook 02 Cypher exactly
+# Node loading. Reading rows also create their HAS_READING relationship,
+# so the large readings CSV is read only once.
 # ---------------------------------------------------------------------------
 
 _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
@@ -148,6 +157,9 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
         SET r.sensor_id = row['sensor_id'],
             r.timestamp = row['ts'],
             r.value = toFloat(row['value'])
+        WITH r, row
+        MATCH (s:Sensor {sensor_id: row['sensor_id']})
+        MERGE (s)-[:HAS_READING]->(r)
         """,
     ),
     (
@@ -279,16 +291,6 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         """,
     ),
     (
-        "HAS_READING",
-        "nodes_readings.csv",
-        """
-        UNWIND $batch AS row
-        MATCH (s:Sensor {sensor_id: row['sensor_id']})
-        MATCH (r:Reading {reading_id: row['reading_id']})
-        MERGE (s)-[:HAS_READING]->(r)
-        """,
-    ),
-    (
         "OPERATES_FLIGHT",
         "rels_aircraft_flight.csv",
         """
@@ -379,18 +381,16 @@ def load_nodes(driver: Driver, database: str | None, data_dir: Path) -> None:
     """Load every operational node type from its CSV file."""
     for label, filename, query in _NODE_DEFINITIONS:
         print(f"Loading {label} nodes...")
-        records = read_csv(data_dir, filename)
-        _run_in_batches(driver, database, records, query)
-        print(f"  [OK] Loaded {len(records)} {label} nodes.")
+        count = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
+        print(f"  [OK] Loaded {count} {label} nodes.")
 
 
 def load_relationships(driver: Driver, database: str | None, data_dir: Path) -> None:
     """Load every operational relationship type from its CSV file."""
     for rel_type, filename, query in _REL_DEFINITIONS:
         print(f"Loading {rel_type} relationships...")
-        records = read_csv(data_dir, filename)
-        _run_in_batches(driver, database, records, query)
-        print(f"  [OK] Loaded {len(records)} {rel_type} relationships.")
+        count = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
+        print(f"  [OK] Loaded {count} {rel_type} relationships.")
 
 
 # Rows deleted per inner transaction when clearing nodes. DETACH DELETE also

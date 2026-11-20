@@ -493,7 +493,7 @@ The LEAP engine is approved for on-wing water wash to restore performance:
 
 **Fault Code:** ENG-OVH-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 15% of engine maintenance events.
+**Industry Statistics:** In typical industry data, this fault accounts for about 20% of events.
 
 #### EGT Exceedance Categories
 
@@ -529,7 +529,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 **Fault Code:** ENG-ELF-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 15% of engine maintenance events.
+**Industry Statistics:** In typical industry data, this fault accounts for about 12% of events.
 
 #### Common Electrical Issues
 
@@ -573,7 +573,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 **Fault Code:** ENG-FUEL-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 9% of engine maintenance events.
+**Industry Statistics:** In typical industry data, this fault accounts for about 6% of events.
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop

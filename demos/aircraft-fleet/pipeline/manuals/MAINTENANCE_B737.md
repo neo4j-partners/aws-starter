@@ -384,7 +384,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 10% of engine maintenance events.
+**Industry Statistics:** In typical industry data, this fault accounts for about 25% of events.
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings
@@ -436,7 +436,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 14% of engine maintenance events.
+**Industry Statistics:** In typical industry data, this fault accounts for about 12% of events.
 
 #### Leak Classification
 

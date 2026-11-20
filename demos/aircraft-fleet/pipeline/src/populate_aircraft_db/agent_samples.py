@@ -429,8 +429,12 @@ def _run_similarity_search(
     """Embed the question and run a vector similarity search over chunks."""
     print(f'  Question: "{question}"\n')
 
-    # Rewrite question into a search phrase
+    # Rewrite question into a search phrase. An empty rewrite would embed
+    # an empty string, so fall back to the original question.
     search_phrase = chat_fn(VECTOR_SEARCH_PROMPT, question).strip()
+    if not search_phrase:
+        print("  [WARN] Empty search phrase from the LLM. Using the question.")
+        search_phrase = question
     print(f'  Search phrase: "{search_phrase}"\n')
 
     embedding = embed_fn(search_phrase)

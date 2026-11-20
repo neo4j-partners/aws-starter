@@ -12,7 +12,9 @@ library builds instead. Pass ``thinking`` through ``model_params`` as usual.
 
 The stock ``_extract_text`` reads ``content[0]``. With thinking on, that is a
 thinking block, so it raises "Expected a text block". This class reads the
-first text block instead.
+first text block instead. When the reply has no text block, it returns content
+that fails graph validation, so the extractor's ``OnError`` setting applies.
+This matches how ``StructuredBedrockLLM`` handles a miss.
 
 Only the structured path, list input with a ``response_format``, carries the
 effort setting. That is the only path the entity extractor uses, because
@@ -21,13 +23,17 @@ effort setting. That is the only path the entity extractor uses, because
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
 
-from neo4j_graphrag.exceptions import LLMGenerationError
 from neo4j_graphrag.llm.anthropic_llm import AnthropicLLM
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
+
+_MISS_PREFIX = "EffortAnthropicLLM miss"
 
 
 class EffortAnthropicLLM(AnthropicLLM):
@@ -47,13 +53,18 @@ class EffortAnthropicLLM(AnthropicLLM):
     def _extract_text(response: Any) -> str:
         """Return the text of the first text block, skipping thinking blocks.
 
-        Raises:
-            LLMGenerationError: If the response has no text block.
+        When the response has no text block, return a miss message instead.
+        It is not valid graph JSON, so the extractor's ``OnError`` applies.
         """
         text = next(
             (block.text for block in response.content if block.type == "text"),
             None,
         )
         if text is None:
-            raise LLMGenerationError("Expected a text block in the response, found none.")
+            stop_reason = getattr(response, "stop_reason", None)
+            logger.warning(
+                "EffortAnthropicLLM: no text block in response (stop_reason=%s).",
+                stop_reason,
+            )
+            return f"{_MISS_PREFIX} (no text block, stop_reason={stop_reason})"
         return text

@@ -142,7 +142,7 @@ its runtime `codeLocation` is this folder.
 
 Before the first deploy, do two things:
 
-1. **Gateway URL:** Set `GATEWAY_URL` in `agentcore/agentcore.json` to the fleet Gateway endpoint.
+1. **Deploy settings:** Set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env`. `./agent.sh deploy` exports them, plus `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. A value already set in the shell wins. The files are parsed, not sourced, and nothing else in them is exported. `agentcore/cdk/lib/cdk-stack.ts` copies the settings onto the runtime. Synth stops with one error that lists every missing or malformed setting. `GATEWAY_URL` must use `https://`, and `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`. `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN, and the runtime role can read only that secret.
 2. **Credential provider:** Add the `fleet-gateway` OAuth credential provider that `GATEWAY_CREDENTIAL_PROVIDER` names. The client ID, scope, and secret come from the fleet credentials file. The discovery URL is an output of the MCP server stack.
 
    ```bash
@@ -230,8 +230,8 @@ but not the project. The package imports because its folder sits next to
 | `AGENT_PORT` | `7071` | Local server port |
 | `MCP_CREDENTIALS_FILE` | `../.mcp-credentials.json` | Local credentials file |
 | `GATEWAY_CREDENTIAL_PROVIDER` | unset | AgentCore Identity provider name. Setting it selects the cloud path. |
-| `GATEWAY_URL` | unset | Gateway endpoint for the cloud path |
-| `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path |
+| `GATEWAY_URL` | unset | Gateway endpoint for the cloud path. It must use `https://`. On deploy it comes from `gateway_url` in the credentials file. |
+| `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path. On deploy they come from `scope` in the credentials file. |
 
 ## Tests
 

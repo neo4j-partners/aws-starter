@@ -38,7 +38,8 @@ RUNTIME_VERSION="PYTHON_3_12"
 # Non-secret runtime environment variables, written into agentcore.json.
 # GATEWAY_CREDENTIAL_PROVIDER names the AgentCore Identity OAuth2 provider
 # that holds the Gateway client secret. Setting it selects the cloud auth path.
-RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_URL":"REPLACE_WITH_FLEET_GATEWAY_URL","GATEWAY_CREDENTIAL_PROVIDER":"fleet-gateway"}'
+# Deployment-specific settings are not written here. See DEPLOY_VARS below.
+RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_CREDENTIAL_PROVIDER":"fleet-gateway"}'
 # Must match GATEWAY_CREDENTIAL_PROVIDER above.
 GATEWAY_CREDENTIAL="fleet-gateway"
 # Local Gateway credentials, written by neo4j-mcp-server/deploy.py.
@@ -48,6 +49,15 @@ CREDENTIALS_FILE="${MCP_CREDENTIALS_FILE:-$ROOT_DIR/../.mcp-credentials.json}"
 # the default deploy target from this region on the first deploy.
 REGION="${AWS_REGION:-us-east-1}"
 export AWS_REGION="$REGION"
+# The settings agentcore/cdk/lib/cdk-stack.ts copies into the Runtime
+# environment. Synth fails and names any that are missing or malformed.
+# GATEWAY_URL and GATEWAY_SCOPES come from gateway_url and scope in the
+# credentials file. The MEM_NEO4J_* settings come from the shared ../.env.
+DEPLOY_VARS=(
+    GATEWAY_URL GATEWAY_SCOPES
+    MEM_NEO4J_URI MEM_NEO4J_USERNAME MEM_NEO4J_DATABASE MEM_NEO4J_PASSWORD_SECRET_ARN
+)
+SHARED_ENV="$ROOT_DIR/../.env"
 # Local server port. graphrag-agent uses 7070; AgentCore Runtime uses 8080.
 LOCAL_PORT="${AGENT_PORT:-7071}"
 cd "$ROOT_DIR"
@@ -192,6 +202,42 @@ ensure_gateway_credential() {
     exit 1
 }
 
+# Export DEPLOY_VARS from ../.env and the credentials file, which both sit
+# outside the code zip. A value already set in the shell wins. The files are
+# parsed, not sourced, and only these names are exported, so the passwords
+# and the client secret in them stay out of the CDK process.
+load_deploy_env() {
+    ensure_deps
+    ensure_credentials
+    if [ ! -f "$SHARED_ENV" ]; then
+        echo -e "${RED}ERROR: $SHARED_ENV not found${NC}"
+        echo "Copy ../.env.sample to ../.env and set the deploy settings."
+        exit 1
+    fi
+    local exports
+    exports=$(uv run --quiet python - "$SHARED_ENV" "$CREDENTIALS_FILE" "${DEPLOY_VARS[@]}" <<'PY'
+import json
+import os
+import shlex
+import sys
+from pathlib import Path
+
+from dotenv import dotenv_values
+
+env_file, credentials_file, *names = sys.argv[1:]
+values = dotenv_values(env_file)
+credentials = json.loads(Path(credentials_file).read_text(encoding="utf-8"))
+values["GATEWAY_URL"] = credentials.get("gateway_url")
+values["GATEWAY_SCOPES"] = credentials.get("scope")
+for name in names:
+    value = values.get(name)
+    if not os.environ.get(name) and value:
+        print(f"export {name}={shlex.quote(value)}")
+PY
+)
+    eval "$exports"
+}
+
 ensure_deps() {
     if [ ! -d ".venv" ]; then
         echo -e "${YELLOW}Installing dependencies (first run)...${NC}"
@@ -265,13 +311,14 @@ case "${1:-help}" in
         (cd agentcore/cdk && npm install)
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
-        echo "Set GATEWAY_URL in agentcore/agentcore.json, then run './agent.sh deploy'"
+        echo "Set the deploy settings in ../.env, then run './agent.sh deploy'"
         ;;
 
     deploy)
         ensure_project
         ensure_no_secrets_in_zip
         ensure_gateway_credential
+        load_deploy_env
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
@@ -329,6 +376,8 @@ case "${1:-help}" in
         # The CLI has no destroy command. Emptying the project and deploying
         # deletes the target's stack. agentcore.json then has no runtime, so
         # restore it from git before deploying again.
+        # The deploy below synthesizes the stack, which needs the settings.
+        load_deploy_env
         agentcore remove all --yes
         agentcore deploy --yes
         echo ""

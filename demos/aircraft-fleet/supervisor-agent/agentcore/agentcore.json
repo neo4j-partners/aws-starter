@@ -16,10 +16,6 @@
           "value": "global.anthropic.claude-sonnet-5-5"
         },
         {
-          "name": "GATEWAY_URL",
-          "value": "REPLACE_WITH_FLEET_GATEWAY_URL"
-        },
-        {
           "name": "GATEWAY_CREDENTIAL_PROVIDER",
           "value": "fleet-gateway"
         }

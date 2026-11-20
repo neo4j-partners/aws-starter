@@ -58,6 +58,8 @@ def load_credentials() -> GatewayCredentials:
         gateway_url = os.getenv("GATEWAY_URL", "").strip()
         if not gateway_url:
             raise ValueError("GATEWAY_URL must be set when GATEWAY_CREDENTIAL_PROVIDER is set")
+        if not is_https(gateway_url):
+            raise ValueError("GATEWAY_URL must be an https URL")
         logger.info("Using AgentCore Identity provider %s for the Gateway", provider_name)
         return IdentityCredentials(
             gateway_url=gateway_url,
@@ -65,6 +67,11 @@ def load_credentials() -> GatewayCredentials:
             scopes=tuple(os.getenv("GATEWAY_SCOPES", "").split()),
         )
     return load_credentials_file(credentials_file())
+
+
+def is_https(url: str) -> bool:
+    """Report whether the URL uses https, so tokens never travel in clear text."""
+    return urlparse(url).scheme == "https"
 
 
 def credentials_file() -> Path:
@@ -87,8 +94,9 @@ def load_credentials_file(path: Path) -> ClientCredentials:
     missing = [key for key in REQUIRED_FILE_KEYS if not data.get(key)]
     if missing:
         raise ValueError(f"Credentials file is missing: {', '.join(missing)}")
-    if urlparse(data["token_url"]).scheme != "https":
-        raise ValueError("Credentials file token_url must be an https URL")
+    for key in ("gateway_url", "token_url"):
+        if not is_https(data[key]):
+            raise ValueError(f"Credentials file {key} must be an https URL")
     logger.info("Loaded Gateway credentials from %s", path)
     return ClientCredentials(
         gateway_url=data["gateway_url"],

@@ -25,6 +25,8 @@ fleet-supervisor-invoke = "fleet_supervisor.client.invoke:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    # agent.sh parses ../.env with it for the deploy settings.
+    "python-dotenv>=1.2.4",
     "ruff>=0.8.0",
 ]
 

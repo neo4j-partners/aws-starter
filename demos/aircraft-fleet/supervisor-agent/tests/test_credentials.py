@@ -72,9 +72,10 @@ def test_missing_keys_are_listed(tmp_path):
         load_credentials_file(path)
 
 
-def test_token_url_must_be_https(tmp_path):
-    path = write(tmp_path, {**VALID, "token_url": "http://auth.example/token"})
-    with pytest.raises(ValueError, match="https"):
+@pytest.mark.parametrize("key", ["gateway_url", "token_url"])
+def test_file_urls_must_be_https(tmp_path, key):
+    path = write(tmp_path, {**VALID, key: "http://example/x"})
+    with pytest.raises(ValueError, match=f"{key} must be an https URL"):
         load_credentials_file(path)
 
 
@@ -95,4 +96,11 @@ def test_provider_env_selects_identity(monkeypatch):
 def test_identity_needs_gateway_url(monkeypatch):
     monkeypatch.setenv("GATEWAY_CREDENTIAL_PROVIDER", "fleet-gateway")
     with pytest.raises(ValueError, match="GATEWAY_URL"):
+        load_credentials()
+
+
+def test_identity_gateway_url_must_be_https(monkeypatch):
+    monkeypatch.setenv("GATEWAY_CREDENTIAL_PROVIDER", "fleet-gateway")
+    monkeypatch.setenv("GATEWAY_URL", "http://g/mcp")
+    with pytest.raises(ValueError, match="GATEWAY_URL must be an https URL"):
         load_credentials()

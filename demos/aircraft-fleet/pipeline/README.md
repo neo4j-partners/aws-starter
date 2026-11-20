@@ -22,7 +22,7 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 ```
 
 - **Shared `.env`:** The file lives in `demos/aircraft-fleet/`. The pipeline and the GraphRAG agent both read it.
-- **Neo4j version:** The pipeline needs Neo4j 5.23 or later. The `clean` command uses the `CALL (n) { ... }` subquery syntax, which older versions reject. Aura runs a newer version.
+- **Neo4j version:** The whole pipeline needs Neo4j 5.23 or later. The `clean`, `clean-enrichment`, `enrich`, and `samples` commands use the scoped `CALL (x) { ... }` subquery syntax, which older versions reject. Aura runs a newer version.
 - **AWS credentials:** `LLM_PROVIDER=bedrock` is the default. Enrichment uses your AWS credentials from the environment or `~/.aws`. You need no API key.
 - **Dataset size:** Leave `LOAD_FULL_DATASET=false` for a small, fast run.
 

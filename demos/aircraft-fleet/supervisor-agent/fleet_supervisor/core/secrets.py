@@ -51,8 +51,20 @@ def _read_secret(secret_arn: str, secret_arn_var: str) -> str:
         client = boto3.client("secretsmanager", region_name=region)
         response = client.get_secret_value(SecretId=secret_arn)
     except (ClientError, BotoCoreError) as e:
-        raise ConfigError(f"Could not read the secret in {secret_arn_var}: {e}") from e
+        # The botocore message can name the role and the secret ARN. It stays
+        # in the log, and the error names only the variable and the failure.
+        logger.error("Could not read the secret in %s: %s", secret_arn_var, e)
+        raise ConfigError(
+            f"Could not read the secret in {secret_arn_var} ({_failure_class(e)})."
+        ) from e
     return _parse_secret(response.get("SecretString"), secret_arn_var)
+
+
+def _failure_class(error: ClientError | BotoCoreError) -> str:
+    """The AWS error code, such as AccessDeniedException, or the class name."""
+    if isinstance(error, ClientError):
+        return error.response.get("Error", {}).get("Code") or type(error).__name__
+    return type(error).__name__
 
 
 def _arn_region(secret_arn: str, secret_arn_var: str) -> str:

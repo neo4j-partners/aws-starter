@@ -116,19 +116,19 @@ AIRCRAFT (B737-800)
 
 #### 2.1.1 Engine Systems (CFM56-7B)
 
-The B737-800 is powered by two CFM International CFM56-7B high-bypass turbofan engines, mounted in close-coupled underwing nacelles with distinctive flat-bottomed nacelle design characteristic of the 737NG series. Each engine produces 26,300 lbf of thrust at takeoff and operates independently with full redundancy. The CFM56-7B features a single-spool low-pressure system and single-spool high-pressure system, with a 3-stage low-pressure compressor driven by a 4-stage low-pressure turbine, and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine. The engine incorporates a dual annular combustor (DAC) option for reduced emissions. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 70% of all maintenance events in the fleet, with the most common issues being sensor drift, contamination, and bearing wear.
+The B737-800 is powered by two CFM International CFM56-7B high-bypass turbofan engines, mounted in close-coupled underwing nacelles with distinctive flat-bottomed nacelle design characteristic of the 737NG series. Each engine produces 26,300 lbf of thrust at takeoff and operates independently with full redundancy. The CFM56-7B features a single-spool low-pressure system and single-spool high-pressure system, with a 3-stage low-pressure compressor driven by a 4-stage low-pressure turbine, and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine. The engine incorporates a dual annular combustor (DAC) option for reduced emissions. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. In typical industry data, engine systems account for about 70% of maintenance events. The most common issues are sensor drift, contamination, and bearing wear.
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The B737-800 features the Honeywell FMC with dual Flight Management Computers providing flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Three Air Data Computers (ADC) supply redundant altitude, airspeed, and Mach calculations via pitot-static inputs integrated with the Digital Flight Control System (DFCS). The multi-mode Navigation Receiver provides VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 and ARINC 629 digital data buses with comprehensive Built-In Test Equipment (BITE). Avionics-related maintenance events comprise approximately 9% of fleet issues, primarily involving sensor drift that is typically resolved through calibration or software updates.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The B737-800 features the Honeywell FMC with dual Flight Management Computers providing flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Three Air Data Computers (ADC) supply redundant altitude, airspeed, and Mach calculations via pitot-static inputs integrated with the Digital Flight Control System (DFCS). The multi-mode Navigation Receiver provides VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 and ARINC 629 digital data buses with comprehensive Built-In Test Equipment (BITE). In typical industry data, avionics accounts for about 9% of maintenance events. Most involve sensor drift, which is typically resolved through calibration or software updates.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The B737-800 hydraulic system provides power for flight control surfaces, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated System A and System B, each operating at 3,000 psi, plus a standby system for emergency backup. This manual focuses on System A, which is powered by two engine-driven pumps (one per engine) and one AC motor pump. The system includes main hydraulic pumps capable of 28 gpm flow rate at 3,000 psi, a reservoir with 5.5 gallon usable capacity, and multiple actuators including the flap actuator assemblies (inboard and outboard). Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 21% of maintenance events, with leaks and contamination being the primary concerns.
+The B737-800 hydraulic system provides power for flight control surfaces, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated System A and System B, each operating at 3,000 psi, plus a standby system for emergency backup. This manual focuses on System A, which is powered by two engine-driven pumps (one per engine) and one AC motor pump. The system includes main hydraulic pumps capable of 28 gpm flow rate at 3,000 psi, a reservoir with 5.5 gallon usable capacity, and multiple actuators including the flap actuator assemblies (inboard and outboard). Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. In typical industry data, the hydraulics system accounts for about 21% of maintenance events. Leaks and contamination are the primary concerns.
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -976,26 +976,26 @@ START: HYD SYS PRESS (System A or B) Warning
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Typical Industry Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 370 |
-| Critical Events | 192 (52%) |
-| Major Events | 115 (31%) |
-| Minor Events | 63 (17%) |
-| Engine-Related | 259 (70%) |
-| Hydraulics-Related | 78 (21%) |
-| Avionics-Related | 33 (9%) |
+**Events by Severity:**
+- Critical: about 52%
+- Major: about 31%
+- Minor: about 17%
+
+**Events by System:**
+- Engine: about 70%
+- Hydraulics: about 21%
+- Avionics: about 9%
 
 **Top Fault Types:**
-1. Overheat (EGT exceedance) — 104 events (28%)
-2. Bearing wear — 93 events (25%)
-3. Vibration exceedance — 74 events (20%)
-4. Sensor drift — 56 events (15%)
-5. Contamination / Leak — 43 events (12%)
+1. Overheat (EGT exceedance): about 28%
+2. Bearing wear: about 25%
+3. Vibration exceedance: about 20%
+4. Sensor drift: about 15%
+5. Contamination / Leak: about 12%
 
 ### 10.6 Revision History Log
 

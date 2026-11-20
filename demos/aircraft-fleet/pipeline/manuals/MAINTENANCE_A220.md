@@ -119,19 +119,19 @@ AIRCRAFT (A220-300)
 
 The A220-300 is powered by two Pratt & Whitney PW1500G geared turbofan (GTF) engines mounted in underwing nacelles. Each engine produces 23,300 lbf of thrust at takeoff. The defining feature of the PW1500G is its epicyclic planetary reduction gearbox, which decouples the fan shaft from the low-pressure compressor (LPC) shaft. This allows the fan to rotate at approximately 30% lower speed than the LPC, enabling each to operate at its individual aerodynamic optimum — the fan at low speed for maximum propulsive efficiency, and the LPC at higher speed for maximum compression efficiency. The result is a bypass ratio of 12:1, significantly higher than conventional turbofans of comparable thrust class, yielding substantial improvements in specific fuel consumption and noise footprint.
 
-Because of the gearbox architecture, the FADEC monitors two distinct low-pressure shaft speeds: N1 (fan shaft speed) and N1c (LPC shaft speed). These are mechanically coupled through the gearbox at a fixed 3.1:1 ratio but are reported and limit-checked independently. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 68% of all maintenance events in the fleet, with the most common issues being sensor drift, gearbox oil faults, and contamination.
+Because of the gearbox architecture, the FADEC monitors two distinct low-pressure shaft speeds: N1 (fan shaft speed) and N1c (LPC shaft speed). These are mechanically coupled through the gearbox at a fixed 3.1:1 ratio but are reported and limit-checked independently. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. In typical industry data, engine systems account for about 68% of maintenance events. The most common issues are sensor drift, gearbox oil faults, and contamination.
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, air data, and inertial reference functions essential for safe aircraft operation. The A220-300 features the Rockwell Collins Pro Line Fusion avionics suite with a fully integrated fly-by-wire (FBW) primary flight control system — a notable distinction within this aircraft class at the time of design. The dual Flight Management Systems (FMS) provide flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Dual Air Data and Inertial Reference Units (ADIRUs) provide redundant altitude, airspeed, attitude, and inertial position data. The Multi-Mode Receiver (MMR) provides VOR/DME, ILS, and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive BITE. Avionics-related maintenance events comprise approximately 11% of fleet issues.
+The avionics system provides flight management, navigation, air data, and inertial reference functions essential for safe aircraft operation. The A220-300 features the Rockwell Collins Pro Line Fusion avionics suite with a fully integrated fly-by-wire (FBW) primary flight control system — a notable distinction within this aircraft class at the time of design. The dual Flight Management Systems (FMS) provide flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Dual Air Data and Inertial Reference Units (ADIRUs) provide redundant altitude, airspeed, attitude, and inertial position data. The Multi-Mode Receiver (MMR) provides VOR/DME, ILS, and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive BITE. In typical industry data, avionics accounts for about 11% of maintenance events.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A220-300 hydraulic system provides power for primary flight control surface actuation, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. A key distinction from conventional hydromechanical designs is the use of electrohydraulic servo actuators (EHSAs) for primary flight control surfaces. EHSAs incorporate integrated position feedback transducers and are commanded directly by the fly-by-wire flight control computers, providing high-bandwidth control with built-in position verification. Hydraulic fluid requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 21% of maintenance events, with leaks and contamination being the primary concerns.
+The A220-300 hydraulic system provides power for primary flight control surface actuation, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. A key distinction from conventional hydromechanical designs is the use of electrohydraulic servo actuators (EHSAs) for primary flight control surfaces. EHSAs incorporate integrated position feedback transducers and are commanded directly by the fly-by-wire flight control computers, providing high-bandwidth control with built-in position verification. Hydraulic fluid requires regular monitoring for contamination and proper fluid levels. In typical industry data, the hydraulics system accounts for about 21% of maintenance events. Leaks and contamination are the primary concerns.
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -1211,28 +1211,28 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Typical Industry Maintenance Statistics
 
-Based on fleet data analysis (July - September 2024):
+These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 38 |
-| Critical Events | 14 (37%) |
-| Major Events | 12 (32%) |
-| Minor Events | 12 (32%) |
-| Engine-Related | 26 (68%) |
-| Hydraulics-Related | 8 (21%) |
-| Avionics-Related | 4 (11%) |
+**Events by Severity:**
+- Critical: about 37%
+- Major: about 32%
+- Minor: about 32%
+
+**Events by System:**
+- Engine: about 68%
+- Hydraulics: about 21%
+- Avionics: about 11%
 
 **Top Fault Types:**
-1. Sensor Drift - 8 events (21%)
-2. Gearbox Oil Issue - 6 events (16%)
-3. Contamination - 5 events (13%)
-4. Bearing Wear - 4 events (11%)
-5. Vibration Exceedance - 4 events (10%)
+1. Sensor Drift: about 21%
+2. Gearbox Oil Issue: about 16%
+3. Contamination: about 13%
+4. Bearing Wear: about 11%
+5. Vibration Exceedance: about 10%
 
-**Note:** Gearbox Oil Issue (ENG-GBX-006) is the second most common fault type in the A220-300 fleet and is a GTF-specific maintenance category not present in conventional turbofan fleet data. Enhanced gearbox monitoring intervals have been implemented in response to this trend.
+**Note:** In typical A220-300 operator data, Gearbox Oil Issue (ENG-GBX-006) is the second most common fault type. It is a GTF-specific maintenance category that does not appear in data for conventional turbofans. Operators often shorten gearbox monitoring intervals in response.
 
 ### 10.6 Revision History Log
 

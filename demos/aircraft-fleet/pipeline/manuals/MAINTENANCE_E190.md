@@ -116,19 +116,19 @@ AIRCRAFT (E190)
 
 #### 2.1.1 Engine Systems (CF34-10E)
 
-The E190 is powered by two GE Aviation CF34-10E high-bypass turbofan engines, mounted on aft-fuselage pylons in the characteristic E-Jet configuration that provides unobstructed underwing space and a low-slung cabin floor. Each engine produces 18,500 lbf of thrust at takeoff and operates independently with full redundancy. The CF34-10E features a two-spool architecture with a single-stage fan driven by a multi-stage low-pressure turbine and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine, achieving an overall pressure ratio of 27.0:1. The engine incorporates an annular combustor with low-emissions fuel nozzle design. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 69% of all maintenance events in the fleet, with the most common issues being sensor drift, contamination, and bearing wear.
+The E190 is powered by two GE Aviation CF34-10E high-bypass turbofan engines, mounted on aft-fuselage pylons in the characteristic E-Jet configuration that provides unobstructed underwing space and a low-slung cabin floor. Each engine produces 18,500 lbf of thrust at takeoff and operates independently with full redundancy. The CF34-10E features a two-spool architecture with a single-stage fan driven by a multi-stage low-pressure turbine and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine, achieving an overall pressure ratio of 27.0:1. The engine incorporates an annular combustor with low-emissions fuel nozzle design. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. In typical industry data, engine systems account for about 69% of maintenance events. The most common issues are sensor drift, contamination, and bearing wear.
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The E190 features the Honeywell Primus Epic EFIS with dual Flight Management Systems providing 4D flight planning, performance calculations, and VNAV/LNAV guidance. Three Air Data / Inertial Reference Units (ADIRU) supply redundant altitude, airspeed, Mach, and inertial reference data integrated with the digital fly-by-wire flight control system. Multi-Mode Receivers (MMR) provide VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive Built-In Test Equipment (BITE). Avionics-related maintenance events comprise approximately 10% of fleet issues, primarily involving sensor drift and FMS anomalies typically resolved through calibration or software updates.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The E190 features the Honeywell Primus Epic EFIS with dual Flight Management Systems providing 4D flight planning, performance calculations, and VNAV/LNAV guidance. Three Air Data / Inertial Reference Units (ADIRU) supply redundant altitude, airspeed, Mach, and inertial reference data integrated with the digital fly-by-wire flight control system. Multi-Mode Receivers (MMR) provide VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive Built-In Test Equipment (BITE). In typical industry data, avionics accounts for about 10% of maintenance events. Most involve sensor drift and FMS anomalies, which are typically resolved through calibration or software updates.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The E190 hydraulic system provides power for flight control surfaces, spoilers, leading edge slats, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. The Left system is powered by two engine-driven pumps (one per engine) and one AC motor pump. Each system reservoir holds 4.0 gallons usable capacity. Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 21% of maintenance events, with leaks and contamination being the primary concerns.
+The E190 hydraulic system provides power for flight control surfaces, spoilers, leading edge slats, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. The Left system is powered by two engine-driven pumps (one per engine) and one AC motor pump. Each system reservoir holds 4.0 gallons usable capacity. Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. In typical industry data, the hydraulics system accounts for about 21% of maintenance events. Leaks and contamination are the primary concerns.
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -972,27 +972,27 @@ START: HYD SYS PRESS (Left or Right) Warning
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Typical Industry Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 92 |
-| Critical Events | 48 (52%) |
-| Major Events | 29 (31%) |
-| Minor Events | 15 (17%) |
-| Engine-Related | 60 (65%) |
-| Hydraulics-Related | 17 (19%) |
-| Avionics-Related | 15 (16%) |
+**Events by Severity:**
+- Critical: about 52%
+- Major: about 31%
+- Minor: about 17%
+
+**Events by System:**
+- Engine: about 65%
+- Hydraulics: about 19%
+- Avionics: about 16%
 
 **Top Fault Types:**
-1. Overheat (EGT exceedance) — 25 events (27%)
-2. Sensor drift — 20 events (22%)
-3. Bearing wear — 18 events (20%)
-4. Vibration exceedance — 15 events (16%)
-5. Contamination — 8 events (9%)
-6. Leak — 6 events (6%)
+1. Overheat (EGT exceedance): about 27%
+2. Sensor drift: about 22%
+3. Bearing wear: about 20%
+4. Vibration exceedance: about 16%
+5. Contamination: about 9%
+6. Leak: about 6%
 
 ### 10.6 Revision History Log
 

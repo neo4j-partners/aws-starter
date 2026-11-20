@@ -128,19 +128,19 @@ AIRCRAFT (A321neo)
 
 #### 2.1.1 Engine Systems (LEAP-1A)
 
-The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU). The engine systems account for approximately 61% of all maintenance events in the fleet, with vibration exceedance and contamination being the most prevalent issues—characteristic of new technology adoption.
+The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU). In typical industry data, engine systems account for about 61% of maintenance events. Vibration exceedance and contamination are the most prevalent issues. This pattern is typical of new engine technology.
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The A321neo features the latest Airbus avionics suite built on enhanced fly-by-wire architecture with improved system integration. The system centers on dual Flight Management Systems (FMS) providing Required Navigation Performance (RNP) 0.1 capability, enabling precision approaches without ground-based navigation aids. Three Air Data and Inertial Reference Units (ADIRU) provide redundant altitude, airspeed, attitude, and position data through integrated air data modules and laser ring gyroscopes. The Multi-Mode Receiver (MMR) integrates VOR/ILS, GPS (L1/L5), SBAS, and GBAS capabilities for worldwide navigation. The cockpit features six LCD displays with enhanced vision system (EVS) compatibility. All avionics communicate via AFDX (Avionics Full-Duplex Switched Ethernet) data network with comprehensive Built-In Test Equipment (BITE). Avionics-related maintenance events comprise approximately 20% of fleet issues, with electrical faults and sensor drift being the primary concerns addressed through software patches and calibration.
+The A321neo features the latest Airbus avionics suite built on enhanced fly-by-wire architecture with improved system integration. The system centers on dual Flight Management Systems (FMS) providing Required Navigation Performance (RNP) 0.1 capability, enabling precision approaches without ground-based navigation aids. Three Air Data and Inertial Reference Units (ADIRU) provide redundant altitude, airspeed, attitude, and position data through integrated air data modules and laser ring gyroscopes. The Multi-Mode Receiver (MMR) integrates VOR/ILS, GPS (L1/L5), SBAS, and GBAS capabilities for worldwide navigation. The cockpit features six LCD displays with enhanced vision system (EVS) compatibility. All avionics communicate via AFDX (Avionics Full-Duplex Switched Ethernet) data network with comprehensive Built-In Test Equipment (BITE). In typical industry data, avionics accounts for about 20% of maintenance events. Electrical faults and sensor drift are the primary concerns. They are addressed through software patches and calibration.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A321neo hydraulic system provides power for flight control surfaces, slats/flaps, landing gear, wheel brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi with enhanced redundancy compared to earlier A320 variants. The Green system is powered by an engine-driven pump on Engine #1, the Yellow system by Engine #2, and the Blue system by an electric pump with RAT (Ram Air Turbine) backup. Each system includes variable-displacement pumps capable of 34 gpm flow rate, a pressurized reservoir with bootstrap design, and multiple actuators including the flap Power Control Unit (PCU). Hydraulic fluid (Skydrol LD-4 or HyJet V) requires regular monitoring for contamination and proper levels. The hydraulics system represents approximately 19% of maintenance events, with leaks and contamination being the primary concerns, consistent with fleet maturity.
+The A321neo hydraulic system provides power for flight control surfaces, slats/flaps, landing gear, wheel brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi with enhanced redundancy compared to earlier A320 variants. The Green system is powered by an engine-driven pump on Engine #1, the Yellow system by Engine #2, and the Blue system by an electric pump with RAT (Ram Air Turbine) backup. Each system includes variable-displacement pumps capable of 34 gpm flow rate, a pressurized reservoir with bootstrap design, and multiple actuators including the flap Power Control Unit (PCU). Hydraulic fluid (Skydrol LD-4 or HyJet V) requires regular monitoring for contamination and proper levels. In typical industry data, the hydraulics system accounts for about 19% of maintenance events. Leaks and contamination are the primary concerns.
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -1079,35 +1079,35 @@ START: Fan Blade Damage Reported/Suspected
 | Engineering Support | engineering@regionalco.com | 24/7 |
 | Parts Supply | parts@regionalco.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Typical Industry Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 185 |
-| Critical Events | 96 (52%) |
-| Major Events | 57 (31%) |
-| Minor Events | 32 (17%) |
-| Engine-Related | 113 (61%) |
-| Avionics-Related | 37 (20%) |
-| Hydraulics-Related | 35 (19%) |
+**Events by Severity:**
+- Critical: about 52%
+- Major: about 31%
+- Minor: about 17%
+
+**Events by System:**
+- Engine: about 61%
+- Avionics: about 20%
+- Hydraulics: about 19%
 
 **Top Fault Types:**
-1. Bearing wear — 41 events (22%)
-2. Overheat (EGT exceedance) — 37 events (20%)
-3. Vibration exceedance — 30 events (16%)
-4. Contamination — 26 events (14%)
-5. Electrical fault — 22 events (12%)
-6. Sensor drift — 18 events (10%)
-7. Fuel starvation — 11 events (6%)
+1. Bearing wear: about 22%
+2. Overheat (EGT exceedance): about 20%
+3. Vibration exceedance: about 16%
+4. Contamination: about 14%
+5. Electrical fault: about 12%
+6. Sensor drift: about 10%
+7. Fuel starvation: about 6%
 
 **Corrective Action Distribution:**
-1. Replaced component — 51 (28%)
-2. Cleaned and reassembled — 43 (23%)
-3. Inspected and cleared — 41 (22%)
-4. Software patch applied — 31 (17%)
-5. Adjusted tolerance — 19 (10%)
+1. Replaced component: about 28%
+2. Cleaned and reassembled: about 23%
+3. Inspected and cleared: about 22%
+4. Software patch applied: about 17%
+5. Adjusted tolerance: about 10%
 
 ### 10.6 Revision History Log
 

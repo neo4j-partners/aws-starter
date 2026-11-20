@@ -14,10 +14,12 @@ dependencies = [
 ]
 
 # Console entry points. The server runs in the foreground of its own
-# terminal (Ctrl+C to stop). `fleet-supervisor-invoke` is the cloud
-# invocation and load-test client.
+# terminal (Ctrl+C to stop). `fleet-supervisor-cli` asks the local server one
+# question. `fleet-supervisor-invoke` is the cloud invocation and load-test
+# client.
 [project.scripts]
 fleet-supervisor-server = "server.runtime_app:main"
+fleet-supervisor-cli = "client.cli:main"
 fleet-supervisor-invoke = "client.invoke:main"
 
 [dependency-groups]

@@ -79,6 +79,8 @@ def _start_runtime() -> Runtime:
     with _runtime_lock:
         if _runtime is None:
             credentials = load_credentials()
+            # One filtered client serves both specialists: they need the same
+            # two tools, so per-specialist filters would be identical.
             mcp_client = build_mcp_client(credentials)
             mcp_client.start()
             try:

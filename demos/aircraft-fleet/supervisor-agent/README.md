@@ -94,6 +94,24 @@ The tool specs come from the first client and never change, so a rebuild never
 changes what the model sees. If a rebuilt client lacks a tool, calls to that
 tool get the same fixed message.
 
+### Tool errors the model sees
+
+The Neo4j MCP server returns the driver's error message as the tool result.
+That message can name the database address, and the specialist could quote it
+to the user. So `GatewayTool` replaces every error result before the model
+sees it. The original text goes to the server log.
+
+| Error | What the model gets |
+|-------|---------------------|
+| The server rejected the query: a syntax error, an unknown function or procedure, a bad argument, or a refused write | The Neo4j code and message, cut to 500 characters and without addresses, so the model can fix its Cypher |
+| The query hit the transaction timeout | "The query took too long and was stopped." |
+| Neo4j, the MCP server, or the Gateway could not be reached, or auth failed | "The graph database is unavailable right now." |
+| Any other error | "The graph database returned an error." |
+
+The wording matches the graphrag agent's tools. The supervisor sees only the
+error text, so `core/tool_errors.py` classifies it by the Neo4j code and the
+driver's connection messages.
+
 ## Prerequisites
 
 1. **Python:** You need Python 3.12 and the `uv` package manager.
@@ -224,7 +242,8 @@ ignores it. Losing it is safe, because destroy declares the credential again.
 | `fleet_supervisor/core/model.py` | The Bedrock model factory |
 | `fleet_supervisor/core/credentials.py` | Picks the local or cloud Gateway credentials |
 | `fleet_supervisor/core/mcp.py` | The Gateway MCP client, its bearer-token auth, and the tool filter |
-| `fleet_supervisor/core/gateway_tools.py` | `GatewayTool`, which reconnects and retries once when the MCP session ends |
+| `fleet_supervisor/core/gateway_tools.py` | `GatewayTool`, which reconnects and retries once when the MCP session ends, and scrubs error results |
+| `fleet_supervisor/core/tool_errors.py` | Classifies a tool's error text into the result the model may see |
 | `fleet_supervisor/core/events.py` | Maps Strands stream events to the client events |
 | `fleet_supervisor/client/cli.py` | Asks the local server one question, run by `fleet-supervisor-cli` |
 | `fleet_supervisor/client/invoke.py` | Cloud calls and load testing, run by `fleet-supervisor-invoke` |

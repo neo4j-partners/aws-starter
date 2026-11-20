@@ -8,11 +8,8 @@ from strands.types.events import ToolResultEvent
 from strands.types.exceptions import MCPClientInitializationError
 
 from fleet_supervisor import server
-from fleet_supervisor.core.gateway_tools import (
-    REQUEST_SESSION_ID,
-    UNAVAILABLE_RESULT,
-    GatewayTool,
-)
+from fleet_supervisor.core.gateway_tools import REQUEST_SESSION_ID, GatewayTool
+from fleet_supervisor.core.tool_errors import UNAVAILABLE_RESULT
 
 TOOL = "fleet___read_neo4j_cypher"
 
@@ -38,16 +35,17 @@ class FakeTool:
 class FakeClient:
     """Stands in for MCPClient.
 
-    ``reply`` is the tool result while the session is up. ``gate``, when set,
+    ``reply`` and ``status`` are the tool result while the session is up. ``gate``, when set,
     holds a call in flight until the test releases it. A call that started
     while the session was up but ends after it went down returns an error
     result, as Strands does. A call made while it is down raises.
     """
 
-    def __init__(self, tools=(TOOL,), spec=None, reply="ok", fail_start=None):
+    def __init__(self, tools=(TOOL,), spec=None, reply="ok", status="success", fail_start=None):
         self.tool_names = list(tools)
         self.spec = spec or {"name": TOOL, "description": "first"}
         self.reply = reply
+        self.status = status
         self.fail_start = fail_start
         self.gate: asyncio.Event | None = None
         self.active = False
@@ -84,10 +82,9 @@ class FakeClient:
                 "status": "error",
                 "content": [{"text": "Tool execution failed: connection closed"}],
             }
-        status = "error" if self.reply.startswith("error:") else "success"
         return {
             "toolUseId": tool_use["toolUseId"],
-            "status": status,
+            "status": self.status,
             "content": [{"text": self.reply}],
         }
 
@@ -287,8 +284,39 @@ def test_tool_missing_after_rebuild_returns_unavailable(clients):
     assert text(asyncio.run(scenario())) == UNAVAILABLE_RESULT
 
 
-def test_error_from_a_live_session_is_not_retried(clients):
-    client = FakeClient(reply="error: Invalid input 'MATC'")
+def test_query_error_from_a_live_session_is_scrubbed_not_retried(clients, caplog):
+    raw = (
+        "Error calling tool 'read_neo4j_cypher': {neo4j_code: Neo.ClientError.Statement."
+        "SyntaxError} {message: Invalid input 'MATC'} {gql_status: 42001}"
+    )
+    client = FakeClient(reply=raw, status="error")
+    clients.append(client)
+
+    async def scenario():
+        REQUEST_SESSION_ID.set("sess-q")
+        _, tool = await start(clients)
+        return await run_tool(tool)
+
+    result = asyncio.run(scenario())
+    assert result["status"] == "error"
+    assert result["toolUseId"] == "u1"
+    assert text(result) == (
+        "The generated Cypher query failed: Neo.ClientError.Statement.SyntaxError:"
+        " Invalid input 'MATC'\nRephrase the question to fit the schema and try again."
+    )
+    assert client.calls == 1
+    assert clients.built == [client]
+    (record,) = [r for r in caplog.records if "tool error" in r.getMessage()]
+    assert record.levelno == logging.WARNING
+    assert "session=sess-q, kind=query, code=Neo.ClientError.Statement.SyntaxError" in (
+        record.getMessage()
+    )
+    assert raw in record.getMessage()
+
+
+def test_unreachable_database_from_a_live_session_is_unavailable(clients, caplog):
+    raw = "Error calling tool 'read_neo4j_cypher': Couldn't connect to db.internal:7687"
+    client = FakeClient(reply=raw, status="error")
     clients.append(client)
 
     async def scenario():
@@ -296,9 +324,47 @@ def test_error_from_a_live_session_is_not_retried(clients):
         return await run_tool(tool)
 
     result = asyncio.run(scenario())
-    assert result["status"] == "error"
-    assert client.calls == 1
-    assert clients.built == [client]
+    assert text(result) == UNAVAILABLE_RESULT
+    assert "db.internal" not in str(result)
+    assert client.calls == 1  # the session is up, so this is not a session retry
+    (record,) = [r for r in caplog.records if "tool error" in r.getMessage()]
+    assert record.levelno == logging.ERROR
+    assert "kind=unavailable" in record.getMessage()
+    assert raw in record.getMessage()
+
+
+def test_in_flight_error_text_never_reaches_the_model_after_a_failed_retry(clients):
+    old, new = FakeClient(), FakeClient()
+    clients.extend([old, new])
+
+    async def scenario():
+        _, tool = await start(clients)
+        old.gate = asyncio.Event()
+        call = asyncio.create_task(run_tool(tool))
+        await asyncio.sleep(0)
+        old.active = False
+        new.start = lambda: setattr(new, "active", False) or new
+        old.gate.set()
+        return await call
+
+    result = asyncio.run(scenario())
+    assert text(result) == UNAVAILABLE_RESULT
+    assert "connection closed" not in str(result)
+
+
+def test_success_results_pass_through_unchanged(clients):
+    client = FakeClient(reply='[{"n": 1}]')
+    clients.append(client)
+
+    async def scenario():
+        _, tool = await start(clients)
+        return await run_tool(tool)
+
+    assert asyncio.run(scenario()) == {
+        "toolUseId": "u1",
+        "status": "success",
+        "content": [{"text": '[{"n": 1}]'}],
+    }
 
 
 def test_spec_is_read_once_and_kept_across_rebuilds(clients):

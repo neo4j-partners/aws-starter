@@ -10,6 +10,10 @@ restarts. A call made while the session is down fails in one of two ways:
 :class:`GatewayTool` catches both. It asks for a rebuilt client once and
 retries the call once. If the retry also fails, or the rebuild fails, the
 model gets :data:`UNAVAILABLE_RESULT`. The next request rebuilds again.
+
+Any other error result is replaced with a model-safe one by
+:func:`~fleet_supervisor.core.tool_errors.classify_tool_error`, and the
+original text goes to the log.
 """
 
 import asyncio
@@ -25,18 +29,18 @@ from strands.types.events import ToolResultEvent
 from strands.types.exceptions import MCPClientInitializationError
 from strands.types.tools import AgentTool, ToolGenerator, ToolResult, ToolSpec, ToolUse
 
+from fleet_supervisor.core.tool_errors import (
+    UNAVAILABLE_RESULT,
+    ErrorKind,
+    classify_tool_error,
+)
+
 logger = logging.getLogger(__name__)
 
 # The AgentCore session ID of the request being served, for log lines. The
 # entrypoint sets it. Tool calls run in tasks that copy the context, so they
 # see it too.
 REQUEST_SESSION_ID: ContextVar[str] = ContextVar("request_session_id", default="-")
-
-# The same wording as the graphrag agent's tools, so both agents tell the
-# model the same thing.
-UNAVAILABLE_RESULT = (
-    "The graph database is unavailable right now. Tell the user the data could not be reached."
-)
 
 
 def session_is_running(client: MCPClient) -> bool:
@@ -237,9 +241,33 @@ class GatewayTool(AgentTool):
             return self._unavailable(tool_use)
         # Strands turns an in-flight failure into an error result and logs the
         # exception itself, so only the result is left to check here.
-        if result["status"] == "error" and not connection.is_running():
+        if result["status"] != "error":
+            return result
+        if not connection.is_running():
             raise _SessionEnded("ErrorResultWhileSessionDown")
-        return result
+        return self._model_safe(result)
+
+    def _model_safe(self, result: ToolResult) -> ToolResult:
+        """Replace an error result's text with what the model may see. Log the original."""
+        original = "\n".join(item["text"] for item in result["content"] if "text" in item)
+        error = classify_tool_error(original)
+        level = (
+            logging.WARNING if error.kind in (ErrorKind.QUERY, ErrorKind.TIMEOUT) else logging.ERROR
+        )
+        logger.log(
+            level,
+            "%s: tool error (session=%s, kind=%s, code=%s): %s",
+            self._name,
+            REQUEST_SESSION_ID.get(),
+            error.kind,
+            error.code or "-",
+            original,
+        )
+        return {
+            "toolUseId": result["toolUseId"],
+            "status": "error",
+            "content": [{"text": error.text}],
+        }
 
     @staticmethod
     def _unavailable(tool_use: ToolUse) -> ToolResult:

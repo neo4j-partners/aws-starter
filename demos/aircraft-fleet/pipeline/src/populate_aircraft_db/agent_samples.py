@@ -236,6 +236,13 @@ def _result_table(records: list[dict[str, Any]], max_rows: int = 10) -> None:
 # ---------------------------------------------------------------------------
 
 
+# Claude counts adaptive thinking toward max_tokens, so leave room for the
+# Cypher after it. "low" effort matches the extraction pipeline.
+_CHAT_MAX_TOKENS = 4000
+_CLAUDE_THINKING = {"type": "adaptive"}
+_CLAUDE_OUTPUT_CONFIG = {"effort": "low"}
+
+
 def _create_llm_client(
     provider: str,
     *,
@@ -260,9 +267,15 @@ def _create_llm_client(
                 modelId=llm_model,
                 system=[{"text": system}],
                 messages=[{"role": "user", "content": [{"text": user}]}],
-                inferenceConfig={"maxTokens": 1000},
+                inferenceConfig={"maxTokens": _CHAT_MAX_TOKENS},
+                additionalModelRequestFields={
+                    "thinking": _CLAUDE_THINKING,
+                    "output_config": _CLAUDE_OUTPUT_CONFIG,
+                },
             )
-            return resp["output"]["message"]["content"][0]["text"]
+            # With thinking on, a reasoningContent block comes before the text.
+            content = resp["output"]["message"]["content"]
+            return next((block["text"] for block in content if "text" in block), "")
 
         def embed(text: str) -> list[float]:
             resp = client.invoke_model(
@@ -313,11 +326,14 @@ def _create_llm_client(
         def chat(system: str, user: str) -> str:
             resp = anth_client.messages.create(
                 model=llm_model,
-                max_tokens=1000,
+                max_tokens=_CHAT_MAX_TOKENS,
+                thinking=_CLAUDE_THINKING,
+                output_config=_CLAUDE_OUTPUT_CONFIG,
                 system=system,
                 messages=[{"role": "user", "content": user}],
             )
-            return resp.content[0].text
+            # With thinking on, a thinking block comes before the text.
+            return next((block.text for block in resp.content if block.type == "text"), "")
 
         def embed(text: str) -> list[float]:
             resp = oai_client.embeddings.create(

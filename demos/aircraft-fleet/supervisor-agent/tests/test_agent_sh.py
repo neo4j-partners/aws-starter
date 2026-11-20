@@ -178,3 +178,20 @@ def test_an_interrupt_during_deploy_restores_the_spec_once(project: Path) -> Non
     assert spec.read_bytes() == tracked
     assert "Could not restore" not in result.stderr
     assert "Cleanup complete" not in result.stdout
+
+
+def test_destroy_strips_a_left_secret_line_and_keeps_the_file_mode(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text(
+        "# OAuth client secret for credential provider 'fleet-gateway' (set before deploy)\n"
+        "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=encrypted-value\n"
+        "OTHER_SETTING=kept\n"
+    )
+    env_local.chmod(0o600)
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_local.read_text() == "OTHER_SETTING=kept\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
+    assert not list(env_local.parent.glob(".env.local.*"))

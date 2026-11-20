@@ -250,14 +250,18 @@ add_gateway_credential() {
 strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
-    local status=0
-    grep -v -F -e "$comment" -e "$GATEWAY_SECRET_VAR=" "$ENV_LOCAL" > "$ENV_LOCAL.tmp" || status=$?
+    local status=0 kept
+    # mktemp creates the file readable by its owner only.
+    kept=$(mktemp)
+    grep -v -F -e "$comment" -e "$GATEWAY_SECRET_VAR=" "$ENV_LOCAL" > "$kept" || status=$?
     # grep exits 1 when it prints nothing, which is fine. 2 is an error.
-    if [ "$status" -gt 1 ] || ! mv "$ENV_LOCAL.tmp" "$ENV_LOCAL"; then
-        rm -f "$ENV_LOCAL.tmp"
+    # cat writes into the existing file, so its mode and owner stay as they are.
+    if [ "$status" -gt 1 ] || ! cat "$kept" > "$ENV_LOCAL"; then
+        rm -f "$kept"
         echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2
         return 1
     fi
+    rm -f "$kept"
 }
 
 # Put back the tracked agentcore.json and remove the secret line. Returns

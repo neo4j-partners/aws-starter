@@ -173,6 +173,12 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
     drop_extraction_constraints(driver, settings.neo4j_database)
     print()
 
+    # Document and Chunk constraints must exist before the pipeline writes.
+    # create_constraints is idempotent, so a graph loaded earlier is unchanged.
+    print("Creating constraints...")
+    create_constraints(driver, settings.neo4j_database)
+    print()
+
     if settings.enrich_sample_size:
         print(
             f"Running SimpleKGPipeline (LLM: {creds.provider}/{creds.llm_model}, "

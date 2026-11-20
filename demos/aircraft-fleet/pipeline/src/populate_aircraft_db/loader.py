@@ -9,6 +9,8 @@ from typing import Any
 from neo4j import Driver
 from neo4j.exceptions import Neo4jError
 
+from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS
+
 BATCH_SIZE = 1000
 OPERATIONAL_LABELS = [
     "Aircraft",
@@ -32,7 +34,7 @@ ENRICHMENT_LABELS = [
     "MaintenanceProcedure",
     "OperatingLimit",
 ]
-RELATIONSHIP_TYPES = [
+OPERATIONAL_RELATIONSHIP_TYPES = [
     "HAS_SYSTEM",
     "HAS_COMPONENT",
     "HAS_SENSOR",
@@ -46,6 +48,8 @@ RELATIONSHIP_TYPES = [
     "AFFECTS_AIRCRAFT",
     "HAS_REMOVAL",
     "REMOVED_COMPONENT",
+]
+ENRICHMENT_RELATIONSHIP_TYPES = [
     "FROM_DOCUMENT",
     "APPLIES_TO",
     "DESCRIBES_MODEL",
@@ -53,29 +57,12 @@ RELATIONSHIP_TYPES = [
     "DESCRIBES_COMPONENT",
     "HAS_LIMIT",
 ]
+RELATIONSHIP_TYPES = [*OPERATIONAL_RELATIONSHIP_TYPES, *ENRICHMENT_RELATIONSHIP_TYPES]
 REQUIRED_INDEXES = [
     "maintenanceChunkEmbeddings",
     "maintenanceChunkText",
 ]
-REQUIRED_CONSTRAINTS = [
-    ("Aircraft", "aircraft_id"),
-    ("System", "system_id"),
-    ("Component", "component_id"),
-    ("Sensor", "sensor_id"),
-    ("Reading", "reading_id"),
-    ("Airport", "airport_id"),
-    ("Flight", "flight_id"),
-    ("Delay", "delay_id"),
-    ("MaintenanceEvent", "event_id"),
-    ("Removal", "removal_id"),
-    ("Document", "documentId"),
-    ("AircraftModel", "name"),
-    ("SystemReference", "name"),
-    ("ComponentReference", "name"),
-    ("Fault", "name"),
-    ("MaintenanceProcedure", "name"),
-    ("OperatingLimit", "name"),
-]
+REQUIRED_CONSTRAINTS = [*CONSTRAINTS, *EXTRACTION_CONSTRAINTS]
 
 # ---------------------------------------------------------------------------
 # CSV helpers
@@ -389,7 +376,7 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
 
 
 def load_nodes(driver: Driver, database: str, data_dir: Path) -> None:
-    """Load all 10 node types from CSV files."""
+    """Load every operational node type from its CSV file."""
     for label, filename, query in _NODE_DEFINITIONS:
         print(f"Loading {label} nodes...")
         records = read_csv(data_dir, filename)
@@ -398,7 +385,7 @@ def load_nodes(driver: Driver, database: str, data_dir: Path) -> None:
 
 
 def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
-    """Load all 13 relationship types from CSV files."""
+    """Load every operational relationship type from its CSV file."""
     for rel_type, filename, query in _REL_DEFINITIONS:
         print(f"Loading {rel_type} relationships...")
         records = read_csv(data_dir, filename)
@@ -566,7 +553,7 @@ def verify(
             strict=strict,
         )
 
-    for rel_type in RELATIONSHIP_TYPES[:13]:
+    for rel_type in OPERATIONAL_RELATIONSHIP_TYPES:
         _warn_or_fail(
             failures,
             warnings,

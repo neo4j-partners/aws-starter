@@ -1,12 +1,15 @@
-"""Tests for the SSE parser in ``client.transport``."""
+"""Tests for the SSE parser and the status lookup in ``client.transport``."""
 
 from __future__ import annotations
 
 import json
+import subprocess
+from types import SimpleNamespace
 
 import pytest
 
-from client.transport import _consume_sse, _result
+from client import transport
+from client.transport import DeploymentNotFoundError, _consume_sse, _result, parse_status
 
 
 def _event(obj: dict) -> bytes:
@@ -100,3 +103,73 @@ def test_success_result_shape() -> None:
 def test_stream_false_prints_nothing(capsys) -> None:
     _consume_sse([_event({"type": "chunk", "data": "quiet"})], stream=False)
     assert capsys.readouterr().out == ""
+
+
+ARN = "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/AircraftFleet_graphrag_agent-abc"
+
+
+def test_parse_status_returns_deployed_runtime_arn() -> None:
+    output = json.dumps(
+        {
+            "projectName": "AircraftFleet",
+            "target": "default",
+            "region": "us-west-2",
+            "resources": [
+                {"resourceType": "credential", "name": "x", "deploymentState": "deployed",
+                 "arn": "arn:other"},
+                {"resourceType": "runtime", "name": "graphrag_agent",
+                 "deploymentState": "deployed", "arn": ARN},
+            ],
+        }
+    )
+    assert parse_status(output) == (ARN, "us-west-2")
+
+
+def test_parse_status_refuses_local_only_runtime() -> None:
+    output = json.dumps(
+        {
+            "region": "us-east-1",
+            "resources": [
+                {"resourceType": "runtime", "name": "graphrag_agent",
+                 "deploymentState": "local-only"},
+            ],
+        }
+    )
+    with pytest.raises(DeploymentNotFoundError, match="not deployed"):
+        parse_status(output)
+
+
+def test_parse_status_refuses_non_json() -> None:
+    with pytest.raises(DeploymentNotFoundError, match="did not return JSON"):
+        parse_status("Error: something")
+
+
+def test_status_failure_raises_with_cli_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(*args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr="Error: No deployment targets are configured for project 'AircraftFleet'.",
+        )
+
+    monkeypatch.setattr(transport.subprocess, "run", fake_run)
+    with pytest.raises(DeploymentNotFoundError, match="No deployment targets"):
+        transport.get_agent_config()
+
+
+def test_missing_cli_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(*args: object, **kwargs: object) -> None:
+        raise FileNotFoundError("agentcore")
+
+    monkeypatch.setattr(transport.subprocess, "run", fake_run)
+    with pytest.raises(DeploymentNotFoundError, match="not installed"):
+        transport.get_agent_config()
+
+
+def test_status_timeout_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(*args: object, **kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(cmd="agentcore", timeout=60)
+
+    monkeypatch.setattr(transport.subprocess, "run", fake_run)
+    with pytest.raises(DeploymentNotFoundError, match="did not finish"):
+        transport.get_agent_config()

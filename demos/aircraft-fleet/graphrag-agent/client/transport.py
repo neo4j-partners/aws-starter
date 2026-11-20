@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
+import subprocess
 import uuid
 from collections.abc import Iterable
 from pathlib import Path
@@ -26,13 +26,13 @@ from typing import Literal
 
 import boto3
 import httpx
-import yaml
 from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
-# graphrag-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
-# default local URL both anchor here regardless of the caller's cwd.
+# graphrag-agent/ is the parent of client/. The AgentCore CLI project lives
+# in agentcore/ under it, so `agentcore status` runs from here regardless of
+# the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_URL = "http://localhost:7070/invocations"
 
@@ -40,40 +40,63 @@ LOCAL_URL = "http://localhost:7070/invocations"
 # for minutes. botocore's 60 s default read timeout would cut it off.
 DEPLOYED_READ_TIMEOUT_S = 300
 
+# `agentcore status` reads CloudFormation outputs. It returns in a few seconds.
+STATUS_TIMEOUT_S = 60
+
 Target = Literal["local", "deployed"]
 
 
+class DeploymentNotFoundError(RuntimeError):
+    """The deployed Runtime ARN could not be read from ``agentcore status``."""
+
+
 def get_agent_config() -> tuple[str, str]:
-    """Read ``(agent_arn, region)`` from ``.bedrock_agentcore.yaml``.
+    """Read ``(agent_arn, region)`` from ``agentcore status --json``.
 
-    The file is created by ``./agent.sh configure``. Resolved against the
-    agent root so it works no matter where the client is invoked from.
+    The AgentCore CLI resolves the Runtime ARN from the deployed stack.
+    Raises :class:`DeploymentNotFoundError` when the CLI is missing, the
+    status call fails, or the Runtime is not deployed.
     """
-    config_file = AGENT_ROOT / ".bedrock_agentcore.yaml"
     try:
-        with config_file.open(encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+        proc = subprocess.run(
+            ["agentcore", "status", "--json"],
+            cwd=AGENT_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=STATUS_TIMEOUT_S,
+        )
+    except FileNotFoundError as e:
+        raise DeploymentNotFoundError(
+            "The agentcore CLI is not installed. Install it with "
+            "'npm install -g @aws/agentcore'."
+        ) from e
+    except subprocess.TimeoutExpired as e:
+        raise DeploymentNotFoundError(
+            f"'agentcore status' did not finish in {STATUS_TIMEOUT_S} s."
+        ) from e
 
-        default_agent = config.get("default_agent")
-        if not default_agent:
-            raise ValueError(f"default_agent not found in {config_file}")
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
+        raise DeploymentNotFoundError(f"'agentcore status' failed: {detail}")
+    return parse_status(proc.stdout)
 
-        agent_config = config.get("agents", {}).get(default_agent, {})
-        arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
-        region = agent_config.get("aws", {}).get("region", "us-east-1")
 
-        if not arn:
-            raise ValueError(
-                f"agent_arn not found for agent '{default_agent}' in "
-                f"{config_file}"
-            )
-        return arn, region
-    except FileNotFoundError:
-        logger.error("%s not found", config_file)
-        print(f"ERROR: {config_file} not found")
-        print("")
-        print("Run './agent.sh configure' and './agent.sh deploy' first")
-        sys.exit(1)
+def parse_status(output: str) -> tuple[str, str]:
+    """Return ``(agent_arn, region)`` for the deployed Runtime in status JSON."""
+    try:
+        status = json.loads(output)
+    except json.JSONDecodeError as e:
+        raise DeploymentNotFoundError(
+            f"'agentcore status --json' did not return JSON: {output.strip()}"
+        ) from e
+
+    for resource in status.get("resources", []):
+        if resource.get("resourceType") == "runtime" and resource.get("arn"):
+            return resource["arn"], status.get("region", "us-east-1")
+    raise DeploymentNotFoundError(
+        "The Runtime is not deployed. Run './agent.sh deploy' first."
+    )
 
 
 def _handle_sse_event(

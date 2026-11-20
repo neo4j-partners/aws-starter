@@ -28,9 +28,10 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import textwrap
 
-from client.transport import Target, invoke
+from client.transport import DeploymentNotFoundError, Target, invoke
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -182,10 +183,14 @@ def main() -> None:
     print("#" + mode_line.center(WIDTH - 2) + "#")
     print("#" * WIDTH)
 
-    section_schema()
-    section_graph_query()
-    section_vector_search()
-    section_agent()
+    try:
+        section_schema()
+        section_graph_query()
+        section_vector_search()
+        section_agent()
+    except DeploymentNotFoundError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
     banner(
         "DONE",
         "You have seen the schema the agent reasons over, each GraphRAG "

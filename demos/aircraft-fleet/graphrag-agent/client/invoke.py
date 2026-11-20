@@ -14,7 +14,7 @@ Usage:
 Prerequisites:
     - Agent deployed (./agent.sh deploy)
     - AWS credentials configured
-    - .bedrock_agentcore.yaml present (created by ./agent.sh configure)
+    - The agentcore CLI on PATH. The Runtime ARN comes from `agentcore status`.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import re
 import sys
 import time
 
-from client.transport import AGENT_ROOT, invoke_deployed
+from client.transport import AGENT_ROOT, DeploymentNotFoundError, invoke_deployed
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -104,6 +104,14 @@ def run_load_test(interval: int = 5) -> None:
 
 
 def main() -> None:
+    try:
+        _run()
+    except DeploymentNotFoundError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+
+def _run() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "load-test":
         interval = 5
         if len(sys.argv) > 2:

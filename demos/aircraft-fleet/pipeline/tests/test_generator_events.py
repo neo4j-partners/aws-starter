@@ -63,6 +63,18 @@ def test_reading_number_is_hour_offset(dataset: Path) -> None:
     assert readings[0]["reading_id"].endswith("-R00000")
 
 
+def test_removal_hours_agree_with_install_date(dataset: Path) -> None:
+    removals = _rows(dataset / "nodes_removals.csv")
+    assert removals, "expected at least one removal"
+    for r in removals:
+        hours = float(r["time_since_install"])
+        assert hours < float(r["flight_hours_at_removal"]), r[":ID(RemovalEvent)"]
+        installed = datetime.fromisoformat(r["installation_date"])
+        days = (datetime.fromisoformat(r["removal_date"]) - installed).total_seconds() / 86400
+        # 8 to 10 flight hours a day, with slack for whole-second dates.
+        assert 7.99 <= hours / days <= 10.01, r[":ID(RemovalEvent)"]
+
+
 def test_same_seed_gives_identical_output(dataset: Path, tmp_path: Path) -> None:
     rerun = _generate(tmp_path)
     files = sorted(p.name for p in dataset.glob("*.csv"))

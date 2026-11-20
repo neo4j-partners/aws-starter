@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 
 @dataclass(frozen=True)
@@ -190,6 +191,30 @@ MANUAL_TAIL_OPERATORS: dict[str, str] = {
     "N20003": "ExampleAir",
     "N20004": "ExampleAir",
     "N20005": "ExampleAir",
+}
+
+# Entry-into-service range for each model, first and last day inclusive.
+# B737, A320, and E190 come from "entered service between" in each manual's
+# §1.2 Fleet Configuration, and A321neo from its §1.3. The A220 manual gives
+# a month per tail instead, so its range spans that table. Every aircraft
+# without a manual date gets a day in its model's range.
+ENTRY_INTO_SERVICE_RANGES: dict[str, tuple[date, date]] = {
+    "B737-800": (date(2016, 1, 1), date(2022, 12, 31)),
+    "A320-200": (date(2017, 1, 1), date(2023, 12, 31)),
+    "A321neo": (date(2020, 1, 1), date(2023, 12, 31)),
+    "E190": (date(2018, 1, 1), date(2022, 12, 31)),
+    "A220-300": (date(2022, 3, 1), date(2023, 5, 31)),
+}
+
+# Entry into service from the A220 manual's §1.2 Fleet Configuration table,
+# the first of each listed month. tests/test_manual_registry.py checks these
+# against the manual.
+MANUAL_TAIL_ENTRY_INTO_SERVICE: dict[str, date] = {
+    "N20001": date(2022, 3, 1),
+    "N20002": date(2022, 6, 1),
+    "N20003": date(2022, 10, 1),
+    "N20004": date(2023, 2, 1),
+    "N20005": date(2023, 5, 1),
 }
 
 MANUFACTURER: dict[str, str] = {

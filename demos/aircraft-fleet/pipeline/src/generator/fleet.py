@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from itertools import count, zip_longest
 
 from .config import GeneratorConfig
 from .specs import (
     COMPONENT_TYPES_BY_SYSTEM,
+    ENTRY_INTO_SERVICE_RANGES,
     MANUAL_FLEET_TAILS,
+    MANUAL_TAIL_ENTRY_INTO_SERVICE,
     MANUAL_TAIL_OPERATORS,
     MANUFACTURER,
     MODEL_DISTRIBUTION,
@@ -24,6 +28,21 @@ _ICAO_CHARS = "0123456789abcdef"
 
 def _icao24(rng: random.Random) -> str:
     return "".join(rng.choices(_ICAO_CHARS, k=6))
+
+
+def entry_into_service(model: str, tail_number: str) -> date:
+    """Return the tail's entry-into-service date.
+
+    A tail with a manual date gets that date. Any other tail gets a day in
+    its model's range, picked from a SHA-256 hash of the tail number, so the
+    date does not depend on the RNG, the seed, or the fleet size.
+    """
+    if tail_number in MANUAL_TAIL_ENTRY_INTO_SERVICE:
+        return MANUAL_TAIL_ENTRY_INTO_SERVICE[tail_number]
+    first, last = ENTRY_INTO_SERVICE_RANGES[model]
+    digest = hashlib.sha256(f"entry-into-service:{tail_number}".encode()).digest()
+    offset = int.from_bytes(digest[:8], "big") % ((last - first).days + 1)
+    return first + timedelta(days=offset)
 
 
 def _registry_fleet() -> list[tuple[str, str]]:
@@ -93,6 +112,8 @@ class AircraftNode:
     manufacturer: str
     operator: str
     operator_profile: OperatorProfile
+    # Internal only: not written to the CSVs or the graph.
+    entry_into_service: date
     systems: list[SystemNode] = field(default_factory=list)
 
 
@@ -169,6 +190,7 @@ def _build_aircraft(
         manufacturer=MANUFACTURER[model],
         operator=operator.name,
         operator_profile=operator,
+        entry_into_service=entry_into_service(model, tail_number),
     )
 
     # Two engines

@@ -14,6 +14,7 @@ from faker import Faker
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
+from .specs import ENTRY_INTO_SERVICE_RANGES
 
 _fake = Faker()
 _fake.seed_instance(0)  # overridden per-call via seed
@@ -27,16 +28,20 @@ _WARRANTY_WEIGHTS = [0.35, 0.65]
 # Removals per aircraft per year (approx) — scaled to config.n_days
 _BASE_REMOVALS_PER_YEAR = 4
 
-# Flight hours per calendar day, used to turn flight hours since install
-# into days since install.
+# Flight hours per calendar day. Each aircraft draws one rate, which turns
+# days since entry into service into airframe hours, and flight hours since
+# install into days since install.
 _UTILIZATION_HOURS_PER_DAY = (8.0, 10.0)
 # Fewest flight hours since install: about 90 days at 8 hours a day.
 _MIN_HOURS_SINCE_INSTALL = 720
-# Airframe flight hours at removal. Hours since install are drawn from
-# [_MIN_HOURS_SINCE_INSTALL, airframe hours - 1], so the airframe minimum
-# must be above the install minimum.
-_AIRFRAME_HOURS_AT_REMOVAL = (1000, 25000)
-assert _AIRFRAME_HOURS_AT_REMOVAL[0] > _MIN_HOURS_SINCE_INSTALL
+
+# Hours since install are drawn from [_MIN_HOURS_SINCE_INSTALL, airframe
+# hours - 1]. The latest entry into service, at the lowest rate, must still
+# give more airframe hours than that minimum by the start of the data window.
+_LATEST_ENTRY_INTO_SERVICE = max(last for _, last in ENTRY_INTO_SERVICE_RANGES.values())
+assert (
+    GeneratorConfig().start_date.date() - _LATEST_ENTRY_INTO_SERVICE
+).days * _UTILIZATION_HOURS_PER_DAY[0] > _MIN_HOURS_SINCE_INSTALL
 
 
 def _part_number(rng: random.Random) -> str:
@@ -84,6 +89,9 @@ def generate_removals(
         n_removals = max(1, round(_BASE_REMOVALS_PER_YEAR * year_fraction * multiplier))
 
         all_components = [comp for system in aircraft.systems for comp in system.components]
+        # One rate per aircraft, so airframe hours grow with the removal date.
+        utilization = rng.uniform(*_UTILIZATION_HOURS_PER_DAY)
+        in_service = datetime.combine(aircraft.entry_into_service, datetime.min.time())
 
         for _ in range(n_removals):
             removal_counter += 1
@@ -94,12 +102,13 @@ def generate_removals(
                 days=rng.randint(0, config.n_days - 1),
                 hours=rng.randint(6, 18),
             )
-            flight_hours_at_removal = rng.randint(*_AIRFRAME_HOURS_AT_REMOVAL)
+            # Airframe hours are the days in service at the aircraft's rate.
+            days_in_service = (removal_date - in_service).total_seconds() / 86400
+            flight_hours_at_removal = int(days_in_service * utilization)
             # Flight hours since install stay below the airframe total. The
-            # install date follows from them at a plausible daily rate, so
-            # the hours and the date always agree.
+            # install date follows from them at the same rate, so it falls
+            # after entry into service, and the hours and the date agree.
             hours_since_install = rng.randint(_MIN_HOURS_SINCE_INSTALL, flight_hours_at_removal - 1)
-            utilization = rng.uniform(*_UTILIZATION_HOURS_PER_DAY)
             install_date = removal_date - timedelta(days=hours_since_install / utilization)
 
             priority = rng.choices(_PRIORITIES, weights=_PRIORITY_WEIGHTS)[0]

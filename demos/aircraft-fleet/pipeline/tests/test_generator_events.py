@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from generator.fleet import entry_into_service
 from generator.main import generate
 from generator.specs import ENGINE_SPECS, SENSOR_FAULT_MAP
 
@@ -95,6 +96,40 @@ def test_removal_hours_agree_with_install_date(dataset: Path) -> None:
         days = (datetime.fromisoformat(r["removal_date"]) - installed).total_seconds() / 86400
         # 8 to 10 flight hours a day, with slack for whole-second dates.
         assert 7.99 <= hours / days <= 10.01, r[":ID(Removal)"]
+
+
+def _removals_with_entry_into_service(
+    dataset: Path,
+) -> list[tuple[dict[str, str], datetime]]:
+    in_service = {
+        r[":ID(Aircraft)"]: datetime.combine(
+            entry_into_service(r["model"], r["tail_number"]), datetime.min.time()
+        )
+        for r in _rows(dataset / "nodes_aircraft.csv")
+    }
+    return [(r, in_service[r["aircraft_id"]]) for r in _rows(dataset / "nodes_removals.csv")]
+
+
+def test_airframe_hours_follow_days_in_service(large_dataset: Path) -> None:
+    removals = _removals_with_entry_into_service(large_dataset)
+    by_aircraft: dict[str, list[dict[str, str]]] = {}
+    for r, in_service in removals:
+        days = (datetime.fromisoformat(r["removal_date"]) - in_service).total_seconds() / 86400
+        # 8 to 10 flight hours a day since entry into service.
+        assert 7.99 <= int(r["flight_hours_at_removal"]) / days <= 10.01, r[":ID(Removal)"]
+        by_aircraft.setdefault(r["aircraft_id"], []).append(r)
+
+    repeat = [rows for rows in by_aircraft.values() if len(rows) > 1]
+    assert len(repeat) >= 5, "expected several aircraft with more than one removal"
+    for rows in repeat:
+        rows.sort(key=lambda r: r["removal_date"])
+        hours = [int(r["flight_hours_at_removal"]) for r in rows]
+        assert hours == sorted(hours), (rows[0]["aircraft_id"], hours)
+
+
+def test_install_date_is_after_entry_into_service(large_dataset: Path) -> None:
+    for r, in_service in _removals_with_entry_into_service(large_dataset):
+        assert datetime.fromisoformat(r["installation_date"]) > in_service, r[":ID(Removal)"]
 
 
 def test_same_seed_gives_identical_output(dataset: Path, tmp_path: Path) -> None:

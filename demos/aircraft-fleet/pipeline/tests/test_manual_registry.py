@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import re
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 
 from generator.config import GeneratorConfig
-from generator.fleet import _distribute, _registry_fleet, generate_fleet
+from generator.fleet import _distribute, _registry_fleet, entry_into_service, generate_fleet
 from generator.specs import (
+    ENTRY_INTO_SERVICE_RANGES,
     MANUAL_FLEET_TAILS,
+    MANUAL_TAIL_ENTRY_INTO_SERVICE,
     MANUAL_TAIL_OPERATORS,
     MODEL_DISTRIBUTION,
     OPERATORS,
@@ -23,6 +26,10 @@ EXAMPLE_AIRCRAFT = re.compile(r"Aircraft: (AC\d+) \((N\w+)\)")
 TABLE_AIRCRAFT = re.compile(r"^\| (AC\d+) \| (N\w+) \|", re.MULTILINE)
 OPERATOR_LINE = re.compile(r"^\*\*Operator:\*\*\s*(.+)$", re.MULTILINE)
 _OPERATOR_NAMES = "|".join(op.name for op in OPERATORS)
+SERVICE_RANGE = re.compile(r"entered service between (\d{4}) and (\d{4})")
+SERVICE_TABLE_ROW = re.compile(
+    r"^\| AC\d+ \| (N\w+) \| [0-9a-f]{6} \| (\w+ \d{4}) \|$", re.MULTILINE
+)
 REGISTRATION_ROW = re.compile(rf"^\| ({_OPERATOR_NAMES}) \| (N\w+(?:, N\w+)*) \|", re.MULTILINE)
 
 
@@ -118,3 +125,31 @@ def test_distribute_uses_largest_remainder(n: int) -> None:
     assert len(models) == n
     for model, fraction in MODEL_DISTRIBUTION:
         assert abs(models.count(model) - n * fraction) < 1
+
+
+@pytest.mark.parametrize("doc", DOCUMENTS, ids=lambda doc: doc.aircraft_type)
+def test_entry_into_service_matches_manual(doc) -> None:
+    """Each model's range, and any per-tail month, matches its manual."""
+    text = _manual_text(doc.filename)
+    first, last = ENTRY_INTO_SERVICE_RANGES[doc.aircraft_type]
+    if match := SERVICE_RANGE.search(text):
+        start_year, end_year = (int(year) for year in match.groups())
+        assert (first, last) == (date(start_year, 1, 1), date(end_year, 12, 31))
+    else:
+        table = {
+            tail: datetime.strptime(month, "%B %Y").date()
+            for tail, month in SERVICE_TABLE_ROW.findall(text)
+        }
+        assert set(table) == set(MANUAL_FLEET_TAILS[doc.aircraft_type])
+        assert {tail: MANUAL_TAIL_ENTRY_INTO_SERVICE[tail] for tail in table} == table
+        assert first == min(table.values())
+        assert last.replace(day=1) == max(table.values())
+
+
+def test_every_entry_into_service_is_in_its_model_range() -> None:
+    for aircraft in generate_fleet(GeneratorConfig(n_aircraft=200)):
+        first, last = ENTRY_INTO_SERVICE_RANGES[aircraft.model]
+        assert first <= aircraft.entry_into_service <= last, aircraft.tail_number
+        assert aircraft.entry_into_service == entry_into_service(
+            aircraft.model, aircraft.tail_number
+        )

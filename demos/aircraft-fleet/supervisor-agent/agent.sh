@@ -8,12 +8,18 @@
 # Usage:
 #   ./agent.sh start              Start supervisor locally (port 7071)
 #   ./agent.sh test               Test local supervisor
-#   ./agent.sh configure          Configure for AWS deployment
+#   ./agent.sh configure          Create the AgentCore project in agentcore/
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
+#   ./agent.sh logs               Show recent runtime logs
 #   ./agent.sh invoke-cloud           Send default question to deployed agent
 #   ./agent.sh invoke-cloud "prompt"  Send custom question to deployed agent
 #   ./agent.sh destroy            Remove from AgentCore
+#
+# The cloud commands use the AgentCore CLI (npm install -g @aws/agentcore).
+# The project lives in agentcore/. Its runtime's codeLocation is this folder,
+# so `agentcore deploy` zips everything here except .git, .venv,
+# __pycache__, .pytest_cache, .DS_Store, node_modules, and agentcore/.
 
 set -e
 
@@ -22,11 +28,19 @@ set -e
 # lives in server/ and the client tooling in client/.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
-AGENT_NAME="aircraft_fleet_supervisor_agent"
+# The deployed runtime name is <project>_<target>_<runtime> and must be at
+# most 48 characters, so both names are short.
+PROJECT_NAME="fleetsupervisor"
+RUNTIME_NAME="supervisor"
+# Matches .python-version.
+RUNTIME_VERSION="PYTHON_3_12"
+# Non-secret runtime environment variables, written into agentcore.json.
+RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_URL":"REPLACE_WITH_FLEET_GATEWAY_URL"}'
 # AgentCore deployment region. AgentCore's primary region is us-east-1
-# (also supported in us-west-2). Set AWS_REGION to override. `configure`
-# pins it into .bedrock_agentcore.yaml, which `deploy`/`status` then read.
+# (also supported in us-west-2). Set AWS_REGION to override. The CLI creates
+# the default deploy target from this region on the first deploy.
 REGION="${AWS_REGION:-us-east-1}"
+export AWS_REGION="$REGION"
 # Local server port. graphrag-agent uses 7070; AgentCore Runtime uses 8080.
 LOCAL_PORT="${AGENT_PORT:-7071}"
 cd "$ROOT_DIR"
@@ -49,9 +63,10 @@ print_usage() {
     echo "  ./agent.sh test               Test local supervisor"
     echo "  ./agent.sh test-maintenance   Test with maintenance query"
     echo "  ./agent.sh test-operations    Test with operations query"
-    echo "  ./agent.sh configure          Configure for AWS deployment"
+    echo "  ./agent.sh configure          Create the AgentCore project in agentcore/"
     echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
     echo "  ./agent.sh status             Check deployment status"
+    echo "  ./agent.sh logs [30m]         Show runtime logs from the last 30 minutes"
     echo "  ./agent.sh invoke-cloud       Send default question to deployed agent"
     echo "  ./agent.sh invoke-cloud \"q\"   Send custom question to deployed agent"
     echo "  ./agent.sh load-test          Cloud load test (random queries every 5s)"
@@ -64,6 +79,73 @@ print_usage() {
     echo "  ./agent.sh test-operations    # Routes to Operations Agent"
     echo "  ./agent.sh invoke-cloud \"What are the most common faults?\""
     echo "  ./agent.sh load-test          # Continuous cloud load testing"
+}
+
+ensure_agentcore_cli() {
+    if ! command -v agentcore >/dev/null 2>&1; then
+        echo -e "${RED}ERROR: the AgentCore CLI is not installed${NC}"
+        echo ""
+        echo "Install it with:"
+        echo "  npm install -g @aws/agentcore"
+        exit 1
+    fi
+}
+
+ensure_project() {
+    ensure_agentcore_cli
+    if [ ! -f "agentcore/agentcore.json" ]; then
+        echo -e "${RED}ERROR: agentcore/agentcore.json not found${NC}"
+        echo "Run './agent.sh configure' first."
+        exit 1
+    fi
+}
+
+# The code zip has no ignore file, so a credentials file in this folder
+# would be uploaded with the code.
+ensure_no_secrets_in_zip() {
+    if [ -f ".mcp-credentials.json" ]; then
+        echo -e "${RED}ERROR: .mcp-credentials.json is in $ROOT_DIR${NC}"
+        echo ""
+        echo "agentcore deploy would upload it with the code. Move it out first:"
+        echo "  mv \"$ROOT_DIR/.mcp-credentials.json\" /somewhere/safe/"
+        exit 1
+    fi
+}
+
+# Print the deployed runtime ARN: AGENT_ARN if set, else from
+# `agentcore status --json`. The match is on the ARN format because the
+# status JSON layout is not documented.
+runtime_arn() {
+    if [ -n "${AGENT_ARN:-}" ]; then
+        echo "$AGENT_ARN"
+        return
+    fi
+    agentcore status --json 2>/dev/null \
+        | jq -r '[.. | strings | select(test("^arn:aws[a-z0-9-]*:bedrock-agentcore:[^:]+:[0-9]+:runtime/[^/]+$"))][0] // empty'
+}
+
+# Create agentcore/ the way `agentcore create` and `agentcore add runtime`
+# lay it out, then point the runtime at this folder's existing code.
+create_project() {
+    local tmp
+    tmp="$(mktemp -d)"
+    (cd "$tmp" && agentcore create --name "$PROJECT_NAME" --skip-install --skip-git)
+    mv "$tmp/$PROJECT_NAME/agentcore" agentcore
+    rm -rf "$tmp"
+
+    agentcore add runtime \
+        --name "$RUNTIME_NAME" \
+        --language python \
+        --description "Aircraft fleet supervisor with Maintenance and Operations specialists" \
+        --environment-variables "$RUNTIME_ENV"
+    # add runtime writes starter docs to app/<name>/; the code lives here instead.
+    rm -rf app
+
+    local spec="agentcore/agentcore.json"
+    jq --arg name "$RUNTIME_NAME" --arg entry "$ENTRYPOINT" --arg ver "$RUNTIME_VERSION" \
+        '(.runtimes[] | select(.name == $name)) |= (.codeLocation = "." | .entrypoint = $entry | .runtimeVersion = $ver)' \
+        "$spec" > "$spec.tmp"
+    mv "$spec.tmp" "$spec"
 }
 
 ensure_deps() {
@@ -126,21 +208,29 @@ case "${1:-help}" in
         ;;
 
     configure)
-        ensure_deps
-        echo -e "${GREEN}Configuring supervisor for AWS deployment...${NC}"
+        ensure_agentcore_cli
+        if [ -f "agentcore/agentcore.json" ]; then
+            echo -e "${GREEN}AgentCore project already exists in agentcore/${NC}"
+        else
+            echo -e "${GREEN}Creating AgentCore project in agentcore/...${NC}"
+            echo ""
+            create_project
+        fi
         echo ""
-        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" -r "$REGION" "${@:2}"
+        echo -e "${GREEN}Installing CDK dependencies...${NC}"
+        (cd agentcore/cdk && npm install)
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
-        echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"
+        echo "Set GATEWAY_URL in agentcore/agentcore.json, then run './agent.sh deploy'"
         ;;
 
     deploy)
-        ensure_deps
+        ensure_project
+        ensure_no_secrets_in_zip
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
-        uv run agentcore deploy
+        agentcore deploy "${@:2}"
         echo ""
         echo -e "${GREEN}Deployment complete!${NC}"
         echo "Run './agent.sh status' to check status"
@@ -148,41 +238,57 @@ case "${1:-help}" in
         ;;
 
     status)
-        ensure_deps
+        ensure_project
         echo -e "${GREEN}Checking deployment status...${NC}"
         echo ""
-        uv run agentcore status
+        agentcore status "${@:2}"
+        ;;
+
+    logs)
+        ensure_project
+        agentcore logs runtime --name "$RUNTIME_NAME" --since "${2:-30m}"
         ;;
 
     invoke|invoke-cloud)
-        ensure_deps
+        ensure_project
+        PROMPT="${2:-What are the most common maintenance faults across all aircraft?}"
         if [ -z "$2" ]; then
-            PROMPT="What are the most common maintenance faults across all aircraft?"
             echo -e "${YELLOW}Using default question${NC}"
-        else
-            PROMPT="$2"
         fi
         echo -e "${GREEN}Invoking deployed supervisor...${NC}"
         echo -e "${BLUE}Prompt: $PROMPT${NC}"
         echo ""
-        uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
+        # jq builds the JSON, so quotes in the prompt are escaped.
+        agentcore invoke --runtime "$RUNTIME_NAME" --payload "$(jq -nc --arg p "$PROMPT" '{prompt: $p}')"
         ;;
 
     load-test)
         ensure_deps
+        ensure_project
+        ARN="$(runtime_arn)"
+        if [ -z "$ARN" ]; then
+            echo -e "${RED}ERROR: could not find the deployed runtime ARN${NC}"
+            echo "Set AGENT_ARN, or run './agent.sh deploy' first."
+            exit 1
+        fi
         echo -e "${GREEN}Starting cloud load test...${NC}"
         echo -e "${BLUE}Tests routing to Maintenance and Operations agents${NC}"
         echo ""
-        uv run fleet-supervisor-invoke load-test "${@:2}"
+        AGENT_ARN="$ARN" uv run fleet-supervisor-invoke load-test "${@:2}"
         ;;
 
     destroy)
-        ensure_deps
+        ensure_project
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
-        uv run agentcore destroy "${@:2}"
+        # The CLI has no destroy command. Emptying the project and deploying
+        # deletes the target's stack. agentcore.json then has no runtime, so
+        # restore it from git before deploying again.
+        agentcore remove all --yes
+        agentcore deploy --yes
         echo ""
         echo -e "${GREEN}Cleanup complete!${NC}"
+        echo "Restore the project spec with: git checkout -- agentcore/agentcore.json"
         ;;
 
     help|--help|-h)

@@ -1,0 +1,12 @@
+# AgentCore CLI state. Commit only the deployed-state binding so a target's
+# stack and credential ARNs are shared.
+agentcore/.cli/*
+!agentcore/.cli/deployed-state.json
+
+# AgentCore build cache, CDK output, and CDK dependencies.
+agentcore/.cache/
+agentcore/cdk/cdk.out/
+agentcore/cdk/node_modules/
+
+# The repo .gitignore ignores lib/ for Python builds; the CDK app needs its lib/.
+!agentcore/cdk/lib/

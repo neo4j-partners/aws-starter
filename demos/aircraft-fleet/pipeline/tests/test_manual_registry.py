@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from generator.config import GeneratorConfig
-from generator.fleet import _distribute, generate_fleet
+from generator.fleet import _distribute, _registry_fleet, generate_fleet
 from generator.specs import MANUAL_FLEET_TAILS, MODEL_DISTRIBUTION
 from populate_aircraft_db.pipeline import DOCUMENTS
 
@@ -42,6 +42,8 @@ def test_generated_fleet_assigns_registry_first(n_aircraft: int) -> None:
     assert len(by_tail) == n_aircraft, "tail numbers must be unique"
     registry_size = sum(len(tails) for tails in MANUAL_FLEET_TAILS.values())
     registry_tails = {tail for tails in MANUAL_FLEET_TAILS.values() for tail in tails}
+    head = min(n_aircraft, registry_size)
+    assert [(ac.model, ac.tail_number) for ac in fleet[:head]] == _registry_fleet()[:n_aircraft]
     for ac in fleet[registry_size:]:
         assert ac.tail_number not in registry_tails
         assert re.fullmatch(r"N9\d{4}", ac.tail_number), ac.tail_number
@@ -60,6 +62,16 @@ def test_manual_example_aircraft_matches_fleet(doc) -> None:
     for aircraft_id, tail in examples + TABLE_AIRCRAFT.findall(text):
         aircraft = fleet[aircraft_id]
         assert (aircraft.tail_number, aircraft.model) == (tail, doc.aircraft_type)
+
+
+def test_registry_order_is_round_robin_by_model() -> None:
+    first = [tails[0] for tails in MANUAL_FLEET_TAILS.values()]
+    assert [tail for _, tail in _registry_fleet()[: len(first)]] == first
+
+
+def test_distribute_gives_remainders_to_largest_fractions() -> None:
+    # Quotas at n=3: B737 1.05, A320 0.75, A321neo 0.60, E190 0.30, A220 0.30.
+    assert _distribute(3) == ["B737-800", "A320-200", "A321neo"]
 
 
 @pytest.mark.parametrize("n", [0, 1, 7, 20, 70])

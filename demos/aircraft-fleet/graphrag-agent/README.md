@@ -25,8 +25,7 @@ uv run fleet-server          # terminal 1: serves http://localhost:7070
 uv run fleet-cli "How many aircraft are in the fleet?"   # terminal 2
 uv run fleet-demo            # terminal 2: full showcase
 
-./agent.sh configure         # deploy to AgentCore Runtime
-./agent.sh deploy
+./agent.sh deploy            # deploy to AgentCore Runtime
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
 
@@ -142,17 +141,26 @@ aws sso login --sso-session <your-sso-session>     # only if you use AWS SSO
 
 ### Deploy
 
+Deployment uses the AgentCore CLI. Install it with
+`npm install -g @aws/agentcore`. The project lives in `agentcore/`, and
+`agentcore/agentcore.json` declares the `graphrag_agent` Runtime.
+
+Before the first deploy, edit the `envVars` in `agentcore/agentcore.json`:
+
+- **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE` for the fleet graph.
+- **Memory connection:** Set the `MEM_NEO4J_*` values for the agent memory database.
+- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the Secrets Manager secrets that hold the passwords. Never put a password in `agentcore.json`.
+
 ```bash
-./agent.sh configure         # writes .bedrock_agentcore.yaml with entrypoint runtime_app.py
-./agent.sh deploy            # creates the runtime and passes the Neo4j settings
-./agent.sh status            # wait for "Endpoint: DEFAULT READY"
+./agent.sh deploy            # builds the code zip and deploys the CDK stack
+./agent.sh status            # shows the Runtime ARN and deployment state
+./agent.sh logs --tail       # follows the Runtime logs
 ```
 
-- **Deploy type:** With `direct_code_deploy`, `agentcore deploy` uploads a code package to S3. It runs on a managed Python 3.13 arm64 runtime and sets up IAM and CloudWatch. It builds no Docker image and pushes nothing to ECR.
-- **Neo4j settings:** `./agent.sh deploy` passes the Neo4j connection as runtime environment variables. The container has no `.env` file. The output shows the agent ARN and the dashboard URL.
-- **Optional settings:** `./agent.sh deploy` also passes `MODEL_ID`, `AWS_REGION`, `VECTOR_INDEX_NAME`, `EMBED_MODEL_ID`, and `EMBED_DIMENSIONS` when you set them.
-- **Configure first:** Run `configure` even if `.bedrock_agentcore.yaml` already exists. It sets the entrypoint and records the account, region, and execution role.
-- **Extra arguments:** `configure` and `destroy` pass any extra arguments to the `agentcore` command. This lets you run them without prompts, for example `./agent.sh configure -ni -dt direct_code_deploy -rt PYTHON_3_13` and `./agent.sh destroy --force`.
+- **Deploy type:** The Runtime uses a `CodeZip` build. `agentcore deploy` zips this directory, uploads it, and runs it on a managed Python 3.12 arm64 runtime. It builds no Docker image.
+- **Packaged files:** The zip holds every file here except `agentcore/`, `.venv`, `.git`, and caches. `./agent.sh deploy` refuses to run while a `.env*` or `.mcp-credentials*.json` file is present, because the zip would include it. Local runs read the shared `../.env` instead.
+- **Placeholders:** `./agent.sh deploy` also refuses to run while `agentcore.json` still has `REPLACE_ME` values.
+- **Deployment target:** The first deploy creates the `default` target in `agentcore/aws-targets.json` from your current AWS account and region. That file and `agentcore/.cli/` hold account-specific values, so git ignores them.
 
 ### Call the deployed agent
 
@@ -167,7 +175,7 @@ The deployed agent has the same four `/invocations` modes as the local server.
 A `mode` field picks one. With no `mode`, the full agent runs. Only the
 connection differs:
 
-- **`./agent.sh invoke-cloud "..."`:** This command sends one prompt through the `agentcore invoke` CLI.
+- **`./agent.sh invoke-cloud "..."`:** This command sends one prompt through `agentcore invoke`.
 - **`uv run fleet-demo --remote`:** This command runs all four demo sections against the deployed agent.
 - **`uv run fleet-invoke "..."`:** This command sends one prompt and streams the answer as it arrives.
 - **`uv run fleet-invoke load-test [seconds]`:** This command sends a random query from `queries.txt` on an interval. The default interval is 5 seconds.
@@ -180,7 +188,8 @@ connection differs:
 | `agent/` | The core package, installed into the venv. `config.py` holds the model ID, region, embedder, index, and system prompt. `retrieval.py` holds the Neo4j driver and the `graph_query`, `vector_search`, and `get_graph_schema` functions. `tools.py` holds the Strands tool wrappers. |
 | `client/` | The clients behind `fleet-cli`, `fleet-demo`, and `fleet-invoke`. `transport.py` is the only network layer. It covers local HTTP on port 7070 and the deployed agent through boto3. `cli.py` is the terminal client, `demo.py` is the showcase, and `invoke.py` is the deployed single call and load test. |
 | `runtime_app.py` | The AgentCore Runtime entrypoint. `main()` is `fleet-server` on port 7070. The cloud container uses `__main__` on port 8080. It handles the `mode` field. |
-| `agent.sh` | The wrapper for local `start`, `stop`, and `test`, and for `configure`, `deploy`, `status`, `invoke-cloud`, and `destroy` |
+| `agent.sh` | The wrapper for local `start`, `stop`, and `test`, and for `deploy`, `status`, `invoke-cloud`, `logs`, and `destroy` |
+| `agentcore/` | The AgentCore CLI project. `agentcore.json` declares the Runtime and its env vars. `cdk/` is the CDK app the CLI deploys. |
 | `queries.txt` | Sample queries for discovery, fleet, maintenance, and delays |
 
 ## Commands
@@ -195,17 +204,16 @@ terminal. Press Ctrl+C to stop it.
 | `uv run fleet-demo` | Run the showcase against the local server. Add `--remote` to use the deployed agent. |
 | `uv run fleet-invoke "prompt"` | Send one prompt to the deployed agent. `load-test [N]` sends a random query from `queries.txt` every N seconds. |
 
-`./agent.sh` wraps the local server and the deployment. On `deploy`, it passes
-the Neo4j connection to the runtime.
+`./agent.sh` wraps the local server and the AgentCore CLI.
 
 | Command | Description |
 |---------|-------------|
 | `start` / `stop` | Start or stop the local server on port 7070 |
 | `test` | Ask the local server one question |
-| `configure` | Create the AWS deployment config |
 | `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
 | `status` | Show the deployment status |
 | `invoke-cloud "prompt"` | Call the deployed agent through `agentcore invoke` |
+| `logs [args]` | Search the Runtime logs. Add `--tail` to follow them. |
 
 ## Environment variables
 

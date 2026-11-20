@@ -18,8 +18,7 @@ Local testing:
         -H "Content-Type: application/json" \
         -d '{"prompt": "How many aircraft are in the database?"}'
 
-Cloud deployment:
-    ./agent.sh configure
+Cloud deployment (AgentCore CLI, see agentcore/agentcore.json):
     ./agent.sh deploy
     ./agent.sh invoke-cloud "How many aircraft are in the database?"
 """

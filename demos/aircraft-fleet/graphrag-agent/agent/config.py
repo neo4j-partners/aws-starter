@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import cast
+
+from agent.model import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, DEFAULT_MODEL_ID, Effort
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +19,9 @@ class Settings:
     index over :Chunk(text). Every field is env-overridable.
     """
 
-    model_id: str = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    model_id: str = DEFAULT_MODEL_ID
+    max_tokens: int = DEFAULT_MAX_TOKENS
+    effort: Effort = DEFAULT_EFFORT
     aws_region: str = "us-east-1"
     vector_index_name: str = "maintenanceChunkEmbeddings"
     embed_model_id: str = "amazon.titan-embed-text-v2:0"
@@ -28,6 +33,8 @@ class Settings:
         defaults = cls()
         return cls(
             model_id=os.getenv("MODEL_ID", defaults.model_id),
+            max_tokens=int(os.getenv("MAX_TOKENS", str(defaults.max_tokens))),
+            effort=cast(Effort, os.getenv("MODEL_EFFORT", defaults.effort)),
             aws_region=os.getenv("AWS_REGION", defaults.aws_region),
             vector_index_name=os.getenv(
                 "VECTOR_INDEX_NAME", defaults.vector_index_name

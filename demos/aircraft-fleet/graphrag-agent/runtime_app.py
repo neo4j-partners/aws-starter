@@ -34,7 +34,6 @@ import neo4j
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from strands import Agent
-from strands.models import BedrockModel
 
 from agent import (
     SYSTEM_PROMPT_TEMPLATE,
@@ -43,6 +42,7 @@ from agent import (
     settings,
     vector_search,
 )
+from agent.model import build_bedrock_model
 from agent.tools import graph_query_tool, vector_search_tool
 
 logging.basicConfig(
@@ -56,11 +56,11 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 app = BedrockAgentCoreApp()
 
-model = BedrockModel(
-    model_id=settings.model_id,
-    region_name=settings.aws_region,
-    temperature=0.0,
-    streaming=True,
+model = build_bedrock_model(
+    settings.model_id,
+    settings.aws_region,
+    max_tokens=settings.max_tokens,
+    effort=settings.effort,
 )
 
 

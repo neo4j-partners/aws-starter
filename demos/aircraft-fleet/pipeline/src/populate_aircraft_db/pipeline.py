@@ -109,15 +109,16 @@ class ContextPrependingSplitter(TextSplitter):
         self.document_id = document_id
 
     async def run(self, text: str) -> TextChunks:
+        if not self.document_id:
+            raise ValueError("Set document_id before splitting so every Chunk gets a chunkId.")
         result = await self.inner.run(text)
         for chunk in result.chunks:
             if self.context:
                 chunk.text = self.context + chunk.text
-            if self.document_id:
-                chunk.metadata = {
-                    **(chunk.metadata or {}),
-                    "chunkId": f"{self.document_id}:{chunk.index}",
-                }
+            chunk.metadata = {
+                **(chunk.metadata or {}),
+                "chunkId": f"{self.document_id}:{chunk.index}",
+            }
         return result
 
 

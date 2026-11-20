@@ -179,3 +179,20 @@ def test_query_error_message_is_cut_to_500_characters():
 )
 def test_no_result_names_a_server_address(text):
     assert not [f for f in ADDRESS_FRAGMENTS if f in classify_tool_error(text).text]
+
+
+def test_message_without_gql_status_stops_at_the_first_newline():
+    text = (
+        "{neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Invalid input 'MATC'\n"
+        "\"MATC (a:Aircraft {tail: 'N-SECRET'}) RETURN a\"\n"
+        " ^}"
+    )
+    error = classify_tool_error(text)
+    assert error.kind is ErrorKind.QUERY
+    assert "Invalid input 'MATC'\n" in error.text
+    assert "N-SECRET" not in error.text
+
+
+def test_one_line_message_without_gql_status_drops_the_closing_brace():
+    text = "{neo4j_code: Neo.ClientError.Statement.ArithmeticError} {message: / by zero}"
+    assert ": / by zero\n" in classify_tool_error(text).text

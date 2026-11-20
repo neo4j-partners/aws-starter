@@ -35,8 +35,13 @@ _MAX_QUERY_ERROR_CHARS = 500
 
 # The server formats a driver error as "{neo4j_code: X} {message: Y}
 # {gql_status: Z} ...". The message can span lines and quote the query.
+# Without the gql_status marker there is no safe end, so the message stops at
+# the first newline and the echoed query is dropped.
 _CODE = re.compile(r"\{neo4j_code: (Neo\.[A-Za-z]+\.[A-Za-z]+\.[A-Za-z]+)\}")
-_MESSAGE = re.compile(r"\{message: (.*?)\}(?= \{gql_status|\s*$)", re.DOTALL)
+_MESSAGE = re.compile(
+    r"\{message: (?:(?P<marked>.*?)\}(?= \{gql_status)|(?P<line>[^\n]*?)\}?(?=\n|\Z))",
+    re.DOTALL,
+)
 
 _TIMEOUT_CODE_PREFIX = "Neo.ClientError.Transaction.TransactionTimedOut"
 _QUERY_ERROR_PREFIXES = ("Neo.ClientError.Statement.", "Neo.ClientError.Procedure.")
@@ -117,7 +122,8 @@ def classify_tool_error(text: str) -> ModelSafeError:
             return ModelSafeError(ErrorKind.TIMEOUT, TIMEOUT_RESULT, code)
         if code.startswith(_QUERY_ERROR_PREFIXES):
             message = _MESSAGE.search(text, match.end())
-            detail = f"{code}: {message.group(1).strip()}" if message else code
+            text_part = message and (message["marked"] or message["line"] or "").strip()
+            detail = f"{code}: {text_part}" if text_part else code
             return ModelSafeError(
                 ErrorKind.QUERY, _query_error_result(_without_addresses(detail)), code
             )

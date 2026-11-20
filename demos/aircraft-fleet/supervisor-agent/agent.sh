@@ -124,13 +124,24 @@ ensure_project() {
     fi
 }
 
-# The code zip has no ignore file, so any .env* or .mcp-credentials*.json
-# file in this folder would be uploaded with the code. .venv is not zipped,
-# and agentcore/ holds the CLI's own .env.local, which is not zipped either.
+# The code zip has no ignore file, so any secrets file in this folder would
+# be uploaded with the code: .env*, .mcp-credentials*.json, .agentcore.json,
+# credentials*.json, or *.pem. .venv is not zipped, but a venv/ folder
+# without the dot is, so it is refused too. agentcore/ holds the CLI's own
+# .env.local, which is not zipped. -L follows symlinks, so a link to a
+# secrets file is caught. A find error stops the deploy instead of passing
+# the check.
 ensure_no_secrets_in_zip() {
     local found
-    found="$(find . \( -path ./.venv -o -path ./agentcore \) -prune -o \
-        -type f \( -name '.env*' -o -name '.mcp-credentials*.json' \) -print)"
+    if ! found="$(find -L . \( -path ./.venv -o -path ./agentcore \) -prune \
+        -o -type d -name venv -prune -print \
+        -o -type f \( -name '.env*' -o -name '.mcp-credentials*.json' \
+            -o -name '.agentcore.json' -o -name 'credentials*.json' -o -name '*.pem' \) \
+        -print)"; then
+        echo -e "${RED}ERROR: could not scan $ROOT_DIR for secret files${NC}"
+        echo "Fix the find error above, then deploy again."
+        exit 1
+    fi
     if [ -n "$found" ]; then
         echo -e "${RED}ERROR: secret files are inside $ROOT_DIR${NC}"
         echo ""

@@ -153,9 +153,78 @@ def test_trailing_event_without_blank_line() -> None:
     assert content == ["tail"]
 
 
-def test_bare_json_without_data_prefix() -> None:
-    content, _ = _consume_sse([b'{"type": "chunk", "data": "x"}\n\n'], stream=False)
+def test_bare_json_without_data_field_is_ignored() -> None:
+    # Per the SSE format this line is a field named '{"type"', not data.
+    content, errors = _consume_sse([b'{"type": "chunk", "data": "x"}\n\n'], stream=False)
+    assert content == []
+    assert errors == [transport.TRUNCATED_STREAM]
+
+
+@pytest.mark.parametrize(
+    ("block", "expected"),
+    [
+        ("data: x", "x"),
+        # One optional space after the colon is removed, and only one.
+        ("data:x", "x"),
+        ("data:  x", " x"),
+        # A field name with no colon has an empty value.
+        ("data", ""),
+        # Data lines join with a newline.
+        ("data: a\ndata: b", "a\nb"),
+        ("data: a\ndata\ndata: b", "a\n\nb"),
+        # Comments and the event, id, retry, and unknown fields are ignored.
+        (": note\nevent: message\nid: 7\nretry: 1000\nother: v\ndata: x", "x"),
+        ("event: message\nid: 7", None),
+        (": keep-alive", None),
+    ],
+)
+def test_event_data_follows_the_sse_format(block: str, expected: str | None) -> None:
+    assert transport._event_data(block) == expected
+
+
+def test_data_split_over_several_lines_is_one_event() -> None:
+    raw = [
+        b'event: message\nid: 1\n: comment\ndata: {"type": "chunk",\ndata:"data": "x"}\n\n',
+        b"retry: 500\n" + COMPLETE,
+    ]
+    content, errors = _consume_sse(raw, stream=False)
     assert content == ["x"]
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "data",
+    [b"[1, 2]", b'"text"', b"42", b"null", b"true"],
+)
+def test_non_object_json_is_skipped_with_a_warning(data: bytes, caplog) -> None:
+    raw = [b"data: " + data + b"\n\n", _event({"type": "chunk", "data": "ok"}), COMPLETE]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["ok"]
+    assert errors == []
+    assert "Skipped an SSE event whose data is a JSON" in caplog.text
+
+
+@pytest.mark.parametrize("value", [None, 42, ["a"], {"text": "a"}])
+def test_chunk_without_string_data_is_skipped_with_a_warning(value: object, caplog) -> None:
+    raw = [
+        _event({"type": "chunk", "data": value}),
+        _event({"type": "chunk"}),
+        _event({"type": "chunk", "data": "ok"}),
+        COMPLETE,
+    ]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["ok"]
+    assert errors == []
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 2
+    assert all("Skipped a chunk event" in r.getMessage() for r in warnings)
+
+
+def test_non_string_type_is_ignored() -> None:
+    raw = [_event({"type": ["chunk"], "data": "x"}), COMPLETE]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == []
+    assert errors == []
 
 
 def test_non_json_and_blank_events_are_ignored() -> None:

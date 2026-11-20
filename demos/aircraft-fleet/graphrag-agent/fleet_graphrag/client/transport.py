@@ -150,42 +150,66 @@ def parse_status(output: str) -> tuple[str, str]:
     return arn, region
 
 
+def _event_data(block: str) -> str | None:
+    """Return the data of one SSE event block, or None when it has no data line.
+
+    Each line is ``field: value``, with one optional space after the colon. A
+    line without a colon is a field with an empty value. Data lines join with
+    newlines. Comment lines start with a colon. The ``event``, ``id``, and
+    ``retry`` fields, and any unknown field, are ignored.
+    """
+    data_lines: list[str] = []
+    for line in block.split("\n"):
+        if not line or line.startswith(":"):
+            continue
+        field, _, value = line.partition(":")
+        if field == "data":
+            data_lines.append(value.removeprefix(" "))
+    return "\n".join(data_lines) if data_lines else None
+
+
 def _handle_sse_event(
     event: str,
     content_parts: list[str],
     errors: list[str],
     stream: bool = True,
 ) -> str | None:
-    """Dispatch one SSE event, printing ``chunk`` text live when streaming.
+    """Dispatch one SSE event block, printing ``chunk`` text live when streaming.
 
-    ``json.loads`` already yields real newlines, so no unescaping is needed;
-    anything that is not one of the four known shapes is ignored. Returns the
-    event's ``type``, or None when the event is not JSON.
+    The event data is one of the four JSON objects the server sends. An event
+    with no data, or data that is not JSON, is ignored. A JSON value that is not
+    an object, or a chunk whose data is not a string, is skipped with a warning.
+    Returns the event's ``type``, or None when the event was ignored or skipped.
     """
-    event = event.strip()
-    if not event:
+    text = _event_data(event)
+    if text is None:
         return None
-    if event.startswith("data: "):
-        event = event[6:]
     try:
-        data = json.loads(event)
+        data = json.loads(text)
     except json.JSONDecodeError:
         return None
-    if data.get("type") == "chunk":
-        text = data.get("data", "")
+    if not isinstance(data, dict):
+        logger.warning("Skipped an SSE event whose data is a JSON %s", type(data).__name__)
+        return None
+    kind = data.get("type")
+    if kind == "chunk":
+        chunk = data.get("data")
+        if not isinstance(chunk, str):
+            logger.warning("Skipped a chunk event whose data is %s", type(chunk).__name__)
+            return None
         if stream:
-            print(text, end="", flush=True)
-        content_parts.append(text)
-    elif data.get("type") == "tool":
+            print(chunk, end="", flush=True)
+        content_parts.append(chunk)
+    elif kind == "tool":
         # A labelled boundary where the agent called a retriever tool.
         # Display-only: kept out of content_parts so the returned response
         # string stays the agent's prose, not the trace.
         if stream:
             name = data.get("name", "")
             print(f"\n\n  → {name}\n", end="\n", flush=True)
-    elif data.get("type") == "error":
+    elif kind == "error":
         errors.append(data.get("error", "Unknown error"))
-    return data.get("type")
+    return kind if isinstance(kind, str) else None
 
 
 def _normalize_newlines(text: str) -> str:

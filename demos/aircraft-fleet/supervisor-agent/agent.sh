@@ -174,26 +174,28 @@ runtime_arn() {
 # Create agentcore/ the way `agentcore create` and `agentcore add runtime`
 # lay it out, then point the runtime at this folder's existing code.
 create_project() {
-    local tmp
-    tmp="$(mktemp -d)"
-    (cd "$tmp" && agentcore create --name "$PROJECT_NAME" --skip-install --skip-git)
+    CREATE_TMP="$(mktemp -d)"
+    # A failed step exits through this trap, so the temporary project and a
+    # partial spec do not stay behind.
+    trap 'rm -rf "${CREATE_TMP:?}"; rm -f "$PROJECT_SPEC.tmp"' EXIT
+    (cd "$CREATE_TMP" && agentcore create --name "$PROJECT_NAME" --skip-install --skip-git)
     # add runtime runs inside the temporary project, because it writes starter
     # docs to app/<name>/ next to agentcore/. The code lives here instead, so
     # only the temporary app/ is removed.
-    (cd "$tmp/$PROJECT_NAME" && agentcore add runtime \
+    (cd "$CREATE_TMP/$PROJECT_NAME" && agentcore add runtime \
         --name "$RUNTIME_NAME" \
         --language python \
         --description "Aircraft fleet supervisor with Maintenance and Operations specialists" \
         --environment-variables "$RUNTIME_ENV")
-    rm -rf "$tmp/$PROJECT_NAME/app"
-    mv "$tmp/$PROJECT_NAME/agentcore" agentcore
-    rm -rf "$tmp"
+    rm -rf "${CREATE_TMP:?}/$PROJECT_NAME/app"
+    mv "$CREATE_TMP/$PROJECT_NAME/agentcore" agentcore
 
-    local spec="agentcore/agentcore.json"
     jq --arg name "$RUNTIME_NAME" --arg entry "$ENTRYPOINT" --arg ver "$RUNTIME_VERSION" \
         '(.runtimes[] | select(.name == $name)) |= (.codeLocation = "." | .entrypoint = $entry | .runtimeVersion = $ver)' \
-        "$spec" > "$spec.tmp"
-    mv "$spec.tmp" "$spec"
+        "$PROJECT_SPEC" > "$PROJECT_SPEC.tmp"
+    mv "$PROJECT_SPEC.tmp" "$PROJECT_SPEC"
+    trap - EXIT
+    rm -rf "${CREATE_TMP:?}"
 }
 
 # The runtime gets its Gateway token from the fleet-gateway OAuth provider.
@@ -287,7 +289,11 @@ restore_project() {
 # first, so a second Ctrl+C cannot stop the restore halfway.
 begin_spec_restore() {
     SPEC_BACKUP=$(mktemp)
-    cp "$PROJECT_SPEC" "$SPEC_BACKUP"
+    # The trap is not armed yet, so a failed copy removes the backup here.
+    if ! cp "$PROJECT_SPEC" "$SPEC_BACKUP"; then
+        rm -f "$SPEC_BACKUP"
+        exit 1
+    fi
     trap "trap '' INT TERM; restore_project || exit 1" EXIT
     trap 'exit 130' INT TERM
 }

@@ -51,6 +51,12 @@ case "$1 $2" in
 esac
 """
 
+# This macOS mktemp ignores TMPDIR, so the stub passes a template in the
+# test's own folder. That lets a test check that nothing was left behind.
+STUB_MKTEMP = r"""#!/bin/bash
+exec /usr/bin/mktemp "$@" "$STUB_TMP/tmp.XXXXXX"
+"""
+
 CLEAN_STATUS = json.dumps(
     {
         "resources": [
@@ -71,7 +77,11 @@ def project(tmp_path: Path) -> Path:
     )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for name, body in (("agentcore", STUB_AGENTCORE), ("aws", STUB_AWS)):
+    for name, body in (
+        ("agentcore", STUB_AGENTCORE),
+        ("aws", STUB_AWS),
+        ("mktemp", STUB_MKTEMP),
+    ):
         stub = bin_dir / name
         stub.write_text(body)
         stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
@@ -79,7 +89,14 @@ def project(tmp_path: Path) -> Path:
 
 
 def run_destroy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[str]:
+    return run_agent(project, "destroy", "--yes", **stub_env)
+
+
+def run_agent(project: Path, *args: str, **stub_env: str) -> subprocess.CompletedProcess[str]:
+    temp_dir = project.parent / "tmp"
+    temp_dir.mkdir(exist_ok=True)
     env = {
+        "STUB_TMP": str(temp_dir),
         "PATH": f"{project.parent / 'bin'}:{os.environ['PATH']}",
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
@@ -87,7 +104,7 @@ def run_destroy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[s
         **stub_env,
     }
     return subprocess.run(
-        ["bash", str(project / "agent.sh"), "destroy", "--yes"],
+        ["bash", str(project / "agent.sh"), *args],
         capture_output=True,
         text=True,
         env=env,
@@ -97,7 +114,8 @@ def run_destroy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[s
 
 
 def calls(project: Path) -> list[str]:
-    return (project.parent / "calls.log").read_text().splitlines()
+    log = project.parent / "calls.log"
+    return log.read_text().splitlines() if log.exists() else []
 
 
 def test_clean_destroy_checks_aws_by_name_and_succeeds(project: Path) -> None:
@@ -195,3 +213,27 @@ def test_destroy_strips_a_left_secret_line_and_keeps_the_file_mode(project: Path
     assert env_local.read_text() == "OTHER_SETTING=kept\n"
     assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
     assert not list(env_local.parent.glob(".env.local.*"))
+
+
+def test_a_failed_configure_leaves_no_temporary_project(project: Path) -> None:
+    shutil.rmtree(project / "agentcore")
+
+    result = run_agent(project, "configure")
+
+    assert result.returncode != 0
+    assert "agentcore create --name fleetsupervisor --skip-install --skip-git" in calls(project)
+    assert not list((project.parent / "tmp").iterdir())
+    assert not (project / "agentcore").exists()
+
+
+def test_a_failed_spec_backup_leaves_no_temporary_file(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    spec.chmod(0)
+    try:
+        result = run_destroy(project)
+    finally:
+        spec.chmod(0o644)
+
+    assert result.returncode == 1
+    assert not list((project.parent / "tmp").iterdir())
+    assert not any(c.startswith("agentcore remove") for c in calls(project))

@@ -14,7 +14,7 @@
 #   ./agent.sh logs               Show recent runtime logs
 #   ./agent.sh invoke-cloud           Send default question to deployed agent
 #   ./agent.sh invoke-cloud "prompt"  Send custom question to deployed agent
-#   ./agent.sh destroy            Remove from AgentCore
+#   ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)
 #
 # The cloud commands use the AgentCore CLI (npm install -g @aws/agentcore).
 # The project lives in agentcore/. Its runtime's codeLocation is this folder,
@@ -95,7 +95,7 @@ print_usage() {
     echo "  ./agent.sh invoke-cloud \"q\"   Send custom question to deployed agent"
     echo "  ./agent.sh load-test          Cloud load test (random queries every 5s)"
     echo "  ./agent.sh load-test 10       Cloud load test with custom interval"
-    echo "  ./agent.sh destroy            Remove from AgentCore"
+    echo "  ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)"
     echo "  ./agent.sh help               Show this help message"
     echo ""
     echo "Examples:"
@@ -258,8 +258,12 @@ strip_gateway_secret() {
 restore_project() {
     local failed=0
     if [ -n "${SPEC_BACKUP:-}" ]; then
-        cp "$SPEC_BACKUP" "$PROJECT_SPEC" && rm -f "$SPEC_BACKUP" \
-            || { echo "Restore failed; backup at $SPEC_BACKUP" >&2; failed=1; }
+        if cp "$SPEC_BACKUP" "$PROJECT_SPEC"; then
+            rm -f "$SPEC_BACKUP"
+        else
+            echo -e "${RED}Could not restore $PROJECT_SPEC. The backup is at $SPEC_BACKUP${NC}" >&2
+            failed=1
+        fi
     fi
     strip_gateway_secret || failed=1
     return "$failed"
@@ -280,6 +284,21 @@ end_gateway_credential() {
     restore_project
 }
 
+# Ask before destroying. Anything but y or yes, including no input from a
+# non-interactive shell, cancels. `destroy --yes` skips the question.
+confirm_destroy() {
+    local reply=""
+    echo -e "${YELLOW}This deletes the $RUNTIME_NAME Runtime, the $GATEWAY_CREDENTIAL credential provider, and the stack in target '$TARGET'.${NC}"
+    read -r -p "Continue? [y/N] " reply || true
+    case "$reply" in
+        y|Y|yes|YES) ;;
+        *)
+            echo "Cancelled. Nothing was changed."
+            exit 1
+            ;;
+    esac
+}
+
 # Report every resource that `agentcore status` still shows as deployed.
 # Status lists only what agentcore.json declares, so destroy calls this with
 # the Runtime and the credential both declared.
@@ -289,6 +308,7 @@ report_remaining() {
     if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
         cat "$errors"
+        echo "$status"
         rm -f "$errors"
         exit 1
     fi
@@ -482,6 +502,9 @@ case "${1:-help}" in
 
     destroy)
         ensure_project
+        if [ "${2:-}" != "--yes" ]; then
+            confirm_destroy
+        fi
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
         # The CLI has no destroy command. A deploy of a project that declares

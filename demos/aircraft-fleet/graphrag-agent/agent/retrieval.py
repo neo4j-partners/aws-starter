@@ -202,7 +202,10 @@ def _text2cypher_retriever() -> BoundedText2CypherRetriever:
     return BoundedText2CypherRetriever(
         get_driver(),
         llm=BedrockLLM(
-            model_name=settings.model_id, region_name=settings.aws_region
+            model_name=settings.model_id,
+            region_name=settings.aws_region,
+            # Merged into the Converse inferenceConfig.
+            model_params={"maxTokens": settings.text2cypher_max_tokens},
         ),
         neo4j_schema=get_graph_schema(),
         neo4j_database=_neo4j_database(),

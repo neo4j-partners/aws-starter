@@ -43,3 +43,9 @@ def test_bad_effort_lists_the_allowed_values(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("MODEL_EFFORT", "extreme")
     with pytest.raises(ValueError, match="low, medium, high, xhigh, max"):
         Settings.from_env()
+
+
+def test_text2cypher_max_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert Settings.from_env().text2cypher_max_tokens == 2048
+    monkeypatch.setenv("TEXT2CYPHER_MAX_TOKENS", "512")
+    assert Settings.from_env().text2cypher_max_tokens == 512

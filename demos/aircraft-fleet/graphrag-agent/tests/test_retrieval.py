@@ -113,3 +113,24 @@ def test_graph_query_notes_truncation(monkeypatch) -> None:
     out = retrieval.graph_query("list everything")
     assert out.startswith("<Record n=0>\n<Record n=1>\n")
     assert "first 2 rows" in out
+
+
+def test_text2cypher_llm_caps_output_tokens(monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_llm(**kwargs):
+        captured.update(kwargs)
+        return "llm"
+
+    monkeypatch.setattr(retrieval, "BedrockLLM", fake_llm)
+    monkeypatch.setattr(retrieval, "BoundedText2CypherRetriever", lambda *a, **kw: kw)
+    monkeypatch.setattr(retrieval, "get_driver", lambda: "driver")
+    monkeypatch.setattr(retrieval, "get_graph_schema", lambda: "schema")
+    retrieval._text2cypher_retriever.cache_clear()
+    try:
+        retrieval._text2cypher_retriever()
+    finally:
+        retrieval._text2cypher_retriever.cache_clear()
+    assert captured["model_params"] == {
+        "maxTokens": retrieval.settings.text2cypher_max_tokens
+    }

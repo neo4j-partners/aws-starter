@@ -74,6 +74,9 @@ class Settings:
     schema_ttl_s: int = 600
     text2cypher_timeout_s: float = 30.0
     text2cypher_max_rows: int = 200
+    # Output cap for the Cypher-writing call. A query needs far less than the
+    # agent's MAX_TOKENS, and the cap stops a runaway generation early.
+    text2cypher_max_tokens: int = 2048
     embed_model_id: str = "amazon.titan-embed-text-v2:0"
     embed_dimensions: int = 1024
 
@@ -98,6 +101,9 @@ class Settings:
             ),
             text2cypher_max_rows=_env_int(
                 "TEXT2CYPHER_MAX_ROWS", defaults.text2cypher_max_rows
+            ),
+            text2cypher_max_tokens=_env_int(
+                "TEXT2CYPHER_MAX_TOKENS", defaults.text2cypher_max_tokens
             ),
             embed_model_id=os.getenv(
                 "EMBED_MODEL_ID", defaults.embed_model_id

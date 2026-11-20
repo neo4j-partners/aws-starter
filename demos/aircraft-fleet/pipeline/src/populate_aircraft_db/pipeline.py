@@ -12,6 +12,8 @@ from neo4j_graphrag.components.text_splitters.base import TextSplitter
 from neo4j_graphrag.components.types import TextChunks
 from neo4j_graphrag.embeddings.openai import OpenAIEmbeddings
 
+from .loader import detach_delete_nodes
+
 # Labels for extracted entity nodes (used by clear/verify logic).
 EXTRACTED_LABELS = [
     "AircraftModel",
@@ -602,32 +604,11 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
 
 def clear_enrichment_data(driver: Driver, database: str) -> None:
     """Delete all Document, Chunk, and extracted entity nodes (preserves operational graph)."""
-    labels_to_clear = ["Document", "Chunk"] + EXTRACTED_LABELS
-    deleted_total = 0
+    # __Entity__ and __KGBuilder__ are labels the KG pipeline adds to its nodes.
+    labels_to_clear = ["Document", "Chunk", *EXTRACTED_LABELS, "__Entity__", "__KGBuilder__"]
 
     print("Clearing enrichment data (Documents, Chunks, extracted entities)...")
-    for label in labels_to_clear:
-        while True:
-            records, _, _ = driver.execute_query(
-                f"MATCH (n:{label}) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted",
-                database_=database,
-            )
-            count = records[0]["deleted"]
-            deleted_total += count
-            if count == 0:
-                break
-
-    # Clean up __Entity__ and __KGBuilder__ labeled nodes left by the pipeline
-    for label in ["__Entity__", "__KGBuilder__"]:
-        while True:
-            records, _, _ = driver.execute_query(
-                f"MATCH (n:{label}) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted",
-                database_=database,
-            )
-            count = records[0]["deleted"]
-            deleted_total += count
-            if count == 0:
-                break
+    deleted_total = sum(detach_delete_nodes(driver, database, label) for label in labels_to_clear)
 
     print(f"  [OK] Cleared {deleted_total} enrichment nodes.")
 

@@ -406,22 +406,35 @@ def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
         print(f"  [OK] Loaded {len(records)} {rel_type} relationships.")
 
 
+# Rows deleted per inner transaction when clearing nodes.
+_DELETE_BATCH_SIZE = 10000
+
+
+def detach_delete_nodes(driver: Driver, database: str, label: str | None = None) -> int:
+    """Detach-delete every node, or every node with ``label``, in batches.
+
+    ``CALL ... IN TRANSACTIONS`` must run in an auto-commit transaction, so
+    this uses ``session.run`` rather than ``execute_query``.
+
+    Returns:
+        The number of nodes deleted.
+    """
+    pattern = f"(n:{label})" if label else "(n)"
+    query = (
+        f"MATCH {pattern} "
+        "CALL (n) { DETACH DELETE n } "
+        f"IN TRANSACTIONS OF {_DELETE_BATCH_SIZE} ROWS"
+    )
+    with driver.session(database=database) as session:
+        summary = session.run(query).consume()
+    return summary.counters.nodes_deleted
+
+
 def clear_database(driver: Driver, database: str) -> None:
     """Delete all nodes and relationships in batches."""
     print("Clearing database...")
-    deleted_total = 0
-    while True:
-        records, _, _ = driver.execute_query(
-            "MATCH (n) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted",
-            database_=database,
-        )
-        count = records[0]["deleted"]
-        deleted_total += count
-        if count > 0:
-            print(f"  Deleted {deleted_total} nodes so far...", end="\r")
-        if count == 0:
-            break
-    print(f"\n  [OK] Database cleared ({deleted_total} nodes deleted).")
+    deleted_total = detach_delete_nodes(driver, database)
+    print(f"  [OK] Database cleared ({deleted_total} nodes deleted).")
 
 
 def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:

@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** A320-200 series aircraft equipped with IAE V2500-A1 engines
-**Operator:** SkyWays Airlines
+**Operator:** SkyWays, ExampleAir, RegionalCo, NorthernJet
 **Fleet:** N30268B, N81338F, N32276J, N76758N, N63098R
 
 ---
@@ -54,12 +54,12 @@
 
 The A320-200 fleet operates across four partner carriers configured for medium-haul operations.
 
-| Operator | Primary Routes |
-|----------|----------------|
-| ExampleAir | Domestic medium-haul |
-| SkyWays | Domestic medium-haul |
-| RegionalCo | Mixed domestic/regional |
-| NorthernJet | Domestic medium-haul |
+| Operator | Registrations | Primary Routes |
+|----------|---------------|----------------|
+| ExampleAir | N32276J | Domestic medium-haul |
+| SkyWays | N30268B, N81338F | Domestic medium-haul |
+| RegionalCo | N76758N | Mixed domestic/regional |
+| NorthernJet | N63098R | Domestic medium-haul |
 
 Aircraft entered service between 2017 and 2023, configured in a single-class or dual-class layout for 150–180 passengers.
 

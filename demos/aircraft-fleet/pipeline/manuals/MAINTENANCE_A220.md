@@ -53,7 +53,7 @@
 
 ### 1.2 Fleet Configuration
 
-The ExampleAir A220-300 fleet consists of five aircraft configured for short to medium-haul operations. Additional operators include SkyWays and NorthernJet.
+The ExampleAir A220-300 fleet consists of five aircraft configured for short to medium-haul operations.
 
 | Aircraft ID | Registration | ICAO 24 | Entry into Service |
 |-------------|--------------|---------|-------------------|

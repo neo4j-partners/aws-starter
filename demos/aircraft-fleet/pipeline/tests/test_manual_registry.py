@@ -9,13 +9,21 @@ import pytest
 
 from generator.config import GeneratorConfig
 from generator.fleet import _distribute, _registry_fleet, generate_fleet
-from generator.specs import MANUAL_FLEET_TAILS, MODEL_DISTRIBUTION
+from generator.specs import (
+    MANUAL_FLEET_TAILS,
+    MANUAL_TAIL_OPERATORS,
+    MODEL_DISTRIBUTION,
+    OPERATORS,
+)
 from populate_aircraft_db.pipeline import DOCUMENTS
 
 MANUALS_DIR = Path(__file__).resolve().parent.parent / "manuals"
 FLEET_LINE = re.compile(r"^\*\*Fleet:\*\*\s*(.+)$", re.MULTILINE)
 EXAMPLE_AIRCRAFT = re.compile(r"Aircraft: (AC\d+) \((N\w+)\)")
 TABLE_AIRCRAFT = re.compile(r"^\| (AC\d+) \| (N\w+) \|", re.MULTILINE)
+OPERATOR_LINE = re.compile(r"^\*\*Operator:\*\*\s*(.+)$", re.MULTILINE)
+_OPERATOR_NAMES = "|".join(op.name for op in OPERATORS)
+REGISTRATION_ROW = re.compile(rf"^\| ({_OPERATOR_NAMES}) \| (N\w+(?:, N\w+)*) \|", re.MULTILINE)
 
 
 def _manual_text(filename: str) -> str:
@@ -24,6 +32,8 @@ def _manual_text(filename: str) -> str:
 
 def test_registry_covers_every_manual() -> None:
     assert set(MANUAL_FLEET_TAILS) == {doc.aircraft_type for doc in DOCUMENTS}
+    registry_tails = {tail for tails in MANUAL_FLEET_TAILS.values() for tail in tails}
+    assert set(MANUAL_TAIL_OPERATORS) == registry_tails
 
 
 @pytest.mark.parametrize("doc", DOCUMENTS, ids=lambda doc: doc.aircraft_type)
@@ -62,6 +72,34 @@ def test_manual_example_aircraft_matches_fleet(doc) -> None:
     for aircraft_id, tail in examples + TABLE_AIRCRAFT.findall(text):
         aircraft = fleet[aircraft_id]
         assert (aircraft.tail_number, aircraft.model) == (tail, doc.aircraft_type)
+
+
+def _manual_tail_operators(text: str, model: str) -> dict[str, str]:
+    """Map each manual tail to its operator.
+
+    The Registrations column of the fleet table gives the mapping. A manual
+    without that column gives every tail the single operator on its
+    **Operator:** line.
+    """
+    rows = REGISTRATION_ROW.findall(text)
+    if rows:
+        return {tail: operator for operator, tails in rows for tail in tails.split(", ")}
+    (operator,) = OPERATOR_LINE.search(text).group(1).split(", ")
+    return dict.fromkeys(MANUAL_FLEET_TAILS[model], operator)
+
+
+@pytest.mark.parametrize("doc", DOCUMENTS, ids=lambda doc: doc.aircraft_type)
+def test_registry_operators_match_manual(doc) -> None:
+    text = _manual_text(doc.filename)
+    manual = _manual_tail_operators(text, doc.aircraft_type)
+    assert sorted(manual) == sorted(MANUAL_FLEET_TAILS[doc.aircraft_type])
+    line_operators = OPERATOR_LINE.search(text).group(1).split(", ")
+    assert set(line_operators) == set(manual.values())
+    tail_counts = [list(manual.values()).count(op) for op in line_operators]
+    assert tail_counts[0] == max(tail_counts), "the primary operator is listed first"
+    fleet = generate_fleet(GeneratorConfig(n_aircraft=30))
+    generated = {ac.tail_number: ac.operator_profile.name for ac in fleet}
+    assert {tail: generated[tail] for tail in manual} == manual
 
 
 def test_registry_order_is_round_robin_by_model() -> None:

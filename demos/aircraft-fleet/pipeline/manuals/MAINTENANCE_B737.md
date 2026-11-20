@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** B737-800 series aircraft equipped with CFM56-7B engines
-**Operator:** ExampleAir
+**Operator:** ExampleAir, SkyWays, RegionalCo, NorthernJet
 **Fleet:** N95040A, N53032E, N84110I, N26760M, N44342Q
 
 ---
@@ -55,12 +55,12 @@
 
 The B737-800 fleet operates across four partner carriers configured for short to medium-haul operations.
 
-| Operator | Primary Routes |
-|----------|----------------|
-| ExampleAir | Domestic short/medium-haul |
-| SkyWays | Domestic short/medium-haul |
-| RegionalCo | Mixed domestic/regional |
-| NorthernJet | Domestic short/medium-haul |
+| Operator | Registrations | Primary Routes |
+|----------|---------------|----------------|
+| ExampleAir | N95040A, N53032E | Domestic short/medium-haul |
+| SkyWays | N84110I | Domestic short/medium-haul |
+| RegionalCo | N26760M | Mixed domestic/regional |
+| NorthernJet | N44342Q | Domestic short/medium-haul |
 
 Aircraft entered service between 2016 and 2022, configured in a single-class or dual-class layout for 162–189 passengers.
 

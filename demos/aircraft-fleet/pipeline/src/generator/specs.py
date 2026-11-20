@@ -149,6 +149,49 @@ MANUAL_FLEET_TAILS: dict[str, list[str]] = {
     "A220-300": ["N20001", "N20002", "N20003", "N20004", "N20005"],
 }
 
+# Operator of each manual tail, from the Registrations column of each
+# manual's fleet table. The A220-300 manual has no such table, and its
+# **Operator:** line names ExampleAir for all five aircraft. The test in
+# tests/test_manual_registry.py checks these against the manuals. Aircraft
+# beyond the registry get shuffled operators instead.
+MANUAL_TAIL_OPERATORS: dict[str, str] = {
+    # B737-800
+    "N95040A": "ExampleAir",
+    "N53032E": "ExampleAir",
+    "N84110I": "SkyWays",
+    "N26760M": "RegionalCo",
+    "N44342Q": "NorthernJet",
+    # A320-200
+    "N30268B": "SkyWays",
+    "N81338F": "SkyWays",
+    "N32276J": "ExampleAir",
+    "N76758N": "RegionalCo",
+    "N63098R": "NorthernJet",
+    # A321neo
+    "N54980C": "RegionalCo",
+    "N86057G": "RegionalCo",
+    "N89365K": "ExampleAir",
+    "N65164O": "SkyWays",
+    "N96107S": "NorthernJet",
+    # E190
+    "N10002": "ExampleAir",
+    "N10017": "ExampleAir",
+    "N10023": "ExampleAir",
+    "N10036": "SkyWays",
+    "N10050": "SkyWays",
+    "N10068": "SkyWays",
+    "N10071": "RegionalCo",
+    "N10073": "RegionalCo",
+    "N10084": "NorthernJet",
+    "N10096": "NorthernJet",
+    # A220-300
+    "N20001": "ExampleAir",
+    "N20002": "ExampleAir",
+    "N20003": "ExampleAir",
+    "N20004": "ExampleAir",
+    "N20005": "ExampleAir",
+}
+
 MANUFACTURER: dict[str, str] = {
     "B737-800": "Boeing",
     "A320-200": "Airbus",

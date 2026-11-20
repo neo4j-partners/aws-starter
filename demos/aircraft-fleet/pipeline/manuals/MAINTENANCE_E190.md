@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** E190 series aircraft equipped with CF34-10E engines
-**Operator:** ExampleAir (also SkyWays, NorthernJet, RegionalCo)
+**Operator:** ExampleAir, SkyWays, RegionalCo, NorthernJet
 **Fleet:** N10002, N10017, N10023, N10036, N10050, N10068, N10071, N10073, N10084, N10096
 
 ---
@@ -55,12 +55,12 @@
 
 The E190 fleet operates across four partner carriers in regional jet service.
 
-| Operator | Aircraft Count | Primary Routes |
+| Operator | Registrations | Primary Routes |
 |----------|---------------|----------------|
-| ExampleAir | 3 | Domestic regional feeders |
-| SkyWays | 3 | Domestic regional feeders |
-| RegionalCo | 2 | Regional and short-haul |
-| NorthernJet | 2 | Northern domestic regional |
+| ExampleAir | N10002, N10017, N10023 | Domestic regional feeders |
+| SkyWays | N10036, N10050, N10068 | Domestic regional feeders |
+| RegionalCo | N10071, N10073 | Regional and short-haul |
+| NorthernJet | N10084, N10096 | Northern domestic regional |
 
 Aircraft entered service between 2018 and 2022, configured in a two-class layout for 94–100 passengers. Regional operations result in higher cycle-to-flight-hour ratios compared to wide-body or long-haul fleets, making cycle-based inspection compliance particularly important.
 

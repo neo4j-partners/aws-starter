@@ -11,6 +11,7 @@ from .config import GeneratorConfig
 from .specs import (
     COMPONENT_TYPES_BY_SYSTEM,
     MANUAL_FLEET_TAILS,
+    MANUAL_TAIL_OPERATORS,
     MANUFACTURER,
     MODEL_DISTRIBUTION,
     OPERATORS,
@@ -188,8 +189,9 @@ def _build_aircraft(
 def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     """Build the fleet: the manual registry aircraft first, then the rest.
 
-    The first aircraft carry the manual tails in a fixed order. Any aircraft
-    beyond the registry follow MODEL_DISTRIBUTION in a shuffled order.
+    The first aircraft carry the manual tails in a fixed order, each with the
+    operator its manual names. Any aircraft beyond the registry follow
+    MODEL_DISTRIBUTION in a shuffled order, with shuffled operators.
     """
     rng = random.Random(config.seed)
 
@@ -200,10 +202,15 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     tails = _generated_tails({tail for _, tail in full_registry})
     plan = [*registry, *((model, next(tails)) for model in extra_models)]
 
-    # Assign operators round-robin then shuffle so each gets a similar fleet size
-    n_ops = len(OPERATORS)
-    operator_assignments = [OPERATORS[i % n_ops] for i in range(config.n_aircraft)]
-    rng.shuffle(operator_assignments)
+    # Registry tails keep their manual operator. Extra aircraft get operators
+    # round-robin, then shuffled, so each operator gets a similar share.
+    operators_by_name = {op.name: op for op in OPERATORS}
+    extra_operators = [OPERATORS[i % len(OPERATORS)] for i in range(len(extra_models))]
+    rng.shuffle(extra_operators)
+    operator_assignments = [
+        *(operators_by_name[MANUAL_TAIL_OPERATORS[tail]] for _, tail in registry),
+        *extra_operators,
+    ]
 
     return [
         _build_aircraft(i, model, tail, op, rng)

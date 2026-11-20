@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** A321neo series aircraft equipped with CFM LEAP-1A engines
-**Operator:** RegionalCo
+**Operator:** RegionalCo, ExampleAir, SkyWays, NorthernJet
 **Fleet:** N54980C, N86057G, N89365K, N65164O, N96107S
 
 ---
@@ -67,12 +67,12 @@ The A321neo represents the latest evolution of the A320 family with:
 
 The A321neo fleet operates across four partner carriers configured for medium to long-haul operations.
 
-| Operator | Primary Routes |
-|----------|----------------|
-| ExampleAir | Domestic medium-haul |
-| SkyWays | Domestic medium-haul |
-| RegionalCo | Mixed domestic/regional |
-| NorthernJet | Domestic medium-haul |
+| Operator | Registrations | Primary Routes |
+|----------|---------------|----------------|
+| ExampleAir | N89365K | Domestic medium-haul |
+| SkyWays | N65164O | Domestic medium-haul |
+| RegionalCo | N54980C, N86057G | Mixed domestic/regional |
+| NorthernJet | N96107S | Domestic medium-haul |
 
 Aircraft entered service between 2020 and 2023, configured in a single-class or dual-class layout for 180–220 passengers.
 

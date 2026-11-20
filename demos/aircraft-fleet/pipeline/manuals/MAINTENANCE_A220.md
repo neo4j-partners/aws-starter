@@ -1218,7 +1218,7 @@ These figures are typical industry shares for this aircraft type. They are not c
 **Events by Severity:**
 - Critical: about 37%
 - Major: about 32%
-- Minor: about 32%
+- Minor: about 31%
 
 **Events by System:**
 - Engine: about 68%

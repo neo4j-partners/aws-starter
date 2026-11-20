@@ -171,16 +171,17 @@ create_project() {
     local tmp
     tmp="$(mktemp -d)"
     (cd "$tmp" && agentcore create --name "$PROJECT_NAME" --skip-install --skip-git)
-    mv "$tmp/$PROJECT_NAME/agentcore" agentcore
-    rm -rf "$tmp"
-
-    agentcore add runtime \
+    # add runtime runs inside the temporary project, because it writes starter
+    # docs to app/<name>/ next to agentcore/. The code lives here instead, so
+    # only the temporary app/ is removed.
+    (cd "$tmp/$PROJECT_NAME" && agentcore add runtime \
         --name "$RUNTIME_NAME" \
         --language python \
         --description "Aircraft fleet supervisor with Maintenance and Operations specialists" \
-        --environment-variables "$RUNTIME_ENV"
-    # add runtime writes starter docs to app/<name>/; the code lives here instead.
-    rm -rf app
+        --environment-variables "$RUNTIME_ENV")
+    rm -rf "$tmp/$PROJECT_NAME/app"
+    mv "$tmp/$PROJECT_NAME/agentcore" agentcore
+    rm -rf "$tmp"
 
     local spec="agentcore/agentcore.json"
     jq --arg name "$RUNTIME_NAME" --arg entry "$ENTRYPOINT" --arg ver "$RUNTIME_VERSION" \

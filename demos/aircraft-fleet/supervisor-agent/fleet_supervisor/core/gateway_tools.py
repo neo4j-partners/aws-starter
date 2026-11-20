@@ -6,6 +6,10 @@ restarts. A call made while the session is down fails in one of two ways:
 - A call already in flight returns an error ``MCPToolResult``.
 - A later call raises ``MCPClientInitializationError`` before
   ``MCPClient.call_tool_async`` reaches its own ``try``.
+- A call that gets HTTP 404 returns :data:`SESSION_TERMINATED_TEXT`. The MCP
+  SDK reports any 404 as a terminated session but keeps the client's thread
+  running, so the session still looks active. The connection is marked
+  ended, so later requests rebuild it too.
 
 :class:`GatewayTool` catches both. It asks for a rebuilt client once and
 retries the call once. If the retry also fails, or the rebuild fails, the
@@ -42,6 +46,11 @@ logger = logging.getLogger(__name__)
 # see it too.
 REQUEST_SESSION_ID: ContextVar[str] = ContextVar("request_session_id", default="-")
 
+# The error result Strands returns when the MCP SDK reports a terminated
+# session: the SDK's JSON-RPC error message after Strands' prefix. The SDK
+# sends it for any HTTP 404 on a request (mcp 1.30.0, streamable_http.py).
+SESSION_TERMINATED_TEXT = "Tool execution failed: Session terminated"
+
 
 def session_is_running(client: MCPClient) -> bool:
     """Report whether the MCP client's session is still up.
@@ -54,11 +63,17 @@ def session_is_running(client: MCPClient) -> bool:
 
 
 def stop_quietly(client: MCPClient) -> None:
-    """Stop the client, logging a failure so it cannot hide another error."""
+    """Stop the client, logging a failure so it cannot hide another error.
+
+    ``MCPClient.stop`` re-raises the error that ended the session, which is
+    routine before a rebuild and can name the Gateway URL. So only the class
+    name goes to WARNING, and the details go to DEBUG.
+    """
     try:
         client.stop(None, None, None)
-    except Exception:
-        logger.exception("Error while stopping the MCP client")
+    except Exception as error:
+        logger.warning("Error while stopping the MCP client (cause=%s)", type(error).__name__)
+        logger.debug("Stop failure details", exc_info=error)
 
 
 def _cause_name(error: BaseException) -> str:
@@ -90,9 +105,14 @@ class GatewayConnection:
         self._holders = 0
         self._retired = False
         self._stopped = False
+        self._ended = False
 
     def is_running(self) -> bool:
-        return session_is_running(self.client)
+        return not self._ended and session_is_running(self.client)
+
+    def mark_ended(self) -> None:
+        """Record that a call found the session ended, though the client looks active."""
+        self._ended = True
 
     def _claim_stop(self) -> bool:
         """Return True once, for the caller that must stop the client. Hold the lock."""
@@ -100,14 +120,6 @@ class GatewayConnection:
             self._stopped = True
             return True
         return False
-
-    def stop(self) -> None:
-        """Stop the client now. For a connection that never served a call."""
-        with self._lock:
-            self._retired = True
-            should_stop = self._claim_stop()
-        if should_stop:
-            stop_quietly(self.client)
 
     def retire(self) -> None:
         """Mark the connection replaced. Stop the client if no call holds it."""
@@ -140,6 +152,10 @@ CurrentConnection = Callable[[], GatewayConnection | None]
 # Returns a running connection other than ``stale``, rebuilding only when
 # ``stale`` is still the current one.
 Reconnect = Callable[[GatewayConnection | None], Awaitable[GatewayConnection]]
+
+
+def _result_text(result: ToolResult) -> str:
+    return "\n".join(item["text"] for item in result["content"] if "text" in item)
 
 
 class _SessionEnded(Exception):
@@ -254,13 +270,16 @@ class GatewayTool(AgentTool):
         # exception itself, so only the result is left to check here.
         if result["status"] != "error":
             return result
+        if _result_text(result).strip() == SESSION_TERMINATED_TEXT:
+            connection.mark_ended()
+            raise _SessionEnded("SessionTerminated")
         if not connection.is_running():
             raise _SessionEnded("ErrorResultWhileSessionDown")
         return self._model_safe(result)
 
     def _model_safe(self, result: ToolResult) -> ToolResult:
         """Replace an error result's text with what the model may see. Log the original."""
-        original = "\n".join(item["text"] for item in result["content"] if "text" in item)
+        original = _result_text(result)
         error = classify_tool_error(original)
         level = (
             logging.WARNING if error.kind in (ErrorKind.QUERY, ErrorKind.TIMEOUT) else logging.ERROR

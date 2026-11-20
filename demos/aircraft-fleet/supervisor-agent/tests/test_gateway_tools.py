@@ -8,7 +8,12 @@ from strands.types.events import ToolResultEvent
 from strands.types.exceptions import MCPClientInitializationError, ToolProviderException
 
 from fleet_supervisor import server
-from fleet_supervisor.core.gateway_tools import REQUEST_SESSION_ID, GatewayTool
+from fleet_supervisor.core.gateway_tools import (
+    REQUEST_SESSION_ID,
+    SESSION_TERMINATED_TEXT,
+    GatewayTool,
+    stop_quietly,
+)
 from fleet_supervisor.core.tool_errors import UNAVAILABLE_RESULT
 
 TOOL = "fleet___read_neo4j_cypher"
@@ -41,12 +46,22 @@ class FakeClient:
     result, as Strands does. A call made while it is down raises.
     """
 
-    def __init__(self, tools=(TOOL,), spec=None, reply="ok", status="success", fail_start=None):
+    def __init__(
+        self,
+        tools=(TOOL,),
+        spec=None,
+        reply="ok",
+        status="success",
+        fail_start=None,
+        terminated=False,
+    ):
         self.tool_names = list(tools)
         self.spec = spec or {"name": TOOL, "description": "first"}
         self.reply = reply
         self.status = status
         self.fail_start = fail_start
+        # Every call gets the SDK's 404 result while the session looks active.
+        self.terminated = terminated
         self.gate: asyncio.Event | None = None
         self.active = False
         self.stopped = False
@@ -90,6 +105,12 @@ class FakeClient:
         self.calls += 1
         if self.gate is not None:
             await self.gate.wait()
+        if self.terminated:
+            return {
+                "toolUseId": tool_use["toolUseId"],
+                "status": "error",
+                "content": [{"text": SESSION_TERMINATED_TEXT}],
+            }
         if not self.active:
             return {
                 "toolUseId": tool_use["toolUseId"],
@@ -284,6 +305,78 @@ def test_failed_rebuild_returns_unavailable_and_the_next_request_rebuilds(client
     )
     assert text(second) == "rows"
     assert broken.stopped
+
+
+def test_session_terminated_result_rebuilds_and_retries(clients, caplog):
+    caplog.set_level(logging.INFO)
+    old, new = FakeClient(terminated=True), FakeClient(reply="rows")
+    clients.extend([old, new])
+
+    async def scenario():
+        _, tool = await start(clients)
+        return await run_tool(tool)
+
+    result = asyncio.run(scenario())
+    assert (result["status"], text(result)) == ("success", "rows")
+    assert "cause=SessionTerminated" in caplog.text
+    assert clients.built == [old, new]
+    assert len(rebuild_logs(caplog)) == 1
+    assert old.stopped
+
+
+def test_session_terminated_on_the_retry_marks_the_new_client_stale(clients, caplog):
+    old, new = FakeClient(terminated=True), FakeClient(terminated=True)
+    good = FakeClient(reply="rows")
+    clients.extend([old, new, good])
+
+    async def scenario():
+        runtime, tool = await start(clients)
+        first = await run_tool(tool)
+        # The client thread is still up, but the next request must rebuild.
+        assert new.active
+        assert not runtime.connection.is_running()
+        await server.get_runtime()  # the next request
+        return first, await run_tool(tool)
+
+    first, second = asyncio.run(scenario())
+    assert text(first) == UNAVAILABLE_RESULT
+    assert "the retry failed too" in caplog.text
+    assert text(second) == "rows"
+    assert clients.built == [old, new, good]
+
+
+def test_session_terminated_text_matches_the_sdk_and_strands():
+    """Pin the text: the MCP SDK's 404 error as Strands turns it into a result."""
+    import anyio
+    from mcp.client.streamable_http import StreamableHTTPTransport
+    from mcp.shared.exceptions import McpError
+    from strands.tools.mcp import MCPClient
+
+    async def sdk_error():
+        writer, reader = anyio.create_memory_object_stream(1)
+        transport = StreamableHTTPTransport("http://127.0.0.1:9/mcp")
+        await transport._send_session_terminated_error(writer, 1)
+        return (await reader.receive()).message.root.error
+
+    error = anyio.run(sdk_error)
+    client = MCPClient(lambda: None)
+    result = client._handle_tool_execution_error("u1", McpError(error))
+    assert text(result) == SESSION_TERMINATED_TEXT
+
+
+def test_stop_failure_logs_the_class_at_warning_and_details_at_debug(caplog):
+    caplog.set_level(logging.DEBUG)
+
+    class Failing:
+        def stop(self, *exc_info):
+            raise RuntimeError("session ended: 404 from https://gw.example/mcp")
+
+    stop_quietly(Failing())
+    warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert [r.getMessage() for r in warnings] == [
+        "Error while stopping the MCP client (cause=RuntimeError)"
+    ]
+    assert any(r.levelno == logging.DEBUG and r.exc_info for r in caplog.records)
 
 
 def test_tool_missing_after_rebuild_returns_unavailable(clients):

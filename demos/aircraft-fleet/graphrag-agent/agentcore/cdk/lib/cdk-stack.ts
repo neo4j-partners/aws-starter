@@ -26,6 +26,10 @@ const PLAIN_VARS = [
  */
 const SECRET_ARN_VARS = ['NEO4J_PASSWORD_SECRET_ARN', 'MEM_NEO4J_PASSWORD_SECRET_ARN'] as const;
 
+/** Connection URIs the Runtime dials. A Runtime cannot reach localhost, and the cloud path must use TLS. */
+const URI_VARS = ['NEO4J_URI', 'MEM_NEO4J_URI'] as const;
+const TLS_NEO4J_URI = /^(neo4j|bolt)\+s:\/\/[^/\s]+/;
+
 /** A complete secret ARN ends in the six-character suffix Secrets Manager adds. */
 const COMPLETE_SECRET_ARN = /^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:\d{12}:secret:.+-[A-Za-z0-9]{6}$/;
 
@@ -45,6 +49,11 @@ function readDeployEnv(): Record<string, string> {
       values[name] = value;
     }
   }
+  for (const name of URI_VARS) {
+    if (values[name] && !TLS_NEO4J_URI.test(values[name])) {
+      problems.push(`${name} must use the neo4j+s:// or bolt+s:// scheme`);
+    }
+  }
   for (const name of SECRET_ARN_VARS) {
     if (values[name] && !COMPLETE_SECRET_ARN.test(values[name])) {
       problems.push(`${name} is not a complete Secrets Manager secret ARN (it must end in the -XXXXXX suffix)`);
@@ -52,8 +61,8 @@ function readDeployEnv(): Record<string, string> {
   }
   if (problems.length > 0) {
     throw new Error(
-      `Missing deploy settings for runtime "${RUNTIME_NAME}":\n  - ${problems.join('\n  - ')}\n` +
-        'Set them in demos/aircraft-fleet/.env and deploy with ./agent.sh deploy.',
+      `Missing or invalid deploy settings for runtime "${RUNTIME_NAME}":\n  - ${problems.join('\n  - ')}\n` +
+        'Fix them in demos/aircraft-fleet/.env and deploy with ./agent.sh deploy.',
     );
   }
   return values;

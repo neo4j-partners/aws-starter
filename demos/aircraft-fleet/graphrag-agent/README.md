@@ -250,7 +250,7 @@ ADOT traces the Neo4j driver, the boto3 calls to Bedrock, and incoming requests.
 | Symptom | Cause and fix |
 |---------|---------------|
 | `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env` in `demos/aircraft-fleet/` for local runs. A deployed Runtime gets `NEO4J_URI` and `NEO4J_PASSWORD_SECRET_ARN` from the deploy. Set them in the shared `.env` and run `./agent.sh deploy` again. |
-| `Missing deploy settings for runtime "graphrag_agent"` | Synth found a deploy setting unset or a secret ARN that is not complete. Set the listed names in the shared `.env`. |
+| `Missing or invalid deploy settings for runtime "graphrag_agent"` | Synth found a deploy setting that is unset, a Neo4j URI without TLS, or a secret ARN that is not complete. Fix the listed names in the shared `.env`. |
 | `Could not read the secret in NEO4J_PASSWORD_SECRET_ARN` in the Runtime logs | The secret does not exist in that region, or the Runtime role cannot read it. Check the ARN and that the secret is not encrypted with a KMS key the role cannot use. |
 | `vector_search` returns poor results or nothing | The agent's embedder must match the pipeline's embedder. Align `EMBED_MODEL_ID` and `EMBED_DIMENSIONS`, and confirm that the `maintenanceChunkEmbeddings` index exists. |
 | `ServiceUnavailable` or an auth error from Neo4j | The `NEO4J_URI` scheme or the credentials are wrong, or the database is unreachable. |

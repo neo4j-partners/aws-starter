@@ -8,6 +8,7 @@ agents, each wrapped as a tool:
 - Operations Agent: flights, delays, routes, airports
 
 The model and the Gateway MCP client are created once, on the first request.
+The client is rebuilt if its MCP session ends.
 The agents are built per request. See ``core.agents`` for why.
 
 Local testing:
@@ -43,7 +44,7 @@ from core.agents import build_supervisor  # noqa: E402
 from core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
 from core.credentials import load_credentials  # noqa: E402
 from core.events import EventMapper  # noqa: E402
-from core.mcp import build_mcp_client  # noqa: E402
+from core.mcp import build_mcp_client, list_all_tools, remember_workload_token  # noqa: E402
 from core.model import build_model  # noqa: E402
 
 logging.basicConfig(
@@ -56,13 +57,14 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 GENERIC_ERROR = "The agent could not complete this request. Check the server logs for details."
+NO_PROMPT_ERROR = "No prompt provided. Include 'prompt' in the request."
 
 app = BedrockAgentCoreApp()
 
 
 @dataclass
 class Runtime:
-    """Process-wide resources, created once."""
+    """Process-wide resources, created once and rebuilt if the MCP session ends."""
 
     model: BedrockModel
     mcp_client: MCPClient
@@ -73,61 +75,104 @@ _runtime: Runtime | None = None
 _runtime_lock = threading.Lock()
 
 
+def _session_is_running(client: MCPClient) -> bool:
+    """Report whether the MCP client's session is still up.
+
+    Strands has no public health check. ``_is_session_active`` is the check
+    ``list_tools_sync`` and ``call_tool`` make before they run, so it matches
+    when tool calls would start failing. tests/test_runtime_app.py pins it.
+    """
+    return client._is_session_active()
+
+
+def _stop_quietly(client: MCPClient) -> None:
+    """Stop the client, logging a failure so it cannot hide the original error."""
+    try:
+        client.stop(None, None, None)
+    except Exception:
+        logger.exception("Error while stopping the MCP client")
+
+
+def _connect_mcp() -> tuple[MCPClient, list[Any]]:
+    """Start the Gateway client and fetch the filtered tool list."""
+    # One filtered client serves both specialists: they need the same
+    # two tools, so per-specialist filters would be identical.
+    mcp_client = build_mcp_client(load_credentials())
+    try:
+        mcp_client.start()
+        tools = list_all_tools(mcp_client)
+        if not tools:
+            raise RuntimeError(
+                "The Gateway returned none of the specialist tools. "
+                "Check the Gateway target and SPECIALIST_TOOL_FILTERS."
+            )
+    except Exception:
+        # Stop the client's background thread; the next request retries.
+        _stop_quietly(mcp_client)
+        raise
+    logger.info("Gateway tools: %s", [t.tool_name for t in tools])
+    return mcp_client, tools
+
+
 def _start_runtime() -> Runtime:
-    """Build the model, start the MCP client, and fetch the filtered tool list."""
+    """Return a runtime with a live MCP session, building or rebuilding it."""
     global _runtime
     with _runtime_lock:
-        if _runtime is None:
-            credentials = load_credentials()
-            # One filtered client serves both specialists: they need the same
-            # two tools, so per-specialist filters would be identical.
-            mcp_client = build_mcp_client(credentials)
-            mcp_client.start()
-            try:
-                tools = mcp_client.list_tools_sync()
-            except Exception:
-                # Stop the client's background thread; the next request retries.
-                mcp_client.stop(None, None, None)
-                raise
-            logger.info("Gateway tools: %s", [t.tool_name for t in tools])
-            _runtime = Runtime(model=build_model(), mcp_client=mcp_client, tools=tools)
+        if _runtime is not None and _session_is_running(_runtime.mcp_client):
+            return _runtime
+        if _runtime is not None:
+            logger.warning("The MCP session ended; reconnecting to the Gateway")
+            _stop_quietly(_runtime.mcp_client)
+            model = _runtime.model
+            _runtime = None
+        else:
+            # Build the model before the client, so a model error leaves
+            # no client thread running.
+            model = build_model()
+        mcp_client, tools = _connect_mcp()
+        _runtime = Runtime(model=model, mcp_client=mcp_client, tools=tools)
         return _runtime
 
 
 async def get_runtime() -> Runtime:
-    """Return the shared runtime, starting it on the first call."""
-    if _runtime is not None:
-        return _runtime
+    """Return the shared runtime, starting or reconnecting it when needed."""
+    runtime = _runtime
+    if runtime is not None and _session_is_running(runtime.mcp_client):
+        return runtime
     return await asyncio.to_thread(_start_runtime)
 
 
-def extract_prompt(payload: dict) -> str | None:
+def extract_prompt(payload: Any) -> str | None:
     """Read the question from the payload keys clients commonly send."""
-    return (
-        payload.get("prompt")
-        or payload.get("message")
-        or payload.get("query")
-        or payload.get("inputText")
-        or payload.get("input")
-    )
+    if not isinstance(payload, dict):
+        return None
+    for key in ("prompt", "message", "query", "inputText", "input"):
+        if isinstance(value := payload.get(key), str) and value.strip():
+            return value
+    return None
 
 
 @app.entrypoint
-async def invoke(payload: dict, context):
+async def invoke(payload: Any, context):
     """Stream the supervisor's answer as SSE events."""
-    payload = payload or {}
-    prompt = extract_prompt(payload)
-    if not prompt:
-        yield {"type": "error", "error": "No prompt provided. Include 'prompt' in the request."}
-        return
-
-    # AgentCore Runtime sets the session ID from the session header. A local
-    # call without the header gets its own ID, so callers never share a session.
-    session_id = getattr(context, "session_id", None) or str(uuid.uuid4())
-    user_id = payload.get("user_id") or "anonymous"
-    logger.info("Request session=%s user=%s prompt=%s", session_id, user_id, prompt[:100])
-
+    # Everything runs inside the try, so no input can raise past the handler
+    # and send exception text to the client.
     try:
+        prompt = extract_prompt(payload)
+        if not prompt:
+            yield {"type": "error", "error": NO_PROMPT_ERROR}
+            return
+
+        # AgentCore Runtime sets the session ID from the session header. A
+        # local call without the header gets its own ID, so callers never
+        # share a session.
+        session_id = getattr(context, "session_id", None) or str(uuid.uuid4())
+        user_id = payload.get("user_id")
+        if not isinstance(user_id, str) or not user_id:
+            user_id = "anonymous"
+        logger.info("Request session=%s user=%s prompt=%s", session_id, user_id, prompt[:100])
+
+        remember_workload_token()
         runtime = await get_runtime()
         supervisor = build_supervisor(runtime.model, runtime.tools)
         mapper = EventMapper()
@@ -138,7 +183,7 @@ async def invoke(payload: dict, context):
         yield {"type": "complete"}
     except Exception:
         # Log the details here; the client gets a generic message only.
-        logger.exception("Request failed for session %s", session_id)
+        logger.exception("Request failed")
         yield {"type": "error", "error": GENERIC_ERROR}
 
 

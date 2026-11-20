@@ -23,9 +23,10 @@
 
 set -e
 
-# This script and the uv project (pyproject.toml, uv.lock, .venv,
-# .mcp-credentials.json) live at the agent root; the runtime entrypoint
-# lives in server/ and the client tooling in client/.
+# This script and the uv project (pyproject.toml, uv.lock, .venv) live at
+# the agent root; the runtime entrypoint lives in server/ and the client
+# tooling in client/. The local Gateway credentials file sits one level up,
+# in demos/aircraft-fleet/, outside the code zip.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
 # The deployed runtime name is <project>_<target>_<runtime> and must be at
@@ -35,7 +36,11 @@ RUNTIME_NAME="supervisor"
 # Matches .python-version.
 RUNTIME_VERSION="PYTHON_3_12"
 # Non-secret runtime environment variables, written into agentcore.json.
-RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_URL":"REPLACE_WITH_FLEET_GATEWAY_URL"}'
+# GATEWAY_CREDENTIAL_PROVIDER names the AgentCore Identity OAuth2 provider
+# that holds the Gateway client secret. Setting it selects the cloud auth path.
+RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5","GATEWAY_URL":"REPLACE_WITH_FLEET_GATEWAY_URL","GATEWAY_CREDENTIAL_PROVIDER":"fleet-gateway"}'
+# Local Gateway credentials, written by neo4j-mcp-server/deploy.py.
+CREDENTIALS_FILE="${MCP_CREDENTIALS_FILE:-$ROOT_DIR/../.mcp-credentials.json}"
 # AgentCore deployment region. AgentCore's primary region is us-east-1
 # (also supported in us-west-2). Set AWS_REGION to override. The CLI creates
 # the default deploy target from this region on the first deploy.
@@ -100,14 +105,20 @@ ensure_project() {
     fi
 }
 
-# The code zip has no ignore file, so a credentials file in this folder
-# would be uploaded with the code.
+# The code zip has no ignore file, so any .env* or .mcp-credentials*.json
+# file in this folder would be uploaded with the code. .venv is not zipped,
+# and agentcore/ holds the CLI's own .env.local, which is not zipped either.
 ensure_no_secrets_in_zip() {
-    if [ -f ".mcp-credentials.json" ]; then
-        echo -e "${RED}ERROR: .mcp-credentials.json is in $ROOT_DIR${NC}"
+    local found
+    found="$(find . \( -path ./.venv -o -path ./agentcore \) -prune -o \
+        -type f \( -name '.env*' -o -name '.mcp-credentials*.json' \) -print)"
+    if [ -n "$found" ]; then
+        echo -e "${RED}ERROR: secret files are inside $ROOT_DIR${NC}"
         echo ""
-        echo "agentcore deploy would upload it with the code. Move it out first:"
-        echo "  mv \"$ROOT_DIR/.mcp-credentials.json\" /somewhere/safe/"
+        echo "$found"
+        echo ""
+        echo "agentcore deploy would upload them with the code. Move them out first."
+        echo "The local credentials file belongs in demos/aircraft-fleet/.mcp-credentials.json."
         exit 1
     fi
 }
@@ -157,11 +168,11 @@ ensure_deps() {
 }
 
 ensure_credentials() {
-    if [ ! -f ".mcp-credentials.json" ]; then
-        echo -e "${RED}ERROR: .mcp-credentials.json not found${NC}"
+    if [ ! -f "$CREDENTIALS_FILE" ]; then
+        echo -e "${RED}ERROR: $CREDENTIALS_FILE not found${NC}"
         echo ""
         echo "Copy it from the MCP server deployment:"
-        echo "  cp \"$ROOT_DIR/../../../neo4j-mcp-server/.mcp-credentials.fleet.json\" \"$ROOT_DIR/.mcp-credentials.json\""
+        echo "  cp \"$ROOT_DIR/../../../neo4j-mcp-server/.mcp-credentials.fleet.json\" \"$CREDENTIALS_FILE\""
         exit 1
     fi
 }

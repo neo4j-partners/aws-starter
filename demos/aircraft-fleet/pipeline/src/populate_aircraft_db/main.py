@@ -32,44 +32,55 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
 )
 
-_LOG_HANDLER_NAME = "populate-aircraft-db-cli"
 
+class _SysStreamHandler(logging.StreamHandler):
+    """Write each record to sys.stdout or sys.stderr as it is at emit time.
 
-class _StdoutHandler(logging.StreamHandler):
-    """Write each record to sys.stdout as it is when the record is emitted.
-
-    CliRunner and pytest replace sys.stdout and can close the old one, so the
-    handler does not keep the stream it was created with.
+    CliRunner and pytest replace sys.stdout and sys.stderr and can close the
+    old ones, so the handler does not keep the stream it was created with.
     """
+
+    def __init__(self, stream_name: Literal["stdout", "stderr"]) -> None:
+        self._stream_name = stream_name
+        super().__init__()
 
     @property
     def stream(self) -> TextIO:
-        return sys.stdout
+        return getattr(sys, self._stream_name)
 
     @stream.setter
     def stream(self, value: TextIO) -> None:
         # StreamHandler.__init__ assigns a stream. The getter ignores it and
-        # always returns the current sys.stdout.
+        # always returns the current sys stream.
         del value
 
 
-def _configure_logging() -> None:
-    """Write this package's INFO and higher records to stdout as bare messages.
+def _below_warning(record: logging.LogRecord) -> bool:
+    return record.levelno < logging.WARNING
 
-    Only the package logger gets a handler, and its records do not propagate
+
+def _configure_logging() -> None:
+    """Write this package's records as bare messages.
+
+    INFO records go to stdout, and WARNING and higher go to stderr.
+
+    Only the package logger gets handlers, and its records do not propagate
     to the root logger. Other libraries keep the root logger's WARNING
     default, so INFO records from httpx and neo4j stay hidden. A repeat call
-    keeps the one handler.
+    keeps the existing handlers.
     """
     package_logger = logging.getLogger(__package__)
     package_logger.setLevel(logging.INFO)
     package_logger.propagate = False
-    if any(h.get_name() == _LOG_HANDLER_NAME for h in package_logger.handlers):
+    if any(isinstance(h, _SysStreamHandler) for h in package_logger.handlers):
         return
-    handler = _StdoutHandler()
-    handler.set_name(_LOG_HANDLER_NAME)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    package_logger.addHandler(handler)
+    stdout_handler = _SysStreamHandler("stdout")
+    stdout_handler.addFilter(_below_warning)
+    stderr_handler = _SysStreamHandler("stderr")
+    stderr_handler.setLevel(logging.WARNING)
+    for handler in (stdout_handler, stderr_handler):
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        package_logger.addHandler(handler)
 
 
 @app.callback()

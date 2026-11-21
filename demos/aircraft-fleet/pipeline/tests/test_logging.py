@@ -182,3 +182,19 @@ def test_cli_logs_to_each_invocations_stdout(monkeypatch: pytest.MonkeyPatch) ->
         assert result.exit_code == 0, result.output
         assert result.output.count("  [OK] Database cleared\n") == 1
     assert logging.getLogger(PACKAGE).propagate is False
+
+
+@pytest.mark.usefixtures("restore_package_logger")
+def test_cli_logging_sends_warnings_to_stderr_and_info_to_stdout(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    main._configure_logging()
+    main._configure_logging()
+
+    logging.getLogger("populate_aircraft_db.bedrock_structured").info("retry line")
+    logging.getLogger("populate_aircraft_db.loader").warning("[WARN] warning line")
+    logging.getLogger("populate_aircraft_db.pipeline").error("error line")
+
+    captured = capsys.readouterr()
+    assert captured.out == "retry line\n"
+    assert captured.err == "[WARN] warning line\nerror line\n"

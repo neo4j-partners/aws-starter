@@ -382,7 +382,7 @@ The LEAP-1A Full Authority Digital Engine Control provides:
 
 ### 4.1 Vibration Exceedance
 
-**Fault Code:** ENG-VIB-001
+**Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
 **Industry Statistics:** In typical industry data, this is the third most common fault type, at about 16% of events.
 
@@ -507,7 +507,7 @@ The LEAP engine is approved for on-wing water wash to restore performance:
 
 ### 4.3 Overheat Conditions
 
-**Fault Code:** ENG-OVH-003
+**Fault Code:** ENG-OVH-006
 **Severity Classification:** CRITICAL / MAJOR / MINOR
 **Industry Statistics:** In typical industry data, this fault accounts for about 20% of events.
 
@@ -543,7 +543,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 ### 4.4 Electrical Faults
 
-**Fault Code:** ENG-ELF-004
+**Fault Code:** ENG-ELF-008
 **Severity Classification:** CRITICAL / MAJOR / MINOR
 **Industry Statistics:** In typical industry data, this fault accounts for about 12% of events.
 
@@ -587,7 +587,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 ### 4.5 Fuel Starvation
 
-**Fault Code:** ENG-FUEL-005
+**Fault Code:** ENG-FUEL-007
 **Severity Classification:** CRITICAL / MAJOR / MINOR
 **Industry Statistics:** In typical industry data, this fault accounts for about 6% of events.
 
@@ -764,36 +764,40 @@ The A321neo flap system uses:
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| ENG-VIB-001 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan inspection, balance |
-| ENG-CNT-002 | Contamination | CRIT/MAJ/MIN | 72 | Water wash, borescope |
-| ENG-OVH-003 | Overheat (EGT) | CRIT/MAJ/MIN | 72 | Borescope, CMC inspect |
-| ENG-ELF-004 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics |
-| ENG-FUEL-005 | Fuel Starvation | CRIT/MAJ | 73 | Fuel system check |
-| ENG-SDR-006 | Sensor Drift | MAJ/MIN | 77 | EMU diagnostics |
-| ENG-BRG-007 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis |
-| ENG-LEAK-008 | Fluid Leak | MAJ/MIN | 79 | Identify and repair |
+| ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | EMU diagnostics |
+| ENG-CNT-002 | Contamination | CRIT/MAJ/MIN | 72 | Oil/fuel analysis, wash/clean |
+| ENG-BRG-003 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, vibration check |
+| ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
+| ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
+| ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Borescope, CMC inspect |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
+| ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADIRU comparison |
-| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power, cooling check |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADIRU comparison |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
-| AVN-NAV-004 | NAV/GPS Fault | MIN | 34 | Antenna, MMR check |
-| AVN-AOA-005 | AOA Disagree | MAJ | 34 | AOA sensor inspection |
+| AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna, MMR check |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample, filter/flush |
-| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump, leak check |
-| HYD-QTY-004 | Low Quantity | MAJ | 29 | Replenish, leak check |
-| HYD-OVHT-005 | Overheat | MAJ | 29 | Reduce demand, inspect |
+| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
+| HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 

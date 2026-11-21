@@ -274,7 +274,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.1 Overheat Condition (EGT Exceedance)
 
-**Fault Code:** ENG-OVH-001
+**Fault Code:** ENG-OVH-006
 **Severity Classification:** CRITICAL / MAJOR / MINOR (based on temperature and duration)
 
 #### Symptoms
@@ -316,7 +316,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.2 Vibration Exceedance
 
-**Fault Code:** ENG-VIB-002
+**Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
 
 #### Vibration Limits
@@ -348,7 +348,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.3 Fuel Starvation
 
-**Fault Code:** ENG-FUEL-003
+**Fault Code:** ENG-FUEL-007
 **Severity Classification:** CRITICAL / MAJOR
 
 #### Symptoms
@@ -373,7 +373,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.4 Bearing Wear
 
-**Fault Code:** ENG-BRG-004
+**Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
 
 #### Detection Methods
@@ -562,36 +562,40 @@ Linear hydraulic actuator providing:
 
 ### 7.1 Engine Fault Codes
 
-| Code | Description | Severity | ATA | Immediate Action |
-|------|-------------|----------|-----|------------------|
-| ENG-OVH-001 | EGT Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, monitor |
-| ENG-VIB-002 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Check limits, possible shutdown |
-| ENG-FUEL-003 | Fuel Starvation | CRIT/MAJ | 73 | Check fuel config, crossfeed |
-| ENG-BRG-004 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, trend monitoring |
-| ENG-SDR-005 | Sensor Drift | MAJ/MIN | 77 | Cross-check redundant sensors |
-| ENG-ELF-006 | Electrical Fault | CRIT/MAJ | 72 | Isolate circuit, check BITE |
-| ENG-CNT-007 | Contamination | CRIT/MAJ | 72 | Borescope, oil analysis |
-| ENG-LK-008 | Fuel/Oil Leak | CRIT/MAJ/MIN | 73 | Identify source, assess severity |
+<!-- BEGIN GENERATED: fault-codes-engine -->
+| Code | Description | Severity | ATA | Primary Action |
+|------|-------------|----------|-----|----------------|
+| ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
+| ENG-CNT-002 | Contamination | CRIT/MAJ/MIN | 72 | Oil/fuel analysis, wash/clean |
+| ENG-BRG-003 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, vibration check |
+| ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
+| ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
+| ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
+| ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
-| Code | Description | Severity | ATA | Immediate Action |
-|------|-------------|----------|-----|------------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | Compare redundant units |
-| AVN-ELF-002 | Electrical Fault | CRIT/MAJ | 34 | Check power supply, BITE |
-| AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, reload database |
-| AVN-ADC-004 | ADC Disagreement | MAJ | 34 | Cross-check, isolate faulty unit |
-| AVN-NAV-005 | NAV Receiver Fault | MIN | 34 | Check antenna, verify tuning |
+<!-- BEGIN GENERATED: fault-codes-avionics -->
+| Code | Description | Severity | ATA | Primary Action |
+|------|-------------|----------|-----|----------------|
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADC comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
+| AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
-| Code | Description | Severity | ATA | Immediate Action |
-|------|-------------|----------|-----|------------------|
-| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Identify source, classify severity |
-| HYD-CNT-002 | Fluid Contamination | MAJ/MIN | 29 | Sample analysis |
-| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Check pump, reservoir level |
-| HYD-ACT-004 | Actuator Malfunction | MAJ | 29 | Check position feedback |
-| HYD-PUMP-005 | Pump Failure | CRIT | 29 | Alternate system selection |
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
+| Code | Description | Severity | ATA | Primary Action |
+|------|-------------|----------|-----|----------------|
+| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
+| HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 

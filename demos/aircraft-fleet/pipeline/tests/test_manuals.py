@@ -20,11 +20,14 @@ from generator.maintenance import SEVERITY_BY_LEVEL
 from generator.manuals import ManualBlockError, render_text
 from generator.specs import (
     COMPONENT_ALIASES,
+    CORRECTIVE_ACTIONS,
     ENGINE_SPECS,
+    FAULT_CODES,
     MANUAL_FLEET_TAILS,
     PHASES,
     SYSTEM_SENSORS,
     VIBRATION_LEVELS,
+    FaultCode,
     sensors_for,
 )
 from populate_aircraft_db.pipeline import DOCUMENTS, read_manual_text, strip_comments
@@ -480,3 +483,163 @@ def test_the_hydraulics_table_is_the_spec_bands(model: str) -> None:
             ]
         )
     assert _rows(table) == expected
+
+
+def _manual(model: str) -> str:
+    return (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+
+
+def _routed(system: str, model: str) -> set[str]:
+    return {r.fault for spec in sensors_for(system, model) for r in spec.faults if r.weight > 0}
+
+
+def test_every_generated_code_records_a_fault_its_system_routes_on_every_model() -> None:
+    for code in FAULT_CODES:
+        if code.generated:
+            assert code.fault in CORRECTIVE_ACTIONS, code
+            assert all(code.fault in _routed(code.system, m) for m in ENGINE_SPECS), code
+
+
+def test_every_routed_fault_has_exactly_one_generated_code() -> None:
+    routed = {
+        (system, fault)
+        for system in SYSTEM_SENSORS
+        for model in ENGINE_SPECS
+        for fault in _routed(system, model)
+    }
+    generated = [(c.system, c.fault) for c in FAULT_CODES if c.generated]
+
+    assert sorted(generated) == sorted(routed)
+
+
+def test_the_codes_are_unique_and_numbered_in_order_per_system() -> None:
+    for system in SYSTEM_SENSORS:
+        numbers = [int(c.code.rsplit("-", 1)[1]) for c in FAULT_CODES if c.system == system]
+        assert numbers == list(range(1, len(numbers) + 1)), system
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_a_generated_code_carries_every_severity_worst_first(model: str) -> None:
+    worst_first = tuple(SEVERITY_BY_LEVEL[level] for level in sorted(SEVERITY_BY_LEVEL)[::-1])
+    for code in FAULT_CODES:
+        severities = manuals.fault_code_severities(code, model)
+        if code.generated:
+            assert severities == worst_first, code
+        else:
+            assert severities == code.severities
+            assert [s for s in worst_first if s in severities] == list(severities), code
+
+
+def test_a_generated_code_without_a_route_raises() -> None:
+    code = FaultCode("ENG-ELF-099", "Engine", "Electrical fault")
+
+    with pytest.raises(ValueError, match="^fault code ENG-ELF-099: no Engine route raises"):
+        manuals.fault_code_severities(code, MODEL)
+
+
+@pytest.mark.parametrize(
+    ("generated", "severities", "message"),
+    [
+        (True, ("MAJOR",), "a generated code takes its severities from the routes"),
+        (False, (), "a manual-only code needs severities"),
+    ],
+)
+def test_a_code_must_take_its_severities_from_one_place(
+    generated: bool, severities: tuple[str, ...], message: str
+) -> None:
+    with pytest.raises(ValueError, match=f"^fault code 'X-Y-001': {message}$"):
+        FaultCode("X-Y-001", "Engine", "Leak", generated=generated, severities=severities)
+
+
+_ABBREVIATIONS = {"CRITICAL": "CRIT", "MAJOR": "MAJ", "MINOR": "MIN"}
+_FAULT_CODE_BLOCKS = {
+    "Engine": "fault-codes-engine",
+    "Avionics": "fault-codes-avionics",
+    "Hydraulics": "fault-codes-hydraulics",
+}
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_fault_code_tables_are_the_canonical_list(model: str) -> None:
+    b737 = {}
+    for system, block_id in _FAULT_CODE_BLOCKS.items():
+        rows = _rows(manuals.RENDERERS[block_id](model, ENGINE_SPECS[model], {}))
+        codes = [c for c in FAULT_CODES if c.system == system]
+        assert [row[0] for row in rows] == [c.code for c in codes]
+        assert [row[2] for row in rows] == [
+            "/".join(_ABBREVIATIONS[s] for s in manuals.fault_code_severities(c, model))
+            for c in codes
+        ]
+        reference = _rows(manuals.RENDERERS[block_id]("B737-800", ENGINE_SPECS["B737-800"], {}))
+        b737.update({r[0]: r for r in reference})
+        # Only the action may differ from the B737, and only where an override names
+        # the model's own equipment.
+        for row in rows:
+            overridden = row[0] in manuals.MODEL_ACTIONS.get(model, {})
+            assert row[:4] == b737[row[0]][:4]
+            assert (row[4] != b737[row[0]][4]) is overridden, row
+
+
+# A code-shaped token: a fault code system prefix, a segment, and three digits.
+# A part number such as AVN-FMS-737-100 continues with "-<digits>", so a token
+# that does is not a code.
+_PREFIXES = "|".join(sorted({c.code.split("-")[0] for c in FAULT_CODES}))
+_CODE_TOKEN = re.compile(rf"\b(?:{_PREFIXES})-[A-Z]{{2,5}}-\d{{3}}\b(?!-\d)")
+# Task card numbers. They share the code shape but are not fault codes.
+_TASK_CARDS = {"ENG-TC-001", "HYD-TC-001", "HYD-TOOL-100"}
+
+
+def _unknown_codes(text: str) -> list[str]:
+    canonical = {c.code for c in FAULT_CODES} | _TASK_CARDS
+    return [t for t in _CODE_TOKEN.findall(text) if t not in canonical]
+
+
+def test_the_code_check_flags_a_mistyped_code_but_not_a_part_number() -> None:
+    text = "Record ENG-OHV-006, not ENG-OVH-006. Order AVN-FMS-737-100 and HYD-PUMP-2901."
+
+    assert _unknown_codes(text) == ["ENG-OHV-006"]
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_every_fault_code_in_a_manual_is_canonical(model: str) -> None:
+    assert _unknown_codes(_manual(model)) == []
+
+
+# Heading words -> the fault a troubleshooting section covers.
+_SECTION_FAULTS = {
+    "sensor drift": "sensor drift",
+    "contamination": "contamination",
+    "bearing wear": "bearing wear",
+    "leak": "leak",
+    "vibration": "vibration exceedance",
+    "overheat": "overheat",
+    "fuel starvation": "fuel starvation",
+    "electrical fault": "electrical fault",
+}
+_SECTION_SYSTEMS = {"4": "Engine", "5": "Avionics", "6": "Hydraulics"}
+
+
+def _fault_code_lines(text: str) -> list[tuple[str, str]]:
+    """Each "**Fault Code:**" line's code, with the heading above it."""
+    out = []
+    heading = ""
+    for line in text.splitlines():
+        if re.match(r"^#{3,5} \d", line):
+            heading = line.lstrip("# ")
+        elif match := re.match(r"^\*\*Fault Code:\*\* (\S+)$", line):
+            out.append((match.group(1), heading))
+    return out
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_each_fault_code_line_is_the_code_of_its_sections_fault(model: str) -> None:
+    lines = _fault_code_lines(_manual(model))
+    assert len(lines) >= 8
+    for code, heading in lines:
+        system = _SECTION_SYSTEMS[heading[0]]
+        faults = [f for word, f in _SECTION_FAULTS.items() if word in heading.lower()]
+        assert len(faults) == 1, heading
+        expected = [
+            c.code for c in FAULT_CODES if c.system == system and c.fault.lower() == faults[0]
+        ]
+        assert [code] == expected, heading

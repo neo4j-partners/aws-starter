@@ -1169,6 +1169,66 @@ CORRECTIVE_ACTIONS: dict[str, str] = {
 
 
 @dataclass(frozen=True)
+class FaultCode:
+    """One code in the manuals' fault code reference, the same on every model.
+
+    A generated code records a fault the generator raises, so the manuals
+    derive its severities from the routes. A manual-only code names a fault
+    the generator never raises, and keeps the severities the manuals give it.
+    """
+
+    code: str
+    system: str  # the system type it applies to
+    fault: str  # the CORRECTIVE_ACTIONS fault; the description for a manual-only code
+    generated: bool = True
+    severities: tuple[str, ...] = ()  # manual-only codes only, worst first
+
+    def __post_init__(self) -> None:
+        if self.generated and self.severities:
+            raise ValueError(
+                f"fault code {self.code!r}: a generated code takes its severities from the routes"
+            )
+        if not self.generated and not self.severities:
+            raise ValueError(f"fault code {self.code!r}: a manual-only code needs severities")
+
+
+# The fault code reference in section 7 of every manual, in table order. The
+# numbering is the B737 manual's.
+FAULT_CODES: tuple[FaultCode, ...] = (
+    FaultCode("ENG-SDR-001", "Engine", "Sensor drift"),
+    FaultCode("ENG-CNT-002", "Engine", "Contamination"),
+    FaultCode("ENG-BRG-003", "Engine", "Bearing wear"),
+    FaultCode("ENG-LEAK-004", "Engine", "Leak"),
+    FaultCode("ENG-VIB-005", "Engine", "Vibration exceedance"),
+    FaultCode("ENG-OVH-006", "Engine", "Overheat"),
+    FaultCode("ENG-FUEL-007", "Engine", "Fuel starvation"),
+    FaultCode(
+        "ENG-ELF-008",
+        "Engine",
+        "Electrical Fault",
+        generated=False,
+        severities=("CRITICAL", "MAJOR", "MINOR"),
+    ),
+    FaultCode("AVN-SDR-001", "Avionics", "Sensor drift"),
+    FaultCode("AVN-ELF-002", "Avionics", "Electrical fault"),
+    FaultCode("AVN-FMS-003", "Avionics", "FMS Malfunction", generated=False, severities=("MAJOR",)),
+    FaultCode(
+        "AVN-NAV-004", "Avionics", "NAV Receiver Fault", generated=False, severities=("MINOR",)
+    ),
+    FaultCode("HYD-LEAK-001", "Hydraulics", "Leak"),
+    FaultCode("HYD-CNT-002", "Hydraulics", "Contamination"),
+    FaultCode(
+        "HYD-PRS-003",
+        "Hydraulics",
+        "Low Pressure",
+        generated=False,
+        severities=("CRITICAL", "MAJOR"),
+    ),
+    FaultCode("HYD-QTY-004", "Hydraulics", "Low Quantity", generated=False, severities=("MAJOR",)),
+)
+
+
+@dataclass(frozen=True)
 class ComponentSpec:
     """One component type, with the part name each manual uses for it.
 

@@ -666,6 +666,7 @@ The trailing edge flap system uses:
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
@@ -674,26 +675,31 @@ The trailing edge flap system uses:
 | ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
 | ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
 | ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
-| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ | 73 | Check fuel system, filter |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
 | ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADC comparison, calibration |
-| AVN-ELF-002 | Electrical Fault | MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADC comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
 | AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
 | HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
 | HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 

@@ -355,7 +355,7 @@ The reduction gearbox uses a dedicated oil supply circuit that is separate from 
 |---------------|-------------|--------------|------------|
 | All power | 60-130 | 130-145 | 150 |
 
-**Chip Detector:** A dedicated magnetic chip detector (MCD) is installed in the gearbox oil scavenge circuit downstream of the gearbox sump. This chip detector is polled separately from the main engine oil chip detectors and generates a distinct CAS message (GBX CHIP DET) when activated. Do not conflate gearbox chip detector activations with main engine MCD activations; the fault codes and inspection requirements differ. See ENG-GBX-006 in Section 7.
+**Chip Detector:** A dedicated magnetic chip detector (MCD) is installed in the gearbox oil scavenge circuit downstream of the gearbox sump. This chip detector is polled separately from the main engine oil chip detectors and generates a distinct CAS message (GBX CHIP DET) when activated. Do not conflate gearbox chip detector activations with main engine MCD activations. The inspection requirements differ, and a gearbox finding is recorded against the Reduction Gearbox. See ENG-BRG-003 in Section 7.
 
 **Temperature Monitoring:** A dedicated thermocouple monitors gearbox oil outlet temperature. This reading is displayed on the maintenance page and is used by the FADEC for oil system health trending. Sustained operation above 145°C requires investigation before further dispatch; operation above 150°C is not permitted.
 
@@ -760,6 +760,7 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
@@ -767,29 +768,34 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 | ENG-BRG-003 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, vibration check |
 | ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
 | ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
-| ENG-GBX-006 | Gearbox Fault | CRIT/MAJ/MIN | 72 | Chip detector, SOAP, oil pressure check |
-| ENG-OVH-007 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
+| ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
 | ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
-**Note on ENG-GBX-006:** This fault code is unique to GTF-equipped aircraft and does not appear in conventional turbofan maintenance programs. It covers all gearbox-specific fault conditions including chip detector activation, gearbox oil pressure loss, and gearbox oil temperature exceedance.
+**Gearbox findings:** The A220-300 has no separate gearbox fault code. Record a gearbox chip detector activation, gearbox oil pressure loss, or gearbox oil temperature exceedance as Bearing Wear, ENG-BRG-003, against the Reduction Gearbox.
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADIRU comparison, calibration |
-| AVN-ELF-002 | Electrical Fault | MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADIRU comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
 | AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
 | HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
 | HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 
@@ -1118,7 +1124,7 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 
 **Oil Type:** PWA 521 Type II
 
-**Caution:** Gearbox oil consumption exceeding 0.25 liters per flight hour requires investigation per ENG-GBX-006 before further dispatch.
+**Caution:** Gearbox oil consumption exceeding 0.25 liters per flight hour requires investigation under ENG-BRG-003, against the Reduction Gearbox, before further dispatch.
 
 #### Task Card: HYD-TC-001 - Hydraulic Fluid Sample
 
@@ -1265,7 +1271,7 @@ These figures are typical industry shares for this aircraft type. They are not c
 4. Bearing Wear: about 11%
 5. Vibration Exceedance: about 10%
 
-**Note:** In typical A220-300 operator data, Gearbox Oil Issue (ENG-GBX-006) is the second most common fault type. It is a GTF-specific maintenance category that does not appear in data for conventional turbofans. Operators often shorten gearbox monitoring intervals in response.
+**Note:** In typical A220-300 operator data, gearbox oil findings are the second most common fault type. They are recorded as Bearing Wear, ENG-BRG-003, against the Reduction Gearbox. Operators often shorten gearbox monitoring intervals in response.
 
 ### 10.6 Revision History Log
 

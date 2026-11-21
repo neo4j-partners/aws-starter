@@ -23,6 +23,7 @@ from .fleet import AircraftNode, SystemNode, generate_fleet
 from .maintenance import SEVERITY_BY_LEVEL
 from .specs import (
     ENGINE_SPECS,
+    FAULT_CODES,
     MANUAL_FLEET_TAILS,
     PHASES,
     SYSTEM_SENSORS,
@@ -30,6 +31,7 @@ from .specs import (
     Direction,
     EgtBand,
     EngineSpec,
+    FaultCode,
     SensorSpec,
     sensors_for,
 )
@@ -364,6 +366,82 @@ def _hydraulic_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     return _table(header, rows)
 
 
+# The section 7 text of each code, from the B737 manual: description, ATA
+# chapter, and primary action.
+_FAULT_CODE_TEXT: dict[str, tuple[str, int, str]] = {
+    "ENG-SDR-001": ("Sensor Drift", 77, "Identify sensor, verify, replace"),
+    "ENG-CNT-002": ("Contamination", 72, "Oil/fuel analysis, wash/clean"),
+    "ENG-BRG-003": ("Bearing Wear", 72, "Oil analysis, vibration check"),
+    "ENG-LEAK-004": ("Fluid Leak", 79, "Identify source, repair"),
+    "ENG-VIB-005": ("Vibration Exceedance", 72, "Fan balance, bearing check"),
+    "ENG-OVH-006": ("Overheat", 72, "Reduce thrust, borescope"),
+    "ENG-FUEL-007": ("Fuel Starvation", 73, "Check fuel system, filter"),
+    "ENG-ELF-008": ("Electrical Fault", 77, "FADEC diagnostics, wiring"),
+    "AVN-SDR-001": ("Sensor Drift", 34, "ADC comparison, calibration"),
+    "AVN-ELF-002": ("Electrical Fault", 34, "Power check, connector inspect"),
+    "AVN-FMS-003": ("FMS Malfunction", 34, "Reset, database reload"),
+    "AVN-NAV-004": ("NAV Receiver Fault", 34, "Antenna check, LRU swap"),
+    "HYD-LEAK-001": ("System Leak", 29, "Locate, classify, repair"),
+    "HYD-CNT-002": ("Contamination", 29, "Sample analysis, filter"),
+    "HYD-PRS-003": ("Low Pressure", 29, "Pump check, leak check"),
+    "HYD-QTY-004": ("Low Quantity", 29, "Check level, leak inspect"),
+}
+
+# Model -> code -> primary action, only where the action names equipment
+# that model has and the B737 does not.
+MODEL_ACTIONS: dict[str, dict[str, str]] = {
+    "A220-300": {"AVN-SDR-001": "ADIRU comparison, calibration"},
+    "A321neo": {
+        "ENG-SDR-001": "EMU diagnostics",
+        "ENG-OVH-006": "Borescope, CMC inspect",
+        "AVN-SDR-001": "ADIRU comparison",
+        "AVN-NAV-004": "Antenna, MMR check",
+    },
+    "E190": {"AVN-SDR-001": "ADIRU comparison, calibration"},
+}
+
+_SEVERITY_ABBREVIATIONS = {"CRITICAL": "CRIT", "MAJOR": "MAJ", "MINOR": "MIN"}
+
+
+def fault_code_severities(code: FaultCode, model: str) -> tuple[str, ...]:
+    """The severities a code's events can carry on one model, worst first."""
+    if not code.generated:
+        return code.severities
+    routed = any(
+        route.fault == code.fault and route.weight > 0
+        for spec in sensors_for(code.system, model)
+        for route in spec.faults
+    )
+    if not routed:
+        raise ValueError(
+            f"fault code {code.code}: no {code.system} route raises {code.fault!r} on the {model}"
+        )
+    # A crossing into any band picks one of the routes on its side, so a
+    # routed fault can be raised at every level.
+    return tuple(SEVERITY_BY_LEVEL[level] for level in sorted(SEVERITY_BY_LEVEL, reverse=True))
+
+
+def _fault_codes(system: str, model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§7.1 to §7.3: the canonical codes of one system type."""
+    actions = MODEL_ACTIONS.get(model, {})
+    rows = []
+    for code in FAULT_CODES:
+        if code.system != system:
+            continue
+        description, ata, action = _FAULT_CODE_TEXT[code.code]
+        severities = fault_code_severities(code, model)
+        rows.append(
+            (
+                code.code,
+                description,
+                "/".join(_SEVERITY_ABBREVIATIONS[s] for s in severities),
+                str(ata),
+                actions.get(code.code, action),
+            )
+        )
+    return _table(("Code", "Description", "Severity", "ATA", "Primary Action"), rows)
+
+
 # Block id -> renderer. Each takes (model, engine spec, fleet stats).
 RENDERERS: dict[str, Renderer] = {
     "sensor-table": _sensor_table,
@@ -376,6 +454,9 @@ RENDERERS: dict[str, Renderer] = {
     "normal-parameters": _phase_limits,
     "quick-ref-engine": _phase_limits,
     "quick-ref-hydraulics": _hydraulic_limits,
+    "fault-codes-engine": functools.partial(_fault_codes, "Engine"),
+    "fault-codes-avionics": functools.partial(_fault_codes, "Avionics"),
+    "fault-codes-hydraulics": functools.partial(_fault_codes, "Hydraulics"),
 }
 
 # Blocks every manual must have, once each.

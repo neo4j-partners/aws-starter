@@ -257,12 +257,17 @@ def _fsync(path: Path) -> None:
     """Flush a file's or a directory's contents to disk.
 
     On macOS, os.fsync can leave the data in the drive's own cache, so
-    F_FULLFSYNC is used where the platform has it.
+    F_FULLFSYNC is used where the platform has it. Some network and FUSE
+    mounts reject F_FULLFSYNC, and those fall back to os.fsync, as SQLite
+    does.
     """
     fd = os.open(path, os.O_RDONLY)
     try:
         if hasattr(fcntl, "F_FULLFSYNC"):
-            fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+            try:
+                fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+            except OSError:
+                os.fsync(fd)
         else:
             os.fsync(fd)
     finally:

@@ -387,3 +387,23 @@ def test_fsync_falls_back_to_os_fsync_without_full_fsync(
     generator_main._fsync(tmp_path)
 
     assert calls == ["fsync"]
+
+
+def test_fsync_falls_back_to_os_fsync_when_full_fsync_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Some network and FUSE mounts reject F_FULLFSYNC. SQLite falls back to
+    # fsync there, and so does _fsync.
+    monkeypatch.setattr(fcntl, "F_FULLFSYNC", 51, raising=False)
+    calls: list[str] = []
+    monkeypatch.setattr(os, "fsync", lambda fd: calls.append("fsync"))
+
+    def reject(fd: int, cmd: int, *args: object) -> int:
+        calls.append("F_FULLFSYNC")
+        raise OSError(errno.ENOTSUP, os.strerror(errno.ENOTSUP))
+
+    monkeypatch.setattr(fcntl, "fcntl", reject)
+
+    generator_main._fsync(tmp_path)
+
+    assert calls == ["F_FULLFSYNC", "fsync"]

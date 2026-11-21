@@ -519,7 +519,9 @@ def render_manuals(
     stats = manuals.load_stats(manuals_dir)
     pending: list[tuple[str, str, str]] = []
     for model, filename in manuals.MANUAL_FILES.items():
-        text = (manuals_dir / filename).read_text(encoding="utf-8")
+        # newline="" keeps CRLF endings, so --check reports them as drift.
+        with (manuals_dir / filename).open(encoding="utf-8", newline="") as f:
+            text = f.read()
         try:
             rendered = manuals.render_text(text, model, stats)
         except manuals.ManualBlockError as exc:
@@ -539,7 +541,7 @@ def render_manuals(
             print("".join(diff), end="")
             console.print(f"[red]{escape(filename)} has drifted[/red]")
         else:
-            (manuals_dir / filename).write_text(rendered, encoding="utf-8")
+            (manuals_dir / filename).write_text(rendered, encoding="utf-8", newline="\n")
             console.print(f"Rendered {escape(filename)}")
     if check and pending:
         console.print("Run `uv run generate-data render-manuals` to update them.")

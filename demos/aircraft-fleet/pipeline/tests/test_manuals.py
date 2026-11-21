@@ -7,6 +7,7 @@ them and leaves every other line as it was.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -190,6 +191,15 @@ def test_crlf_line_endings_render_as_lf() -> None:
 
 def test_git_checks_out_the_manuals_with_lf_endings() -> None:
     path = manuals.MANUALS_DIR / manuals.MANUAL_FILES[MODEL]
+    inside = shutil.which("git") and subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=path.parent,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if not inside or inside.stdout.strip() != "true":
+        pytest.skip("the manuals are not in a git checkout")
     result = subprocess.run(
         ["git", "check-attr", "text", "eol", "--", path.name],
         cwd=path.parent,
@@ -279,6 +289,26 @@ def test_render_rewrites_only_the_drifted_manual(manuals_dir: Path) -> None:
     assert drifted.read_text() == "# B737-800\n" + _block("greeting", "Hello from the B737-800.")
     assert other.stat().st_mtime_ns == before
     assert f"Rendered {drifted.name}" in result.output
+
+
+def test_check_flags_a_manual_with_crlf_endings(manuals_dir: Path) -> None:
+    crlf = manuals_dir / manuals.MANUAL_FILES[MODEL]
+    crlf.write_bytes(crlf.read_bytes().replace(b"\n", b"\r\n"))
+
+    result = _cli(manuals_dir, "--check")
+
+    assert result.exit_code == 1
+    assert f"{crlf.name} has drifted" in result.output
+
+
+def test_render_writes_lf_endings(manuals_dir: Path) -> None:
+    crlf = manuals_dir / manuals.MANUAL_FILES[MODEL]
+    crlf.write_bytes(crlf.read_bytes().replace(b"\n", b"\r\n"))
+
+    result = _cli(manuals_dir)
+
+    assert result.exit_code == 0, result.output
+    assert b"\r" not in crlf.read_bytes()
 
 
 def test_a_bad_manual_stops_the_render_before_any_manual_is_written(

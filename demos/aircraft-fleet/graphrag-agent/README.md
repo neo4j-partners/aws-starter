@@ -139,6 +139,12 @@ Deployment uses the AgentCore CLI. Install it with
 `npm install -g @aws/agentcore`. The project lives in `agentcore/`, and
 `agentcore/agentcore.json` declares the `graphrag_agent` Runtime.
 
+The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` runs `npm ci` there on the first deploy. To run `agentcore deploy` directly, install them once first:
+
+```bash
+(cd agentcore/cdk && npm ci)
+```
+
 `./agent.sh deploy` reads the deploy settings from the shared `../.env`. A value exported in the shell wins. `agentcore/cdk/lib/cdk-stack.ts` copies them into the Runtime environment, and synth stops with a list of any that are missing:
 
 - **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE` for the fleet graph.

@@ -83,6 +83,14 @@ exec "$STUB_PYTHON" "$@"
 
 # macOS /usr/bin/mktemp ignores TMPDIR here, so without this stub a test of
 # temp file cleanup would pass on code that leaks.
+# npm logs its arguments and working folder. `npm ci` creates node_modules,
+# as the real install does, unless STUB_NPM_EXIT makes it fail.
+STUB_NPM = r"""#!/bin/bash
+echo "npm $* in ${PWD##*/graphrag-agent/}" >> "$STUB_LOG"
+if [ -n "$STUB_NPM_EXIT" ]; then echo "npm ERR! stub failure" >&2; exit "$STUB_NPM_EXIT"; fi
+mkdir node_modules
+"""
+
 STUB_MKTEMP = r"""#!/bin/bash
 exec /usr/bin/mktemp "$@" "$STUB_TMP/tmp.XXXXXX"
 """
@@ -109,7 +117,13 @@ def project(tmp_path: Path) -> Path:
     (root / "agentcore" / "aws-targets.json").write_text(json.dumps(targets))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    stubs = {"agentcore": STUB_AGENTCORE, "aws": STUB_AWS, "uv": STUB_UV, "mktemp": STUB_MKTEMP}
+    stubs = {
+        "agentcore": STUB_AGENTCORE,
+        "aws": STUB_AWS,
+        "uv": STUB_UV,
+        "mktemp": STUB_MKTEMP,
+        "npm": STUB_NPM,
+    }
     for name, body in stubs.items():
         stub = bin_dir / name
         stub.write_text(body)
@@ -396,3 +410,64 @@ def test_destroy_runs_when_confirmed(project: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "agentcore deploy --target default --yes" in calls(project)
+
+
+def run_deploy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[str]:
+    # deploy needs the shared ../.env and an installed .venv. The CDK project
+    # starts without node_modules, as in a fresh clone.
+    (project.parent / ".env").write_text("NEO4J_URI=bolt://localhost:27687\n")
+    (project / ".venv").mkdir(exist_ok=True)
+    (project / "agentcore" / "cdk").mkdir(exist_ok=True)
+    env = {
+        "PATH": f"{project.parent / 'bin'}:/usr/bin:/bin",
+        "HOME": os.environ["HOME"],
+        "STUB_LOG": str(project.parent / "calls.log"),
+        "STUB_PYTHON": sys.executable,
+        "STUB_TMP": str(project.parent / "tmp"),
+        **stub_env,
+    }
+    return subprocess.run(
+        ["bash", str(project / "agent.sh"), "deploy"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+        check=False,
+    )
+
+
+def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
+    result = run_deploy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    logged = calls(project)
+    assert logged == ["npm ci in agentcore/cdk", "agentcore deploy --target default"]
+    assert (project / "agentcore" / "cdk" / "node_modules").is_dir()
+
+
+def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> None:
+    (project / "agentcore" / "cdk" / "node_modules").mkdir(parents=True)
+
+    result = run_deploy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == ["agentcore deploy --target default"]
+
+
+def test_a_failed_cdk_install_stops_before_deploy(project: Path) -> None:
+    result = run_deploy(project, STUB_NPM_EXIT="1")
+
+    assert result.returncode == 1
+    assert "(cd agentcore/cdk && npm ci)" in result.stdout
+    assert calls(project) == ["npm ci in agentcore/cdk"]
+
+
+def test_deploy_without_npm_names_the_install_step(project: Path) -> None:
+    (project.parent / "bin" / "npm").unlink()
+
+    result = run_deploy(project)
+
+    assert result.returncode == 1
+    assert "npm is not installed" in result.stdout
+    assert "(cd agentcore/cdk && npm ci)" in result.stdout
+    assert calls(project) == []

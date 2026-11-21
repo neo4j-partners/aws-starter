@@ -83,6 +83,8 @@ TARGET="default"
 PROJECT_SPEC="agentcore/agentcore.json"
 # The first deploy records each target's account and region here. Git ignores it.
 TARGETS_FILE="agentcore/aws-targets.json"
+# The CDK app that agentcore deploy synthesizes.
+CDK_DIR="agentcore/cdk"
 
 ensure_deps() {
     if [ ! -d ".venv" ]; then
@@ -98,6 +100,27 @@ ensure_cli() {
         echo "Install it with: npm install -g @aws/agentcore"
         exit 1
     fi
+}
+
+# agentcore deploy refuses to run without agentcore/cdk/node_modules, and
+# git ignores that folder, so a fresh clone has none. Install it from the
+# committed package-lock.json on the first deploy.
+ensure_cdk_deps() {
+    if [ -d "$CDK_DIR/node_modules" ]; then
+        return
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        echo -e "${RED}ERROR: npm is not installed, so the CDK dependencies cannot be installed${NC}"
+        echo "Install Node.js, then run: (cd $CDK_DIR && npm ci)"
+        exit 1
+    fi
+    echo -e "${YELLOW}Installing the CDK dependencies (first deploy)...${NC}"
+    if ! (cd "$CDK_DIR" && npm ci); then
+        echo -e "${RED}ERROR: npm ci failed in $CDK_DIR${NC}"
+        echo "Fix the error above, then run: (cd $CDK_DIR && npm ci)"
+        exit 1
+    fi
+    echo ""
 }
 
 # The CodeZip build ships every file under this directory except agentcore/,
@@ -406,6 +429,7 @@ case "${1:-help}" in
         ensure_cli
         refuse_secret_files
         load_deploy_env
+        ensure_cdk_deps
         echo -e "${GREEN}Deploying agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""

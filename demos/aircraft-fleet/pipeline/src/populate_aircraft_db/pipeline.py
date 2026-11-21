@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,8 @@ from .schema import (
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
     SYSTEM_TYPES_TEXT,
 )
+
+logger = logging.getLogger(__name__)
 
 # Labels for extracted entity nodes (used by clear/verify logic).
 EXTRACTED_LABELS = [
@@ -448,26 +451,28 @@ def debug_extract_chunks(
     async def _run() -> bool:
         text = (document_dir / filename).read_text(encoding="utf-8").strip()
         chunks = await splitter.run(text)
-        print(f"Document: {filename}")
-        print(f"Total chunks: {len(chunks.chunks)}")
-        print(f"LLM: {provider}/{llm_model} max_tokens={llm_max_tokens}")
+        logger.info("Document: %s", filename)
+        logger.info("Total chunks: %d", len(chunks.chunks))
+        logger.info("LLM: %s/%s max_tokens=%d", provider, llm_model, llm_max_tokens)
 
         ok = True
         for index in chunk_indexes:
             if index < 0 or index >= len(chunks.chunks):
-                print(f"  [FAIL] chunk_index={index} is out of range")
+                logger.error("  [FAIL] chunk_index=%d is out of range", index)
                 ok = False
                 continue
             chunk = chunks.chunks[index]
             try:
                 graph = await extractor.extract_for_chunk(schema, "", chunk)
             except Exception as exc:
-                print(f"  [FAIL] chunk_index={index}: {exc}")
+                logger.error("  [FAIL] chunk_index=%d: %s", index, exc)
                 ok = False
                 continue
-            print(
-                f"  [OK] chunk_index={index}: "
-                f"{len(graph.nodes)} nodes, {len(graph.relationships)} relationships"
+            logger.info(
+                "  [OK] chunk_index=%d: %d nodes, %d relationships",
+                index,
+                len(graph.nodes),
+                len(graph.relationships),
             )
         return ok
 
@@ -526,14 +531,16 @@ def process_all_documents(
 
     async def _run_all():
         for meta in DOCUMENTS:
-            print(f"\nProcessing: {meta.filename}")
+            logger.info("Processing: %s", meta.filename)
             filepath = document_dir / meta.filename
             text = filepath.read_text(encoding="utf-8").strip()
-            print(f"  Read {len(text):,} characters.")
+            logger.info("  Read %s characters.", f"{len(text):,}")
 
             if max_chars and len(text) > max_chars:
                 text = text[:max_chars]
-                print(f"  Truncated to {max_chars:,} chars (~{enrich_sample_size} chunks).")
+                logger.info(
+                    "  Truncated to %s chars (~%d chunks).", f"{max_chars:,}", enrich_sample_size
+                )
 
             # Update the splitter's context so every chunk the LLM sees starts
             # with the aircraft type.  The custom EXTRACTION_PROMPT instructs
@@ -553,7 +560,7 @@ def process_all_documents(
                     "path": meta.filename,
                 },
             )
-            print(f"  [OK] Pipeline complete for {meta.document_id}")
+            logger.info("  [OK] Pipeline complete for %s", meta.document_id)
 
     asyncio.run(_run_all())
 
@@ -576,7 +583,7 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     """,
         database_=database,
     )
-    print(f"  [OK] {records[0]['count']} Document -[:APPLIES_TO]-> Aircraft")
+    logger.info("  [OK] %d Document -[:APPLIES_TO]-> Aircraft", records[0]["count"])
 
     # AircraftModel -[:DESCRIBES_MODEL]-> Aircraft
     # (model-level manual entity to tail-level fleet)
@@ -589,7 +596,7 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     """,
         database_=database,
     )
-    print(f"  [OK] {records[0]['count']} AircraftModel -[:DESCRIBES_MODEL]-> Aircraft")
+    logger.info("  [OK] %d AircraftModel -[:DESCRIBES_MODEL]-> Aircraft", records[0]["count"])
 
     # SystemReference -[:DESCRIBES_SYSTEM]-> System
     # (same aircraft model, systemType equals the System type, ignoring case;
@@ -605,7 +612,7 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     """,
         database_=database,
     )
-    print(f"  [OK] {records[0]['count']} SystemReference -[:DESCRIBES_SYSTEM]-> System")
+    logger.info("  [OK] %d SystemReference -[:DESCRIBES_SYSTEM]-> System", records[0]["count"])
 
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
     # (same aircraft model, componentType equals the Component type, ignoring
@@ -626,7 +633,9 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         system_types=SYSTEM_TYPE_BY_COMPONENT_TYPE,
         database_=database,
     )
-    print(f"  [OK] {records[0]['count']} ComponentReference -[:DESCRIBES_COMPONENT]-> Component")
+    logger.info(
+        "  [OK] %d ComponentReference -[:DESCRIBES_COMPONENT]-> Component", records[0]["count"]
+    )
 
     # Sensor -[:HAS_LIMIT]-> OperatingLimit (match parameterName + aircraftType)
     records, _, _ = driver.execute_query(
@@ -638,7 +647,7 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     """,
         database_=database,
     )
-    print(f"  [OK] {records[0]['count']} Sensor -[:HAS_LIMIT]-> OperatingLimit")
+    logger.info("  [OK] %d Sensor -[:HAS_LIMIT]-> OperatingLimit", records[0]["count"])
 
 
 # ---------------------------------------------------------------------------
@@ -651,10 +660,10 @@ def clear_enrichment_data(driver: Driver, database: str) -> None:
     # __Entity__ and __KGBuilder__ are labels the KG pipeline adds to its nodes.
     labels_to_clear = ["Document", "Chunk", *EXTRACTED_LABELS, "__Entity__", "__KGBuilder__"]
 
-    print("Clearing enrichment data (Documents, Chunks, extracted entities)...")
+    logger.info("Clearing enrichment data (Documents, Chunks, extracted entities)...")
     deleted_total = sum(detach_delete_nodes(driver, database, label) for label in labels_to_clear)
 
-    print(f"  [OK] Cleared {deleted_total} enrichment nodes.")
+    logger.info("  [OK] Cleared %d enrichment nodes.", deleted_total)
 
 
 # ---------------------------------------------------------------------------

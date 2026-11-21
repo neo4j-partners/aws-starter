@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from itertools import batched
@@ -13,6 +14,8 @@ from neo4j import Driver
 from neo4j.exceptions import Neo4jError
 
 from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
+
+logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000
 OPERATIONAL_LABELS = [
@@ -396,33 +399,33 @@ def load_nodes(driver: Driver, database: str, data_dir: Path) -> int:
     """
     skipped_total = 0
     for label, filename, query in _NODE_DEFINITIONS:
-        print(f"Loading {label} nodes...")
+        logger.info("Loading %s nodes...", label)
         count, skipped = _run_in_batches(
             driver, database, iter_csv_batches(data_dir, filename), query
         )
         skipped_total += skipped
-        print(f"  [OK] Loaded {count - skipped} {label} nodes.")
+        logger.info("  [OK] Loaded %d %s nodes.", count - skipped, label)
     return skipped_total
 
 
 def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
     """Load every operational relationship type from its CSV file."""
     for rel_type, filename, query in _REL_DEFINITIONS:
-        print(f"Loading {rel_type} relationships...")
+        logger.info("Loading %s relationships...", rel_type)
         count, _ = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
-        print(f"  [OK] Loaded {count} {rel_type} relationships.")
+        logger.info("  [OK] Loaded %d %s relationships.", count, rel_type)
 
 
 def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
     """Load all operational nodes, then all relationships, then report skips."""
     skipped = load_nodes(driver, database, data_dir)
-    print()
     load_relationships(driver, database, data_dir)
-    print()
     if skipped:
-        print(f"[WARN] Skipped {skipped:,} readings whose sensor_id matches no Sensor.")
+        logger.warning(
+            "[WARN] Skipped %s readings whose sensor_id matches no Sensor.", f"{skipped:,}"
+        )
     else:
-        print("[OK] No readings skipped.")
+        logger.info("[OK] No readings skipped.")
 
 
 # Rows deleted per inner transaction when clearing nodes. DETACH DELETE also
@@ -476,10 +479,12 @@ def clear_database(driver: Driver, database: str) -> None:
     batch of dense nodes, such as Sensors with thousands of readings, can
     otherwise exceed the heap.
     """
-    print("Clearing database...")
+    logger.info("Clearing database...")
     relationships = delete_all_relationships(driver, database)
     nodes = detach_delete_nodes(driver, database)
-    print(f"  [OK] Database cleared ({relationships} relationships, {nodes} nodes deleted).")
+    logger.info(
+        "  [OK] Database cleared (%d relationships, %d nodes deleted).", relationships, nodes
+    )
 
 
 def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:

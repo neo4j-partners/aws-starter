@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TextIO
 
 import typer
 from neo4j import Driver, GraphDatabase
@@ -30,6 +31,32 @@ app = typer.Typer(
     add_completion=False,
     pretty_exceptions_show_locals=False,
 )
+
+_LOG_HANDLER_NAME = "populate-aircraft-db-cli"
+
+
+def _configure_logging(stream: TextIO) -> None:
+    """Write this package's INFO and higher records to stream as bare messages.
+
+    Only the package logger gets a handler. Other libraries keep the root
+    logger's WARNING default, so INFO records from httpx and neo4j stay
+    hidden. A repeat call points the existing handler at the new stream.
+    """
+    package_logger = logging.getLogger(__package__)
+    package_logger.setLevel(logging.INFO)
+    for handler in package_logger.handlers:
+        if handler.get_name() == _LOG_HANDLER_NAME:
+            handler.setStream(stream)
+            return
+    handler = logging.StreamHandler(stream)
+    handler.set_name(_LOG_HANDLER_NAME)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    package_logger.addHandler(handler)
+
+
+@app.callback()
+def _main() -> None:
+    _configure_logging(sys.stdout)
 
 
 def _fmt_elapsed(seconds: float) -> str:

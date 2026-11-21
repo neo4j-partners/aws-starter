@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from neo4j import Driver
 
 from generator.specs import COMPONENT_TYPES_BY_SYSTEM
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Fleet type vocabulary for extraction
@@ -99,7 +103,7 @@ def create_constraints(driver: Driver, database: str) -> None:
             f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
             database_=database,
         )
-        print(f"  [OK] Constraint: {label}.{prop}")
+        logger.info(f"  [OK] Constraint: {label}.{prop}")
 
 
 def create_indexes(driver: Driver, database: str) -> None:
@@ -111,7 +115,7 @@ def create_indexes(driver: Driver, database: str) -> None:
             f"FOR (n:{_quote_identifier(label)}) ON (n.{_quote_identifier(prop)})",
             database_=database,
         )
-        print(f"  [OK] Index: {label}.{prop}")
+        logger.info(f"  [OK] Index: {label}.{prop}")
 
 
 def create_fulltext_indexes(driver: Driver, database: str) -> None:
@@ -123,7 +127,7 @@ def create_fulltext_indexes(driver: Driver, database: str) -> None:
             f"FOR (n:{_quote_identifier(label)}) ON EACH [{props_clause}]",
             database_=database,
         )
-        print(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
+        logger.info(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
 
 
 def create_extraction_constraints(driver: Driver, database: str) -> None:
@@ -134,7 +138,7 @@ def create_extraction_constraints(driver: Driver, database: str) -> None:
             f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
             database_=database,
         )
-        print(f"  [OK] Constraint: {label}.{prop}")
+        logger.info(f"  [OK] Constraint: {label}.{prop}")
 
 
 def drop_extraction_constraints(driver: Driver, database: str) -> None:
@@ -163,7 +167,7 @@ def drop_extraction_constraints(driver: Driver, database: str) -> None:
             driver.execute_query(
                 f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS", database_=database
             )
-            print(f"  [OK] Dropped constraint: {label}.{prop}")
+            logger.info(f"  [OK] Dropped constraint: {label}.{prop}")
 
 
 def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> None:
@@ -182,7 +186,7 @@ def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> 
         similarity_fn="cosine",
         neo4j_database=database,
     )
-    print("  [OK] Vector index: maintenanceChunkEmbeddings")
+    logger.info("  [OK] Vector index: maintenanceChunkEmbeddings")
 
     create_fulltext_index(
         driver,
@@ -191,7 +195,7 @@ def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> 
         node_properties=["text"],
         neo4j_database=database,
     )
-    print("  [OK] Fulltext index: maintenanceChunkText")
+    logger.info("  [OK] Fulltext index: maintenanceChunkText")
 
 
 def build_extraction_schema():

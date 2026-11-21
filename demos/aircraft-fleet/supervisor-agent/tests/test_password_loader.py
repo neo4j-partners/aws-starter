@@ -160,8 +160,10 @@ def test_aws_errors_become_config_errors(
     assert f"Could not read the secret in {ARN_VAR} ({failure})" in caplog.text
     assert ROLE not in caplog.text
     assert ARN not in caplog.text
+    # No context either: password_rejected walks __context__, and the
+    # botocore error must not be reachable from the ConfigError at all.
     assert raised.value.__cause__ is None
-    assert raised.value.__suppress_context__
+    assert raised.value.__context__ is None
 
 
 def test_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:

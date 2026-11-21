@@ -534,6 +534,82 @@ The Full Authority Digital Engine Control (FADEC) provides:
 | Bearing | 1 × N1 or N2 | Bearing degradation |
 | Gear mesh | Multiple of N2 | AGB wear |
 
+### 4.6 Overheat Condition (EGT Exceedance)
+
+**Fault Code:** ENG-OVH-006
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 11 of the B737-800's 37 engine maintenance events, or 30%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
+
+#### Symptoms
+- EGT indication above the normal operating range
+- EICAS caution or warning message
+- EGT margin loss in trend data
+- Possible heat damage found on borescope inspection
+
+#### Immediate Actions
+1. Reduce thrust if flight conditions permit
+2. Monitor the EGT trend for stabilization
+3. If EGT reaches the maximum in the Operating Limits table in section 3.2.3, High-Pressure Turbine, follow the engine shutdown procedure in the QRH
+
+#### Troubleshooting Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review DFDR/QAR data for the EGT exceedance | Document peak temperature and exposure time |
+| 2 | Compare EGT probe readings | Find a failed or drifting probe |
+| 3 | Borescope the combustor and HPT blades | Check for thermal distress and coating loss |
+| 4 | Check fuel nozzle spray patterns | Ensure even fuel distribution |
+| 5 | Review the FADEC fault log via CMC | Rule out a sensor or control fault |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (EGT above the maximum limit):**
+- Ground aircraft pending HPT borescope inspection
+- If blade damage is found, remove the engine for a shop visit
+
+**MAJOR (EGT in the caution band, intermittent):**
+- Perform a hot section inspection within 50 flight hours
+- Replace EGT probes if calibration drift is found
+- Monitor trend data for recurrence
+
+**MINOR (EGT trending high but within limits):**
+- Adjust engine trim if applicable
+- Schedule an inspection at the next C-check
+- Continue monitoring with increased frequency
+
+### 4.7 Fuel Starvation
+
+**Fault Code:** ENG-FUEL-007
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 3 of the B737-800's 37 engine maintenance events, or 8%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
+
+#### Symptoms
+- Fuel flow fluctuation or sudden drop
+- N1 and N2 rollback
+- EGT rise from a lean mixture
+- Fuel filter bypass or low fuel pressure EICAS message
+- Possible flameout
+
+#### Immediate Actions
+1. Check fuel quantity and crossfeed configuration
+2. Confirm the fuel boost pumps are on
+3. If flameout occurs, follow the relight procedure in the QRH
+
+#### Diagnostic Procedure
+
+| Step | Action | Check Point |
+|------|--------|-------------|
+| 1 | Verify fuel quantity and feed configuration | Rule out a fuel management error |
+| 2 | Check fuel filter differential pressure | A high reading means a blocked filter |
+| 3 | Compare fuel flow with the Main Fuel Pump flow rate in section 3.2.4 | Low flow points to the pump or metering valve |
+| 4 | Check fuel metering valve operation | FADEC command matches actual position |
+| 5 | Inspect fuel lines for leaks or blockage | Visual and pressure decay test |
+| 6 | Sample fuel for contamination | Water, particulates, microbial growth |
+
 ---
 
 ## 5. Avionics System

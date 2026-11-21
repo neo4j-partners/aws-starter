@@ -619,6 +619,82 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 | Bearing | 1 × N1 or N1c | Bearing degradation |
 | Gear mesh | Multiple of N1/N1c | Gearbox planetary wear |
 
+### 4.6 Overheat Condition (EGT Exceedance)
+
+**Fault Code:** ENG-OVH-006
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 7 of the A220-300's 22 engine maintenance events, or 32%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
+
+#### Symptoms
+- EGT indication above the normal operating range
+- CAS caution or warning message
+- EGT margin loss in trend data
+- Possible heat damage found on borescope inspection
+
+#### Immediate Actions
+1. Reduce thrust if flight conditions permit
+2. Monitor the EGT trend for stabilization
+3. If EGT reaches the maximum in the Operating Limits table in section 3.2.3, High-Pressure Turbine, follow the engine shutdown procedure in the QRH
+
+#### Troubleshooting Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review DFDR/QAR data for the EGT exceedance | Document peak temperature and exposure time |
+| 2 | Compare EGT probe readings | Find a failed or drifting probe |
+| 3 | Borescope the combustor and HPT blades | Check for thermal distress and coating loss |
+| 4 | Check fuel nozzle spray patterns | Ensure even fuel distribution |
+| 5 | Review the FADEC fault log via CMS | Rule out a sensor or control fault |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (EGT above the maximum limit):**
+- Ground aircraft pending HPT borescope inspection
+- If blade damage is found, remove the engine for a shop visit
+
+**MAJOR (EGT in the caution band, intermittent):**
+- Perform a hot section inspection within 50 flight hours
+- Replace EGT probes if calibration drift is found
+- Monitor trend data for recurrence
+
+**MINOR (EGT trending high but within limits):**
+- Adjust engine trim if applicable
+- Schedule an inspection at the next C-check
+- Continue monitoring with increased frequency
+
+### 4.7 Fuel Starvation
+
+**Fault Code:** ENG-FUEL-007
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A220-300's 22 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
+
+#### Symptoms
+- Fuel flow fluctuation or sudden drop
+- N1 and N2 rollback
+- EGT rise from a lean mixture
+- Fuel filter bypass or low fuel pressure CAS message
+- Possible flameout
+
+#### Immediate Actions
+1. Check fuel quantity and crossfeed configuration
+2. Confirm the fuel boost pumps are on
+3. If flameout occurs, follow the relight procedure in the QRH
+
+#### Diagnostic Procedure
+
+| Step | Action | Check Point |
+|------|--------|-------------|
+| 1 | Verify fuel quantity and feed configuration | Rule out a fuel management error |
+| 2 | Check fuel filter differential pressure | A high reading means a blocked filter |
+| 3 | Compare fuel flow with the Main Fuel Pump flow rate in section 3.2.4 | Low flow points to the pump or metering valve |
+| 4 | Check fuel metering valve operation | FADEC command matches actual position |
+| 5 | Inspect fuel lines for leaks or blockage | Visual and pressure decay test |
+| 6 | Sample fuel for contamination | Water, particulates, microbial growth |
+
 ---
 
 ## 5. Avionics System
@@ -1118,11 +1194,11 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 6. Replace cap and verify secure
 7. Close service door
 8. Record quantity added in aircraft log
-9. Do not confuse engine oil service point with gearbox oil service point (see GBX-TC-001)
+9. Do not confuse engine oil service point with gearbox oil service point (see ENG-TC-002)
 
 **Oil Type:** PWA 521 Type II (Mobil Jet Oil 254 or equivalent)
 
-#### Task Card: GBX-TC-001 - Gearbox Oil Service
+#### Task Card: ENG-TC-002 - Gearbox Oil Service
 
 **Purpose:** Replenish gearbox oil to proper level and collect sample for SOAP analysis
 

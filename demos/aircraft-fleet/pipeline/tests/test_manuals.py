@@ -586,7 +586,7 @@ def test_the_fault_code_tables_are_the_canonical_list(model: str) -> None:
 _PREFIXES = "|".join(sorted({c.code.split("-")[0] for c in FAULT_CODES}))
 _CODE_TOKEN = re.compile(rf"\b(?:{_PREFIXES})-[A-Z]{{2,5}}-\d{{3}}\b(?!-\d)")
 # Task card numbers. They share the code shape but are not fault codes.
-_TASK_CARDS = {"ENG-TC-001", "HYD-TC-001", "HYD-TOOL-100"}
+_TASK_CARDS = {"ENG-TC-001", "ENG-TC-002", "HYD-TC-001", "HYD-TOOL-100"}
 
 
 def _unknown_codes(text: str) -> list[str]:
@@ -643,3 +643,56 @@ def test_each_fault_code_line_is_the_code_of_its_sections_fault(model: str) -> N
             c.code for c in FAULT_CODES if c.system == system and c.fault.lower() == faults[0]
         ]
         assert [code] == expected, heading
+
+
+# Fault codes a manual covers although the generator never raises them.
+_MANUAL_ONLY_SECTIONS = {"A321neo": {"ENG-ELF-008"}}
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_section_4_covers_every_engine_fault_once(model: str) -> None:
+    codes = [code for code, heading in _fault_code_lines(_manual(model)) if heading[0] == "4"]
+    generated = {c.code for c in FAULT_CODES if c.system == "Engine" and c.generated}
+
+    assert len(codes) == len(set(codes))
+    assert set(codes) == generated | _MANUAL_ONLY_SECTIONS.get(model, set())
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_a_severity_line_lists_the_severities_of_its_code(model: str) -> None:
+    by_code = {c.code: c for c in FAULT_CODES}
+    pairs = re.findall(
+        r"^\*\*Fault Code:\*\* (\S+)\n\*\*Severity Classification:\*\* (.+)$",
+        _manual(model),
+        re.M,
+    )
+
+    assert pairs
+    for code, line in pairs:
+        expected = " / ".join(manuals.fault_code_severities(by_code[code], model))
+        assert line == expected or line.startswith(f"{expected} ("), (code, line)
+
+
+# A gearbox code. The A220's gearbox findings are recorded under the engine
+# codes, so no manual names one. The gearbox CAS messages, such as
+# "GBX CHIP DET", are cockpit text and stay.
+_GBX_CODE = re.compile(r"\bGBX-[A-Z0-9]")
+
+
+def test_the_gearbox_check_flags_a_code_but_not_a_cas_message() -> None:
+    text = "GBX CHIP DET and GBX OIL PRESS show on EICAS. See GBX-TC-001 and ENG-TC-002."
+
+    assert _GBX_CODE.findall(text) == ["GBX-T"]
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_no_manual_names_a_gearbox_code(model: str) -> None:
+    assert re.findall(r"^.*\bGBX-[A-Z0-9].*$", _manual(model), re.M) == []
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_chapters_1_and_3_share_the_numbering_of_every_manual(model: str) -> None:
+    text = _manual(model)
+
+    assert re.search(r"^### 1\.2 Fleet Configuration$", text, re.M)
+    assert re.search(r"^### 3\.2 Component Descriptions$", text, re.M)

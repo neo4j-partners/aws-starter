@@ -591,8 +591,8 @@ UTILIZATION = Utilization(
 
 
 # Entry-into-service range for each model, first and last day inclusive.
-# B737, A320, and E190 come from "entered service between" in each manual's
-# §1.2 Fleet Configuration, and A321neo from its §1.3. The A220 manual gives
+# B737, A320, A321neo, and E190 come from "entered service between" in each
+# manual's §1.2 Fleet Configuration. The A220 manual gives
 # a month per tail instead, so its range spans that table. Every aircraft
 # without a manual date gets a day in its model's range.
 ENTRY_INTO_SERVICE_RANGES: dict[str, tuple[date, date]] = {

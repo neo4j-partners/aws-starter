@@ -369,7 +369,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 ### 4.3 Fuel Starvation
 
 **Fault Code:** ENG-FUEL-007
-**Severity Classification:** CRITICAL / MAJOR
+**Severity Classification:** CRITICAL / MAJOR / MINOR
 <!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
 **Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
 <!-- END GENERATED: fault-stats-engine-fuel-starvation -->
@@ -421,6 +421,128 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 - **CRITICAL:** Immediate engine removal; bearing replacement at shop
 - **MAJOR:** Schedule engine removal within 100 flight hours
 - **MINOR:** Increase oil sampling frequency to every 50 hours; trend monitoring
+
+### 4.5 Sensor Drift
+
+**Fault Code:** ENG-SDR-001
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 4 of the A320-200's 21 engine maintenance events, or 19%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
+
+#### Symptoms
+- Parameter disagree messages on ECAM
+- Gradual deviation between redundant sensor readings
+- Thrust asymmetry indications
+- FADEC fault messages
+
+#### Diagnostic Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review the FADEC fault log | Identify affected channel and parameter |
+| 2 | Compare sensor values (Channel A vs B) | Determine which channel has drifted |
+| 3 | Cross-check with independent references | Validate actual engine condition |
+| 4 | Perform sensor Built-In Test (BIT) | Confirm sensor hardware status |
+| 5 | Check wiring continuity and connections | Rule out intermittent connections |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (Drift > 10% affecting thrust control):**
+- Ground aircraft pending sensor replacement
+- Replace affected sensor or EEC channel
+- Perform engine ground run verification
+
+**MAJOR (Drift 5-10%, redundancy compromised):**
+- Dispatch with MEL if applicable
+- Schedule sensor replacement within 10 days
+- Increase monitoring frequency
+
+**MINOR (Drift < 5%, trending):**
+- Document in aircraft log
+- Schedule calibration check at next maintenance visit
+- Continue trend monitoring
+
+### 4.6 Contamination
+
+**Fault Code:** ENG-CNT-002
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
+
+#### Types of Contamination
+
+| Type | Source | Detection Method |
+|------|--------|------------------|
+| Oil contamination | Bearing seal leak, oil cooler failure | Oil analysis, carbon deposits |
+| Fuel contamination | Water, particulates, microbial growth | Fuel filter DP, fuel sample |
+| Compressor fouling | Airborne particles, salt, volcanic ash | EGT margin loss, performance |
+| Turbine deposits | Combustion byproducts, sulfidation | Borescope, EGT spread |
+
+#### Diagnostic Procedure
+
+| Step | Action | Indicator |
+|------|--------|-----------|
+| 1 | Review trend data for EGT margin degradation | A steady EGT rise indicates fouling |
+| 2 | Perform oil spectrographic analysis | Check for wear metals, contamination |
+| 3 | Check fuel filter differential pressure | High DP indicates fuel contamination |
+| 4 | Borescope HPT nozzle and blades | Visual deposits, coating loss |
+| 5 | Perform compressor wash if applicable | Evaluate EGT margin recovery |
+
+#### Corrective Actions
+
+**CRITICAL (Severe contamination affecting operation):**
+- Engine removal for shop cleaning
+- HPT blade replacement if sulfidation present
+- Oil system flush and filter replacement
+
+**MAJOR (Moderate contamination):**
+- Perform on-wing compressor wash (motoring wash)
+- Replace fuel filter element
+- Enhanced oil sampling (every 25 FH)
+- Monitor EGT margin recovery
+
+**MINOR (Early detection):**
+- Schedule compressor wash at next opportunity
+- Increase fuel sampling frequency
+- Document trend for fleet analysis
+
+### 4.7 Leak Detection
+
+**Fault Code:** ENG-LEAK-004
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-leak -->
+
+#### Leak Classification
+
+| Class | Rate | Definition | Action |
+|-------|------|------------|--------|
+| A | Seep | Wetness, no drip | Monitor, clean |
+| B | Leak | 1-5 drops/min | Repair within 100 FH |
+| C | Heavy | > 5 drops/min | Repair before flight |
+
+#### Common Leak Sources
+
+| System | Location | Visual Indicator |
+|--------|----------|------------------|
+| Oil | Accessory gearbox | Brown/black streaks |
+| Oil | Turbine rear bearing | Oil in exhaust area |
+| Fuel | Fuel manifold | Fuel odor, staining |
+| Fuel | Fuel metering unit connections | Wet fittings |
+| Bleed | Duct connections | Sooting, heat damage |
+
+#### Troubleshooting Procedure
+
+| Step | Action | Inspection Point |
+|------|--------|------------------|
+| 1 | Perform visual inspection of engine | Note all fluid trails |
+| 2 | Clean suspected areas thoroughly | Prepare for leak check |
+| 3 | Operate engine at ground idle | Observe for fresh leaks |
+| 4 | Apply leak detection solution | Bubble test for pneumatic |
+| 5 | UV dye inspection (if oil dye installed) | Pinpoint oil leak source |
 
 ---
 

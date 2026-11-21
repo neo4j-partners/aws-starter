@@ -2,7 +2,9 @@
 
 This test writes to Neo4j, so it runs only when NEO4J_TEST_URI points at a
 local server. Set NEO4J_TEST_PASSWORD, and optionally NEO4J_TEST_USERNAME
-and NEO4J_TEST_DATABASE. It removes the nodes it creates.
+and NEO4J_TEST_DATABASE. link_to_existing_graph links across the whole
+database, so the tests skip unless it holds only their own nodes. They
+remove the nodes they create.
 """
 
 from __future__ import annotations
@@ -64,15 +66,30 @@ def driver() -> Iterator[Driver]:
         yield drv
 
 
+# Matches every node the tests create.
+_TEST_NODE = """
+n.model = $model OR n.aircraftType STARTS WITH $model
+OR n.system_id STARTS WITH $model OR n.component_id STARTS WITH $model
+OR n.sensor_id STARTS WITH $model
+"""
+
+
+def _skip_unless_only_test_nodes(driver: Driver, database: str) -> None:
+    records, _, _ = driver.execute_query(
+        # A missing property makes the predicate null, so treat null as false.
+        f"MATCH (n) WHERE NOT coalesce(({_TEST_NODE}), false) RETURN count(n) AS count",
+        model=MODEL,
+        database_=database,
+    )
+    if records[0]["count"]:
+        pytest.skip(f"database {database!r} holds nodes the link tests did not create")
+
+
 @pytest.fixture
 def database(driver: Driver) -> Iterator[str]:
     db = os.environ.get("NEO4J_TEST_DATABASE", "neo4j")
-    cleanup = """
-    MATCH (n) WHERE n.model = $model OR n.aircraftType = $model
-       OR n.system_id STARTS WITH $model OR n.component_id STARTS WITH $model
-       OR n.sensor_id STARTS WITH $model
-    DETACH DELETE n
-    """
+    _skip_unless_only_test_nodes(driver, db)
+    cleanup = f"MATCH (n) WHERE {_TEST_NODE} DETACH DELETE n"
     driver.execute_query(cleanup, model=MODEL, database_=db)
     yield db
     driver.execute_query(cleanup, model=MODEL, database_=db)
@@ -127,23 +144,26 @@ def test_sensor_links_to_limits_on_parameter_name_ignoring_case(
 ) -> None:
     driver.execute_query(_SENSOR_SETUP, model=MODEL, limits=_LIMITS, database_=database)
 
-    try:
-        link_to_existing_graph(driver, database)
+    link_to_existing_graph(driver, database)
 
-        records, _, _ = driver.execute_query(
-            """
-            MATCH (s:Sensor)-[:HAS_LIMIT]->(ol:OperatingLimit)
-            WHERE s.sensor_id STARTS WITH $model
-            RETURN ol.name AS limit
-            ORDER BY limit
-            """,
-            model=MODEL,
-            database_=database,
-        )
-    finally:
-        driver.execute_query(
-            "MATCH (ol:OperatingLimit {aircraftType: $other}) DETACH DELETE ol",
-            other=MODEL + "-OTHER",
-            database_=database,
-        )
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (s:Sensor)-[:HAS_LIMIT]->(ol:OperatingLimit)
+        WHERE s.sensor_id STARTS WITH $model
+        RETURN ol.name AS limit
+        ORDER BY limit
+        """,
+        model=MODEL,
+        database_=database,
+    )
     assert [r["limit"] for r in records] == ["EGT exact", "EGT lower"]
+
+
+def test_a_database_with_other_nodes_is_skipped(driver: Driver, database: str) -> None:
+    driver.execute_query("CREATE (:PytestForeign)", database_=database)
+    try:
+        with pytest.raises(pytest.skip.Exception, match="did not create"):
+            _skip_unless_only_test_nodes(driver, database)
+    finally:
+        driver.execute_query("MATCH (n:PytestForeign) DELETE n", database_=database)
+    _skip_unless_only_test_nodes(driver, database)

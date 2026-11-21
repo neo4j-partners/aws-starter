@@ -23,6 +23,7 @@ Cloud deployment (AgentCore CLI, see agentcore/agentcore.json):
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import uuid
@@ -292,16 +293,23 @@ async def invoke(
             # a tool call is being assembled; dedupe by toolUseId so each call
             # surfaces exactly once. Emitting these as ``tool`` events lets
             # the client print a labelled boundary where a retriever tool ran.
+            #
+            # On a client disconnect, aclosing() closes the agent stream here.
+            # Strands then runs its AfterInvocationEvent hooks, which flush
+            # memory, before the finally below closes the manager. Without it,
+            # the stream's close runs later as a separate task and can flush
+            # into a manager that is closing or already closed.
             last_tool_id: str | None = None
-            async for event in agent.stream_async(prompt):
-                if "data" in event:
-                    yield {"type": "chunk", "data": event["data"]}
-                elif tool_use := event.get("current_tool_use"):
-                    tool_id = tool_use.get("toolUseId")
-                    name = tool_use.get("name")
-                    if name and tool_id != last_tool_id:
-                        last_tool_id = tool_id
-                        yield {"type": "tool", "name": name}
+            async with contextlib.aclosing(agent.stream_async(prompt)) as events:
+                async for event in events:
+                    if "data" in event:
+                        yield {"type": "chunk", "data": event["data"]}
+                    elif tool_use := event.get("current_tool_use"):
+                        tool_id = tool_use.get("toolUseId")
+                        name = tool_use.get("name")
+                        if name and tool_id != last_tool_id:
+                            last_tool_id = tool_id
+                            yield {"type": "tool", "name": name}
         finally:
             await _close_after_build(build)
 

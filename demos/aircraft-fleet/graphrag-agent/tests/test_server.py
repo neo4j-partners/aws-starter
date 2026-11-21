@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 
 import neo4j
 import pytest
@@ -376,6 +377,41 @@ def test_memory_is_closed_when_the_client_disconnects(monkeypatch) -> None:
 
     assert asyncio.run(first_chunk_then_disconnect())["type"] == "chunk"
     assert made[0].closed == 1
+
+
+def test_disconnect_closes_the_agent_stream_before_the_memory(monkeypatch) -> None:
+    """The stream's own cleanup, where Strands flushes memory, runs before close."""
+    order: list[str] = []
+
+    class Memory(_FakeMemory):
+        def close(self) -> None:
+            order.append("close start")
+            time.sleep(0.05)
+            order.append("close end")
+
+    class Agent(_FakeAgent):
+        async def stream_async(self, prompt: str):
+            try:
+                for n in range(1000):
+                    yield {"data": f"t{n}"}
+                    await asyncio.sleep(0)
+            finally:
+                order.append("stream finally")
+
+    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
+    monkeypatch.setattr(server, "session_manager", lambda s, u: Memory(s, u))
+    monkeypatch.setattr(server, "Agent", lambda **kwargs: Agent(**kwargs))
+
+    async def disconnect_mid_answer() -> None:
+        stream = server.invoke({"prompt": "hi"}, RequestContext(session_id="s-1"))
+        for _ in range(3):
+            await anext(stream)
+        await stream.aclose()
+        # Give a stray close of the inner stream time to run, if one was scheduled.
+        await asyncio.sleep(0.2)
+
+    asyncio.run(disconnect_mid_answer())
+    assert order == ["stream finally", "close start", "close end"]
 
 
 def test_close_failure_is_logged_not_sent(monkeypatch, caplog) -> None:

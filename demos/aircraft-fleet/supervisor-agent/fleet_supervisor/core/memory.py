@@ -9,7 +9,8 @@ Memory is required. These variables configure it:
 
 The settings are built once per process. If Neo4j rejects the password,
 :func:`forget_memory_settings` drops them so the next build reads the
-password again. Each request gets its own
+password again. A request that failed with a password another request
+already replaced leaves the newer settings in place. Each request gets its own
 :class:`Neo4jSessionManager`, and the caller must close it when the request
 ends. Each manager runs its own event-loop thread, and its Neo4j driver is
 bound to that loop, so managers cannot share one client.
@@ -18,7 +19,7 @@ bound to that loop, so managers cannot share one client.
 from __future__ import annotations
 
 import os
-from functools import cache
+import threading
 
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory import MemorySettings
@@ -47,10 +48,30 @@ def memory_password() -> str:
     return password_from("MEM_NEO4J_PASSWORD_SECRET_ARN", "MEM_NEO4J_PASSWORD")
 
 
-def forget_memory_settings() -> None:
-    """Drop the cached settings and secrets, so the next build reads them again."""
-    memory_settings.cache_clear()
-    forget_secrets()
+# The settings built once per process, or None until the next build. Read
+# and change it only under _settings_lock, so a build and a forget never
+# overlap.
+_settings: MemorySettings | None = None
+_settings_lock = threading.Lock()
+
+
+def forget_memory_settings(failed: MemorySettings) -> None:
+    """Drop the cached settings and secrets if they still hold ``failed``'s password.
+
+    Concurrent requests can fail with the same old password. The first one
+    drops it, and the next build reads the password again. A later one finds
+    the settings already dropped or rebuilt with another password, and keeps
+    them.
+    """
+    global _settings
+    with _settings_lock:
+        if _settings is not None and _password(_settings) == _password(failed):
+            _settings = None
+            forget_secrets()
+
+
+def _password(settings: MemorySettings) -> str:
+    return settings.neo4j.password.get_secret_value()
 
 
 def password_rejected(error: BaseException) -> bool:
@@ -69,14 +90,21 @@ def password_rejected(error: BaseException) -> bool:
     return False
 
 
-@cache
 def memory_settings() -> MemorySettings:
-    """Build the memory settings once per process.
+    """Return the memory settings, built once per process.
 
     Raises :class:`~fleet_supervisor.core.config.ConfigError` when
     ``MEM_NEO4J_URI`` or the password is missing, or the password secret
     cannot be read. A failure is not cached.
     """
+    global _settings
+    with _settings_lock:
+        if _settings is None:
+            _settings = _build_memory_settings()
+        return _settings
+
+
+def _build_memory_settings() -> MemorySettings:
     uri = os.environ.get(MEM_NEO4J_URI, "").strip()
     if not uri:
         raise ConfigError(f"{MEM_NEO4J_URI} is not set.")
@@ -103,15 +131,17 @@ def memory_settings() -> MemorySettings:
     )
 
 
-def build_session_manager(session_id: str, user_id: str) -> Neo4jSessionManager:
-    """Return the memory session manager for one request.
+def build_session_manager(
+    session_id: str, user_id: str, settings: MemorySettings
+) -> Neo4jSessionManager:
+    """Return the memory session manager for one request, built from ``settings``.
 
     It connects when the agent that owns it is built. The caller must call
     ``close()`` when the request ends, on every path.
     """
     return Neo4jSessionManager(
         session_id,
-        settings=memory_settings(),
+        settings=settings,
         user_id=user_id,
         retrieval_config=Neo4jRetrievalConfig(min_score=RETRIEVAL_MIN_SCORE),
         # Set explicitly, because defaults can change between releases.

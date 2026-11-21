@@ -53,7 +53,8 @@ def supervisor(monkeypatch):
     monkeypatch.setattr(server, "get_runtime", fake_runtime)
     fake.calls = calls
     monkeypatch.setattr(server, "build_supervisor", lambda model, tools, manager=None: fake)
-    monkeypatch.setattr(server, "build_session_manager", lambda session_id, user_id: None)
+    monkeypatch.setattr(server, "memory_settings", lambda: None)
+    monkeypatch.setattr(server, "build_session_manager", lambda session_id, user_id, settings: None)
     return fake
 
 
@@ -74,7 +75,7 @@ def manager(monkeypatch, supervisor):
     fake = FakeManager()
     built: dict = {}
 
-    def fake_build_session_manager(session_id, user_id):
+    def fake_build_session_manager(session_id, user_id, settings):
         built["session_id"], built["user_id"] = session_id, user_id
         return fake
 
@@ -301,12 +302,12 @@ def password_retry(monkeypatch, supervisor):
     managers: list[FakeManager] = []
     forgotten: list[bool] = []
 
-    def new_manager(session_id, user_id):
+    def new_manager(session_id, user_id, settings):
         managers.append(FakeManager())
         return managers[-1]
 
     monkeypatch.setattr(server, "build_session_manager", new_manager)
-    monkeypatch.setattr(server, "forget_memory_settings", lambda: forgotten.append(True))
+    monkeypatch.setattr(server, "forget_memory_settings", lambda settings: forgotten.append(True))
     return managers, forgotten
 
 
@@ -324,6 +325,50 @@ def test_a_rejected_password_is_read_again_once(supervisor, password_retry, monk
     assert events[-1] == {"type": "complete"}
     assert forgotten == [True]
     assert [m.closed for m in managers] == [1, 1]
+
+
+def test_concurrent_rejections_of_one_password_read_it_again_once(supervisor, monkeypatch):
+    from fleet_supervisor.core import memory
+
+    monkeypatch.setenv("MEM_NEO4J_URI", "bolt://127.0.0.1:37687")
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "old-pw")
+    monkeypatch.setattr(memory, "_settings", None)
+    monkeypatch.setattr(server, "memory_settings", memory.memory_settings)
+    monkeypatch.setattr(server, "forget_memory_settings", memory.forget_memory_settings)
+    forgotten: list[bool] = []
+    monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
+
+    def new_manager(session_id, user_id, settings):
+        manager = FakeManager()
+        manager.password = settings.neo4j.password.get_secret_value()
+        return manager
+
+    # Both requests build with the old password before either fails, and the
+    # secret rotates in between.
+    both_built = threading.Barrier(
+        2, action=lambda: monkeypatch.setenv("MEM_NEO4J_PASSWORD", "new-pw")
+    )
+
+    def build(model, tools, session_manager=None):
+        if session_manager.password == "old-pw":
+            both_built.wait(timeout=10)
+            raise password_rejected_error()
+        return supervisor
+
+    monkeypatch.setattr(server, "build_session_manager", new_manager)
+    monkeypatch.setattr(server, "build_supervisor", build)
+
+    async def two_requests():
+        async def one(session_id):
+            context = SimpleNamespace(session_id=session_id)
+            return [event async for event in server.invoke({"prompt": "q"}, context)]
+
+        return await asyncio.gather(one("s1"), one("s2"))
+
+    results = asyncio.run(two_requests())
+    assert [events[-1] for events in results] == [{"type": "complete"}] * 2
+    # The second rejection finds the old password already dropped.
+    assert forgotten == [True]
 
 
 def test_a_password_rejected_twice_fails_without_a_third_try(

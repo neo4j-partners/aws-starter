@@ -45,6 +45,7 @@ ENV_FILE = Path(os.environ.get("FLEET_ENV_FILE") or Path(__file__).resolve().par
 load_dotenv(ENV_FILE)
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
+from neo4j_agent_memory import MemorySettings  # noqa: E402
 from neo4j_agent_memory.integrations.strands import Neo4jSessionManager  # noqa: E402
 from strands import Agent  # noqa: E402
 from strands.models import BedrockModel  # noqa: E402
@@ -268,28 +269,30 @@ def _build_agent(
 
     The supervisor's constructor connects the manager and restores the
     session history. If Neo4j rejects the password, the cached one may
-    predate a secret rotation, so this reads it again and builds once more.
+    predate a secret rotation. So this drops it, unless another request
+    already replaced it, and builds once more with the current settings.
     """
+    settings = memory_settings()
     try:
-        return _build_agent_once(runtime, session_id, user_id)
+        return _build_agent_once(runtime, settings, session_id, user_id)
     except Exception as error:
         if not password_rejected(error):
             raise
     # Outside the except block, so a second failure does not chain the first.
     logger.warning("Neo4j rejected the memory password; reading it again")
-    forget_memory_settings()
-    return _build_agent_once(runtime, session_id, user_id)
+    forget_memory_settings(settings)
+    return _build_agent_once(runtime, memory_settings(), session_id, user_id)
 
 
 def _build_agent_once(
-    runtime: Runtime, session_id: str, user_id: str
+    runtime: Runtime, settings: MemorySettings, session_id: str, user_id: str
 ) -> tuple[Agent, Neo4jSessionManager | None]:
     """Build the manager and the supervisor once.
 
     If the build fails, this closes the manager before raising, so the
     caller only closes a manager it gets back.
     """
-    manager = build_session_manager(session_id, user_id)
+    manager = build_session_manager(session_id, user_id, settings)
     try:
         supervisor = build_supervisor(runtime.model, runtime.tools, manager)
     except BaseException:

@@ -25,10 +25,8 @@ MEM_VARS = (
 def _clean(monkeypatch: pytest.MonkeyPatch):
     for name in MEM_VARS:
         monkeypatch.delenv(name, raising=False)
-    memory.memory_settings.cache_clear()
+    monkeypatch.setattr(memory, "_settings", None)
     secrets._read_secret.cache_clear()
-    yield
-    memory.memory_settings.cache_clear()
 
 
 @pytest.fixture
@@ -101,7 +99,7 @@ def test_settings_are_built_once(memory_on) -> None:
 
 
 def test_session_manager_uses_settings_and_retrieval_config(memory_on) -> None:
-    manager = memory.build_session_manager("s1", "u1")
+    manager = memory.build_session_manager("s1", "u1", memory.memory_settings())
     try:
         assert isinstance(manager, Neo4jSessionManager)
         assert manager.session_id == "s1"
@@ -115,8 +113,8 @@ def test_session_manager_uses_settings_and_retrieval_config(memory_on) -> None:
 
 
 def test_each_request_gets_its_own_manager(memory_on) -> None:
-    first = memory.build_session_manager("s1", "u1")
-    second = memory.build_session_manager("s1", "u1")
+    first = memory.build_session_manager("s1", "u1", memory.memory_settings())
+    second = memory.build_session_manager("s1", "u1", memory.memory_settings())
     try:
         assert first is not second
     finally:
@@ -127,11 +125,42 @@ def test_each_request_gets_its_own_manager(memory_on) -> None:
 def test_forget_memory_settings_reads_the_password_again(
     monkeypatch: pytest.MonkeyPatch, memory_on
 ) -> None:
-    memory.memory_settings()
+    failed = memory.memory_settings()
     monkeypatch.setenv("MEM_NEO4J_PASSWORD", "rotated-pw")
     assert memory.memory_settings().neo4j.password.get_secret_value() == "local-pw"
-    memory.forget_memory_settings()
+    memory.forget_memory_settings(failed)
     assert memory.memory_settings().neo4j.password.get_secret_value() == "rotated-pw"
+
+
+def test_a_late_failure_with_the_old_password_keeps_the_new_settings(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    # Two requests fail with the old password. The first drops it and the
+    # next build reads the new one. The second must not drop that.
+    failed = memory.memory_settings()
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "rotated-pw")
+    memory.forget_memory_settings(failed)
+    rebuilt = memory.memory_settings()
+    forgotten: list[bool] = []
+    monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
+
+    memory.forget_memory_settings(failed)
+
+    assert memory.memory_settings() is rebuilt
+    assert forgotten == []
+
+
+def test_a_failure_after_another_request_dropped_the_settings_does_nothing(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    failed = memory.memory_settings()
+    memory.forget_memory_settings(failed)
+    forgotten: list[bool] = []
+    monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
+
+    memory.forget_memory_settings(failed)
+
+    assert forgotten == []
 
 
 def test_password_rejected_finds_an_auth_error_in_the_cause_chain() -> None:

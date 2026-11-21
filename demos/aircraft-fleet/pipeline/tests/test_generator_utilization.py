@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -60,6 +60,21 @@ def test_an_aircraft_flies_one_leg_at_a_time(flights_by_aircraft) -> None:
     for aircraft, legs in flights_by_aircraft.items():
         for (_, arrival), (departure, _) in zip(legs, legs[1:], strict=False):
             assert departure >= arrival, (aircraft, arrival, departure)
+
+
+def test_every_leg_flies_inside_the_window_and_after_five(flights_by_aircraft) -> None:
+    start = datetime(2024, 7, 1)
+    end = start + timedelta(days=DAYS)
+    for aircraft, legs in flights_by_aircraft.items():
+        for departure, arrival in legs:
+            assert departure.hour >= 5, (aircraft, departure)
+            assert arrival <= end, (aircraft, arrival)
+            # Each day's legs end that day, so none runs into the next.
+            assert arrival.date() == departure.date() or arrival.time() == time(), (
+                aircraft,
+                departure,
+                arrival,
+            )
 
 
 def test_cycles_rise_with_airframe_hours(removals_by_aircraft) -> None:

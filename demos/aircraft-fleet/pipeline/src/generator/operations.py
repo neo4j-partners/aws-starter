@@ -21,6 +21,14 @@ _BLOCK_SPREAD = (0.75, 1.25)
 
 _DELAY_WEIGHTS = [spec.weight for spec in DELAY_CAUSE_SPECS]
 
+# Minutes on the ground between legs.
+_TURNAROUND_MINUTES = (45, 90)
+
+# The first departure of a day falls between these hours. At most 10 hours
+# of flying and 6 turnarounds of 90 minutes fit between 05:00 and midnight.
+_FIRST_DEPARTURE = 5.0
+_LATEST_FIRST_DEPARTURE = 9.0
+
 # Hub airports get this weight multiplier in route selection
 _HUB_WEIGHT = 4.0
 
@@ -70,21 +78,28 @@ def generate_operations(
 
         # One leg is one cycle, so the legs flown match the cycles counted.
         n_flights = aircraft.legs_per_day
-        current_time = config.start_date
 
         for day in range(config.n_days):
             raw_blocks = [
                 rng.uniform(*_BLOCK_SPREAD) * aircraft.hours_per_cycle for _ in range(n_flights)
             ]
             scale = aircraft.hours_per_day / sum(raw_blocks)
-            # First departure between 06:00 and 09:00, but never before the
-            # previous day's last leg has landed and turned around.
-            current_time = max(
-                current_time,
-                config.start_date + timedelta(days=day, hours=rng.uniform(6.0, 9.0)),
+            turnarounds = [rng.randint(*_TURNAROUND_MINUTES) for _ in range(n_flights - 1)]
+            # The day's flying, from first departure to last arrival.
+            span = aircraft.hours_per_day + sum(turnarounds) / 60
+            # First departure from 05:00, late enough in the morning that the
+            # last leg lands by midnight. So no leg flies into the next day.
+            latest = min(_LATEST_FIRST_DEPARTURE, 24.0 - span)
+            if latest < _FIRST_DEPARTURE:
+                raise ValueError(
+                    f"{aircraft.aircraft_id}: {span:.1f} hours of flying a day "
+                    f"does not fit between 05:00 and midnight"
+                )
+            current_time = config.start_date + timedelta(
+                days=day, hours=rng.uniform(_FIRST_DEPARTURE, latest)
             )
 
-            for raw_block in raw_blocks:
+            for leg, raw_block in enumerate(raw_blocks):
                 # Weighted destination selection — hubs attract more traffic
                 candidates = [ap for ap in airports if ap.airport_id != current_airport.airport_id]
                 candidate_weights = [_HUB_WEIGHT if ap.is_hub else 1.0 for ap in candidates]
@@ -132,8 +147,8 @@ def generate_operations(
                     rels_delay.append({":START_ID(Flight)": flight_id, ":END_ID(Delay)": delay_id})
 
                 current_airport = destination
-                # Turnaround time: 45–90 minutes on ground
-                current_time = arrival + timedelta(minutes=rng.randint(45, 90))
+                if leg < len(turnarounds):
+                    current_time = arrival + timedelta(minutes=turnarounds[leg])
 
     return (
         airport_nodes,

@@ -425,6 +425,37 @@ def test_disconnect_closes_the_agent_stream_before_the_memory(monkeypatch) -> No
     assert order == ["stream finally", "close start", "close end"]
 
 
+def test_stream_close_failure_on_disconnect_is_logged(monkeypatch, caplog) -> None:
+    """A flush that fails while the agent stream closes must not break the close."""
+
+    class Agent(_FakeAgent):
+        async def stream_async(self, prompt: str):
+            try:
+                for n in range(100):
+                    yield {"data": f"t{n}"}
+                    await asyncio.sleep(0)
+            finally:
+                # Stands in for the AfterInvocationEvent flush failing.
+                raise RuntimeError("flush failed")
+
+    made, _ = _agent_path(monkeypatch)
+    monkeypatch.setattr(server, "Agent", lambda **kwargs: Agent(**kwargs))
+
+    async def disconnect_mid_answer() -> None:
+        stream = server.invoke({"prompt": "hi"}, RequestContext(session_id="s-1"))
+        for _ in range(3):
+            await anext(stream)
+        await stream.aclose()
+
+    asyncio.run(disconnect_mid_answer())
+    assert made[0].closed == 1
+    [record] = [
+        r for r in caplog.records if r.getMessage() == "The agent stream failed while closing"
+    ]
+    assert record.exc_info is not None
+    assert str(record.exc_info[1]) == "flush failed"
+
+
 def test_close_failure_is_logged_not_sent(monkeypatch, caplog) -> None:
     made, _ = _agent_path(monkeypatch, close_error=True)
     events = _run({"prompt": "hi"}, session_id="s-1\nINFO forged line")

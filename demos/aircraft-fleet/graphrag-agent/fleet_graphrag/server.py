@@ -23,7 +23,6 @@ Cloud deployment (AgentCore CLI, see agentcore/agentcore.json):
 """
 
 import asyncio
-import contextlib
 import logging
 import os
 import uuid
@@ -300,13 +299,18 @@ async def invoke(
             # surfaces exactly once. Emitting these as ``tool`` events lets
             # the client print a labelled boundary where a retriever tool ran.
             #
-            # On a client disconnect, aclosing() closes the agent stream here.
-            # Strands then runs its AfterInvocationEvent hooks, which flush
-            # memory, before the finally below closes the manager. Without it,
-            # the stream's close runs later as a separate task and can flush
-            # into a manager that is closing or already closed.
+            # The agent stream is closed here on every path. Strands then runs
+            # its AfterInvocationEvent hooks, which flush memory, before the
+            # outer finally closes the manager. Left to the garbage collector,
+            # the close runs later and can flush into a closed manager.
+            #
+            # On a client disconnect this generator is closing, so it must not
+            # yield again. A flush that fails there is logged, and the
+            # GeneratorExit is raised again instead of the flush error, which
+            # the handlers below would turn into an error event.
             last_tool_id: str | None = None
-            async with contextlib.aclosing(agent.stream_async(prompt)) as events:
+            events = agent.stream_async(prompt)
+            try:
                 async for event in events:
                     if "data" in event:
                         yield {"type": "chunk", "data": event["data"]}
@@ -316,6 +320,14 @@ async def invoke(
                         if name and tool_id != last_tool_id:
                             last_tool_id = tool_id
                             yield {"type": "tool", "name": name}
+            except GeneratorExit:
+                try:
+                    await events.aclose()
+                except Exception:
+                    logger.exception("The agent stream failed while closing")
+                raise
+            finally:
+                await events.aclose()
         finally:
             await _close_after_build(build)
 

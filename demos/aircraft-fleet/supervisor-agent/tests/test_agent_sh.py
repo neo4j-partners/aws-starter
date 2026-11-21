@@ -27,6 +27,9 @@ case "$1" in
         mv agentcore/agentcore.json.stub agentcore/agentcore.json
         ;;
     deploy)
+        if [ -n "$STUB_DEPLOY_TARGETS" ]; then
+            printf '%s\n' "$STUB_DEPLOY_TARGETS" > agentcore/aws-targets.json
+        fi
         if [ -n "$STUB_DEPLOY_SIGNAL" ]; then kill -s "$STUB_DEPLOY_SIGNAL" "$PPID"; fi
         exit "${STUB_DEPLOY_EXIT:-0}"
         ;;
@@ -118,7 +121,9 @@ def run_destroy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[s
     return run_agent(project, "destroy", "--yes", **stub_env)
 
 
-def run_agent(project: Path, *args: str, **stub_env: str) -> subprocess.CompletedProcess[str]:
+def run_agent(
+    project: Path, *args: str, stdin: str = "", **stub_env: str
+) -> subprocess.CompletedProcess[str]:
     temp_dir = project.parent / "tmp"
     temp_dir.mkdir(exist_ok=True)
     env = {
@@ -134,6 +139,7 @@ def run_agent(project: Path, *args: str, **stub_env: str) -> subprocess.Complete
         capture_output=True,
         text=True,
         env=env,
+        input=stdin,
         timeout=60,
         check=False,
     )
@@ -159,16 +165,36 @@ def test_clean_destroy_checks_aws_by_name_and_succeeds(project: Path) -> None:
         "--name fleetsupervisor_default_fleet-gateway" in c
         for c in logged
     )
+    # The account is checked before the first agentcore call and again
+    # after the deploy, before the lookups.
+    sts = "aws sts get-caller-identity --query Account --output text --region us-west-2"
+    assert logged[0] == sts
+    deploy = logged.index("agentcore deploy --target default --yes")
+    assert sts in logged[deploy:]
 
 
-def test_credentials_for_another_account_fail_before_the_aws_lookups(project: Path) -> None:
-    result = run_destroy(project, STUB_CALLER_ACCOUNT="999988887777")
+def test_credentials_for_another_account_fail_before_the_confirmation(project: Path) -> None:
+    spec = (project / "agentcore" / "agentcore.json").read_text()
+
+    result = run_agent(project, "destroy", stdin="y\n", STUB_CALLER_ACCOUNT="999988887777")
 
     assert result.returncode == 1
     assert f"account 999988887777, but target 'default' is in account {ACCOUNT}" in result.stdout
+    assert "Continue?" not in result.stdout
+    assert not any(c.startswith("agentcore") for c in calls(project))
+    assert (project / "agentcore" / "agentcore.json").read_text() == spec
+
+
+def test_an_account_change_during_the_deploy_fails_before_the_aws_lookups(project: Path) -> None:
+    targets = [{"name": "default", "account": "999988887777", "region": "us-west-2"}]
+
+    result = run_destroy(project, STUB_DEPLOY_TARGETS=json.dumps(targets))
+
+    assert result.returncode == 1
+    assert f"account {ACCOUNT}, but target 'default' is in account 999988887777" in result.stdout
     assert "Cleanup complete" not in result.stdout
     logged = calls(project)
-    assert "aws sts get-caller-identity --query Account --output text --region us-west-2" in logged
+    assert "agentcore deploy --target default --yes" in logged
     assert not any(c.startswith(("aws cloudformation", "aws bedrock")) for c in logged)
 
 
@@ -181,19 +207,46 @@ def test_a_failed_identity_check_fails(project: Path) -> None:
     assert "Cleanup complete" not in result.stdout
 
 
-@pytest.mark.parametrize("targets", [None, "[]", "not json", '[{"name": "default"}]'])
-def test_an_unknown_target_account_fails(project: Path, targets: str | None) -> None:
+@pytest.mark.parametrize("targets", ["[]", "not json", '[{"name": "default"}]'])
+def test_an_unknown_target_account_fails(project: Path, targets: str) -> None:
+    (project / "agentcore" / "aws-targets.json").write_text(targets)
+
+    result = run_agent(project, "destroy", stdin="y\n")
+
+    assert result.returncode == 1
+    assert "Could not read the account for target 'default'" in result.stdout
+    # Nothing ran: no confirmation, no STS call, and no agentcore call.
+    assert "Continue?" not in result.stdout
+    assert calls(project) == []
+
+
+def test_a_directory_at_the_targets_path_fails_as_unreadable(project: Path) -> None:
     path = project / "agentcore" / "aws-targets.json"
-    if targets is None:
-        path.unlink()
-    else:
-        path.write_text(targets)
+    path.unlink()
+    path.mkdir()
 
     result = run_destroy(project)
 
     assert result.returncode == 1
     assert "Could not read the account for target 'default'" in result.stdout
-    assert "Cleanup complete" not in result.stdout
+    assert "No deployment is recorded" not in result.stdout
+    assert calls(project) == []
+
+
+@pytest.mark.parametrize("args", [("--yes",), ("",)])
+def test_a_missing_targets_file_fails_before_any_call(project: Path, args: tuple[str, ...]) -> None:
+    (project / "agentcore" / "aws-targets.json").unlink()
+
+    result = run_agent(project, "destroy", *args, stdin="y\n")
+
+    assert result.returncode == 1
+    assert (
+        "No deployment is recorded in this checkout: agentcore/aws-targets.json is missing. "
+        "Run destroy from the checkout that deployed."
+    ) in result.stdout
+    assert "Could not read the account" not in result.stdout
+    assert "Continue?" not in result.stdout
+    assert calls(project) == []
 
 
 def test_status_without_a_resources_array_fails(project: Path) -> None:

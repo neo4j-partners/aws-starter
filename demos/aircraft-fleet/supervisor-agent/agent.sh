@@ -40,6 +40,8 @@ RUNTIME_VERSION="PYTHON_3_12"
 RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5"}'
 PROJECT_SPEC="agentcore/agentcore.json"
 TARGET="default"
+# The deploy targets. The first deploy writes this file, and git ignores it.
+TARGETS_FILE="agentcore/aws-targets.json"
 # The AgentCore Identity OAuth2 credential that holds the Gateway client
 # secret. deploy and destroy declare it for the one CLI run, then restore the
 # tracked agentcore.json. The construct then sets CREDENTIAL_FLEET_GATEWAY_NAME
@@ -343,25 +345,52 @@ confirm_destroy() {
     esac
 }
 
-# The deploy target's region from agentcore/aws-targets.json. Before the
-# first deploy writes the target, it is REGION.
+# The deploy target's region from $TARGETS_FILE. Before the first deploy
+# writes the target, it is REGION.
 target_region() {
     local region=""
-    if [ -f agentcore/aws-targets.json ]; then
+    if [ -f "$TARGETS_FILE" ]; then
         region=$(jq -r --arg t "$TARGET" \
-            '.[]? | select(.name == $t) | .region // empty' agentcore/aws-targets.json)
+            '.[]? | select(.name == $t) | .region // empty' "$TARGETS_FILE")
     fi
     echo "${region:-$REGION}"
 }
 
-# The account that $TARGET deploys to, from agentcore/aws-targets.json,
-# where the first deploy records it. Fails unless there is exactly one.
+# The account that $TARGET deploys to, from $TARGETS_FILE, where the first
+# deploy records it. Fails unless there is exactly one.
 target_account() {
     jq -r -e --arg t "$TARGET" '
         [.[] | select(.name == $t) | .account]
         | if length == 1 and (.[0] | type) == "string" then .[0]
           else error("no single account for the target") end' \
-        agentcore/aws-targets.json 2>/dev/null
+        "$TARGETS_FILE" 2>/dev/null
+}
+
+# Exit unless the active AWS credentials belong to the account of $TARGET.
+# Credentials for another account would deploy there and read the stack and
+# provider as gone. $1 is the region for the STS call, by default the
+# target's region.
+require_target_account() {
+    local account caller
+    # The first deploy writes this file, and git ignores it, so a fresh
+    # checkout has none.
+    if [ ! -e "$TARGETS_FILE" ]; then
+        echo -e "${RED}No deployment is recorded in this checkout: $TARGETS_FILE is missing. Run destroy from the checkout that deployed.${NC}"
+        exit 1
+    fi
+    if ! account=$(target_account); then
+        echo -e "${RED}Could not read the account for target '$TARGET' from $TARGETS_FILE.${NC}"
+        exit 1
+    fi
+    if ! caller=$(aws sts get-caller-identity --query Account --output text --region "${1:-$(target_region)}"); then
+        echo -e "${RED}Could not check the active AWS account with STS.${NC}"
+        exit 1
+    fi
+    if [ "$caller" != "$account" ]; then
+        echo -e "${RED}The active AWS credentials belong to account $caller, but target '$TARGET' is in account $account.${NC}"
+        echo "Use credentials for account $account, for example with AWS_PROFILE, and run destroy again."
+        exit 1
+    fi
 }
 
 # Run a read-only AWS lookup and keep its output in AWS_LOOKUP_OUTPUT.
@@ -395,7 +424,7 @@ aws_lookup() {
 # CLI's deployed-state.json, so a lost state file would read as clean. The
 # stack and the credential provider are also looked up in AWS by name.
 report_remaining() {
-    local status errors remaining region account caller
+    local status errors remaining region
     errors=$(mktemp)
     if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
@@ -417,21 +446,10 @@ report_remaining() {
         exit 1
     fi
     region=$(target_region)
-    # The lookups below use the active credentials. Credentials for another
-    # account would read the stack and provider as gone, so confirm first.
-    if ! account=$(target_account); then
-        echo -e "${RED}Could not read the account for target '$TARGET' from agentcore/aws-targets.json.${NC}"
-        exit 1
-    fi
-    if ! caller=$(aws sts get-caller-identity --query Account --output text --region "$region"); then
-        echo -e "${RED}Could not check the active AWS account with STS.${NC}"
-        exit 1
-    fi
-    if [ "$caller" != "$account" ]; then
-        echo -e "${RED}The active AWS credentials belong to account $caller, but target '$TARGET' is in account $account.${NC}"
-        echo "Use credentials for account $account, for example with AWS_PROFILE, and run destroy again."
-        exit 1
-    fi
+    # The lookups below use the active credentials. destroy checked the
+    # account before the deploy, but the credentials can change after that,
+    # for example when a session expires or a profile changes. So check again.
+    require_target_account "$region"
     if aws_lookup "does not exist" aws cloudformation describe-stacks \
         --region "$region" --stack-name "$STACK_NAME" \
         --query 'Stacks[0].StackStatus' --output text; then
@@ -623,6 +641,9 @@ case "${1:-help}" in
 
     destroy)
         ensure_project
+        # Check the account before anything changes, so credentials for
+        # another account cannot deploy the empty project there.
+        require_target_account
         if [ "${2:-}" != "--yes" ]; then
             confirm_destroy
         fi

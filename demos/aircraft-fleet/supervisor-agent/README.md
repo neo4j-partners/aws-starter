@@ -225,6 +225,12 @@ Then run these commands:
 finds the runtime ARN in `AGENT_ARN`. If it is unset, it reads the ARN from
 `agentcore status --json`.
 
+Before it asks, and before any AWS change, `./agent.sh destroy` confirms that
+the active AWS credentials belong to the account recorded for the target in
+`agentcore/aws-targets.json`. Credentials for another account would deploy
+there. The first deploy writes that file, and git ignores it. If the file is
+missing, destroy stops and says to run it from the checkout that deployed.
+
 The CLI has no destroy command. `./agent.sh destroy` removes the runtime from
 the spec and deploys. A deploy with nothing to deploy deletes the target's
 stack. It also deletes each credential provider that the CLI's state records
@@ -234,9 +240,9 @@ fleet credentials file nor the MCP server stack. With no runtime in the spec,
 `cdk-stack.ts` reads no deploy settings. The script then restores the tracked
 spec and checks what remains. It reads `agentcore status`, and it looks up the
 stack and the credential provider in AWS by name. Before those lookups, it
-confirms that the active AWS credentials belong to the account recorded for
-the target in `agentcore/aws-targets.json`. Credentials for another account
-would not see the stack or the provider. If anything is still deployed, it
+checks the account again, because the credentials can change during the
+deploy. Credentials for another account would not see the stack or the
+provider. If anything is still deployed, it
 lists it with the command that deletes it and exits with an error.
 
 The CLI's local state in `agentcore/.cli/` holds account-specific ARNs, so git

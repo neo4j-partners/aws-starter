@@ -228,6 +228,14 @@ def test_strip_comments_drops_marker_lines_and_inline_comments() -> None:
     assert strip_comments(text) == "# Title\nBody.\nKeep  this.\nEnd.\n"
 
 
+def test_strip_comments_keeps_text_between_two_comments() -> None:
+    # A comment ends at its first "-->", so a line comment cannot run on to
+    # a later comment and take the text between them.
+    text = "<!-- note --> keep this\nmore text <!-- x -->\nlast\n"
+
+    assert strip_comments(text) == " keep this\nmore text \nlast\n"
+
+
 def test_read_manual_text_strips_comments_and_outer_space(tmp_path: Path) -> None:
     path = tmp_path / "manual.md"
     path.write_text("\n" + _block("greeting", "Body.") + "\n", encoding="utf-8")

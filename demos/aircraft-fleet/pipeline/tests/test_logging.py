@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Iterator
 from contextlib import nullcontext
 from pathlib import Path
@@ -199,6 +200,58 @@ def test_cli_logging_sends_warnings_to_stderr_and_info_to_stdout(
     captured = capsys.readouterr()
     assert captured.out == "retry line\n"
     assert captured.err == "[WARN] warning line\nerror line\n"
+
+
+class _Terminal:
+    """Record what reaches a terminal that both stdout and stderr write to."""
+
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+
+class _BlockBufferedStream:
+    """Hold writes until flush, like stdout piped to tee."""
+
+    def __init__(self, terminal: _Terminal) -> None:
+        self.terminal = terminal
+        self.pending: list[str] = []
+
+    def write(self, text: str) -> int:
+        self.pending.append(text)
+        return len(text)
+
+    def flush(self) -> None:
+        self.terminal.lines.append("".join(self.pending))
+        self.pending.clear()
+
+
+class _UnbufferedStream:
+    """Pass each write straight through, like stderr."""
+
+    def __init__(self, terminal: _Terminal) -> None:
+        self.terminal = terminal
+
+    def write(self, text: str) -> int:
+        self.terminal.lines.append(text)
+        return len(text)
+
+    def flush(self) -> None:
+        return None
+
+
+@pytest.mark.usefixtures("restore_package_logger")
+def test_cli_warning_follows_earlier_stdout_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    # With setup.sh 2>&1 | tee, stdout is block buffered and stderr is not,
+    # so a warning could reach the terminal before earlier print() output.
+    terminal = _Terminal()
+    monkeypatch.setattr(sys, "stdout", _BlockBufferedStream(terminal))
+    monkeypatch.setattr(sys, "stderr", _UnbufferedStream(terminal))
+    main._configure_logging()
+
+    print("Stage 3: earlier output")
+    logging.getLogger("populate_aircraft_db.loader").warning("[WARN] warning line")
+
+    assert terminal.lines == ["Stage 3: earlier output\n", "[WARN] warning line\n"]
 
 
 def _fake_loader(monkeypatch: pytest.MonkeyPatch, skipped: int) -> None:

@@ -54,6 +54,14 @@ class _SysStreamHandler(logging.StreamHandler):
         # always returns the current sys stream.
         del value
 
+    def emit(self, record: logging.LogRecord) -> None:
+        # When stdout is a block-buffered pipe, as in setup.sh 2>&1 | tee,
+        # earlier print() output can still sit in its buffer. Flushing it
+        # first keeps a stderr record after that output.
+        if self._stream_name == "stderr":
+            sys.stdout.flush()
+        super().emit(record)
+
 
 class _CliFormatter(logging.Formatter):
     """Format a record as its bare message, after a blank line if it asks for one.

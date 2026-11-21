@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification, RoutingControl
+from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification, Query, RoutingControl
 from neo4j.exceptions import Neo4jError
 
 from generator.specs import (
@@ -371,6 +371,8 @@ def _extract_cypher(raw: str) -> str:
 
 
 _MAX_RETRIES = 2
+# Seconds the server lets one LLM-generated query run before it stops it.
+_GENERATED_QUERY_TIMEOUT = 30
 
 
 def _run_text2cypher(
@@ -399,10 +401,12 @@ def _run_text2cypher(
     show_cypher(cypher, label="Generated Cypher")
 
     # LLM-generated Cypher runs in a read transaction, so the server rejects
-    # any write it contains.
+    # any write it contains. The timeout stops a runaway query.
     try:
         records, _, _ = driver.execute_query(
-            cypher, database_=database, routing_=RoutingControl.READ
+            Query(cypher, timeout=_GENERATED_QUERY_TIMEOUT),
+            database_=database,
+            routing_=RoutingControl.READ,
         )
         rows = [dict(r) for r in records]
         records_table(rows)

@@ -15,6 +15,7 @@ from neo4j import (
     Driver,
     GraphDatabase,
     NotificationDisabledClassification,
+    Query,
     RoutingControl,
 )
 
@@ -280,6 +281,17 @@ def test_generated_cypher_runs_in_a_read_transaction() -> None:
 
     ((_, params),) = driver.calls
     assert params == {"database_": "db", "routing_": RoutingControl.READ}
+
+
+def test_generated_cypher_runs_with_a_timeout() -> None:
+    driver = RecordingDriver()
+
+    _run_text2cypher(driver, "db", lambda _system, _user: "MATCH (n) RETURN n", "prompt", "q")
+
+    ((query, _),) = driver.calls
+    assert isinstance(query, Query)
+    assert query.text == "MATCH (n) RETURN n"
+    assert query.timeout == 30
 
 
 @pytest.fixture

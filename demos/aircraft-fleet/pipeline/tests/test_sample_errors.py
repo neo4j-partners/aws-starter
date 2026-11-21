@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from neo4j import Query
 from neo4j.exceptions import ClientError, Forbidden
 
 from populate_aircraft_db.agent_samples import _run_similarity_search, _run_text2cypher
@@ -40,7 +41,8 @@ class FailingDriver:
         self.index_error = index_error
         self.index_lookups: list[str] = []
 
-    def execute_query(self, cypher: str, /, **params: Any) -> tuple[list[dict], None, None]:
+    def execute_query(self, query: str | Query, /, **params: Any) -> tuple[list[dict], None, None]:
+        cypher = query.text if isinstance(query, Query) else query
         if cypher.startswith("SHOW INDEXES"):
             self.index_lookups.append(params["index"])
             if self.index_error is not None:

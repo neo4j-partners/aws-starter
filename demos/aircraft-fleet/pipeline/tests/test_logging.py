@@ -254,6 +254,31 @@ def test_cli_warning_follows_earlier_stdout_output(monkeypatch: pytest.MonkeyPat
     assert terminal.lines == ["Stage 3: earlier output\n", "[WARN] warning line\n"]
 
 
+class _BrokenPipeStream:
+    """Fail every flush, like stdout piped to a reader that has exited."""
+
+    def write(self, text: str) -> int:
+        return len(text)
+
+    def flush(self) -> None:
+        raise BrokenPipeError(32, "Broken pipe")
+
+
+@pytest.mark.usefixtures("restore_package_logger")
+@pytest.mark.parametrize("stdout", [None, _BrokenPipeStream()], ids=["none", "broken-pipe"])
+def test_cli_warning_reaches_stderr_when_stdout_cannot_flush(
+    monkeypatch: pytest.MonkeyPatch, stdout: object
+) -> None:
+    terminal = _Terminal()
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(sys, "stderr", _UnbufferedStream(terminal))
+    main._configure_logging()
+
+    logging.getLogger("populate_aircraft_db.loader").warning("[WARN] warning line")
+
+    assert terminal.lines == ["[WARN] warning line\n"]
+
+
 def _fake_loader(monkeypatch: pytest.MonkeyPatch, skipped: int) -> None:
     """Load one node type and two relationship types, five rows each."""
     monkeypatch.setattr(loader, "_NODE_DEFINITIONS", [("Aircraft", "a.csv", "nodes")])

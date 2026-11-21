@@ -6,7 +6,7 @@ import logging
 import sys
 import time
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from typing import Literal, TextIO
 
@@ -60,8 +60,12 @@ class _SysStreamHandler(logging.StreamHandler):
         # When stdout is a block-buffered pipe, as in setup.sh 2>&1 | tee,
         # earlier print() output can still sit in its buffer. Flushing it
         # first keeps a stderr record after that output.
-        if self._stream_name == "stderr":
-            sys.stdout.flush()
+        # stdout can be None (pythonw, a closed descriptor) or a pipe whose
+        # reader has exited. The flush only orders output, so a failure must
+        # not stop the record from reaching stderr.
+        if self._stream_name == "stderr" and (stdout := sys.stdout) is not None:
+            with suppress(OSError, ValueError):
+                stdout.flush()
         super().emit(record)
 
 

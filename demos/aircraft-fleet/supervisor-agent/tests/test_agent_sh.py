@@ -51,6 +51,19 @@ case "$1 $2" in
 esac
 """
 
+# rm passes through. With STUB_RM_SIGNAL set, the first rm call then sends
+# that signal to agent.sh, the same as a Ctrl+C right after it.
+STUB_RM = r"""#!/bin/bash
+/bin/rm "$@"
+status=$?
+marker="${STUB_LOG%/*}/rm-signalled"
+if [ -n "$STUB_RM_SIGNAL" ] && [ ! -e "$marker" ]; then
+    : > "$marker"
+    kill -s "$STUB_RM_SIGNAL" "$PPID"
+fi
+exit "$status"
+"""
+
 # This macOS mktemp ignores TMPDIR, so the stub passes a template in the
 # test's own folder. That lets a test check that nothing was left behind.
 STUB_MKTEMP = r"""#!/bin/bash
@@ -81,6 +94,7 @@ def project(tmp_path: Path) -> Path:
         ("agentcore", STUB_AGENTCORE),
         ("aws", STUB_AWS),
         ("mktemp", STUB_MKTEMP),
+        ("rm", STUB_RM),
     ):
         stub = bin_dir / name
         stub.write_text(body)
@@ -237,3 +251,17 @@ def test_a_failed_spec_backup_leaves_no_temporary_file(project: Path) -> None:
     assert result.returncode == 1
     assert not list((project.parent / "tmp").iterdir())
     assert not any(c.startswith("agentcore remove") for c in calls(project))
+
+
+def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
+    project: Path,
+) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_RM_SIGNAL="INT")
+
+    assert result.returncode == 130
+    assert spec.read_bytes() == tracked
+    assert "Could not restore" not in result.stderr
+    assert not list((project.parent / "tmp").iterdir())

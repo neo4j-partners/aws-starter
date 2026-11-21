@@ -272,9 +272,12 @@ restore_project() {
     local failed=0
     if [ -n "${SPEC_BACKUP:-}" ]; then
         if cp "$SPEC_BACKUP" "$PROJECT_SPEC"; then
-            rm -f "$SPEC_BACKUP"
-            # A second run, from the EXIT trap after an interrupt, skips it.
+            # Clear the name before removing the file. A second run, from the
+            # EXIT trap after an interrupt, then skips the restore instead of
+            # copying from a file that is already gone.
+            local backup="$SPEC_BACKUP"
             SPEC_BACKUP=""
+            rm -f "$backup"
         else
             echo -e "${RED}Could not restore $PROJECT_SPEC. The backup is at $SPEC_BACKUP${NC}" >&2
             failed=1

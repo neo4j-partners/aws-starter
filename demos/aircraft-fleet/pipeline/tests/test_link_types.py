@@ -166,4 +166,8 @@ def test_a_database_with_other_nodes_is_skipped(driver: Driver, database: str) -
             _skip_unless_only_test_nodes(driver, database)
     finally:
         driver.execute_query("MATCH (n:PytestForeign) DELETE n", database_=database)
-    _skip_unless_only_test_nodes(driver, database)
+    # A skip here would hide a regression, so it fails the test instead.
+    try:
+        _skip_unless_only_test_nodes(driver, database)
+    except pytest.skip.Exception:
+        pytest.fail("clean database was skipped")

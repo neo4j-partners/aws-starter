@@ -309,7 +309,6 @@ def _targets(account: object) -> str:
 @pytest.mark.parametrize(
     "targets",
     [
-        None,
         "[]",
         "not json",
         # An account must be a string of 12 digits.
@@ -319,18 +318,30 @@ def _targets(account: object) -> str:
         _targets(111122223333),
     ],
 )
-def test_an_unknown_target_account_fails(project: Path, targets: str | None) -> None:
-    path = project / "agentcore" / "aws-targets.json"
-    if targets is None:
-        path.unlink()
-    else:
-        path.write_text(targets)
+def test_an_unknown_target_account_fails(project: Path, targets: str) -> None:
+    (project / "agentcore" / "aws-targets.json").write_text(targets)
 
     result = run_destroy(project)
 
     assert result.returncode == 1
     assert "Could not read the account for target 'default'" in result.stdout
     assert "Cleanup complete" not in result.stdout
+
+
+@pytest.mark.parametrize("args", [("--yes",), ("",)])
+def test_a_missing_targets_file_fails_before_any_call(project: Path, args: tuple[str, ...]) -> None:
+    (project / "agentcore" / "aws-targets.json").unlink()
+
+    result = run_destroy(project, *args, stdin="y\n")
+
+    assert result.returncode == 1
+    assert (
+        "No deployment is recorded in this checkout: agentcore/aws-targets.json is missing. "
+        "Run destroy from the checkout that deployed."
+    ) in result.stdout
+    assert "Could not read the account" not in result.stdout
+    assert "Continue?" not in result.stdout
+    assert calls(project) == []
 
 
 def test_missing_aws_cli_fails(project: Path) -> None:

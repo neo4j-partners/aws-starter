@@ -208,6 +208,12 @@ caller_account() {
 # absent. $1 is the region for the STS call, by default the target's region.
 require_target_account() {
     local entry account target_region caller
+    # The first deploy writes this file, and git ignores it, so a fresh
+    # checkout has none.
+    if [ ! -e "$TARGETS_FILE" ]; then
+        echo -e "${RED}No deployment is recorded in this checkout: $TARGETS_FILE is missing. Run destroy from the checkout that deployed.${NC}"
+        exit 1
+    fi
     if ! entry=$(target_entry); then
         echo -e "${RED}Could not read the account for target '$TARGET' from $TARGETS_FILE.${NC}"
         exit 1

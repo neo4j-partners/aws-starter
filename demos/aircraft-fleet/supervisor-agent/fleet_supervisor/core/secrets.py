@@ -8,7 +8,7 @@ back to the password variable otherwise.
 
 The secret value is a JSON object with a ``password`` key, the same shape as
 an AWS database credentials secret. Other keys are ignored. Each secret is read
-once per process.
+once per process, until :func:`forget_secrets` drops the cached values.
 """
 
 from __future__ import annotations
@@ -59,6 +59,15 @@ def _read_secret(secret_arn: str, secret_arn_var: str) -> str:
         logger.error("Could not read the secret in %s (%s)", secret_arn_var, failure)
         raise ConfigError(f"Could not read the secret in {secret_arn_var} ({failure}).") from None
     return _parse_secret(response.get("SecretString"), secret_arn_var)
+
+
+def forget_secrets() -> None:
+    """Drop the cached secrets, so the next read fetches each one again.
+
+    Call it when a database rejects a password, in case the secret was
+    rotated after it was cached.
+    """
+    _read_secret.cache_clear()
 
 
 def _failure_class(error: ClientError | BotoCoreError) -> str:

@@ -65,7 +65,12 @@ from fleet_supervisor.core.mcp import (  # noqa: E402
     build_gateway_auth,
     build_mcp_client,
 )
-from fleet_supervisor.core.memory import build_session_manager, memory_settings  # noqa: E402
+from fleet_supervisor.core.memory import (  # noqa: E402
+    build_session_manager,
+    forget_memory_settings,
+    memory_settings,
+    password_rejected,
+)
 from fleet_supervisor.core.model import build_model  # noqa: E402
 
 logging.basicConfig(
@@ -263,8 +268,27 @@ def _build_agent(
     """Build the memory session manager and the supervisor. Blocks on Neo4j.
 
     The supervisor's constructor connects the manager and restores the
-    session history. If it fails, this closes the manager before raising,
-    so the caller only closes a manager it gets back.
+    session history. If Neo4j rejects the password, the cached one may
+    predate a secret rotation, so this reads it again and builds once more.
+    """
+    try:
+        return _build_agent_once(runtime, session_id, user_id)
+    except Exception as error:
+        if not password_rejected(error):
+            raise
+    # Outside the except block, so a second failure does not chain the first.
+    logger.warning("Neo4j rejected the memory password; reading it again")
+    forget_memory_settings()
+    return _build_agent_once(runtime, session_id, user_id)
+
+
+def _build_agent_once(
+    runtime: Runtime, session_id: str, user_id: str
+) -> tuple[Agent, Neo4jSessionManager | None]:
+    """Build the manager and the supervisor once.
+
+    If the build fails, this closes the manager before raising, so the
+    caller only closes a manager it gets back.
     """
     manager = build_session_manager(session_id, user_id)
     try:

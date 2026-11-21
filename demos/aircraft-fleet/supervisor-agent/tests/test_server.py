@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 import anyio
 import pytest
+from neo4j.exceptions import AuthError
+from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
 from strands.types.exceptions import ToolProviderException
 
 from fleet_supervisor import server
@@ -250,6 +252,74 @@ def test_a_failed_build_closes_the_manager_once(supervisor, manager, monkeypatch
     events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
     assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
     assert manager.closed == 1
+
+
+def password_rejected_error() -> Exception:
+    """The chain a rejected memory password raises from the Agent constructor."""
+    connection = MemoryConnectionError("Authentication failed")
+    connection.__cause__ = AuthError("The client is unauthorized due to authentication failure.")
+    error = RuntimeError("Failed to initialize session 's1'")
+    error.__cause__ = connection
+    return error
+
+
+@pytest.fixture
+def password_retry(monkeypatch, supervisor):
+    """Hand out a new FakeManager per build; record attempts and cache resets."""
+    managers: list[FakeManager] = []
+    forgotten: list[bool] = []
+
+    def new_manager(session_id, user_id):
+        managers.append(FakeManager())
+        return managers[-1]
+
+    monkeypatch.setattr(server, "build_session_manager", new_manager)
+    monkeypatch.setattr(server, "forget_memory_settings", lambda: forgotten.append(True))
+    return managers, forgotten
+
+
+def test_a_rejected_password_is_read_again_once(supervisor, password_retry, monkeypatch):
+    managers, forgotten = password_retry
+    errors = [password_rejected_error()]
+
+    def build(model, tools, session_manager=None):
+        if errors:
+            raise errors.pop()
+        return supervisor
+
+    monkeypatch.setattr(server, "build_supervisor", build)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "complete"}
+    assert forgotten == [True]
+    assert [m.closed for m in managers] == [1, 1]
+
+
+def test_a_password_rejected_twice_fails_without_a_third_try(
+    supervisor, password_retry, monkeypatch
+):
+    managers, forgotten = password_retry
+
+    def build(model, tools, session_manager=None):
+        raise password_rejected_error()
+
+    monkeypatch.setattr(server, "build_supervisor", build)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert forgotten == [True]
+    assert [m.closed for m in managers] == [1, 1]
+
+
+def test_other_build_errors_keep_the_cached_password(supervisor, password_retry, monkeypatch):
+    managers, forgotten = password_retry
+
+    def build(model, tools, session_manager=None):
+        raise MemoryConnectionError("Neo4j service unavailable")
+
+    monkeypatch.setattr(server, "build_supervisor", build)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert forgotten == []
+    assert [m.closed for m in managers] == [1]
 
 
 def test_close_error_is_logged_not_sent(supervisor, manager, caplog):

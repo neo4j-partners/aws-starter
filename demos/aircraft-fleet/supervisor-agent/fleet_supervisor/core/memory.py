@@ -7,7 +7,9 @@ Memory is required. These variables configure it:
 - ``MEM_NEO4J_PASSWORD_SECRET_ARN`` names a Secrets Manager secret in the
   cloud. ``MEM_NEO4J_PASSWORD`` holds the password itself for a local run.
 
-The settings are built once per process. Each request gets its own
+The settings are built once per process. If Neo4j rejects the password,
+:func:`forget_memory_settings` drops them so the next build reads the
+password again. Each request gets its own
 :class:`Neo4jSessionManager`, and the caller must close it when the request
 ends. Each manager runs its own event-loop thread, and its Neo4j driver is
 bound to that loop, so managers cannot share one client.
@@ -18,6 +20,7 @@ from __future__ import annotations
 import os
 from functools import cache
 
+from neo4j.exceptions import AuthError
 from neo4j_agent_memory import MemorySettings
 from neo4j_agent_memory.config.settings import ExtractionConfig, ExtractorType, Neo4jConfig
 from neo4j_agent_memory.integrations.strands import Neo4jRetrievalConfig, Neo4jSessionManager
@@ -25,7 +28,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, Be
 from pydantic import SecretStr
 
 from fleet_supervisor.core.config import AWS_REGION, ConfigError
-from fleet_supervisor.core.secrets import password_from
+from fleet_supervisor.core.secrets import forget_secrets, password_from
 
 MEM_NEO4J_URI = "MEM_NEO4J_URI"
 
@@ -42,6 +45,28 @@ RETRIEVAL_MIN_SCORE = 0.75
 def memory_password() -> str:
     """Return the memory database password."""
     return password_from("MEM_NEO4J_PASSWORD_SECRET_ARN", "MEM_NEO4J_PASSWORD")
+
+
+def forget_memory_settings() -> None:
+    """Drop the cached settings and secrets, so the next build reads them again."""
+    memory_settings.cache_clear()
+    forget_secrets()
+
+
+def password_rejected(error: BaseException) -> bool:
+    """Return True if Neo4j rejected the credentials somewhere in ``error``'s chain.
+
+    neo4j-agent-memory wraps the driver's ``AuthError`` in its own
+    ``ConnectionError``, and Strands wraps that in a ``SessionException``.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        if isinstance(current, AuthError):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
 
 
 @cache

@@ -171,3 +171,12 @@ def test_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
         password_from(ARN_VAR, PASSWORD_VAR)
     _fake_secrets_manager(monkeypatch)
     assert password_from(ARN_VAR, PASSWORD_VAR) == "s3cret"
+
+
+def test_forget_secrets_reads_the_secret_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(ARN_VAR, ARN)
+    calls = _fake_secrets_manager(monkeypatch)
+    password_from(ARN_VAR, PASSWORD_VAR)
+    secrets.forget_secrets()
+    password_from(ARN_VAR, PASSWORD_VAR)
+    assert [c for c in calls if "secret_id" in c] == [{"secret_id": ARN}, {"secret_id": ARN}]

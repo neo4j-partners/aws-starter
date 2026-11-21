@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import pytest
+from neo4j.exceptions import AuthError
 from neo4j_agent_memory.config.settings import ExtractorType
+from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
 from neo4j_agent_memory.integrations.strands import Neo4jSessionManager
 from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, BedrockProvider
 
@@ -120,3 +122,32 @@ def test_each_request_gets_its_own_manager(memory_on) -> None:
     finally:
         first.close()
         second.close()
+
+
+def test_forget_memory_settings_reads_the_password_again(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    memory.memory_settings()
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "rotated-pw")
+    assert memory.memory_settings().neo4j.password.get_secret_value() == "local-pw"
+    memory.forget_memory_settings()
+    assert memory.memory_settings().neo4j.password.get_secret_value() == "rotated-pw"
+
+
+def test_password_rejected_finds_an_auth_error_in_the_cause_chain() -> None:
+    connection = MemoryConnectionError("Authentication failed")
+    connection.__cause__ = AuthError("unauthorized")
+    error = RuntimeError("Failed to initialize session")
+    error.__cause__ = connection
+    assert memory.password_rejected(error)
+
+
+def test_password_rejected_follows_an_implicit_context() -> None:
+    error = RuntimeError("raised while handling the auth error")
+    error.__context__ = AuthError("unauthorized")
+    assert memory.password_rejected(error)
+
+
+def test_other_connection_errors_are_not_a_rejected_password() -> None:
+    error = MemoryConnectionError("Neo4j service unavailable")
+    assert not memory.password_rejected(error)

@@ -104,25 +104,34 @@ ensure_cli() {
 
 # agentcore deploy refuses to run without agentcore/cdk/node_modules, and
 # git ignores that folder, so a fresh clone has none. Install it from the
-# committed package-lock.json before deploy or destroy. npm writes
+# committed package-lock.json, when there is one, before deploy or destroy. npm writes
 # node_modules/.package-lock.json only after a complete install, so a
 # partial install from a failed npm ci is installed again. A package-lock.json
 # newer than that marker, as after a git pull that changes it, is installed
 # again too.
 ensure_cdk_deps() {
     local marker="$CDK_DIR/node_modules/.package-lock.json"
+    local install
     if [ -f "$marker" ] && ! [ "$CDK_DIR/package-lock.json" -nt "$marker" ]; then
         return
     fi
+    # npm ci needs package-lock.json. A project made by
+    # `agentcore create --skip-install` has none, so it gets npm install.
+    if [ -f "$CDK_DIR/package-lock.json" ]; then
+        install="npm ci"
+    else
+        install="npm install"
+    fi
     if ! command -v npm >/dev/null 2>&1; then
         echo -e "${RED}ERROR: npm is not installed, so the CDK dependencies cannot be installed${NC}"
-        echo "Install Node.js, then run: (cd $CDK_DIR && npm ci)"
+        echo "Install Node.js, then run: (cd $CDK_DIR && $install)"
         exit 1
     fi
     echo -e "${YELLOW}Installing the CDK dependencies...${NC}"
-    if ! (cd "$CDK_DIR" && npm ci); then
-        echo -e "${RED}ERROR: npm ci failed in $CDK_DIR${NC}"
-        echo "Fix the error above, then run: (cd $CDK_DIR && npm ci)"
+    # $install is unquoted on purpose: it splits into npm and its command.
+    if ! (cd "$CDK_DIR" && $install); then
+        echo -e "${RED}ERROR: $install failed in $CDK_DIR${NC}"
+        echo "Fix the error above, then run: (cd $CDK_DIR && $install)"
         exit 1
     fi
     echo ""

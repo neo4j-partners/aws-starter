@@ -105,9 +105,9 @@ SYSTEM_TOOLS = (
 # A time well before any test runs, for files that must look older.
 STALE_TIME = 1_000_000_000
 
-# npm logs its arguments and working folder. `npm ci` writes
-# node_modules/.package-lock.json, as a complete real install does, unless
-# STUB_NPM_EXIT makes it fail.
+# npm logs its arguments and working folder. `npm ci` and `npm install`
+# write node_modules/.package-lock.json, as a complete real install does,
+# unless STUB_NPM_EXIT makes them fail.
 STUB_NPM = r"""#!/bin/bash
 echo "npm $* in ${PWD##*/graphrag-agent/}" >> "$STUB_LOG"
 if [ -n "$STUB_NPM_EXIT" ]; then echo "npm ERR! stub failure" >&2; exit "$STUB_NPM_EXIT"; fi
@@ -538,6 +538,30 @@ def test_a_failed_cdk_install_stops_before_deploy(project: Path) -> None:
     assert result.returncode == 1
     assert "(cd agentcore/cdk && npm ci)" in result.stdout
     assert calls(project) == ["npm ci in agentcore/cdk"]
+
+
+def test_a_cdk_project_without_a_lockfile_uses_npm_install(project: Path) -> None:
+    # npm ci needs package-lock.json. A project made by
+    # `agentcore create --skip-install` has none.
+    remove_cdk_install(project)
+    (project / "agentcore" / "cdk" / "package-lock.json").unlink()
+
+    result = run_deploy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == ["npm install in agentcore/cdk", "agentcore deploy --target default"]
+
+
+def test_a_failed_install_without_a_lockfile_names_npm_install(project: Path) -> None:
+    remove_cdk_install(project)
+    (project / "agentcore" / "cdk" / "package-lock.json").unlink()
+
+    result = run_deploy(project, STUB_NPM_EXIT="1")
+
+    assert result.returncode == 1
+    assert "(cd agentcore/cdk && npm install)" in result.stdout
+    assert "npm ci" not in result.stdout
+    assert calls(project) == ["npm install in agentcore/cdk"]
 
 
 def test_deploy_without_npm_names_the_install_step(project: Path) -> None:

@@ -21,18 +21,26 @@ UNREACHABLE = (
 _QUERY_ERROR_PREFIXES = ("Neo.ClientError.Statement.", "Neo.ClientError.Procedure.")
 
 
-def is_auth_error(error: BaseException) -> bool:
-    """True when ``error``, or an error it was raised from, is a rejected login.
+def auth_error(error: BaseException) -> neo4j.exceptions.AuthError | None:
+    """Return the rejected login in ``error`` or the errors it was raised from.
 
     The memory library raises its own ``ConnectionError`` from the driver's
-    ``AuthError``, so the chain of causes is checked too.
+    ``AuthError``, so the chain of causes is checked too. A chain that loops
+    back on itself is checked once.
     """
+    seen: set[int] = set()
     cause: BaseException | None = error
-    while cause is not None:
+    while cause is not None and id(cause) not in seen:
         if isinstance(cause, neo4j.exceptions.AuthError):
-            return True
+            return cause
+        seen.add(id(cause))
         cause = cause.__cause__
-    return False
+    return None
+
+
+def is_auth_error(error: BaseException) -> bool:
+    """True when ``error``, or an error it was raised from, is a rejected login."""
+    return auth_error(error) is not None
 
 
 def is_transaction_timeout(error: neo4j.exceptions.Neo4jError) -> bool:

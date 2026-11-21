@@ -23,6 +23,7 @@ from neo4j_agent_memory.integrations.strands import SharedMemory
 
 from fleet_graphrag import server
 from fleet_graphrag.agent import memory
+from fleet_graphrag.agent.neo4j_errors import is_auth_error
 
 # Stands in for the shared memory object on the agent path.
 _SHARED = object()
@@ -681,7 +682,9 @@ def test_data_modes_work_when_the_memory_open_fails(
     monkeypatch.setattr(server, "graph_query", lambda q: f"rows for {q}")
     [agent_event] = _run({"prompt": "hi"}, session_id="s-1")
     assert agent_event == {"type": "error", "error": server.MEMORY_UNREACHABLE_ERROR}
-    assert "MEM_NEO4J_URI" in server.MEMORY_UNREACHABLE_ERROR
+    assert server.MEMORY_UNREACHABLE_ERROR == (
+        "Could not open the memory database. Check MEM_NEO4J_URI and that the database is running."
+    )
     assert _run({"mode": "schema"}) == [
         {"type": "chunk", "data": "SCHEMA"},
         {"type": "complete"},
@@ -702,6 +705,28 @@ def test_rejected_memory_password_names_the_memory_password(
     assert agent_event == {"type": "error", "error": server.MEMORY_AUTH_ERROR}
     assert "MEM_NEO4J_PASSWORD" in server.MEMORY_AUTH_ERROR
     assert "Could not reach" not in server.MEMORY_AUTH_ERROR
+
+
+def test_request_after_shutdown_says_the_server_is_shutting_down(
+    monkeypatch, failing_open: type[_FailingOpen]
+) -> None:
+    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
+    asyncio.run(memory.close_memory())
+    assert _run({"prompt": "hi"}, session_id="s-1") == [
+        {"type": "error", "error": server.MEMORY_CLOSED_ERROR}
+    ]
+    assert "shutting down" in server.MEMORY_CLOSED_ERROR
+    assert failing_open.opens == 0
+
+
+def test_is_auth_error_stops_on_a_cyclic_chain() -> None:
+    first, second = RuntimeError("first"), RuntimeError("second")
+    first.__cause__, second.__cause__ = second, first
+    result: list[bool] = []
+    check = threading.Thread(target=lambda: result.append(is_auth_error(first)), daemon=True)
+    check.start()
+    check.join(2)
+    assert result == [False]
 
 
 def test_memory_config_error_on_open_says_not_configured(

@@ -66,6 +66,7 @@ from fleet_graphrag.agent import (  # noqa: E402
     vector_search,
 )
 from fleet_graphrag.agent.memory import (  # noqa: E402
+    MemoryClosedError,
     close_memory,
     memory_settings,
     session_manager,
@@ -134,9 +135,9 @@ GENERIC_ERROR = (
 INVALID_PAYLOAD = "Invalid request payload."
 
 MEMORY_UNREACHABLE_ERROR = (
-    "Could not open the conversation memory database. Check MEM_NEO4J_URI "
-    "and that the instance is running."
+    "Could not open the memory database. Check MEM_NEO4J_URI and that the database is running."
 )
+MEMORY_CLOSED_ERROR = "The server is shutting down. Try again shortly."
 MEMORY_AUTH_ERROR = (
     "The conversation memory database rejected its password. Check "
     "MEM_NEO4J_PASSWORD, or the secret in MEM_NEO4J_PASSWORD_SECRET_ARN."
@@ -340,7 +341,12 @@ async def invoke(
         except ConfigError:
             raise
         except Exception as e:
-            error = MEMORY_AUTH_ERROR if is_auth_error(e) else MEMORY_UNREACHABLE_ERROR
+            if isinstance(e, MemoryClosedError):
+                error = MEMORY_CLOSED_ERROR
+            elif is_auth_error(e):
+                error = MEMORY_AUTH_ERROR
+            else:
+                error = MEMORY_UNREACHABLE_ERROR
             yield {"type": "error", "error": error}
             return
 

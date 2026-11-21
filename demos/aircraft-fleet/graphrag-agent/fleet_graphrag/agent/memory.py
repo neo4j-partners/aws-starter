@@ -32,6 +32,7 @@ import os
 import threading
 from collections.abc import Callable
 from functools import cache
+from urllib.parse import urlsplit
 
 import neo4j
 from neo4j_agent_memory import (
@@ -40,6 +41,7 @@ from neo4j_agent_memory import (
     MemorySettings,
     Neo4jConfig,
 )
+from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
 from neo4j_agent_memory.integrations.strands import (
     Neo4jRetrievalConfig,
     Neo4jSessionManager,
@@ -52,7 +54,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import (
 from pydantic import SecretStr
 
 from fleet_graphrag.agent.config import ConfigError, settings
-from fleet_graphrag.agent.neo4j_errors import is_auth_error
+from fleet_graphrag.agent.neo4j_errors import UNREACHABLE, auth_error
 from fleet_graphrag.agent.secrets import memory_password
 
 logger = logging.getLogger(__name__)
@@ -79,15 +81,27 @@ _opening: concurrent.futures.Future[SharedMemory] | None = None
 _open_thread: threading.Thread | None = None
 # Set by close_memory. No open starts after it.
 _closed = False
-# A rejected password. Every later call raises it, with no new open.
-_auth_failure: Exception | None = None
+# The message of a rejected login. Every later call raises a fresh
+# MemoryAuthError with it, with no new open.
+_auth_failure: str | None = None
+
+# Open failures that are about reaching the database. They are logged
+# without a traceback. Any other failure is logged with one.
+_CONNECTION_ERRORS = (MemoryConnectionError, TimeoutError, *UNREACHABLE)
 
 
 class MemoryClosedError(neo4j.exceptions.ServiceUnavailable):
     """The shared memory was closed at shutdown.
 
-    It is a ``ServiceUnavailable``, so a request that arrives after shutdown
-    gets the same error as a failed open.
+    It is a ``ServiceUnavailable``, so it is handled like a failed open,
+    and the server reports it as a shutdown.
+    """
+
+
+class MemoryAuthError(neo4j.exceptions.AuthError):
+    """The memory database rejected its password earlier in this process.
+
+    It is an ``AuthError``, so it is handled like the first rejection.
     """
 
 
@@ -96,11 +110,19 @@ def memory_settings() -> MemorySettings:
     """Build the memory settings once per process.
 
     Raises :class:`ConfigError` when ``MEM_NEO4J_URI`` or the password is
-    missing, or the password secret cannot be read. A failure is not cached.
+    missing, ``MEM_NEO4J_URI`` holds a login, or the password secret cannot
+    be read. A failure is not cached.
     """
     uri = os.getenv("MEM_NEO4J_URI", "").strip()
     if not uri:
         raise ConfigError("MEM_NEO4J_URI is not set.")
+    if "@" in urlsplit(uri).netloc:
+        # The driver echoes the URI in its errors, so a password in it would
+        # reach the logs. The message does not echo it either.
+        raise ConfigError(
+            "MEM_NEO4J_URI must not hold a user name or password. Set "
+            "MEM_NEO4J_USERNAME and MEM_NEO4J_PASSWORD instead."
+        )
     region = settings.aws_region
     return MemorySettings(
         # Set explicitly so a MEMORY_API_KEY in the environment cannot switch
@@ -143,8 +165,11 @@ async def shared_memory(background_hook: BackgroundHook) -> SharedMemory:
         if _closed:
             raise MemoryClosedError("The memory is closed. The server is shutting down.")
         if _auth_failure is not None:
-            # Drop the traceback of the earlier raise, so it does not grow.
-            raise _auth_failure.with_traceback(None)
+            # A fresh error each time, so no raise carries another's
+            # traceback or context.
+            raise MemoryAuthError(
+                f"The memory database rejected its password: {_auth_failure}"
+            ) from None
         if _shared is not None:
             return _shared
         if _opening is None:
@@ -166,19 +191,27 @@ def _open(
     """Open the shared memory and settle ``opening``. Runs on its own thread."""
     global _shared, _opening, _auth_failure
     # A running future cannot be cancelled, so no waiter can drop the open.
-    opening.set_running_or_notify_cancel()
-    try:
-        shared = SharedMemory.open(memory_settings(), background_hook=background_hook)
-    except Exception as e:
-        # Logged here, since every caller waiting for it may be gone. The
-        # error goes to the callers that are left.
-        logger.warning("Memory open failed: %s", e)
+    # It returns False only when the future was cancelled before this.
+    if not opening.set_running_or_notify_cancel():
         with _lock:
             _opening = None
-            if is_auth_error(e):
+        return
+    try:
+        shared = SharedMemory.open(memory_settings(), background_hook=background_hook)
+    except BaseException as e:
+        # Every failure settles the future, or close_memory would wait for
+        # it forever. Logged here, since every caller waiting for it may be
+        # gone. The error goes to the callers that are left.
+        traceback = None if isinstance(e, _CONNECTION_ERRORS) else e
+        logger.warning("Memory open failed: %s", e, exc_info=traceback)
+        rejected = auth_error(e)
+        with _lock:
+            _opening = None
+            if rejected is not None:
                 # Retrying sends the same password. It cannot succeed and
-                # counts toward the server's failed-login lockout.
-                _auth_failure = e
+                # counts toward the server's failed-login lockout. Only the
+                # message is kept, so no traceback or context is shared.
+                _auth_failure = str(rejected)
         opening.set_exception(e)
         return
     with _lock:

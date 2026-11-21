@@ -7,6 +7,7 @@ with a fake, and the real ``SharedMemory`` is built on a stub client.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import threading
 from collections.abc import Callable, Iterator
 
@@ -23,6 +24,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import (
 
 from fleet_graphrag.agent import memory
 from fleet_graphrag.agent.config import ConfigError
+from fleet_graphrag.agent.neo4j_errors import is_auth_error
 
 
 @pytest.fixture(autouse=True)
@@ -101,6 +103,20 @@ def test_missing_uri_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MEM_NEO4J_PASSWORD", "local-only")
     with pytest.raises(ConfigError, match="MEM_NEO4J_URI is not set"):
         memory.memory_settings()
+
+
+@pytest.mark.parametrize(
+    "uri", ["neo4j://mem_user:s3cret@memory.example.io", "bolt://mem_user:s3cret@host:7687"]
+)
+def test_uri_with_a_login_is_a_config_error(monkeypatch: pytest.MonkeyPatch, uri: str) -> None:
+    """The driver echoes a bad URI in its errors, so a password in it reaches the logs."""
+    monkeypatch.setenv("MEM_NEO4J_URI", uri)
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "local-only")
+    with pytest.raises(ConfigError) as raised:
+        memory.memory_settings()
+    assert "MEM_NEO4J_URI" in str(raised.value)
+    assert "s3cret" not in str(raised.value)
+    assert "mem_user" not in str(raised.value)
 
 
 def test_missing_password_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -242,13 +258,24 @@ def test_failed_open_is_logged_without_a_traceback(
     fake_shared: type[_FakeShared], caplog: pytest.LogCaptureFixture
 ) -> None:
     """A failed open is logged even when no caller is left to see its error."""
-    fake_shared.fail.append(RuntimeError("memory is down"))
-    with pytest.raises(RuntimeError):
+    fake_shared.fail.append(_wrapped(neo4j.exceptions.ServiceUnavailable("memory is down")))
+    with pytest.raises(MemoryConnectionError):
         asyncio.run(memory.shared_memory(_hook))
     [record] = [r for r in caplog.records if r.name == memory.__name__]
     assert record.levelname == "WARNING"
-    assert record.getMessage() == "Memory open failed: memory is down"
+    assert record.getMessage() == "Memory open failed: Failed: memory is down"
     assert record.exc_info is None
+
+
+def test_unexpected_open_failure_is_logged_with_a_traceback(
+    fake_shared: type[_FakeShared], caplog: pytest.LogCaptureFixture
+) -> None:
+    fake_shared.fail.append(ValueError("a bug"))
+    with pytest.raises(ValueError):
+        asyncio.run(memory.shared_memory(_hook))
+    [record] = [r for r in caplog.records if r.name == memory.__name__]
+    assert record.levelname == "WARNING"
+    assert record.exc_info is not None
 
 
 def _wrapped(driver_error: Exception) -> Exception:
@@ -266,15 +293,45 @@ def test_rejected_password_is_kept_until_restart(
     rejected = _wrapped(neo4j.exceptions.AuthError("bad password"))
     fake_shared.fail.append(rejected)
 
-    async def call_three_times() -> None:
-        for _ in range(3):
-            with pytest.raises(MemoryConnectionError) as raised:
+    async def call_three_times() -> list[BaseException]:
+        with pytest.raises(MemoryConnectionError) as first:
+            await memory.shared_memory(_hook)
+        assert first.value is rejected
+        later = []
+        for _ in range(2):
+            with pytest.raises(memory.MemoryAuthError) as raised:
                 await memory.shared_memory(_hook)
-            assert raised.value is rejected
+            later.append(raised.value)
+        return later
 
-    asyncio.run(call_three_times())
+    later = asyncio.run(call_three_times())
     assert fake_shared.opened == []
     assert len([r for r in caplog.records if r.name == memory.__name__]) == 1
+    assert later[0] is not later[1]
+    assert all(is_auth_error(e) for e in later)
+    assert "bad password" in str(later[0])
+
+
+def test_kept_password_error_is_fresh_on_every_raise(fake_shared: type[_FakeShared]) -> None:
+    """A shared error object would carry one raise's context into the next."""
+    fake_shared.fail.append(_wrapped(neo4j.exceptions.AuthError("bad password")))
+
+    async def raise_in_and_out_of_a_handler() -> tuple[BaseException, BaseException]:
+        with pytest.raises(MemoryConnectionError):
+            await memory.shared_memory(_hook)
+        try:
+            {}["unrelated"]
+        except KeyError:
+            with pytest.raises(memory.MemoryAuthError) as inside:
+                await memory.shared_memory(_hook)
+        with pytest.raises(memory.MemoryAuthError) as outside:
+            await memory.shared_memory(_hook)
+        return inside.value, outside.value
+
+    inside, outside = asyncio.run(raise_in_and_out_of_a_handler())
+    assert inside is not outside
+    assert outside.__context__ is None
+    assert inside.__cause__ is None and inside.__suppress_context__
 
 
 @pytest.mark.parametrize(
@@ -309,6 +366,34 @@ def test_cancelled_first_caller_keeps_the_open(fake_shared: type[_FakeShared]) -
 
     shared = asyncio.run(cancel_then_call())
     assert fake_shared.opened == [shared]
+
+
+class _Abort(BaseException):
+    """A BaseException that is not an Exception."""
+
+
+def test_close_returns_when_the_open_dies_with_a_base_exception(
+    fake_shared: type[_FakeShared],
+) -> None:
+    fake_shared.fail.append(_Abort())
+
+    async def open_then_close() -> None:
+        caller = asyncio.create_task(memory.shared_memory(_hook))
+        await asyncio.sleep(0.1)
+        await asyncio.wait_for(memory.close_memory(), 2)
+        with pytest.raises(_Abort):
+            await caller
+
+    asyncio.run(open_then_close())
+
+
+def test_open_of_a_cancelled_future_does_nothing(fake_shared: type[_FakeShared]) -> None:
+    opening: concurrent.futures.Future = concurrent.futures.Future()
+    opening.cancel()
+    memory._opening = opening
+    memory._open(opening, _hook)
+    assert memory._opening is None
+    assert fake_shared.opened == []
 
 
 def test_close_without_an_open_does_nothing(fake_shared: type[_FakeShared]) -> None:

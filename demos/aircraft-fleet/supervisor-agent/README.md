@@ -250,11 +250,12 @@ Keep the file, because destroy needs it. Run these commands from this folder
 in one shell. The first command backs the file up to a temporary name and
 prints it. It discards your change and pulls only after the backup is made.
 The second command puts the file back, even if the pull failed, and removes
-the backup:
+the backup. It runs only if the backup was complete, so a partial backup
+never replaces the file:
 
 ```bash
-backup=$(mktemp) && cp agentcore/aws-targets.json "$backup" && echo "Backup: $backup" && git checkout -- agentcore/aws-targets.json && git pull
-cp "$backup" agentcore/aws-targets.json && rm -f "$backup"
+backed_up= && backup=$(mktemp) && cp agentcore/aws-targets.json "$backup" && backed_up=1 && echo "Backup: $backup" && git checkout -- agentcore/aws-targets.json && git pull
+[ "${backed_up:-}" = 1 ] && cp "$backup" agentcore/aws-targets.json && rm -f "$backup"
 ```
 
 After the pull, git ignores the file. If that last `cp` fails, the backup is

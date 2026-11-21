@@ -380,10 +380,11 @@ def test_memory_is_closed_when_the_client_disconnects(monkeypatch) -> None:
 
 def test_close_failure_is_logged_not_sent(monkeypatch, caplog) -> None:
     made, _ = _agent_path(monkeypatch, close_error=True)
-    events = _run({"prompt": "hi"}, session_id="s-1")
+    events = _run({"prompt": "hi"}, session_id="s-1\nINFO forged line")
     assert events[-1] == {"type": "complete"}
     assert made[0].closed == 1
-    assert "Could not close the memory session s-1" in caplog.text
+    [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Could not")]
+    assert line == "Could not close the memory session s-1\\nINFO forged line"
 
 
 def test_failed_build_closes_the_memory_once(monkeypatch) -> None:

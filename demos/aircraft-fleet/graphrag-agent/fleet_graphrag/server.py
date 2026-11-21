@@ -405,7 +405,7 @@ def _close_memory(memory: Neo4jSessionManager) -> None:
     try:
         memory.close()
     except Exception:
-        logger.exception("Could not close the memory session %s", memory.session_id)
+        logger.exception("Could not close the memory session %s", _printable(memory.session_id))
 
 
 def main(default_port: int = 7070) -> None:

@@ -94,6 +94,7 @@ def project(tmp_path: Path) -> Path:
     (root / "agentcore").mkdir(parents=True)
     shutil.copy2(AGENT_ROOT / "agent.sh", root / "agent.sh")
     shutil.copy2(AGENT_ROOT / "agentcore" / "agentcore.json", root / "agentcore" / "agentcore.json")
+    # The first deploy writes this file. Git ignores it, so the test writes its own.
     (root / "agentcore" / "aws-targets.json").write_text(
         json.dumps([{"name": "default", "account": ACCOUNT, "region": "us-west-2"}])
     )

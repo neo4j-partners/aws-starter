@@ -91,7 +91,9 @@ esac
 # rm, cp, mv, awk, and chmod pass through to the real command. STUB_INTERRUPT_AFTER
 # =cmd:N sends SIGINT to agent.sh right after the Nth call of cmd, the same as
 # a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
-# name right after the Nth rm of that name. STUB_RECORD_STRIP_MODE makes awk
+# name right after the Nth rm of that name, or with STUB_PLANT_DEVNULL a link
+# to /dev/null. STUB_SKIP_STRIP_CHMOD makes chmod of the copy succeed without
+# running. STUB_RECORD_STRIP_MODE makes awk
 # record the copy's mode while the copy exists. STUB_RECORD_STRIP_SIZE makes
 # chmod record the copy's size in bytes before it changes the mode.
 STUB_PASSTHROUGH = r"""#!/bin/bash
@@ -104,8 +106,10 @@ if [ "$name" = chmod ] && [ -n "${STUB_RECORD_STRIP_SIZE:-}" ]; then
             wc -c < "${!#}" | tr -d ' ' >> "${STUB_LOG%/*}/strip-sizes" ;;
     esac
 fi
-"$real" "$@"
-status=$?
+case "$name:${STUB_SKIP_STRIP_CHMOD:-}:${!#}" in
+    chmod:?*:*.env.local.strip.*) status=0 ;;
+    *) "$real" "$@"; status=$? ;;
+esac
 counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
@@ -125,7 +129,11 @@ if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
             count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
             echo "$count" > "$counter"
             if [ "$count" = "$STUB_PLANT_AFTER_STRIP_RM" ]; then
-                printf 'PLANTED=1\n' > "${!#}"
+                if [ -n "${STUB_PLANT_DEVNULL:-}" ]; then
+                    ln -s /dev/null "${!#}"
+                else
+                    printf 'PLANTED=1\n' > "${!#}"
+                fi
             fi
             ;;
     esac
@@ -582,6 +590,34 @@ def test_a_file_made_at_the_copy_name_after_the_remove_is_refused(project: Path)
     assert not any(
         call.startswith(("agentcore add", "agentcore deploy")) for call in calls(project)
     )
+    assert env_local.read_text() == "A=1\n"
+    assert not list(env_local.parent.glob(".env.local.*"))
+
+
+# set -C opens a link to a device. chmod of the root-owned /dev/null would
+# fail, so the stub skips it, and only the regular-file check stops mv from
+# putting the link in place of .env.local.
+def test_a_link_to_a_device_made_at_the_copy_name_is_refused(project: Path) -> None:
+    ready_to_deploy(project)
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o600)
+
+    result = run_agent(
+        project,
+        "deploy",
+        STUB_STACK_STATUS="https://cognito-idp.example/.well-known/openid-configuration",
+        STUB_PLANT_AFTER_STRIP_RM="1",
+        STUB_PLANT_DEVNULL="1",
+        STUB_SKIP_STRIP_CHMOD="1",
+    )
+
+    assert result.returncode == 1
+    assert "Could not remove" in result.stderr
+    assert not any(
+        call.startswith(("agentcore add", "agentcore deploy")) for call in calls(project)
+    )
+    assert not env_local.is_symlink()
     assert env_local.read_text() == "A=1\n"
     assert not list(env_local.parent.glob(".env.local.*"))
 

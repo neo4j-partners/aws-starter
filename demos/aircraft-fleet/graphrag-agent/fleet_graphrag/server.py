@@ -167,6 +167,14 @@ def _invalid_fields(error: ValidationError) -> str:
     return ", ".join(names)
 
 
+def _invalid_details(error: ValidationError) -> str:
+    """Each failed field with its error type, for the log, without the values."""
+    return ", ".join(
+        f"{'.'.join(str(part) for part in detail['loc']) or '(body)'} ({detail['type']})"
+        for detail in error.errors()
+    )
+
+
 @app.entrypoint
 async def invoke(
     payload: dict | None,
@@ -194,8 +202,9 @@ async def invoke(
     try:
         req = RequestPayload.model_validate(raw)
     except ValidationError as e:
-        # The full detail echoes the rejected values. Keep it in the log.
-        logger.warning("Invalid request payload: %s", e)
+        # The full detail echoes the rejected values, which can be the prompt
+        # text. Log only the field names and the error types.
+        logger.warning("Invalid request payload: %s", _invalid_details(e))
         yield {
             "type": "error",
             "error": f"{INVALID_PAYLOAD} Invalid fields: {_invalid_fields(e)}",
@@ -256,7 +265,7 @@ async def invoke(
         # The prompt is user text. Its length goes to INFO, the text to DEBUG.
         logger.info(
             "Request session=%s user=%s prompt_chars=%d",
-            session_id,
+            _printable(session_id),
             _printable(req.user_id),
             len(prompt),
         )

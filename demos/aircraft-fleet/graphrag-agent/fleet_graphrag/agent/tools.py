@@ -94,7 +94,6 @@ def graph_query_tool(question: str) -> str:
     except neo4j.exceptions.DriverError as e:
         return _neo4j_error_result("graph_query_tool", e)
     except Exception as e:
-        # Exception, not BaseException, so a cancelled task still stops.
         logger.error("graph_query_tool failed", exc_info=e)
         return QUERY_FAILED_RESULT
 

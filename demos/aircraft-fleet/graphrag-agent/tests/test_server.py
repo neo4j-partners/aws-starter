@@ -183,8 +183,26 @@ def test_invalid_payload_names_fields_without_values(caplog) -> None:
             "error": "Invalid request payload. Invalid fields: mode, top_k, inputText",
         }
     ]
-    # The rejected values stay in the server log.
-    assert "drop_database" in caplog.text
+    # The log names each field and its error type, but not the values.
+    assert "mode (enum), top_k (int_parsing), inputText (string_type)" in caplog.text
+    assert "drop_database" not in caplog.text
+    assert "lots" not in caplog.text
+
+
+def test_invalid_prompt_text_stays_out_of_the_log(caplog) -> None:
+    events = _run({"prompt": ["the secret question"]})
+    assert events[0]["type"] == "error"
+    assert "prompt (string_type)" in caplog.text
+    assert "secret question" not in caplog.text
+
+
+def test_session_id_control_characters_are_escaped(monkeypatch, caplog) -> None:
+    _stop_before_the_agent(monkeypatch)
+    with caplog.at_level("INFO", logger="fleet_graphrag.server"):
+        _run({"prompt": "hi"}, session_id="s-1\nINFO forged line")
+    [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Request ")]
+    assert "session=s-1\\nINFO forged line " in line
+    assert "\n" not in line
 
 
 def test_env_file_is_overridden_for_tests() -> None:

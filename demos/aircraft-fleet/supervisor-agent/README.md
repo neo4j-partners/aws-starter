@@ -233,9 +233,11 @@ provider. So destroy does not declare the credential, and it needs neither the
 fleet credentials file nor the MCP server stack. With no runtime in the spec,
 `cdk-stack.ts` reads no deploy settings. The script then restores the tracked
 spec and checks what remains. It reads `agentcore status`, and it looks up the
-stack and the credential provider in AWS by name. If anything is still
-deployed, it lists it with the command that deletes it and exits with an
-error.
+stack and the credential provider in AWS by name. Before those lookups, it
+confirms that the active AWS credentials belong to the account recorded for
+the target in `agentcore/aws-targets.json`. Credentials for another account
+would not see the stack or the provider. If anything is still deployed, it
+lists it with the command that deletes it and exits with an error.
 
 The CLI's local state in `agentcore/.cli/` holds account-specific ARNs, so git
 ignores it. If it is lost, destroy still deletes the stack, which the CLI

@@ -354,6 +354,16 @@ target_region() {
     echo "${region:-$REGION}"
 }
 
+# The account that $TARGET deploys to, from agentcore/aws-targets.json,
+# where the first deploy records it. Fails unless there is exactly one.
+target_account() {
+    jq -r -e --arg t "$TARGET" '
+        [.[] | select(.name == $t) | .account]
+        | if length == 1 and (.[0] | type) == "string" then .[0]
+          else error("no single account for the target") end' \
+        agentcore/aws-targets.json 2>/dev/null
+}
+
 # Run a read-only AWS lookup and keep its output in AWS_LOOKUP_OUTPUT.
 # Returns 0 if the resource exists and 1 if the error text contains
 # not_found. Any other failure exits, so an expired login or a missing
@@ -385,7 +395,7 @@ aws_lookup() {
 # CLI's deployed-state.json, so a lost state file would read as clean. The
 # stack and the credential provider are also looked up in AWS by name.
 report_remaining() {
-    local status errors remaining region
+    local status errors remaining region account caller
     errors=$(mktemp)
     if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
@@ -407,6 +417,21 @@ report_remaining() {
         exit 1
     fi
     region=$(target_region)
+    # The lookups below use the active credentials. Credentials for another
+    # account would read the stack and provider as gone, so confirm first.
+    if ! account=$(target_account); then
+        echo -e "${RED}Could not read the account for target '$TARGET' from agentcore/aws-targets.json.${NC}"
+        exit 1
+    fi
+    if ! caller=$(aws sts get-caller-identity --query Account --output text --region "$region"); then
+        echo -e "${RED}Could not check the active AWS account with STS.${NC}"
+        exit 1
+    fi
+    if [ "$caller" != "$account" ]; then
+        echo -e "${RED}The active AWS credentials belong to account $caller, but target '$TARGET' is in account $account.${NC}"
+        echo "Use credentials for account $account, for example with AWS_PROFILE, and run destroy again."
+        exit 1
+    fi
     if aws_lookup "does not exist" aws cloudformation describe-stacks \
         --region "$region" --stack-name "$STACK_NAME" \
         --query 'Stacks[0].StackStatus' --output text; then

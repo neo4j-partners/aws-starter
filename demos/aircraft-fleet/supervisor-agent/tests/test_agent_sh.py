@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 AGENT_ROOT = Path(__file__).resolve().parents[1]
+ACCOUNT = "111122223333"
 
 STUB_AGENTCORE = r"""#!/bin/bash
 echo "agentcore $*" >> "$STUB_LOG"
@@ -36,6 +37,10 @@ esac
 STUB_AWS = r"""#!/bin/bash
 echo "aws $*" >> "$STUB_LOG"
 case "$1 $2" in
+    "sts get-caller-identity")
+        if [ -n "$STUB_STS_ERROR" ]; then echo "$STUB_STS_ERROR" >&2; exit 254; fi
+        echo "${STUB_CALLER_ACCOUNT:-111122223333}"
+        ;;
     "cloudformation describe-stacks")
         if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
         if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
@@ -90,7 +95,7 @@ def project(tmp_path: Path) -> Path:
     shutil.copy2(AGENT_ROOT / "agent.sh", root / "agent.sh")
     shutil.copy2(AGENT_ROOT / "agentcore" / "agentcore.json", root / "agentcore" / "agentcore.json")
     (root / "agentcore" / "aws-targets.json").write_text(
-        json.dumps([{"name": "default", "region": "us-west-2"}])
+        json.dumps([{"name": "default", "account": ACCOUNT, "region": "us-west-2"}])
     )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -153,6 +158,41 @@ def test_clean_destroy_checks_aws_by_name_and_succeeds(project: Path) -> None:
         "--name fleetsupervisor_default_fleet-gateway" in c
         for c in logged
     )
+
+
+def test_credentials_for_another_account_fail_before_the_aws_lookups(project: Path) -> None:
+    result = run_destroy(project, STUB_CALLER_ACCOUNT="999988887777")
+
+    assert result.returncode == 1
+    assert f"account 999988887777, but target 'default' is in account {ACCOUNT}" in result.stdout
+    assert "Cleanup complete" not in result.stdout
+    logged = calls(project)
+    assert "aws sts get-caller-identity --query Account --output text --region us-west-2" in logged
+    assert not any(c.startswith(("aws cloudformation", "aws bedrock")) for c in logged)
+
+
+def test_a_failed_identity_check_fails(project: Path) -> None:
+    result = run_destroy(project, STUB_STS_ERROR="An error occurred (ExpiredToken)")
+
+    assert result.returncode == 1
+    assert "Could not check the active AWS account with STS." in result.stdout
+    assert "ExpiredToken" in result.stderr
+    assert "Cleanup complete" not in result.stdout
+
+
+@pytest.mark.parametrize("targets", [None, "[]", "not json", '[{"name": "default"}]'])
+def test_an_unknown_target_account_fails(project: Path, targets: str | None) -> None:
+    path = project / "agentcore" / "aws-targets.json"
+    if targets is None:
+        path.unlink()
+    else:
+        path.write_text(targets)
+
+    result = run_destroy(project)
+
+    assert result.returncode == 1
+    assert "Could not read the account for target 'default'" in result.stdout
+    assert "Cleanup complete" not in result.stdout
 
 
 def test_status_without_a_resources_array_fails(project: Path) -> None:

@@ -102,6 +102,9 @@ SYSTEM_TOOLS = (
     "tail",
 )
 
+# A time well before any test runs, for files that must look older.
+STALE_TIME = 1_000_000_000
+
 # npm logs its arguments and working folder. `npm ci` writes
 # node_modules/.package-lock.json, as a complete real install does, unless
 # STUB_NPM_EXIT makes it fail.
@@ -138,10 +141,14 @@ def project(tmp_path: Path) -> Path:
     # The first deploy writes this file. Git ignores it, so the test writes its own.
     targets = [{"name": "default", "account": ACCOUNT, "region": "us-east-1"}]
     (root / "agentcore" / "aws-targets.json").write_text(json.dumps(targets))
-    # The checkout that deployed has a complete CDK install.
+    # The checkout that deployed has a complete CDK install, made after the
+    # committed package-lock.json was last changed.
     modules = root / "agentcore" / "cdk" / "node_modules"
     modules.mkdir(parents=True)
+    lock = root / "agentcore" / "cdk" / "package-lock.json"
+    lock.write_text("{}")
     (modules / ".package-lock.json").write_text("{}")
+    os.utime(lock, (STALE_TIME, STALE_TIME))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     stubs = {
@@ -503,6 +510,19 @@ def test_a_partial_cdk_install_is_installed_again(project: Path) -> None:
     # A failed npm ci can leave node_modules without the lockfile that npm
     # writes only after a complete install.
     (project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json").unlink()
+
+    result = run_deploy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == ["npm ci in agentcore/cdk", "agentcore deploy --target default"]
+
+
+def test_a_newer_package_lock_is_installed_again(project: Path) -> None:
+    # A git pull that changes package-lock.json leaves the old install in
+    # place. The lock is then newer than npm's marker from that install.
+    marker = project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json"
+    os.utime(marker, (STALE_TIME, STALE_TIME))
+    os.utime(project / "agentcore" / "cdk" / "package-lock.json")
 
     result = run_deploy(project)
 

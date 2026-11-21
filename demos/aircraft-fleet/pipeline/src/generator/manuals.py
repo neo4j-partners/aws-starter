@@ -614,8 +614,33 @@ REQUIRED_BLOCKS: tuple[str, ...] = tuple(
 _MARKER = re.compile(r"^<!-- (BEGIN|END) GENERATED: ([a-z0-9-]+) -->$")
 # A line that looks like a marker but does not match _MARKER exactly.
 _MARKER_LIKE = re.compile(r"^\s*<!--\s*(BEGIN|END)\s+GENERATED", re.IGNORECASE)
-# The opening or closing line of a fenced code block.
-_FENCE = re.compile(r"^ {0,3}(```|~~~)")
+# A fence line, as CommonMark reads one: up to three spaces, then a run of
+# three or more backticks or tildes, then the rest of the line.
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
+def _opens_fence(line: str) -> str | None:
+    """The fence run line opens, or None when it is not an opening fence.
+
+    A backtick fence's info string cannot hold a backtick.
+    """
+    match = _FENCE.match(line)
+    if match is None:
+        return None
+    run, info = match.groups()
+    if run[0] == "`" and "`" in info:
+        return None
+    return run
+
+
+def _closes_fence(line: str, fence: str) -> bool:
+    """Whether line closes fence: the same character, at least as long, and
+    nothing after it but spaces or tabs."""
+    match = _FENCE.match(line)
+    if match is None:
+        return False
+    run, rest = match.groups()
+    return run[0] == fence[0] and len(run) >= len(fence) and not rest.strip(" \t")
 
 
 class ManualBlockError(ValueError):
@@ -659,11 +684,10 @@ def render_text(
                 raise ManualBlockError(f"line {number}: malformed marker {stripped!r}")
             if open_id is None:
                 # A block body is replaced, so only fences outside blocks count.
-                if fence_match := _FENCE.match(stripped):
-                    if fence is None:
-                        fence = fence_match.group(1)
-                    elif fence_match.group(1) == fence:
-                        fence = None
+                if fence is None:
+                    fence = _opens_fence(stripped)
+                elif _closes_fence(stripped, fence):
+                    fence = None
                 out.append(line)
             continue
         kind, block_id = match.groups()

@@ -133,11 +133,37 @@ def test_rendering_is_idempotent() -> None:
             "line 2: marker inside a fenced code block",
             id="malformed-in-fence",
         ),
+        pytest.param(
+            "````\n```\n" + _block("greeting", "a") + "````\n",
+            "line 3: marker inside a fenced code block",
+            id="short-line-in-long-fence",
+        ),
+        pytest.param(
+            "```\n```python\n" + _block("greeting", "a") + "```\n",
+            "line 3: marker inside a fenced code block",
+            id="info-string-line-in-fence",
+        ),
+        pytest.param(
+            "```\n~~~\n" + _block("greeting", "a") + "```\n",
+            "line 3: marker inside a fenced code block",
+            id="other-char-line-in-fence",
+        ),
     ],
 )
 def test_bad_markers_raise_with_the_line(text: str, message: str) -> None:
     with pytest.raises(ManualBlockError, match=f"^{message}$"):
         _render(text)
+
+
+@pytest.mark.parametrize(
+    "fence",
+    ["```\n```\n", "```\n`````\n", "~~~~\n~~~~  \n", "``` a`b\n"],
+    ids=["same", "longer-close", "trailing-space", "backtick-info-is-not-a-fence"],
+)
+def test_a_closed_fence_leaves_later_markers_outside(fence: str) -> None:
+    assert _render(fence + _block("greeting", "stale")) == fence + _block(
+        "greeting", "Hello from the B737-800."
+    )
 
 
 def test_a_fence_inside_a_block_is_the_block_body() -> None:

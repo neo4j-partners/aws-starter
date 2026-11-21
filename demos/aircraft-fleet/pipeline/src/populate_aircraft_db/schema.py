@@ -115,7 +115,7 @@ def create_constraints(driver: Driver, database: str) -> None:
             f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
             database_=database,
         )
-        logger.info(f"  [OK] Constraint: {label}.{prop}")
+        logger.info("  [OK] Constraint: %s.%s", label, prop)
 
 
 def create_indexes(driver: Driver, database: str) -> None:
@@ -127,7 +127,7 @@ def create_indexes(driver: Driver, database: str) -> None:
             f"FOR (n:{_quote_identifier(label)}) ON (n.{_quote_identifier(prop)})",
             database_=database,
         )
-        logger.info(f"  [OK] Index: {label}.{prop}")
+        logger.info("  [OK] Index: %s.%s", label, prop)
 
 
 def create_fulltext_indexes(driver: Driver, database: str) -> None:
@@ -139,7 +139,7 @@ def create_fulltext_indexes(driver: Driver, database: str) -> None:
             f"FOR (n:{_quote_identifier(label)}) ON EACH [{props_clause}]",
             database_=database,
         )
-        logger.info(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
+        logger.info("  [OK] Fulltext index: %s on %s(%s)", name, label, ", ".join(props))
 
 
 def create_extraction_constraints(driver: Driver, database: str) -> None:
@@ -150,7 +150,7 @@ def create_extraction_constraints(driver: Driver, database: str) -> None:
             f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
             database_=database,
         )
-        logger.info(f"  [OK] Constraint: {label}.{prop}")
+        logger.info("  [OK] Constraint: %s.%s", label, prop)
 
 
 def drop_extraction_constraints(driver: Driver, database: str) -> None:
@@ -179,7 +179,7 @@ def drop_extraction_constraints(driver: Driver, database: str) -> None:
             driver.execute_query(
                 f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS", database_=database
             )
-            logger.info(f"  [OK] Dropped constraint: {label}.{prop}")
+            logger.info("  [OK] Dropped constraint: %s.%s", label, prop)
 
 
 def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> None:

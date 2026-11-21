@@ -34,11 +34,16 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 |---------|--------------|
 | `./setup.sh` | Full pipeline: install dependencies, generate, clean, load, enrich, fuse, and verify |
 | `./setup.sh generate` | Stage 1 only: generate CSVs into `generated/` |
-| `./setup.sh load` | Clean, then stages 2 to 5. This needs Bedrock or LLM access. |
-| `./setup.sh load-operational` | Clean, then stage 2 and relinking only. This needs no LLM and no API key. |
+| `./setup.sh load` | Regenerate `generated/` if it is stale, clean, then stages 2 to 5. This needs Bedrock or LLM access. |
+| `./setup.sh load-operational` | Regenerate `generated/` if it is stale, clean, then stage 2 and relinking only. This needs no LLM and no API key. |
 | `./setup.sh verify` | Stage 5 only. This is read-only and runs with `--strict`. |
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |
+
+`generate` writes `generated/.stamp.json` with the generator settings and a hash of
+the generator code. `generated/` is stale when its stamp does not match the `GEN_*`
+values or the current code, and `load` and `load-operational` regenerate it then.
+`verify --strict` fails when the stamp is missing or the code has changed since.
 
 The `uv run populate-aircraft-db` CLI has more commands:
 
@@ -204,7 +209,7 @@ override single values.
 | `src/populate_aircraft_db/main.py` | The CLI: credential lookup and command wiring |
 | `src/populate_aircraft_db/agent_samples.py` | Chat and embedding calls for the `agent-samples` command |
 | `manuals/` | The maintenance manuals used for enrichment. They are committed. |
-| `generated/` | The CSV output. It is git-ignored. Recreate it with `./setup.sh generate`. |
+| `generated/` | The CSV output and its `.stamp.json`. It is git-ignored. Recreate it with `./setup.sh generate`. |
 | `setup.sh` | One command that drives all five stages |
 
 ## Connect the MCP server and the GraphRAG agent

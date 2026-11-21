@@ -998,12 +998,38 @@ def test_chapters_1_and_3_share_the_numbering_of_every_manual(model: str) -> Non
     assert re.search(r"^### 3\.2 Component Descriptions$", text, re.M)
 
 
+# A turbofan has no mixture control, so "lean mixture" is piston wording.
+_PISTON_MIXTURE = re.compile(r"\b(?:lean|rich)\s+mixture\b|mixture control", re.IGNORECASE)
+
+
+@pytest.mark.parametrize(
+    ("text", "piston"),
+    [
+        ("Symptoms of a lean mixture.", True),
+        ("A Rich  Mixture fouls the plugs.", True),
+        ("Set the mixture control to idle cutoff.", True),
+        ("The fuel-air mixture ignites in the combustor.", False),
+    ],
+)
+def test_the_mixture_guard_flags_only_piston_wording(text: str, piston: bool) -> None:
+    assert bool(_PISTON_MIXTURE.search(text)) is piston
+
+
 @pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
 def test_no_manual_uses_piston_mixture_terms(model: str) -> None:
-    # A turbofan has no mixture control, so "lean mixture" is piston wording.
     text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
 
-    assert not re.findall(r".*\bmixture\b.*", text, re.IGNORECASE)
+    assert not [line for line in text.splitlines() if _PISTON_MIXTURE.search(line)]
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_fuel_starvation_symptoms_do_not_claim_an_egt_rise(model: str) -> None:
+    # Starving the combustor of fuel drops EGT as the spools roll back.
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+    section = re.search(r"^\*\*Fault Code:\*\* ENG-FUEL-007$(.*?)^#{2,3} ", text, re.M | re.S)
+
+    assert section is not None
+    assert not re.search(r"EGT rise|nozzle spray", section.group(1), re.IGNORECASE)
 
 
 def test_the_e190_manual_names_its_engine_one_way() -> None:

@@ -590,8 +590,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
-- N1 and N2 rollback
-- EGT rise from a degraded fuel nozzle spray pattern
+- EGT drop with N1/N2 rollback
 - Fuel filter bypass or low fuel pressure EICAS message
 - Possible flameout
 

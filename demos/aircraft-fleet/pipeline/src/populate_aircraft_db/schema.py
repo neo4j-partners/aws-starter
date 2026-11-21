@@ -2,7 +2,77 @@
 
 from __future__ import annotations
 
+import logging
+
 from neo4j import Driver
+
+from generator.specs import (
+    COMPONENT_ALIASES,
+    COMPONENT_TYPES_BY_SYSTEM,
+    COMPONENTS_BY_SYSTEM,
+    SENSOR_TYPES,
+)
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Fleet type vocabulary for extraction
+# ---------------------------------------------------------------------------
+# The cross-link joins in pipeline.link_to_existing_graph match a
+# SystemReference systemType and a ComponentReference componentType to the
+# operational System and Component types. The extraction prompt and schema
+# give the LLM the same lists, from the generator specs, so the values match.
+
+SYSTEM_TYPES: list[str] = list(COMPONENT_TYPES_BY_SYSTEM)
+
+
+def system_type_by_component_type(components_by_system: dict[str, list[str]]) -> dict[str, str]:
+    """Return lowercase component type -> the system type that has it.
+
+    Raises ValueError if a component type, ignoring case, is listed under
+    more than one system type or twice under one.
+    """
+    mapping: dict[str, str] = {}
+    for system, components in components_by_system.items():
+        for component in components:
+            key = component.lower()
+            if key in mapping and mapping[key] == system:
+                raise ValueError(
+                    f"component type {component!r} is listed twice under {system!r}, "
+                    "ignoring case; a component type must be listed once"
+                )
+            if key in mapping:
+                raise ValueError(
+                    f"component type {component!r} is listed under {mapping[key]!r} "
+                    f"and {system!r}; a component type must belong to one system type"
+                )
+            mapping[key] = system
+    return mapping
+
+
+SYSTEM_TYPE_BY_COMPONENT_TYPE = system_type_by_component_type(COMPONENT_TYPES_BY_SYSTEM)
+
+# The join maps an extracted componentType through this, so a manual's part
+# name, such as ADIRU, links like its type.
+COMPONENT_TYPE_BY_ALIAS: dict[str, str] = COMPONENT_ALIASES
+
+# "Engine: Fan Module, HP Compressor, ...; Avionics: ...; Hydraulics: ..."
+COMPONENT_TYPES_TEXT = "; ".join(
+    f"{system}: {', '.join(components)}" for system, components in COMPONENT_TYPES_BY_SYSTEM.items()
+)
+SYSTEM_TYPES_TEXT = ", ".join(SYSTEM_TYPES)
+
+# "HP Turbine for High-Pressure Turbine; Air Data Unit for ADC or ADIRU; ..."
+COMPONENT_ALIASES_TEXT = "; ".join(
+    f"{spec.type} for {' or '.join(spec.aliases()[1:])}"
+    for specs in COMPONENTS_BY_SYSTEM.values()
+    for spec in specs
+    if len(spec.aliases()) > 1
+)
+
+# The fleet sensor types, which the Sensor HAS_LIMIT join matches to
+# OperatingLimit parameterName.
+SENSOR_PARAMETER_NAMES = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)
 
 # (label, property) pairs — one uniqueness constraint each.
 CONSTRAINTS: list[tuple[str, str]] = [
@@ -17,6 +87,9 @@ CONSTRAINTS: list[tuple[str, str]] = [
     ("MaintenanceEvent", "event_id"),
     ("Removal", "removal_id"),
     ("Document", "documentId"),
+    ("Chunk", "chunkId"),
+    # The load records its generator stamp on one Dataset node, id 'current'.
+    ("Dataset", "id"),
 ]
 
 # (label, property) pairs — property indexes for common lookups.
@@ -47,52 +120,64 @@ EXTRACTION_CONSTRAINTS: list[tuple[str, str]] = [
     ("OperatingLimit", "name"),
 ]
 
+# SHOW CONSTRAINTS reports a node uniqueness constraint as UNIQUENESS on
+# older Neo4j releases and as NODE_PROPERTY_UNIQUENESS on newer ones,
+# such as the 2026.06 test container. Match either name.
+UNIQUENESS_CONSTRAINT_TYPES: list[str] = ["UNIQUENESS", "NODE_PROPERTY_UNIQUENESS"]
+
 
 def _quote_identifier(identifier: str) -> str:
     """Quote a Neo4j schema identifier."""
     return f"`{identifier.replace('`', '``')}`"
 
 
-def create_constraints(driver: Driver) -> None:
+def create_constraints(driver: Driver, database: str) -> None:
     """Create uniqueness constraints (idempotent)."""
     for label, prop in CONSTRAINTS:
         driver.execute_query(
-            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
+            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{_quote_identifier(label)}) "
+            f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
+            database_=database,
         )
-        print(f"  [OK] Constraint: {label}.{prop}")
+        logger.info("  [OK] Constraint: %s.%s", label, prop)
 
 
-def create_indexes(driver: Driver) -> None:
+def create_indexes(driver: Driver, database: str) -> None:
     """Create property indexes (idempotent)."""
     for label, prop in INDEXES:
         index_name = f"idx_{label.lower()}_{prop.lower()}"
         driver.execute_query(
-            f"CREATE INDEX {index_name} IF NOT EXISTS FOR (n:{label}) ON (n.{prop})"
+            f"CREATE INDEX {_quote_identifier(index_name)} IF NOT EXISTS "
+            f"FOR (n:{_quote_identifier(label)}) ON (n.{_quote_identifier(prop)})",
+            database_=database,
         )
-        print(f"  [OK] Index: {label}.{prop}")
+        logger.info("  [OK] Index: %s.%s", label, prop)
 
 
-def create_fulltext_indexes(driver: Driver) -> None:
+def create_fulltext_indexes(driver: Driver, database: str) -> None:
     """Create fulltext indexes for sample demo queries (idempotent)."""
     for name, label, props in FULLTEXT_INDEXES:
-        props_clause = ", ".join(f"n.{p}" for p in props)
+        props_clause = ", ".join(f"n.{_quote_identifier(p)}" for p in props)
         driver.execute_query(
-            f"CREATE FULLTEXT INDEX {name} IF NOT EXISTS "
-            f"FOR (n:{label}) ON EACH [{props_clause}]"
+            f"CREATE FULLTEXT INDEX {_quote_identifier(name)} IF NOT EXISTS "
+            f"FOR (n:{_quote_identifier(label)}) ON EACH [{props_clause}]",
+            database_=database,
         )
-        print(f"  [OK] Fulltext index: {name} on {label}({', '.join(props)})")
+        logger.info("  [OK] Fulltext index: %s on %s(%s)", name, label, ", ".join(props))
 
 
-def create_extraction_constraints(driver: Driver) -> None:
+def create_extraction_constraints(driver: Driver, database: str) -> None:
     """Create uniqueness constraints for extracted entity types (idempotent)."""
     for label, prop in EXTRACTION_CONSTRAINTS:
         driver.execute_query(
-            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.{prop} IS UNIQUE"
+            f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{_quote_identifier(label)}) "
+            f"REQUIRE n.{_quote_identifier(prop)} IS UNIQUE",
+            database_=database,
         )
-        print(f"  [OK] Constraint: {label}.{prop}")
+        logger.info("  [OK] Constraint: %s.%s", label, prop)
 
 
-def drop_extraction_constraints(driver: Driver) -> None:
+def drop_extraction_constraints(driver: Driver, database: str) -> None:
     """Drop extracted-entity uniqueness constraints before SimpleKGPipeline runs.
 
     The pipeline writes duplicate extracted nodes first and performs entity
@@ -104,22 +189,24 @@ def drop_extraction_constraints(driver: Driver) -> None:
             """
             SHOW CONSTRAINTS
             YIELD name, type, labelsOrTypes, properties
-            WHERE type = 'UNIQUENESS'
+            WHERE type IN $types
               AND labelsOrTypes = [$label]
               AND properties = [$property]
             RETURN name
             """,
             label=label,
             property=prop,
+            types=UNIQUENESS_CONSTRAINT_TYPES,
+            database_=database,
         )
         for record in records:
             driver.execute_query(
-                f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS"
+                f"DROP CONSTRAINT {_quote_identifier(record['name'])} IF EXISTS", database_=database
             )
-            print(f"  [OK] Dropped constraint: {label}.{prop}")
+            logger.info("  [OK] Dropped constraint: %s.%s", label, prop)
 
 
-def create_embedding_indexes(driver: Driver, dimensions: int) -> None:
+def create_embedding_indexes(driver: Driver, database: str, dimensions: int) -> None:
     """Create vector and fulltext indexes for Chunk embeddings (idempotent).
 
     Imports neo4j_graphrag lazily so that other commands don't require it.
@@ -133,16 +220,18 @@ def create_embedding_indexes(driver: Driver, dimensions: int) -> None:
         embedding_property="embedding",
         dimensions=dimensions,
         similarity_fn="cosine",
+        neo4j_database=database,
     )
-    print("  [OK] Vector index: maintenanceChunkEmbeddings")
+    logger.info("  [OK] Vector index: maintenanceChunkEmbeddings")
 
     create_fulltext_index(
         driver,
         name="maintenanceChunkText",
         label="Chunk",
         node_properties=["text"],
+        neo4j_database=database,
     )
-    print("  [OK] Fulltext index: maintenanceChunkText")
+    logger.info("  [OK] Fulltext index: maintenanceChunkText")
 
 
 def build_extraction_schema():
@@ -152,7 +241,7 @@ def build_extraction_schema():
     the operational graph loaded from CSV.  Entity names are qualified with the
     aircraft type where appropriate so entity resolution stays model-scoped.
     """
-    from neo4j_graphrag.experimental.components.schema import (
+    from neo4j_graphrag.components.schema import (
         ConstraintType,
         GraphConstraintType,
         GraphSchema,
@@ -192,7 +281,10 @@ def build_extraction_schema():
                 PropertyType(
                     name="systemType",
                     type="STRING",
-                    description="System category, e.g. Engine, Avionics, Hydraulics.",
+                    description=(
+                        f"Fleet system type, exactly one of: {SYSTEM_TYPES_TEXT}. "
+                        "Omit it for any other system."
+                    ),
                 ),
                 PropertyType(
                     name="aircraftType",
@@ -214,7 +306,13 @@ def build_extraction_schema():
                 PropertyType(
                     name="componentType",
                     type="STRING",
-                    description="Generic component or part type.",
+                    description=(
+                        "Fleet component type, exactly one of the types listed "
+                        f"for the part's system ({COMPONENT_TYPES_TEXT}). "
+                        f"Use these types for the manuals' own part names: "
+                        f"{COMPONENT_ALIASES_TEXT}. "
+                        "Omit it when no listed type fits."
+                    ),
                 ),
                 PropertyType(
                     name="partNumber",
@@ -269,8 +367,7 @@ def build_extraction_schema():
                     name="procedureType",
                     type="STRING",
                     description=(
-                        "Inspection, troubleshooting, removal, replacement, "
-                        "test, or reset."
+                        "Inspection, troubleshooting, removal, replacement, test, or reset."
                     ),
                 ),
                 PropertyType(
@@ -303,8 +400,9 @@ def build_extraction_schema():
                     name="parameterName",
                     type="STRING",
                     description=(
-                        "Base parameter name matching sensor type, e.g. EGT, "
-                        "Vibration, N1Speed, FuelFlow"
+                        f"Fleet sensor type when the limit is for one: {SENSOR_PARAMETER_NAMES}. "
+                        "Use Vibration for N1 and N2 vibration. "
+                        "Otherwise a short sensor-style parameter name."
                     ),
                 ),
                 PropertyType(name="unit", type="STRING", description="Unit of measurement"),

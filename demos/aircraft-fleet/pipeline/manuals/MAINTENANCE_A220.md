@@ -53,15 +53,15 @@
 
 ### 1.2 Fleet Configuration
 
-The ExampleAir A220-300 fleet consists of five aircraft configured for short to medium-haul operations. Additional operators include SkyWays and NorthernJet.
+The ExampleAir A220-300 fleet consists of five aircraft configured for short to medium-haul operations.
 
 | Aircraft ID | Registration | ICAO 24 | Entry into Service |
 |-------------|--------------|---------|-------------------|
-| AC1101 | N20001 | a1b2c3 | March 2022 |
-| AC1102 | N20002 | d4e5f6 | June 2022 |
-| AC1103 | N20003 | 7a8b9c | October 2022 |
-| AC1104 | N20004 | 0d1e2f | February 2023 |
-| AC1105 | N20005 | 3a4b5c | May 2023 |
+| AC1005 | N20001 | 203d1e | March 2022 |
+| AC1010 | N20002 | c821f4 | June 2022 |
+| AC1015 | N20003 | 8a09b6 | October 2022 |
+| AC1020 | N20004 | 8f45f5 | February 2023 |
+| AC1025 | N20005 | 26832a | May 2023 |
 
 ### 1.3 ATA Chapter Reference
 
@@ -85,6 +85,7 @@ This manual covers the following ATA chapters:
 
 Each A220-300 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (A220-300)
 │
@@ -107,46 +108,69 @@ AIRCRAFT (A220-300)
 ├── AVIONICS SYSTEM
 │   ├── Flight Management System (FMS)
 │   ├── Air Data and Inertial Reference Unit (ADIRU)
-│   └── Navigation Receiver (MMR)
+│   └── Multi-Mode Receiver (MMR)
 │
 └── HYDRAULICS SYSTEM
     ├── Main Hydraulic Pump
     ├── Hydraulic Reservoir
     └── Electrohydraulic Servo Actuators (EHSA)
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (PW1500G)
 
 The A220-300 is powered by two Pratt & Whitney PW1500G geared turbofan (GTF) engines mounted in underwing nacelles. Each engine produces 23,300 lbf of thrust at takeoff. The defining feature of the PW1500G is its epicyclic planetary reduction gearbox, which decouples the fan shaft from the low-pressure compressor (LPC) shaft. This allows the fan to rotate at approximately 30% lower speed than the LPC, enabling each to operate at its individual aerodynamic optimum — the fan at low speed for maximum propulsive efficiency, and the LPC at higher speed for maximum compression efficiency. The result is a bypass ratio of 12:1, significantly higher than conventional turbofans of comparable thrust class, yielding substantial improvements in specific fuel consumption and noise footprint.
 
-Because of the gearbox architecture, the FADEC monitors two distinct low-pressure shaft speeds: N1 (fan shaft speed) and N1c (LPC shaft speed). These are mechanically coupled through the gearbox at a fixed 3.1:1 ratio but are reported and limit-checked independently. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 68% of all maintenance events in the fleet, with the most common issues being sensor drift, gearbox oil faults, and contamination.
+Because of the gearbox architecture, the FADEC monitors two distinct low-pressure shaft speeds: N1 (fan shaft speed) and N1c (LPC shaft speed). These are mechanically coupled through the gearbox at a fixed 3.1:1 ratio but are reported and limit-checked independently. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 22 of the A220-300's 30 maintenance events, or 73%. The most common engine faults are overheat with 7 events, bearing wear with 5, and sensor drift with 5.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, air data, and inertial reference functions essential for safe aircraft operation. The A220-300 features the Rockwell Collins Pro Line Fusion avionics suite with a fully integrated fly-by-wire (FBW) primary flight control system — a notable distinction within this aircraft class at the time of design. The dual Flight Management Systems (FMS) provide flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Dual Air Data and Inertial Reference Units (ADIRUs) provide redundant altitude, airspeed, attitude, and inertial position data. The Multi-Mode Receiver (MMR) provides VOR/DME, ILS, and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive BITE. Avionics-related maintenance events comprise approximately 11% of fleet issues.
+The avionics system provides flight management, navigation, air data, and inertial reference functions essential for safe aircraft operation. The A220-300 features the Rockwell Collins Pro Line Fusion avionics suite with a fully integrated fly-by-wire (FBW) primary flight control system — a notable distinction within this aircraft class at the time of design. The dual Flight Management Systems (FMS) provide flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Dual Air Data and Inertial Reference Units (ADIRUs) provide redundant altitude, airspeed, attitude, and inertial position data. The Multi-Mode Receiver (MMR) provides VOR/DME, ILS, and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive BITE.
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 5 of the A220-300's 30 maintenance events, or 17%. The avionics faults are sensor drift with 4 events and electrical fault with 1.
+<!-- END GENERATED: system-shares-avionics -->
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A220-300 hydraulic system provides power for primary flight control surface actuation, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. A key distinction from conventional hydromechanical designs is the use of electrohydraulic servo actuators (EHSAs) for primary flight control surfaces. EHSAs incorporate integrated position feedback transducers and are commanded directly by the fly-by-wire flight control computers, providing high-bandwidth control with built-in position verification. Hydraulic fluid requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 21% of maintenance events, with leaks and contamination being the primary concerns.
+The A220-300 hydraulic system provides power for primary flight control surface actuation, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. A key distinction from conventional hydromechanical designs is the use of electrohydraulic servo actuators (EHSAs) for primary flight control surfaces. EHSAs incorporate integrated position feedback transducers and are commanded directly by the fly-by-wire flight control computers, providing high-bandwidth control with built-in position verification. Hydraulic fluid requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 3 of the A220-300's 30 maintenance events, or 10%. All of them are leak.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
 ### 2.2 Engine Health Monitoring
 
-Each PW1500G engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each PW1500G engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
-| Vibration | Engine Vibration | ips (inches/sec) | Fan frame, turbine frame |
-| N1Speed | Fan Speed N1 | rpm | Fan shaft (gearbox output) |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
+| Engine | Vibration | Engine Vibration | ips | Fan frame, turbine frame |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft (gearbox output) |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
+
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the PW1500G, the trend baseline is 625°C, with Advisory at 645°C, Caution at 655°C, and Warning at 665°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
 
 **FADEC Integration:** The PW1500G features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation. The FADEC monitors fan speed (N1) and LPC speed (N1c) as independent parameters. N1Speed in the sensor dataset refers to fan shaft speed (gearbox output). The FADEC also monitors gearbox oil temperature and pressure as first-class parameters distinct from engine oil.
 
@@ -156,20 +180,22 @@ Each PW1500G engine is equipped with four primary monitoring sensors:
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
-Example: AC1101-S01-C03
+Example: AC1005-S01-C03
          │       │    └── Component: High-Pressure Turbine
          │       └─────── System: Engine #1
-         └─────────────── Aircraft: AC1101 (N20001)
+         └─────────────── Aircraft: AC1005 (N20001)
 ```
 
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 
@@ -231,11 +257,13 @@ The 8-stage high-pressure compressor (HPC) achieves a pressure ratio of approxim
 The 2-stage HPT drives the high-pressure compressor through a concentric shaft. Turbine blades feature third-generation single-crystal CMSX-10 alloy construction with ceramic thermal barrier coating (TBC) and advanced film cooling circuits. The nozzle guide vanes use impingement and film cooling. The 2-stage HPT design, compared to the single-stage configuration found in many contemporary engines, allows for higher expansion work per unit of blade stress, contributing to the high overall pressure ratio.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 855°C | 855-880°C | 890°C |
+| EGT (Takeoff, 5 min) | < 855°C | 855-890°C | 890°C |
 | EGT (Max Continuous) | < 820°C | 820-855°C | 855°C |
 | EGT (Start) | — | — | 700°C |
+<!-- END GENERATED: egt-limits -->
 
 **Note:** PW1500G EGT limits are lower than conventional turbofans of comparable thrust class due to the higher-efficiency combustion cycle and gearbox-enabled LPC aerodynamic optimization. EGT values exceeding these limits have greater consequence given the reduced thermal margin of the high-efficiency combustor design.
 
@@ -249,7 +277,9 @@ The 2-stage HPT drives the high-pressure compressor through a concentric shaft. 
 
 The engine-driven fuel pump is a positive displacement gear pump providing metered fuel flow to the combustion chamber through the fuel metering valve (FMV). The electronic engine control (EEC) integrates fuel pump management with the fuel metering valve under FADEC control.
 
-**Flow Rate:** 0.22 - 1.35 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.09 - 1.35 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings
@@ -281,14 +311,18 @@ See Section 3.5 for detailed gearbox maintenance information.
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 18-24% | 24-30% | 92% | 100% |
-| EGT (°C) | 310-380 | 380-440 | 820-855 | 855-890 |
-| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.80-1.10 | 1.15-1.35 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temperature (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-24 | 24-30 | 85 (83-87) | 92 | 100 |
+| EGT (°C) | 310-380 | 380-440 | 625 (< 645) | < 820 | < 855 |
+| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.28 (0.26-0.30) | 0.80-1.10 | 1.15-1.35 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 1.5 | < 1.5 | 0.6 (< 1.5) | < 1.5 | < 1.5 |
+| Gearbox Oil Pressure (psi) | 50-65 | 55-70 | — | 65-80 | 65-80 |
+| Gearbox Oil Temperature (°C) | 60-90 | 70-110 | — | 90-130 | 90-130 |
+<!-- END GENERATED: normal-parameters -->
 
 **Note on N1Speed:** N1Speed in this table and in the sensor dataset refers to fan shaft speed (gearbox output). N1c (LPC shaft speed) is approximately 3.1 times the fan shaft speed at all power settings and is monitored independently by the FADEC but is not separately captured in the digital twin sensor schema.
 
@@ -335,7 +369,7 @@ The reduction gearbox uses a dedicated oil supply circuit that is separate from 
 |---------------|-------------|--------------|------------|
 | All power | 60-130 | 130-145 | 150 |
 
-**Chip Detector:** A dedicated magnetic chip detector (MCD) is installed in the gearbox oil scavenge circuit downstream of the gearbox sump. This chip detector is polled separately from the main engine oil chip detectors and generates a distinct CAS message (GBX CHIP DET) when activated. Do not conflate gearbox chip detector activations with main engine MCD activations; the fault codes and inspection requirements differ. See ENG-GBX-006 in Section 7.
+**Chip Detector:** A dedicated magnetic chip detector (MCD) is installed in the gearbox oil scavenge circuit downstream of the gearbox sump. This chip detector is polled separately from the main engine oil chip detectors and generates a distinct CAS message (GBX CHIP DET) when activated. Do not conflate gearbox chip detector activations with main engine MCD activations. The inspection requirements differ, and a gearbox finding is recorded against the Reduction Gearbox. See ENG-BRG-003 in Section 7.
 
 **Temperature Monitoring:** A dedicated thermocouple monitors gearbox oil outlet temperature. This reading is displayed on the maintenance page and is used by the FADEC for oil system health trending. Sustained operation above 145°C requires investigation before further dispatch; operation above 150°C is not permitted.
 
@@ -370,7 +404,9 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (21% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 5 of the A220-300's 22 engine maintenance events, or 23%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
 
 #### Symptoms
 - Parameter disagree messages on CAS
@@ -410,7 +446,9 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 13% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 0 of the A220-300's 22 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Types of Contamination
 
@@ -455,7 +493,9 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 11% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 5 of the A220-300's 22 engine maintenance events, or 23%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings (engine and gearbox circuits)
@@ -518,7 +558,9 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 14% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 1 of the A220-300's 22 engine maintenance events, or 5%.
+<!-- END GENERATED: fault-stats-engine-leak -->
 
 #### Leak Classification
 
@@ -553,17 +595,22 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 4 of the A220-300's 22 engine maintenance events, or 18%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits (PW1500G)
 
-| Level | N1 (fan) | N1c (LPC) | Alert |
-|-------|----------|-----------|-------|
-| Normal | < 1.5 ips | < 1.2 ips | None |
-| Advisory | 1.5-2.5 ips | 1.2-2.0 ips | ENG VIB (amber) |
-| Caution | 2.5-3.5 ips | 2.0-3.0 ips | ENG VIB (amber) |
-| Warning | > 3.5 ips | > 3.0 ips | ENG VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 1.5 ips | None | None |
+| Advisory | 1.5-2.5 ips | MINOR | ENG VIB (amber) |
+| Caution | 2.5-3.5 ips | MAJOR | ENG VIB (amber) |
+| Warning | ≥ 3.5 ips | CRITICAL | ENG VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
-**Note:** PW1500G vibration limits are significantly lower than those of conventional turbofans (compare: CFM56-7B warning threshold 4.5 ips N1). The reduction gearbox attenuates fan-rotor excitations before they can propagate into the core structure, so the ambient vibration level at engine mounts is lower in normal operation. Advisory thresholds are set tightly to provide early warning of gearbox anomalies or bearing degradation that might otherwise be masked by the damping effect of the gearbox.
+**Note:** PW1500G vibration limits are significantly lower than those of conventional turbofans such as the CFM56-7B. The reduction gearbox attenuates fan-rotor excitations before they can propagate into the core structure, so the ambient vibration level at engine mounts is lower in normal operation. Advisory thresholds are set tightly to provide early warning of gearbox anomalies or bearing degradation that might otherwise be masked by the damping effect of the gearbox.
 
 #### Common Root Causes
 
@@ -573,6 +620,81 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 | Core imbalance | 1 × N1c | HPC blade loss |
 | Bearing | 1 × N1 or N1c | Bearing degradation |
 | Gear mesh | Multiple of N1/N1c | Gearbox planetary wear |
+
+### 4.6 Overheat Condition (EGT Exceedance)
+
+**Fault Code:** ENG-OVH-006
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 7 of the A220-300's 22 engine maintenance events, or 32%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
+
+#### Symptoms
+- EGT indication above the normal operating range
+- CAS caution or warning message
+- EGT margin loss in trend data
+- Possible heat damage found on borescope inspection
+
+#### Immediate Actions
+1. Reduce thrust if flight conditions permit
+2. Monitor the EGT trend for stabilization
+3. If EGT reaches the maximum in the Operating Limits table in section 3.2.3, High-Pressure Turbine, follow the engine shutdown procedure in the QRH
+
+#### Troubleshooting Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review DFDR/QAR data for the EGT exceedance | Document peak temperature and exposure time |
+| 2 | Compare EGT probe readings | Find a failed or drifting probe |
+| 3 | Borescope the combustor and HPT blades | Check for thermal distress and coating loss |
+| 4 | Check fuel nozzle spray patterns | Ensure even fuel distribution |
+| 5 | Review the FADEC fault log via CMS | Rule out a sensor or control fault |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (EGT above the maximum limit):**
+- Ground aircraft pending HPT borescope inspection
+- If blade damage is found, remove the engine for a shop visit
+
+**MAJOR (EGT in the caution band, intermittent):**
+- Perform a hot section inspection within 50 flight hours
+- Replace EGT probes if calibration drift is found
+- Monitor trend data for recurrence
+
+**MINOR (EGT trending high but within limits):**
+- Adjust engine trim if applicable
+- Schedule an inspection at the next C-check
+- Continue monitoring with increased frequency
+
+### 4.7 Fuel Starvation
+
+**Fault Code:** ENG-FUEL-007
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A220-300's 22 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
+
+#### Symptoms
+- Fuel flow fluctuation or sudden drop
+- EGT drop with N1/N2 rollback
+- Fuel filter bypass or low fuel pressure CAS message
+- Possible flameout
+
+#### Immediate Actions
+1. Check fuel quantity and crossfeed configuration
+2. Confirm the fuel boost pumps are on
+3. If flameout occurs, follow the relight procedure in the QRH
+
+#### Diagnostic Procedure
+
+| Step | Action | Check Point |
+|------|--------|-------------|
+| 1 | Verify fuel quantity and feed configuration | Rule out a fuel management error |
+| 2 | Check fuel filter differential pressure | A high reading means a blocked filter |
+| 3 | Compare fuel flow with the Main Fuel Pump flow rate in section 3.2.4 | Low flow points to the pump or metering valve |
+| 4 | Check fuel metering valve operation | FADEC command matches actual position |
+| 5 | Inspect fuel lines for leaks or blockage | Visual and pressure decay test |
+| 6 | Sample fuel for contamination | Water, particulates, microbial growth |
 
 ---
 
@@ -634,6 +756,9 @@ Dual Multi-Mode Receivers (MMR) providing:
 #### 5.3.1 Sensor Drift (Avionics)
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 4 of the A220-300's 5 avionics maintenance events, or 80%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADIRU outputs (ADIRU 1/2) via maintenance page
@@ -700,6 +825,9 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 3 of the A220-300's 3 hydraulics maintenance events, or 100%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -721,6 +849,9 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 0 of the A220-300's 3 hydraulics maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Limits (NAS 1638):**
 
@@ -738,6 +869,7 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
@@ -745,29 +877,34 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 | ENG-BRG-003 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, vibration check |
 | ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
 | ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
-| ENG-GBX-006 | Gearbox Fault | CRIT/MAJ/MIN | 72 | Chip detector, SOAP, oil pressure check |
-| ENG-OVH-007 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
+| ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
 | ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
-**Note on ENG-GBX-006:** This fault code is unique to GTF-equipped aircraft and does not appear in conventional turbofan maintenance programs. It covers all gearbox-specific fault conditions including chip detector activation, gearbox oil pressure loss, and gearbox oil temperature exceedance.
+**Gearbox findings:** The A220-300 has no separate gearbox fault code. Record a gearbox chip detector activation, gearbox oil pressure loss, or gearbox oil temperature exceedance as Bearing Wear, ENG-BRG-003, against the Reduction Gearbox.
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADIRU comparison, calibration |
-| AVN-ELF-002 | Electrical Fault | MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADIRU comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
 | AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
 | HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
 | HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 
@@ -783,10 +920,14 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 3.5 ips. The Caution level starts at 2.5 ips. The Advisory level starts at 1.5 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Advisory
 │
-├─► Is vibration > 3.5 ips (N1 fan) or > 3.0 ips (N1c LPC)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust immediately
 │   │          If vibration persists above warning limits, shutdown engine
@@ -1054,11 +1195,11 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 6. Replace cap and verify secure
 7. Close service door
 8. Record quantity added in aircraft log
-9. Do not confuse engine oil service point with gearbox oil service point (see GBX-TC-001)
+9. Do not confuse engine oil service point with gearbox oil service point (see ENG-TC-002)
 
 **Oil Type:** PWA 521 Type II (Mobil Jet Oil 254 or equivalent)
 
-#### Task Card: GBX-TC-001 - Gearbox Oil Service
+#### Task Card: ENG-TC-002 - Gearbox Oil Service
 
 **Purpose:** Replenish gearbox oil to proper level and collect sample for SOAP analysis
 
@@ -1092,7 +1233,7 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 
 **Oil Type:** PWA 521 Type II
 
-**Caution:** Gearbox oil consumption exceeding 0.25 liters per flight hour requires investigation per ENG-GBX-006 before further dispatch.
+**Caution:** Gearbox oil consumption exceeding 0.25 liters per flight hour requires investigation under ENG-BRG-003, against the Reduction Gearbox, before further dispatch.
 
 #### Task Card: HYD-TC-001 - Hydraulic Fluid Sample
 
@@ -1124,24 +1265,39 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 
 #### Engine Parameters (PW1500G)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (% RPM) | 18-24 | 24-30 | 92 | 100 |
-| EGT (°C) | 310-380 | 380-440 | 855 | 890 |
-| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.80-1.10 | 1.15-1.35 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temp (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
-| GBX Oil Pressure (psi) | 50-65 | 55-70 | 65-80 | 65-80 |
-| GBX Oil Temp (°C) | 60-90 | 70-110 | 90-130 | 90-130 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-24 | 24-30 | 85 (83-87) | 92 | 100 |
+| EGT (°C) | 310-380 | 380-440 | 625 (< 645) | < 820 | < 855 |
+| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.28 (0.26-0.30) | 0.80-1.10 | 1.15-1.35 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 1.5 | < 1.5 | 0.6 (< 1.5) | < 1.5 | < 1.5 |
+| Gearbox Oil Pressure (psi) | 50-65 | 55-70 | — | 65-80 | 65-80 |
+| Gearbox Oil Temperature (°C) | 60-90 | 70-110 | — | 90-130 | 90-130 |
+<!-- END GENERATED: quick-ref-engine -->
+
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
 
 #### Hydraulic System
 
-| Parameter | Left System | Right System | Standby |
-|-----------|-------------|--------------|---------|
-| Pressure | 2,800-3,200 psi | 2,800-3,200 psi | 2,800-3,200 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Left, Right, and Standby systems each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 
@@ -1211,28 +1367,42 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Fleet Maintenance Statistics
 
-Based on fleet data analysis (July - September 2024):
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The A220-300 has 5 of the aircraft and 30 of the maintenance events.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 38 |
-| Critical Events | 14 (37%) |
-| Major Events | 12 (32%) |
-| Minor Events | 12 (32%) |
-| Engine-Related | 26 (68%) |
-| Hydraulics-Related | 8 (21%) |
-| Avionics-Related | 4 (11%) |
+**Events by Severity:**
 
-**Top Fault Types:**
-1. Sensor Drift - 8 events (21%)
-2. Gearbox Oil Issue - 6 events (16%)
-3. Contamination - 5 events (13%)
-4. Bearing Wear - 4 events (11%)
-5. Vibration Exceedance - 4 events (10%)
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 5 | 17% |
+| Major | 5 | 17% |
+| Minor | 20 | 67% |
 
-**Note:** Gearbox Oil Issue (ENG-GBX-006) is the second most common fault type in the A220-300 fleet and is a GTF-specific maintenance category not present in conventional turbofan fleet data. Enhanced gearbox monitoring intervals have been implemented in response to this trend.
+**Events by System:**
+
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 22 | 73% |
+| Avionics | 5 | 17% |
+| Hydraulics | 3 | 10% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 7 | 23% |
+| Bearing wear | Engine | 5 | 17% |
+| Sensor drift | Engine | 5 | 17% |
+| Vibration exceedance | Engine | 4 | 13% |
+| Sensor drift | Avionics | 4 | 13% |
+| Leak | Hydraulics | 3 | 10% |
+| Leak | Engine | 1 | 3% |
+| Electrical fault | Avionics | 1 | 3% |
+<!-- END GENERATED: fleet-statistics -->
+
+**Note:** A220-300 gearbox oil findings are recorded as Bearing Wear, ENG-BRG-003, against the Reduction Gearbox. Operators often shorten gearbox monitoring intervals when these findings recur.
 
 ### 10.6 Revision History Log
 

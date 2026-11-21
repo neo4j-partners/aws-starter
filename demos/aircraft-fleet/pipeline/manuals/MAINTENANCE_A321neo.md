@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** A321neo series aircraft equipped with CFM LEAP-1A engines
-**Operator:** RegionalCo
+**Operator:** RegionalCo, ExampleAir, SkyWays, NorthernJet
 **Fleet:** N54980C, N86057G, N89365K, N65164O, N96107S
 
 ---
@@ -52,31 +52,20 @@
 | Cruise Speed | Mach 0.78 (450 ktas) |
 | Passengers (Typical) | 180-220 |
 
-### 1.2 A321neo "New Engine Option" Features
+### 1.2 Fleet Configuration
 
-The A321neo represents the latest evolution of the A320 family with:
+The A321neo fleet operates across four partner carriers configured for medium to long-haul operations.
 
-- **15% fuel burn reduction** compared to previous generation
-- **CFM LEAP-1A engines** with advanced 3D woven carbon fiber fan blades
-- **Sharklet wingtips** (2.4m height) reducing drag by 4%
-- **New cabin design** with wider overhead bins
-- **Fly-by-wire flight controls** with enhanced envelope protection
-- **Advanced avionics** with improved FMS capabilities
-
-### 1.3 Fleet Configuration
-
-The A321neo fleet operates across four partner carriers configured for medium to long-haul operations. The combined fleet of approximately 20 aircraft is distributed as follows:
-
-| Operator | Aircraft Count | Primary Routes |
+| Operator | Registrations | Primary Routes |
 |----------|---------------|----------------|
-| ExampleAir | 5 | Domestic medium-haul |
-| SkyWays | 5 | Domestic medium-haul |
-| RegionalCo | 5 | Mixed domestic/regional |
-| NorthernJet | 5 | Domestic medium-haul |
+| ExampleAir | N89365K | Domestic medium-haul |
+| SkyWays | N65164O | Domestic medium-haul |
+| RegionalCo | N54980C, N86057G | Mixed domestic/regional |
+| NorthernJet | N96107S | Domestic medium-haul |
 
 Aircraft entered service between 2020 and 2023, configured in a single-class or dual-class layout for 180–220 passengers.
 
-### 1.4 ATA Chapter Reference
+### 1.3 ATA Chapter Reference
 
 This manual covers the following ATA chapters:
 
@@ -90,6 +79,17 @@ This manual covers the following ATA chapters:
 | ATA 77 | Engine Indicating | Section 3 |
 | ATA 79 | Oil | Section 3 |
 
+### 1.4 A321neo "New Engine Option" Features
+
+The A321neo represents the latest evolution of the A320 family with:
+
+- **15% fuel burn reduction** compared to previous generation
+- **CFM LEAP-1A engines** with advanced 3D woven carbon fiber fan blades
+- **Sharklet wingtips** (2.4m height) reducing drag by 4%
+- **New cabin design** with wider overhead bins
+- **Fly-by-wire flight controls** with enhanced envelope protection
+- **Advanced avionics** with improved FMS capabilities
+
 ---
 
 ## 2. System Architecture
@@ -98,6 +98,7 @@ This manual covers the following ATA chapters:
 
 Each A321neo aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (A321neo)
 │
@@ -125,43 +126,64 @@ AIRCRAFT (A321neo)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (LEAP-1A)
 
-The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU). The engine systems account for approximately 61% of all maintenance events in the fleet, with vibration exceedance and contamination being the most prevalent issues—characteristic of new technology adoption.
+The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU).
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 21 of the A321neo's 36 maintenance events, or 58%. The most common engine faults are sensor drift with 6 events, vibration exceedance with 6, and overheat with 5.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The A321neo features the latest Airbus avionics suite built on enhanced fly-by-wire architecture with improved system integration. The system centers on dual Flight Management Systems (FMS) providing Required Navigation Performance (RNP) 0.1 capability, enabling precision approaches without ground-based navigation aids. Three Air Data and Inertial Reference Units (ADIRU) provide redundant altitude, airspeed, attitude, and position data through integrated air data modules and laser ring gyroscopes. The Multi-Mode Receiver (MMR) integrates VOR/ILS, GPS (L1/L5), SBAS, and GBAS capabilities for worldwide navigation. The cockpit features six LCD displays with enhanced vision system (EVS) compatibility. All avionics communicate via AFDX (Avionics Full-Duplex Switched Ethernet) data network with comprehensive Built-In Test Equipment (BITE). Avionics-related maintenance events comprise approximately 20% of fleet issues, with electrical faults and sensor drift being the primary concerns addressed through software patches and calibration.
+The A321neo features the latest Airbus avionics suite built on enhanced fly-by-wire architecture with improved system integration. The system centers on dual Flight Management Systems (FMS) providing Required Navigation Performance (RNP) 0.1 capability, enabling precision approaches without ground-based navigation aids. Three Air Data and Inertial Reference Units (ADIRU) provide redundant altitude, airspeed, attitude, and position data through integrated air data modules and laser ring gyroscopes. The Multi-Mode Receiver (MMR) integrates VOR/ILS, GPS (L1/L5), SBAS, and GBAS capabilities for worldwide navigation. The cockpit features six LCD displays with enhanced vision system (EVS) compatibility. All avionics communicate via AFDX (Avionics Full-Duplex Switched Ethernet) data network with comprehensive Built-In Test Equipment (BITE).
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 3 of the A321neo's 36 maintenance events, or 8%. All of them are sensor drift.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are addressed through software patches and calibration.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A321neo hydraulic system provides power for flight control surfaces, slats/flaps, landing gear, wheel brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi with enhanced redundancy compared to earlier A320 variants. The Green system is powered by an engine-driven pump on Engine #1, the Yellow system by Engine #2, and the Blue system by an electric pump with RAT (Ram Air Turbine) backup. Each system includes variable-displacement pumps capable of 34 gpm flow rate, a pressurized reservoir with bootstrap design, and multiple actuators including the flap Power Control Unit (PCU). Hydraulic fluid (Skydrol LD-4 or HyJet V) requires regular monitoring for contamination and proper levels. The hydraulics system represents approximately 19% of maintenance events, with leaks and contamination being the primary concerns, consistent with fleet maturity.
+The A321neo hydraulic system provides power for flight control surfaces, slats/flaps, landing gear, wheel brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi with enhanced redundancy compared to earlier A320 variants. The Green system is powered by an engine-driven pump on Engine #1, the Yellow system by Engine #2, and the Blue system by an electric pump with RAT (Ram Air Turbine) backup. Each system includes variable-displacement pumps capable of 34 gpm flow rate, a pressurized reservoir with bootstrap design, and multiple actuators including the flap Power Control Unit (PCU). Hydraulic fluid (Skydrol LD-4 or HyJet V) requires regular monitoring for contamination and proper levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 12 of the A321neo's 36 maintenance events, or 33%. The hydraulics faults are leak with 7 events and contamination with 5.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
 ### 2.2 Engine Health Monitoring
 
-Each LEAP-1A engine is equipped with comprehensive monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each LEAP-1A engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | HPT exit (8 thermocouples) |
-| VIB | Engine Vibration | ips (inches/sec) | Fan case, core case |
-| N1Speed | Fan Speed | % RPM | Fan shaft |
-| N2 | Core Speed | % RPM | HP shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
-| OIL-P | Oil Pressure | psi | Main oil gallery |
-| OIL-T | Oil Temperature | °C | Scavenge return |
-| OIL-Q | Oil Quantity | % | Oil tank |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | HPT exit (8 thermocouples) |
+| Engine | Vibration | Engine Vibration | ips | Fan case, core case |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz flight data, 50 Hz vibration analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~634°C, warning threshold ~663°C) differ from the instantaneous ECAM EGT readings shown in Section 3.4 and Appendix 10.1, which reflect peak values during takeoff and high-power operations (typically 950–1,040°C for the LEAP-1A). The trend-monitoring scale detects gradual EGT margin deterioration over weeks and months rather than acute exceedances; the absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the LEAP-1A, the trend baseline is 634°C, with Advisory at 654°C, Caution at 664°C, and Warning at 674°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
+
+Instantaneous takeoff EGT for the LEAP-1A must stay within the Operating Limits table in section 3.2.3, High-Pressure Turbine.
 
 **Engine Monitoring Unit (EMU):** The LEAP-1A features an enhanced EMU providing:
 - Real-time trend monitoring
@@ -173,11 +195,12 @@ Each LEAP-1A engine is equipped with comprehensive monitoring sensors:
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
 Example: AC1003-S01-C01
-         │       │    └── Component: Fan Module
+         │       │    └── Component: Fan Module (Carbon Fiber Composite)
          │       └─────── System: Engine #1
          └─────────────── Aircraft: AC1003 (N54980C)
 ```
@@ -185,8 +208,9 @@ Example: AC1003-S01-C01
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 
@@ -207,7 +231,141 @@ Example: AC1003-S01-C01
 | Length | 3.34 m (131.5 inches) |
 | Fan Blades | 18 (3D woven carbon fiber composite) |
 
-### 3.2 LEAP-1A Technology Highlights
+### 3.2 Component Descriptions
+
+#### 3.2.1 Fan Module
+**Part Number:** LEAP-FM-1A32-100
+**ATA Reference:** 72-21
+
+The fan module features 18 wide-chord 3D woven carbon fiber composite blades—a revolutionary technology exclusive to LEAP engines. Each blade is manufactured using Resin Transfer Molding (RTM) with a titanium leading edge for erosion protection.
+
+**Key Characteristics:**
+- Blade weight: 11.3 kg (vs. 25 kg for titanium)
+- Tip speed: 1,570 ft/sec at takeoff
+- Containment: Kevlar fan case with ballistic protection
+
+**Inspection Intervals:**
+- Visual inspection: Every 750 flight hours
+- Detailed inspection: Every 5,000 flight hours
+- Blade replacement: On-condition only (no life limit)
+
+**Composite Blade Damage Assessment:**
+Unlike metal blades, composite fan blades require specialized inspection:
+
+| Damage Type | Acceptable Limit | Action Required |
+|-------------|-----------------|-----------------|
+| Leading edge nick | < 3mm depth | Monitor |
+| Delamination | None visible | Replace blade |
+| Matrix cracking | Surface only, < 25mm | Repair per SRM |
+| Impact damage | Per CFM assessment | Engineering review |
+
+#### 3.2.2 Compressor Stage (High-Pressure)
+**Part Number:** LEAP-HPC-1A32-200
+**ATA Reference:** 72-32
+
+The 10-stage high-pressure compressor achieves a pressure ratio of 22:1, significantly higher than previous generation engines. Stages 1-5 feature variable stator vanes (VSV) with improved scheduling algorithms.
+
+**Advanced Features:**
+- 3D aerodynamic blade design with compound sweep
+- Blisk (bladed disk) construction in forward stages
+- Active surge margin management
+- Improved tip clearance control
+
+**Common Fault Modes:**
+- Compressor stall/surge (vibration exceedance)
+- Variable vane actuator anomalies (sensor drift)
+- Blade tip rub (EGT margin loss)
+- FOD ingestion damage
+
+#### 3.2.3 High-Pressure Turbine
+**Part Number:** LEAP-HPT-1A32-300
+**ATA Reference:** 72-51
+
+The two-stage HPT features advanced single-crystal nickel superalloy blades with thermal barrier coating (TBC) and ceramic matrix composite (CMC) shrouds.
+
+**CMC Shroud Benefits:**
+- Operating temperature: 2,400°F (vs. 2,000°F for metal)
+- Weight reduction: 66%
+- Reduced cooling air: +1% efficiency gain
+
+**Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
+| Parameter | Normal | Caution | Maximum |
+|-----------|--------|---------|---------|
+| EGT (Takeoff, 5 min) | < 1,000°C | 1,000-1,060°C | 1,060°C |
+| EGT (Max Continuous) | < 950°C | 950-1,000°C | 1,000°C |
+| EGT (Start) | — | — | 750°C |
+<!-- END GENERATED: egt-limits -->
+
+**Inter-turbine temperature:** Normal is below 1,100°C. Caution is 1,100-1,200°C. The maximum is 1,200°C.
+
+#### 3.2.4 Main Fuel Pump
+**Part Number:** LEAP-FP-1A32-400
+**ATA Reference:** 73-21
+
+The engine-driven fuel pump module integrates the fuel pump, fuel metering unit (FMU), and servo fuel heater into a single line-replaceable unit (LRU) for improved maintainability.
+
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.12 - 2.00 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
+
+**Fuel System Features:**
+- Variable geometry fuel nozzles
+- Integrated debris monitoring
+- FADEC-controlled fuel scheduling
+- Automatic fuel recirculation for thermal management
+
+#### 3.2.5 Thrust Bearing Assembly
+**Part Number:** LEAP-TB-1A32-500
+**ATA Reference:** 72-50
+
+The #3 main bearing assembly is a duplex ball bearing with squeeze film damper, designed for the higher loads of the LEAP architecture.
+
+**Advanced Features:**
+- Ceramic hybrid rolling elements option
+- Enhanced oil jet cooling
+- Integrated speed sensor
+- Prognostic wear detection
+
+**Replacement Criteria:**
+- Oil debris detection (chip detector or filter)
+- Vibration signature change at bearing frequency
+- Oil temperature rise > 15°C above baseline
+- Time since overhaul exceeding 25,000 cycles
+
+### 3.3 Normal Operating Parameters
+
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-23 | 23-28 | 86 (84-88) | 92 | 97 |
+| N2 (%) | 52-58 | 58-64 | — | 96 | 100 |
+| EGT (°C) | 320-400 | 400-480 | 634 (< 654) | < 950 | < 1,000 |
+| FuelFlow (kg/s) | 0.12-0.20 | 0.20-0.30 | 0.38 (0.35-0.41) | 0.95-1.25 | 1.50-2.00 |
+| Oil Pressure (psi) | 40-65 | 45-75 | — | 50-80 | 50-85 |
+| Oil Temperature (°C) | 45-85 | 55-115 | — | 75-135 | 75-150 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.7 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
+
+### 3.4 FADEC System
+
+The LEAP-1A Full Authority Digital Engine Control provides:
+
+- Automatic engine start with single-switch operation
+- Thrust management with FLX/TOGA computation
+- Fuel metering and scheduling
+- Variable stator vane positioning
+- Active clearance control management
+- Bleed valve and variable bypass valve control
+- Engine limit protection
+- Comprehensive fault detection/isolation
+- Data recording for trend monitoring
+
+**FADEC Configuration:** Dual-channel with automatic switchover
+**Software:** LEAP-1A Standard 2.3 (or as updated per SB)
+**Manual Reversion:** Not available—FADEC failure requires engine shutdown
+
+### 3.5 LEAP-1A Technology Highlights
 
 The LEAP-1A incorporates several breakthrough technologies:
 
@@ -234,164 +392,38 @@ The LEAP-1A incorporates several breakthrough technologies:
 - Improved specific fuel consumption
 - Reduced EGT margin deterioration
 
-### 3.3 Component Descriptions
-
-#### 3.3.1 Fan Module
-**Part Number:** LEAP-FM-1A32-100
-**ATA Reference:** 72-21
-
-The fan module features 18 wide-chord 3D woven carbon fiber composite blades—a revolutionary technology exclusive to LEAP engines. Each blade is manufactured using Resin Transfer Molding (RTM) with a titanium leading edge for erosion protection.
-
-**Key Characteristics:**
-- Blade weight: 11.3 kg (vs. 25 kg for titanium)
-- Tip speed: 1,570 ft/sec at takeoff
-- Containment: Kevlar fan case with ballistic protection
-
-**Inspection Intervals:**
-- Visual inspection: Every 750 flight hours
-- Detailed inspection: Every 5,000 flight hours
-- Blade replacement: On-condition only (no life limit)
-
-**Composite Blade Damage Assessment:**
-Unlike metal blades, composite fan blades require specialized inspection:
-
-| Damage Type | Acceptable Limit | Action Required |
-|-------------|-----------------|-----------------|
-| Leading edge nick | < 3mm depth | Monitor |
-| Delamination | None visible | Replace blade |
-| Matrix cracking | Surface only, < 25mm | Repair per SRM |
-| Impact damage | Per CFM assessment | Engineering review |
-
-#### 3.3.2 Compressor Stage (High-Pressure)
-**Part Number:** LEAP-HPC-1A32-200
-**ATA Reference:** 72-32
-
-The 10-stage high-pressure compressor achieves a pressure ratio of 22:1, significantly higher than previous generation engines. Stages 1-5 feature variable stator vanes (VSV) with improved scheduling algorithms.
-
-**Advanced Features:**
-- 3D aerodynamic blade design with compound sweep
-- Blisk (bladed disk) construction in forward stages
-- Active surge margin management
-- Improved tip clearance control
-
-**Common Fault Modes:**
-- Compressor stall/surge (vibration exceedance)
-- Variable vane actuator anomalies (sensor drift)
-- Blade tip rub (EGT margin loss)
-- FOD ingestion damage
-
-#### 3.3.3 High-Pressure Turbine
-**Part Number:** LEAP-HPT-1A32-300
-**ATA Reference:** 72-51
-
-The two-stage HPT features advanced single-crystal nickel superalloy blades with thermal barrier coating (TBC) and ceramic matrix composite (CMC) shrouds.
-
-**CMC Shroud Benefits:**
-- Operating temperature: 2,400°F (vs. 2,000°F for metal)
-- Weight reduction: 66%
-- Reduced cooling air: +1% efficiency gain
-
-**Operating Limits:**
-| Parameter | Normal | Caution | Maximum |
-|-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 1,000°C | 1,000-1,040°C | 1,060°C |
-| EGT (Max Continuous) | < 950°C | 950-980°C | 1,000°C |
-| EGT (Start) | — | — | 750°C |
-| Inter-turbine Temp | < 1,100°C | 1,100-1,150°C | 1,200°C |
-
-#### 3.3.4 Main Fuel Pump
-**Part Number:** LEAP-FP-1A32-400
-**ATA Reference:** 73-21
-
-The engine-driven fuel pump module integrates the fuel pump, fuel metering unit (FMU), and servo fuel heater into a single line-replaceable unit (LRU) for improved maintainability.
-
-**Flow Rate:** 0.40 - 2.00 kg/s (normal operating range)
-
-**Fuel System Features:**
-- Variable geometry fuel nozzles
-- Integrated debris monitoring
-- FADEC-controlled fuel scheduling
-- Automatic fuel recirculation for thermal management
-
-#### 3.3.5 Thrust Bearing Assembly
-**Part Number:** LEAP-TB-1A32-500
-**ATA Reference:** 72-50
-
-The #3 main bearing assembly is a duplex ball bearing with squeeze film damper, designed for the higher loads of the LEAP architecture.
-
-**Advanced Features:**
-- Ceramic hybrid rolling elements option
-- Enhanced oil jet cooling
-- Integrated speed sensor
-- Prognostic wear detection
-
-**Replacement Criteria:**
-- Oil debris detection (chip detector or filter)
-- Vibration signature change at bearing frequency
-- Oil temperature rise > 15°C above baseline
-- Time since overhaul exceeding 25,000 cycles
-
-### 3.4 Normal Operating Parameters
-
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 18-23% | 23-28% | 92% | 97% |
-| N2 (% RPM) | 52-58% | 58-64% | 96% | 100% |
-| EGT (°C) | 320-400 | 400-480 | 900-950 | 980-1040 |
-| FuelFlow (kg/s) | 0.12-0.20 | 0.20-0.30 | 0.95-1.25 | 1.50-2.00 |
-| Oil Pressure (psi) | 40-65 | 45-75 | 50-80 | 50-85 |
-| Oil Temperature (°C) | 45-85 | 55-115 | 75-135 | 75-150 |
-| Vibration N1 (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
-| Vibration N2 (ips) | < 0.6 | < 1.0 | < 1.8 | < 2.2 |
-
-### 3.5 FADEC System
-
-The LEAP-1A Full Authority Digital Engine Control provides:
-
-- Automatic engine start with single-switch operation
-- Thrust management with FLX/TOGA computation
-- Fuel metering and scheduling
-- Variable stator vane positioning
-- Active clearance control management
-- Bleed valve and variable bypass valve control
-- Engine limit protection
-- Comprehensive fault detection/isolation
-- Data recording for trend monitoring
-
-**FADEC Configuration:** Dual-channel with automatic switchover
-**Software:** LEAP-1A Standard 2.3 (or as updated per SB)
-**Manual Reversion:** Not available—FADEC failure requires engine shutdown
-
 ---
 
 ## 4. Engine Troubleshooting Procedures
 
 ### 4.1 Vibration Exceedance
 
-**Fault Code:** ENG-VIB-001
+**Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (19% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 6 of the A321neo's 21 engine maintenance events, or 29%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 The LEAP-1A's lightweight composite fan and high bypass ratio make vibration monitoring particularly critical.
 
 #### Vibration Limits (LEAP-1A Specific)
 
-| Level | N1 Vibration | N2 Vibration | ECAM Alert |
-|-------|--------------|--------------|------------|
-| Normal | < 2.0 ips | < 1.8 ips | None |
-| Caution | 2.0-3.0 ips | 1.8-2.5 ips | ENG 1(2) VIB (amber) |
-| Warning | 3.0-4.0 ips | 2.5-3.5 ips | ENG 1(2) VIB HI (amber) |
-| Limit | > 4.0 ips | > 3.5 ips | ENG 1(2) VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.0 ips | MINOR | ENG 1(2) VIB (amber) |
+| Caution | 3.0-4.0 ips | MAJOR | ENG 1(2) VIB HI (amber) |
+| Warning | ≥ 4.0 ips | CRITICAL | ENG 1(2) VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Common Root Causes (LEAP-1A)
 
-| Cause | Frequency | Typical Indicator |
-|-------|-----------|-------------------|
-| Ice crystal icing | 30% | High altitude, humid conditions |
-| Fan blade damage | 25% | 1×N1 frequency dominant |
-| Bearing wear | 20% | Bearing-specific frequency |
-| Core contamination | 15% | 1×N2 with EGT rise |
-| Sensor/wiring fault | 10% | Erratic readings |
+- Ice crystal icing: high altitude, humid conditions
+- Fan blade damage: 1×N1 frequency dominant
+- Bearing wear: bearing-specific frequency
+- Core contamination: 1×N2 with EGT rise
+- Sensor/wiring fault: erratic readings
 
 #### Ice Crystal Icing (LEAP-1A Specific Issue)
 
@@ -418,14 +450,14 @@ The LEAP-1A has experienced ice crystal icing events in high-altitude convective
 
 #### Corrective Actions by Severity
 
-**CRITICAL (Vibration > 4.0 ips N1 or > 3.5 ips N2):**
+**CRITICAL (Warning level):**
 - Ground aircraft immediately
 - Comprehensive borescope inspection all stages
 - If blade damage found: Engine removal likely
 - If ice event suspected: Document and monitor after inspection clears
 - Estimated downtime: 24-72 hours minimum
 
-**MAJOR (Vibration 2.5-4.0 ips):**
+**MAJOR (Caution level):**
 - Detailed fan blade inspection
 - Borescope HPC and HPT
 - Fan balance check and correction if needed
@@ -440,7 +472,9 @@ The LEAP-1A has experienced ice crystal icing events in high-altitude convective
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Second most common fault (12% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 0 of the A321neo's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Contamination Types
 
@@ -491,18 +525,22 @@ The LEAP engine is approved for on-wing water wash to restore performance:
 
 ### 4.3 Overheat Conditions
 
-**Fault Code:** ENG-OVH-003
+**Fault Code:** ENG-OVH-006
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 15% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 5 of the A321neo's 21 engine maintenance events, or 24%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
 
 #### EGT Exceedance Categories
 
+<!-- BEGIN GENERATED: egt-exceedance -->
 | Category | Temperature | Duration | Required Action |
 |----------|-------------|----------|-----------------|
 | Start exceedance | > 750°C | Any | Abort start, inspect |
 | Takeoff exceedance | > 1,060°C | > 5 sec | Borescope within 10 FH |
 | Max continuous exceed | > 1,000°C | > 2 min | Borescope inspection |
 | Hot start (hung) | EGT rising, N2 stagnant | — | Motor cool, inspect |
+<!-- END GENERATED: egt-exceedance -->
 
 #### Troubleshooting Procedure
 
@@ -527,9 +565,11 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 ### 4.4 Electrical Faults
 
-**Fault Code:** ENG-ELF-004
+**Fault Code:** ENG-ELF-008
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 15% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-electrical-fault -->
+**Fleet Statistics:** The generated fleet data has no engine electrical fault events, because the data generator does not raise this fault.
+<!-- END GENERATED: fault-stats-engine-electrical-fault -->
 
 #### Common Electrical Issues
 
@@ -571,14 +611,15 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 ### 4.5 Fuel Starvation
 
-**Fault Code:** ENG-FUEL-005
+**Fault Code:** ENG-FUEL-007
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 9% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A321neo's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
-- N1/N2 rollback
-- EGT rise (lean mixture)
+- EGT drop with N1/N2 rollback
 - Possible flameout
 
 #### Diagnostic Procedure
@@ -591,6 +632,128 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 | 4 | Inspect fuel metering unit operation | FADEC command vs actual position |
 | 5 | Check for fuel system leaks | Visual and pressure decay test |
 | 6 | Sample fuel for contamination | Water, particulates, microbial |
+
+### 4.6 Sensor Drift
+
+**Fault Code:** ENG-SDR-001
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 6 of the A321neo's 21 engine maintenance events, or 29%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
+
+#### Symptoms
+- Parameter disagree messages on ECAM
+- Gradual deviation between redundant sensor readings
+- Thrust asymmetry indications
+- FADEC fault messages
+
+#### Diagnostic Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review the FADEC fault log | Identify affected channel and parameter |
+| 2 | Compare sensor values (Channel A vs B) | Determine which channel has drifted |
+| 3 | Cross-check with independent references | Validate actual engine condition |
+| 4 | Perform sensor Built-In Test (BIT) | Confirm sensor hardware status |
+| 5 | Check wiring continuity and connections | Rule out intermittent connections |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (Drift > 10% affecting thrust control):**
+- Ground aircraft pending sensor replacement
+- Replace affected sensor or EEC channel
+- Perform engine ground run verification
+
+**MAJOR (Drift 5-10%, redundancy compromised):**
+- Dispatch with MEL if applicable
+- Schedule sensor replacement within 10 days
+- Increase monitoring frequency
+
+**MINOR (Drift < 5%, trending):**
+- Document in aircraft log
+- Schedule calibration check at next maintenance visit
+- Continue trend monitoring
+
+### 4.7 Bearing Wear
+
+**Fault Code:** ENG-BRG-003
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 3 of the A321neo's 21 engine maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
+
+#### Detection Methods
+- Magnetic chip detector (MCD) warnings
+- Oil spectrographic analysis (SOAP)
+- Vibration trend monitoring
+- Oil consumption increase
+- Oil temperature rise
+
+The Replacement Criteria for the #3 main bearing are in section 3.2.5, Thrust Bearing Assembly.
+
+#### Bearing Identification by Vibration Frequency
+
+| Bearing | Location | Rotor | Frequency |
+|---------|----------|-------|-----------|
+| #1 | Fan forward | Low-pressure | 1.0 × N1 |
+| #2 | Fan aft | Low-pressure | 1.0 × N1 |
+| #3 (Thrust) | HPC forward | High-pressure | 1.0 × N2 |
+| #4 | HPT | High-pressure | 1.0 × N2 |
+| #5 | LPT | Low-pressure | 1.0 × N1 |
+
+#### Corrective Actions
+
+**CRITICAL (MCD activation or rapid debris increase):**
+- Immediate engine shutdown
+- Do not motor engine
+- Remove engine for teardown inspection
+
+**MAJOR (Elevated wear metals, trending):**
+- Increase oil sampling to every 25 FH
+- Plan engine removal within 200 FH
+- Monitor vibration closely
+- No power above MCT
+
+**MINOR (Slight increase, stable):**
+- Increase sampling frequency to every 50 FH
+- Continue normal operations
+- Trend monitoring with fleet comparison
+
+### 4.8 Leak Detection
+
+**Fault Code:** ENG-LEAK-004
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 1 of the A321neo's 21 engine maintenance events, or 5%.
+<!-- END GENERATED: fault-stats-engine-leak -->
+
+#### Leak Classification
+
+| Class | Rate | Definition | Action |
+|-------|------|------------|--------|
+| A | Seep | Wetness, no drip | Monitor, clean |
+| B | Leak | 1-5 drops/min | Repair within 100 FH |
+| C | Heavy | > 5 drops/min | Repair before flight |
+
+#### Common Leak Sources
+
+| System | Location | Visual Indicator |
+|--------|----------|------------------|
+| Oil | Accessory gearbox | Brown/black streaks |
+| Oil | Turbine rear bearing | Oil in exhaust area |
+| Fuel | Fuel manifold | Fuel odor, staining |
+| Fuel | Fuel metering unit connections | Wet fittings |
+| Bleed | Duct connections | Sooting, heat damage |
+
+#### Troubleshooting Procedure
+
+| Step | Action | Inspection Point |
+|------|--------|------------------|
+| 1 | Perform visual inspection of engine | Note all fluid trails |
+| 2 | Clean suspected areas thoroughly | Prepare for leak check |
+| 3 | Operate engine at ground idle | Observe for fresh leaks |
+| 4 | Apply leak detection solution | Bubble test for pneumatic |
+| 5 | UV dye inspection (if oil dye installed) | Pinpoint oil leak source |
 
 ---
 
@@ -643,7 +806,9 @@ Multi-Mode Receiver providing:
 #### 5.3.1 Sensor Drift
 
 **Fault Code:** AVN-SDR-001
-**Fleet Statistics:** 11% of avionics events
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 3 of the A321neo's 3 avionics maintenance events, or 100%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADIRU 1/2/3 outputs on maintenance page
@@ -655,7 +820,9 @@ Multi-Mode Receiver providing:
 #### 5.3.2 Electrical Faults (Avionics)
 
 **Fault Code:** AVN-ELF-002
-**Fleet Statistics:** 15% of avionics events
+<!-- BEGIN GENERATED: fault-stats-avionics-electrical-fault -->
+**Fleet Statistics:** In the generated fleet data, electrical fault accounts for 0 of the A321neo's 3 avionics maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-avionics-electrical-fault -->
 
 **Common Causes:**
 - Power supply interruption
@@ -716,7 +883,9 @@ The A321neo flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
-**Fleet Statistics:** 50% of hydraulics events
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 7 of the A321neo's 12 hydraulics maintenance events, or 58%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -731,7 +900,9 @@ The A321neo flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
-**Fleet Statistics:** 22% of hydraulics events
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 5 of the A321neo's 12 hydraulics maintenance events, or 42%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Analysis (NAS 1638):**
 
@@ -748,36 +919,40 @@ The A321neo flap system uses:
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| ENG-VIB-001 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan inspection, balance |
-| ENG-CNT-002 | Contamination | CRIT/MAJ/MIN | 72 | Water wash, borescope |
-| ENG-OVH-003 | Overheat (EGT) | CRIT/MAJ/MIN | 72 | Borescope, CMC inspect |
-| ENG-ELF-004 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics |
-| ENG-FUEL-005 | Fuel Starvation | CRIT/MAJ | 73 | Fuel system check |
-| ENG-SDR-006 | Sensor Drift | MAJ/MIN | 77 | EMU diagnostics |
-| ENG-BRG-007 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis |
-| ENG-LEAK-008 | Fluid Leak | MAJ/MIN | 79 | Identify and repair |
+| ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | EMU diagnostics |
+| ENG-CNT-002 | Contamination | CRIT/MAJ/MIN | 72 | Oil/fuel analysis, wash/clean |
+| ENG-BRG-003 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, vibration check |
+| ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
+| ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
+| ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Borescope, CMC inspect |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
+| ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADIRU comparison |
-| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power, cooling check |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADIRU comparison |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
-| AVN-NAV-004 | NAV/GPS Fault | MIN | 34 | Antenna, MMR check |
-| AVN-AOA-005 | AOA Disagree | MAJ | 34 | AOA sensor inspection |
+| AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna, MMR check |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample, filter/flush |
-| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump, leak check |
-| HYD-QTY-004 | Low Quantity | MAJ | 29 | Replenish, leak check |
-| HYD-OVHT-005 | Overheat | MAJ | 29 | Reduce demand, inspect |
+| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
+| HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 
@@ -793,6 +968,10 @@ The A321neo flap system uses:
 
 ### 8.1 Engine Vibration Diagnostic Flow (LEAP-1A)
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 4.0 ips. The Caution level starts at 3.0 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Caution
 │
@@ -806,7 +985,7 @@ START: Engine Vibration Warning/Caution
 │   │
 │   └─► NO ─► Continue to vibration analysis
 │
-├─► Is vibration > 4.0 ips (N1) or > 3.5 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust to idle
 │   │          If vibration remains high: Shutdown engine
@@ -844,7 +1023,7 @@ START: EGT Limit Exceedance Recorded
 │
 ├─► Was exceedance during start?
 │   │
-│   ├─► YES (> 750°C)
+│   ├─► YES (above the start maximum)
 │   │   ├─► Hot start likely
 │   │   ├─► Allow engine to cool (30+ minutes)
 │   │   ├─► Borescope combustor and HPT
@@ -855,13 +1034,13 @@ START: EGT Limit Exceedance Recorded
 │
 ├─► Was exceedance during takeoff/climb?
 │   │
-│   ├─► > 1,060°C for > 5 seconds
+│   ├─► Above the takeoff maximum for > 5 seconds
 │   │   ├─► Ground aircraft
 │   │   ├─► Full HPT borescope inspection
 │   │   ├─► Inspect CMC shrouds for thermal damage
 │   │   └─► END: Engineering assessment required
 │   │
-│   └─► < 1,060°C, brief
+│   └─► Below the takeoff maximum, brief
 │       ├─► Document in log
 │       ├─► Schedule borescope within 100 FH
 │       └─► END: Monitor EGT margin trend
@@ -1013,23 +1192,38 @@ START: Fan Blade Damage Reported/Suspected
 
 #### Engine Parameters (LEAP-1A)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (%) | 18-23 | 23-28 | 92 | 97 |
-| N2 (%) | 52-58 | 58-64 | 96 | 100 |
-| EGT (°C) | 320-400 | 400-480 | 950 | 1,040 |
-| Oil Pressure (psi) | 40-65 | 45-75 | 50-80 | 50-85 |
-| Oil Temp (°C) | 45-85 | 55-115 | 75-135 | 75-150 |
-| Vibration N1 (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
-| Vibration N2 (ips) | < 0.6 | < 1.0 | < 1.8 | < 2.2 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-23 | 23-28 | 86 (84-88) | 92 | 97 |
+| N2 (%) | 52-58 | 58-64 | — | 96 | 100 |
+| EGT (°C) | 320-400 | 400-480 | 634 (< 654) | < 950 | < 1,000 |
+| FuelFlow (kg/s) | 0.12-0.20 | 0.20-0.30 | 0.38 (0.35-0.41) | 0.95-1.25 | 1.50-2.00 |
+| Oil Pressure (psi) | 40-65 | 45-75 | — | 50-80 | 50-85 |
+| Oil Temperature (°C) | 45-85 | 55-115 | — | 75-135 | 75-150 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.7 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
+
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
 
 #### Hydraulic System
 
-| Parameter | Green | Blue | Yellow |
-|-----------|-------|------|--------|
-| Pressure | 2,900-3,100 psi | 2,900-3,100 psi | 2,900-3,100 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,900 | 2,600-2,900 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Green, Blue, and Yellow systems each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 
@@ -1079,35 +1273,40 @@ START: Fan Blade Damage Reported/Suspected
 | Engineering Support | engineering@regionalco.com | 24/7 |
 | Parts Supply | parts@regionalco.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Fleet Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The A321neo has 5 of the aircraft and 36 of the maintenance events.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 185 |
-| Critical Events | 96 (52%) |
-| Major Events | 57 (31%) |
-| Minor Events | 32 (17%) |
-| Engine-Related | 113 (61%) |
-| Avionics-Related | 37 (20%) |
-| Hydraulics-Related | 35 (19%) |
+**Events by Severity:**
 
-**Top Fault Types:**
-1. Bearing wear — 41 events (22%)
-2. Overheat (EGT exceedance) — 37 events (20%)
-3. Vibration exceedance — 30 events (16%)
-4. Contamination — 26 events (14%)
-5. Electrical fault — 22 events (12%)
-6. Sensor drift — 18 events (10%)
-7. Fuel starvation — 11 events (6%)
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 7 | 19% |
+| Major | 9 | 25% |
+| Minor | 20 | 56% |
 
-**Corrective Action Distribution:**
-1. Replaced component — 51 (28%)
-2. Cleaned and reassembled — 43 (23%)
-3. Inspected and cleared — 41 (22%)
-4. Software patch applied — 31 (17%)
-5. Adjusted tolerance — 19 (10%)
+**Events by System:**
+
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 21 | 58% |
+| Avionics | 3 | 8% |
+| Hydraulics | 12 | 33% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Leak | Hydraulics | 7 | 19% |
+| Sensor drift | Engine | 6 | 17% |
+| Vibration exceedance | Engine | 6 | 17% |
+| Overheat | Engine | 5 | 14% |
+| Contamination | Hydraulics | 5 | 14% |
+| Bearing wear | Engine | 3 | 8% |
+| Sensor drift | Avionics | 3 | 8% |
+| Leak | Engine | 1 | 3% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

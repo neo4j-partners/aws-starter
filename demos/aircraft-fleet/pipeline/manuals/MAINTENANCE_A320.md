@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** A320-200 series aircraft equipped with IAE V2500-A1 engines
-**Operator:** SkyWays Airlines
+**Operator:** SkyWays, ExampleAir, RegionalCo, NorthernJet
 **Fleet:** N30268B, N81338F, N32276J, N76758N, N63098R
 
 ---
@@ -52,14 +52,14 @@
 
 ### 1.2 Fleet Configuration
 
-The A320-200 fleet operates across four partner carriers configured for medium-haul operations. The combined fleet of approximately 30 aircraft is distributed as follows:
+The A320-200 fleet operates across four partner carriers configured for medium-haul operations.
 
-| Operator | Aircraft Count | Primary Routes |
+| Operator | Registrations | Primary Routes |
 |----------|---------------|----------------|
-| ExampleAir | 8 | Domestic medium-haul |
-| SkyWays | 8 | Domestic medium-haul |
-| RegionalCo | 7 | Mixed domestic/regional |
-| NorthernJet | 7 | Domestic medium-haul |
+| ExampleAir | N32276J | Domestic medium-haul |
+| SkyWays | N30268B, N81338F | Domestic medium-haul |
+| RegionalCo | N76758N | Mixed domestic/regional |
+| NorthernJet | N63098R | Domestic medium-haul |
 
 Aircraft entered service between 2017 and 2023, configured in a single-class or dual-class layout for 150–180 passengers.
 
@@ -84,6 +84,7 @@ This manual covers the following ATA chapters:
 
 Each A320-200 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (A320-200)
 │
@@ -111,44 +112,68 @@ AIRCRAFT (A320-200)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (V2500-A1)
 
-The A320-200 is powered by two International Aero Engines (IAE) V2500-A1 high-bypass turbofan engines, mounted in underwing nacelles. Each engine produces 25,000 lbf of thrust and operates independently with full redundancy. The V2500 features a two-spool design with a single-stage fan, 4-stage low-pressure compressor, 10-stage high-pressure compressor, annular combustor, 2-stage high-pressure turbine, and 5-stage low-pressure turbine. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 58% of all maintenance events in the fleet, with the most common issues being overheat conditions, vibration exceedances, and bearing wear.
+The A320-200 is powered by two International Aero Engines (IAE) V2500-A1 high-bypass turbofan engines, mounted in underwing nacelles. Each engine produces 25,000 lbf of thrust and operates independently with full redundancy. The V2500 features a two-spool design with a single-stage fan, 4-stage low-pressure compressor, 10-stage high-pressure compressor, annular combustor, 2-stage high-pressure turbine, and 5-stage low-pressure turbine. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 21 of the A320-200's 36 maintenance events, or 58%. The most common engine faults are overheat with 7 events, vibration exceedance with 7, and sensor drift with 4.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The system is built around dual Flight Management Systems (FMS) that handle flight planning, navigation computation, performance optimization, and guidance commands. Three Air Data Computers (ADC) provide redundant altitude, airspeed, and Mach number calculations using pitot-static inputs. The Navigation Receiver integrates VOR, ILS localizer, glideslope, and marker beacon reception for precision approaches. All avionics components communicate via ARINC 429 digital data buses with built-in test equipment (BITE) for fault detection. Avionics-related maintenance events comprise approximately 22% of fleet issues, primarily involving sensor drift and electrical faults that are often resolved through software patches or calibration adjustments.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The system is built around dual Flight Management Systems (FMS) that handle flight planning, navigation computation, performance optimization, and guidance commands. Three Air Data Computers (ADC) provide redundant altitude, airspeed, and Mach number calculations using pitot-static inputs. The Navigation Receiver integrates VOR, ILS localizer, glideslope, and marker beacon reception for precision approaches. All avionics components communicate via ARINC 429 digital data buses with built-in test equipment (BITE) for fault detection.
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 6 of the A320-200's 36 maintenance events, or 17%. The avionics faults are sensor drift with 4 events and electrical fault with 2.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are often resolved through software patches or calibration adjustments.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A320-200 hydraulic system provides power for flight control surfaces, landing gear operation, brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi. This manual focuses on the Green system, which is powered by an engine-driven pump on Engine #1. The system includes a main hydraulic pump capable of 26 gpm flow rate, a 14.5-liter reservoir with integrated quantity indication, and multiple actuators including the flap actuator assembly for high-lift device operation. Hydraulic fluid (Skydrol LD-4) requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 19% of maintenance events, with leaks and fluid contamination being the most common issues requiring attention.
+The A320-200 hydraulic system provides power for flight control surfaces, landing gear operation, brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi. This manual focuses on the Green system, which is powered by an engine-driven pump on Engine #1. The system includes a main hydraulic pump capable of 26 gpm flow rate, a 14.5-liter reservoir with integrated quantity indication, and multiple actuators including the flap actuator assembly for high-lift device operation. Hydraulic fluid (Skydrol LD-4) requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 9 of the A320-200's 36 maintenance events, or 25%. The hydraulics faults are leak with 7 events and contamination with 2.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
 ### 2.2 Engine Health Monitoring
 
-Each V2500 engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each V2500-A1 engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust |
-| VIB | Engine Vibration | ips (inches/sec) | Fan case |
-| N1Speed | Fan Speed | % RPM | Fan shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust |
+| Engine | Vibration | Engine Vibration | ips | Fan case |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~645°C, warning threshold ~674°C) differ from the instantaneous ECAM EGT readings shown in Section 3.3 and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend-monitoring scale is used to detect gradual EGT margin deterioration over weeks and months rather than acute exceedances. Note: the digital twin dataset models this A320-200 variant as equipped with CFM56-5B engines; procedure steps in this manual reference the IAE V2500-A1 alternative powerplant.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the V2500-A1, the trend baseline is 560°C, with Advisory at 580°C, Caution at 590°C, and Warning at 600°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
 
 ### 2.3 Component Identification Schema
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
@@ -161,8 +186,9 @@ Example: AC1002-S01-C03
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 
@@ -211,10 +237,12 @@ The 10-stage high-pressure compressor (HPC) achieves a pressure ratio of approxi
 The two-stage HPT extracts energy to drive the HPC. Turbine blades feature advanced cooling passages and thermal barrier coatings.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff) | < 650°C | 650-680°C | 695°C |
-| EGT (Continuous) | < 620°C | 620-650°C | 665°C |
+| EGT (Takeoff, 5 min) | < 650°C | 650-695°C | 695°C |
+| EGT (Max Continuous) | < 620°C | 620-665°C | 665°C |
+<!-- END GENERATED: egt-limits -->
 
 #### 3.2.4 Main Fuel Pump
 **Part Number:** V25-FP-7310
@@ -222,7 +250,9 @@ The two-stage HPT extracts energy to drive the HPC. Turbine blades feature advan
 
 The engine-driven fuel pump provides metered fuel flow to the combustion chamber. The pump incorporates an integral fuel filter and fuel-oil heat exchanger.
 
-**Flow Rate:** 0.85 - 1.95 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.15 - 1.95 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings
@@ -242,13 +272,17 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Idle | Cruise | Takeoff |
-|-----------|------|--------|---------|
-| N1Speed (% RPM) | 22-28% | 85-92% | 100-104% |
-| N2 (% RPM) | 58-65% | 92-97% | 100-102% |
-| EGT (°C) | 380-450 | 520-580 | 620-680 |
-| FuelFlow (kg/s) | 0.15-0.25 | 0.65-0.85 | 1.20-1.95 |
-| Vibration (ips) | < 0.8 | < 1.2 | < 2.0 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 22 | 28 | 87 (85-89) | 97 | 104 |
+| N2 (%) | 58 | 65 | — | 97 | 102 |
+| EGT (°C) | 380 | 450 | 560 (< 580) | < 620 | < 650 |
+| FuelFlow (kg/s) | 0.15-0.25 | 0.15-0.25 | 0.34 (0.31-0.37) | 0.85-1.20 | 1.20-1.95 |
+| Oil Pressure (psi) | 25-55 | 40-65 | — | 40-65 | 40-65 |
+| Oil Temperature (°C) | 40-90 | 60-120 | — | 60-150 | 60-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
 
 ---
 
@@ -256,8 +290,11 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.1 Overheat Condition (EGT Exceedance)
 
-**Fault Code:** ENG-OVH-001
+**Fault Code:** ENG-OVH-006
 **Severity Classification:** CRITICAL / MAJOR / MINOR (based on temperature and duration)
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 7 of the A320-200's 21 engine maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
 
 #### Symptoms
 - EGT indication above normal operating range
@@ -267,7 +304,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 #### Immediate Actions
 1. Reduce thrust to idle if flight conditions permit
 2. Monitor EGT trend for stabilization
-3. If EGT exceeds 695°C, initiate engine shutdown procedures per QRH
+3. If EGT exceeds the takeoff maximum in the Operating Limits table, initiate engine shutdown procedures per QRH
 
 #### Troubleshooting Procedure
 
@@ -281,12 +318,12 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 #### Corrective Actions by Severity
 
-**CRITICAL (EGT > 695°C or duration > 5 minutes above 680°C):**
+**CRITICAL (EGT above the takeoff maximum, or more than 5 minutes in the takeoff caution band):**
 - Ground aircraft pending HPT borescope inspection
 - If blade damage found: Engine removal for shop visit
 - Estimated downtime: 5-10 days
 
-**MAJOR (EGT 650-680°C, intermittent):**
+**MAJOR (EGT in the takeoff caution band, intermittent):**
 - Perform hot section inspection within 50 flight hours
 - Replace EGT probes if calibration drift detected
 - Monitor trend data for recurrence
@@ -298,17 +335,22 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.2 Vibration Exceedance
 
-**Fault Code:** ENG-VIB-002
+**Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 7 of the A320-200's 21 engine maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits
 
-| Level | N1 Vibration | N2 Vibration | Action Required |
-|-------|--------------|--------------|-----------------|
-| Normal | < 2.0 ips | < 1.5 ips | Continue operations |
-| Caution | 2.0-3.5 ips | 1.5-2.5 ips | Increase monitoring |
-| Warning | 3.5-5.0 ips | 2.5-4.0 ips | Return to base |
-| Limit | > 5.0 ips | > 4.0 ips | Shutdown engine |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.5 ips | MINOR | ENG 1(2) VIB (amber) |
+| Caution | 3.5-5.0 ips | MAJOR | ENG 1(2) VIB HI (amber) |
+| Warning | ≥ 5.0 ips | CRITICAL | ENG 1(2) VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Troubleshooting Procedure
 
@@ -321,15 +363,18 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 | 5 | Perform fan blade balance check | Correct imbalance if identified |
 
 #### Common Root Causes
-- Fan blade damage from FOD (40% of cases)
-- Bearing wear in thrust bearing assembly (25%)
-- Compressor blade erosion (20%)
-- Sensor malfunction / cable damage (15%)
+- Fan blade damage from FOD
+- Bearing wear in thrust bearing assembly
+- Compressor blade erosion
+- Sensor malfunction / cable damage
 
 ### 4.3 Fuel Starvation
 
-**Fault Code:** ENG-FUEL-003
-**Severity Classification:** CRITICAL / MAJOR
+**Fault Code:** ENG-FUEL-007
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
@@ -353,8 +398,11 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 4.4 Bearing Wear
 
-**Fault Code:** ENG-BRG-004
+**Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 3 of the A320-200's 21 engine maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Oil debris monitoring (chip detectors, spectrographic analysis)
@@ -375,6 +423,128 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 - **CRITICAL:** Immediate engine removal; bearing replacement at shop
 - **MAJOR:** Schedule engine removal within 100 flight hours
 - **MINOR:** Increase oil sampling frequency to every 50 hours; trend monitoring
+
+### 4.5 Sensor Drift
+
+**Fault Code:** ENG-SDR-001
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 4 of the A320-200's 21 engine maintenance events, or 19%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
+
+#### Symptoms
+- Parameter disagree messages on ECAM
+- Gradual deviation between redundant sensor readings
+- Thrust asymmetry indications
+- FADEC fault messages
+
+#### Diagnostic Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review the FADEC fault log | Identify affected channel and parameter |
+| 2 | Compare sensor values (Channel A vs B) | Determine which channel has drifted |
+| 3 | Cross-check with independent references | Validate actual engine condition |
+| 4 | Perform sensor Built-In Test (BIT) | Confirm sensor hardware status |
+| 5 | Check wiring continuity and connections | Rule out intermittent connections |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (Drift > 10% affecting thrust control):**
+- Ground aircraft pending sensor replacement
+- Replace affected sensor or EEC channel
+- Perform engine ground run verification
+
+**MAJOR (Drift 5-10%, redundancy compromised):**
+- Dispatch with MEL if applicable
+- Schedule sensor replacement within 10 days
+- Increase monitoring frequency
+
+**MINOR (Drift < 5%, trending):**
+- Document in aircraft log
+- Schedule calibration check at next maintenance visit
+- Continue trend monitoring
+
+### 4.6 Contamination
+
+**Fault Code:** ENG-CNT-002
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
+
+#### Types of Contamination
+
+| Type | Source | Detection Method |
+|------|--------|------------------|
+| Oil contamination | Bearing seal leak, oil cooler failure | Oil analysis, carbon deposits |
+| Fuel contamination | Water, particulates, microbial growth | Fuel filter DP, fuel sample |
+| Compressor fouling | Airborne particles, salt, volcanic ash | EGT margin loss, performance |
+| Turbine deposits | Combustion byproducts, sulfidation | Borescope, EGT spread |
+
+#### Diagnostic Procedure
+
+| Step | Action | Indicator |
+|------|--------|-----------|
+| 1 | Review trend data for EGT margin degradation | A steady EGT rise indicates fouling |
+| 2 | Perform oil spectrographic analysis | Check for wear metals, contamination |
+| 3 | Check fuel filter differential pressure | High DP indicates fuel contamination |
+| 4 | Borescope HPT nozzle and blades | Visual deposits, coating loss |
+| 5 | Perform compressor wash if applicable | Evaluate EGT margin recovery |
+
+#### Corrective Actions
+
+**CRITICAL (Severe contamination affecting operation):**
+- Engine removal for shop cleaning
+- HPT blade replacement if sulfidation present
+- Oil system flush and filter replacement
+
+**MAJOR (Moderate contamination):**
+- Perform on-wing compressor wash (motoring wash)
+- Replace fuel filter element
+- Enhanced oil sampling (every 25 FH)
+- Monitor EGT margin recovery
+
+**MINOR (Early detection):**
+- Schedule compressor wash at next opportunity
+- Increase fuel sampling frequency
+- Document trend for fleet analysis
+
+### 4.7 Leak Detection
+
+**Fault Code:** ENG-LEAK-004
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-leak -->
+
+#### Leak Classification
+
+| Class | Rate | Definition | Action |
+|-------|------|------------|--------|
+| A | Seep | Wetness, no drip | Monitor, clean |
+| B | Leak | 1-5 drops/min | Repair within 100 FH |
+| C | Heavy | > 5 drops/min | Repair before flight |
+
+#### Common Leak Sources
+
+| System | Location | Visual Indicator |
+|--------|----------|------------------|
+| Oil | Accessory gearbox | Brown/black streaks |
+| Oil | Turbine rear bearing | Oil in exhaust area |
+| Fuel | Fuel manifold | Fuel odor, staining |
+| Fuel | Fuel metering unit connections | Wet fittings |
+| Bleed | Duct connections | Sooting, heat damage |
+
+#### Troubleshooting Procedure
+
+| Step | Action | Inspection Point |
+|------|--------|------------------|
+| 1 | Perform visual inspection of engine | Note all fluid trails |
+| 2 | Clean suspected areas thoroughly | Prepare for leak check |
+| 3 | Operate engine at ground idle | Observe for fresh leaks |
+| 4 | Apply leak detection solution | Bubble test for pneumatic |
+| 5 | UV dye inspection (if oil dye installed) | Pinpoint oil leak source |
 
 ---
 
@@ -430,6 +600,9 @@ Integrated VOR/ILS receiver providing:
 #### 5.3.1 Sensor Drift
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 4 of the A320-200's 6 avionics maintenance events, or 67%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 Sensor drift manifests as gradual deviation between redundant sensor inputs or comparison with known references.
 
@@ -447,6 +620,9 @@ Sensor drift manifests as gradual deviation between redundant sensor inputs or c
 #### 5.3.2 Electrical Fault
 
 **Fault Code:** AVN-ELF-002
+<!-- BEGIN GENERATED: fault-stats-avionics-electrical-fault -->
+**Fleet Statistics:** In the generated fleet data, electrical fault accounts for 2 of the A320-200's 6 avionics maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-avionics-electrical-fault -->
 
 **Common Causes:**
 - Power supply irregularities
@@ -502,6 +678,9 @@ Linear hydraulic actuator providing:
 #### 6.3.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 7 of the A320-200's 9 hydraulics maintenance events, or 78%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Inspection Points:**
 | Location | Access Panel | Common Leak Source |
@@ -519,6 +698,9 @@ Linear hydraulic actuator providing:
 #### 6.3.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 2 of the A320-200's 9 hydraulics maintenance events, or 22%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Sources:**
 - Water ingress (humidity, rain)
@@ -542,36 +724,40 @@ Linear hydraulic actuator providing:
 
 ### 7.1 Engine Fault Codes
 
-| Code | Description | Severity | ATA | Immediate Action |
-|------|-------------|----------|-----|------------------|
-| ENG-OVH-001 | EGT Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, monitor |
-| ENG-VIB-002 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Check limits, possible shutdown |
-| ENG-FUEL-003 | Fuel Starvation | CRIT/MAJ | 73 | Check fuel config, crossfeed |
-| ENG-BRG-004 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, trend monitoring |
-| ENG-SDR-005 | Sensor Drift | MAJ/MIN | 77 | Cross-check redundant sensors |
-| ENG-ELF-006 | Electrical Fault | CRIT/MAJ | 72 | Isolate circuit, check BITE |
-| ENG-CNT-007 | Contamination | CRIT/MAJ | 72 | Borescope, oil analysis |
-| ENG-LK-008 | Fuel/Oil Leak | CRIT/MAJ/MIN | 73 | Identify source, assess severity |
+<!-- BEGIN GENERATED: fault-codes-engine -->
+| Code | Description | Severity | ATA | Primary Action |
+|------|-------------|----------|-----|----------------|
+| ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
+| ENG-CNT-002 | Contamination | CRIT/MAJ/MIN | 72 | Oil/fuel analysis, wash/clean |
+| ENG-BRG-003 | Bearing Wear | CRIT/MAJ/MIN | 72 | Oil analysis, vibration check |
+| ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
+| ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
+| ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
+| ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
-| Code | Description | Severity | ATA | Immediate Action |
-|------|-------------|----------|-----|------------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | Compare redundant units |
-| AVN-ELF-002 | Electrical Fault | CRIT/MAJ | 34 | Check power supply, BITE |
-| AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, reload database |
-| AVN-ADC-004 | ADC Disagreement | MAJ | 34 | Cross-check, isolate faulty unit |
-| AVN-NAV-005 | NAV Receiver Fault | MIN | 34 | Check antenna, verify tuning |
+<!-- BEGIN GENERATED: fault-codes-avionics -->
+| Code | Description | Severity | ATA | Primary Action |
+|------|-------------|----------|-----|----------------|
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADC comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
+| AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
-| Code | Description | Severity | ATA | Immediate Action |
-|------|-------------|----------|-----|------------------|
-| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Identify source, classify severity |
-| HYD-CNT-002 | Fluid Contamination | MAJ/MIN | 29 | Sample analysis |
-| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Check pump, reservoir level |
-| HYD-ACT-004 | Actuator Malfunction | MAJ | 29 | Check position feedback |
-| HYD-PUMP-005 | Pump Failure | CRIT | 29 | Alternate system selection |
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
+| Code | Description | Severity | ATA | Primary Action |
+|------|-------------|----------|-----|----------------|
+| HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
+| HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 
@@ -587,10 +773,14 @@ Linear hydraulic actuator providing:
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 5.0 ips. The Caution level starts at 3.5 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Vibration Warning Received
 │
-├─► Is vibration > 5.0 ips (N1) or > 4.0 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES: Shutdown engine per QRH
 │   │        Ground aircraft
@@ -599,7 +789,7 @@ START: Vibration Warning Received
 │   │
 │   └─► NO: Continue to next step
 │
-├─► Is vibration > 3.5 ips (N1) or > 2.5 ips (N2)?
+├─► Is vibration at or above the Caution level?
 │   │
 │   ├─► YES: Plan return to base at earliest opportunity
 │   │        Do not cycle thrust unnecessarily
@@ -792,22 +982,38 @@ START: Low Hydraulic Pressure Warning
 
 #### Engine Parameters (V2500-A1)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (%) | 22 | 28 | 97 | 104 |
-| N2 (%) | 58 | 65 | 97 | 102 |
-| EGT (°C) | 380 | 450 | 620 | 680 |
-| Oil Pressure (psi) | 25-55 | 40-65 | 40-65 | 40-65 |
-| Oil Temp (°C) | 40-90 | 60-120 | 60-150 | 60-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 22 | 28 | 87 (85-89) | 97 | 104 |
+| N2 (%) | 58 | 65 | — | 97 | 102 |
+| EGT (°C) | 380 | 450 | 560 (< 580) | < 620 | < 650 |
+| FuelFlow (kg/s) | 0.15-0.25 | 0.15-0.25 | 0.34 (0.31-0.37) | 0.85-1.20 | 1.20-1.95 |
+| Oil Pressure (psi) | 25-55 | 40-65 | — | 40-65 | 40-65 |
+| Oil Temperature (°C) | 40-90 | 60-120 | — | 60-150 | 60-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
+
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
 
 #### Hydraulic System
 
-| Parameter | Normal | Warning |
-|-----------|--------|---------|
-| System Pressure | 2,900-3,100 psi | < 2,500 psi |
-| Reservoir Level | 70-100% | < 50% |
-| Fluid Temperature | -40 to +100°C | > 110°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Green, Blue, and Yellow systems each operate from -40 to +100°C. Above 110°C is a warning.
 
 ### 10.2 Abbreviations and Acronyms
 
@@ -855,34 +1061,40 @@ START: Low Hydraulic Pressure Warning
 | Engineering Support | engineering@skyways.aero | 24/7 |
 | Parts Supply | parts@skyways.aero | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Fleet Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The A320-200 has 5 of the aircraft and 36 of the maintenance events.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 277 |
-| Critical Events | 144 (52%) |
-| Major Events | 86 (31%) |
-| Minor Events | 47 (17%) |
-| Engine-Related | 161 (58%) |
-| Avionics-Related | 61 (22%) |
-| Hydraulics-Related | 55 (20%) |
+**Events by Severity:**
 
-**Top Fault Types:**
-1. Overheat (EGT exceedance) — 75 events (27%)
-2. Bearing wear — 63 events (23%)
-3. Vibration exceedance — 53 events (19%)
-4. Sensor drift — 39 events (14%)
-5. Contamination — 28 events (10%)
-6. Leak — 19 events (7%)
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 7 | 19% |
+| Major | 7 | 19% |
+| Minor | 22 | 61% |
 
-**Corrective Action Distribution:**
-1. Inspected and cleared — 72 (26%)
-2. Replaced component — 69 (25%)
-3. Cleaned and reassembled — 61 (22%)
-4. Software patch applied — 47 (17%)
-5. Adjusted tolerance — 28 (10%)
+**Events by System:**
+
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 21 | 58% |
+| Avionics | 6 | 17% |
+| Hydraulics | 9 | 25% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 7 | 19% |
+| Vibration exceedance | Engine | 7 | 19% |
+| Leak | Hydraulics | 7 | 19% |
+| Sensor drift | Engine | 4 | 11% |
+| Sensor drift | Avionics | 4 | 11% |
+| Bearing wear | Engine | 3 | 8% |
+| Electrical fault | Avionics | 2 | 6% |
+| Contamination | Hydraulics | 2 | 6% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

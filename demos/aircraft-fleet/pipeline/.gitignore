@@ -9,3 +9,7 @@ generated/
 __pycache__/
 *.pyc
 .ruff_cache/
+
+# Lock and stamp that generate writes into its output, including --output .
+.generate.lock
+.stamp.json

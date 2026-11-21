@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** B737-800 series aircraft equipped with CFM56-7B engines
-**Operator:** ExampleAir
+**Operator:** ExampleAir, SkyWays, RegionalCo, NorthernJet
 **Fleet:** N95040A, N53032E, N84110I, N26760M, N44342Q
 
 ---
@@ -53,14 +53,14 @@
 
 ### 1.2 Fleet Configuration
 
-The B737-800 fleet operates across four partner carriers configured for short to medium-haul operations. The combined fleet of approximately 40 aircraft is distributed as follows:
+The B737-800 fleet operates across four partner carriers configured for short to medium-haul operations.
 
-| Operator | Aircraft Count | Primary Routes |
+| Operator | Registrations | Primary Routes |
 |----------|---------------|----------------|
-| ExampleAir | 10 | Domestic short/medium-haul |
-| SkyWays | 10 | Domestic short/medium-haul |
-| RegionalCo | 10 | Mixed domestic/regional |
-| NorthernJet | 10 | Domestic short/medium-haul |
+| ExampleAir | N95040A, N53032E | Domestic short/medium-haul |
+| SkyWays | N84110I | Domestic short/medium-haul |
+| RegionalCo | N26760M | Mixed domestic/regional |
+| NorthernJet | N44342Q | Domestic short/medium-haul |
 
 Aircraft entered service between 2016 and 2022, configured in a single-class or dual-class layout for 162–189 passengers.
 
@@ -86,6 +86,7 @@ This manual covers the following ATA chapters:
 
 Each B737-800 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (B737-800)
 │
@@ -113,39 +114,64 @@ AIRCRAFT (B737-800)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (CFM56-7B)
 
-The B737-800 is powered by two CFM International CFM56-7B high-bypass turbofan engines, mounted in close-coupled underwing nacelles with distinctive flat-bottomed nacelle design characteristic of the 737NG series. Each engine produces 26,300 lbf of thrust at takeoff and operates independently with full redundancy. The CFM56-7B features a single-spool low-pressure system and single-spool high-pressure system, with a 3-stage low-pressure compressor driven by a 4-stage low-pressure turbine, and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine. The engine incorporates a dual annular combustor (DAC) option for reduced emissions. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 70% of all maintenance events in the fleet, with the most common issues being sensor drift, contamination, and bearing wear.
+The B737-800 is powered by two CFM International CFM56-7B high-bypass turbofan engines, mounted in close-coupled underwing nacelles with distinctive flat-bottomed nacelle design characteristic of the 737NG series. Each engine produces 26,300 lbf of thrust at takeoff and operates independently with full redundancy. The CFM56-7B features a single-spool low-pressure system and single-spool high-pressure system, with a 3-stage low-pressure compressor driven by a 4-stage low-pressure turbine, and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine. The engine incorporates a dual annular combustor (DAC) option for reduced emissions. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 37 of the B737-800's 51 maintenance events, or 73%. The most common engine faults are overheat with 11 events, sensor drift with 6, and vibration exceedance with 6.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The B737-800 features the Honeywell FMC with dual Flight Management Computers providing flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Three Air Data Computers (ADC) supply redundant altitude, airspeed, and Mach calculations via pitot-static inputs integrated with the Digital Flight Control System (DFCS). The multi-mode Navigation Receiver provides VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 and ARINC 629 digital data buses with comprehensive Built-In Test Equipment (BITE). Avionics-related maintenance events comprise approximately 9% of fleet issues, primarily involving sensor drift that is typically resolved through calibration or software updates.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The B737-800 features the Honeywell FMC with dual Flight Management Computers providing flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Three Air Data Computers (ADC) supply redundant altitude, airspeed, and Mach calculations via pitot-static inputs integrated with the Digital Flight Control System (DFCS). The multi-mode Navigation Receiver provides VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 and ARINC 629 digital data buses with comprehensive Built-In Test Equipment (BITE).
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 7 of the B737-800's 51 maintenance events, or 14%. The avionics faults are sensor drift with 5 events and electrical fault with 2.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are typically resolved through calibration or software updates.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The B737-800 hydraulic system provides power for flight control surfaces, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated System A and System B, each operating at 3,000 psi, plus a standby system for emergency backup. This manual focuses on System A, which is powered by two engine-driven pumps (one per engine) and one AC motor pump. The system includes main hydraulic pumps capable of 28 gpm flow rate at 3,000 psi, a reservoir with 5.5 gallon usable capacity, and multiple actuators including the flap actuator assemblies (inboard and outboard). Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 21% of maintenance events, with leaks and contamination being the primary concerns.
+The B737-800 hydraulic system provides power for flight control surfaces, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated System A and System B, each operating at 3,000 psi, plus a standby system for emergency backup. This manual focuses on System A, which is powered by two engine-driven pumps (one per engine) and one AC motor pump. The system includes main hydraulic pumps capable of 28 gpm flow rate at 3,000 psi, a reservoir with 5.5 gallon usable capacity, and multiple actuators including the flap actuator assemblies (inboard and outboard). Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 7 of the B737-800's 51 maintenance events, or 14%. The hydraulics faults are leak with 6 events and contamination with 1.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
 ### 2.2 Engine Health Monitoring
 
-Each CFM56-7B engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each CFM56-7B engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
-| VIB | Engine Vibration | ips (inches/sec) | Fan frame, turbine frame |
-| N1Speed | Fan Speed | % RPM | Fan shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
+| Engine | Vibration | Engine Vibration | ips | Fan frame, turbine frame |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~658°C, warning threshold ~688°C) differ from the instantaneous EICAS EGT readings shown in Section 3.3 and Appendix 10.1, which reflect peak values during takeoff and high-power operations (typically 850–950°C for the CFM56-7B). The trend-monitoring scale detects gradual EGT margin deterioration over weeks and months rather than acute exceedances; the absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the CFM56-7B, the trend baseline is 658°C, with Advisory at 678°C, Caution at 688°C, and Warning at 698°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
+
+Instantaneous takeoff EGT for the CFM56-7B must stay within the Operating Limits table in section 3.2.3, High-Pressure Turbine.
 
 **FADEC Integration:** The CFM56-7B features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation.
 
@@ -153,6 +179,7 @@ Each CFM56-7B engine is equipped with four primary monitoring sensors:
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
@@ -165,8 +192,9 @@ Example: AC1001-S01-C03
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 
@@ -227,11 +255,13 @@ The 9-stage high-pressure compressor (HPC) achieves a pressure ratio of approxim
 The single-stage HPT drives the high-pressure compressor through a concentric shaft. Turbine blades feature advanced single-crystal alloy construction with thermal barrier coating and film cooling. The nozzle guide vanes are air-cooled with impingement and film cooling.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
 | EGT (Takeoff, 5 min) | < 930°C | 930-950°C | 950°C |
 | EGT (Max Continuous) | < 895°C | 895-925°C | 925°C |
 | EGT (Start) | — | — | 725°C |
+<!-- END GENERATED: egt-limits -->
 
 **Life-Limited Parts:**
 - HPT disk: 20,000 cycles
@@ -243,7 +273,9 @@ The single-stage HPT drives the high-pressure compressor through a concentric sh
 
 The engine-driven fuel pump is a positive displacement gear pump providing metered fuel flow to the combustion chamber through the fuel metering valve (FMV). The hydromechanical unit (HMU) integrates the fuel pump with the fuel metering valve under FADEC control.
 
-**Flow Rate:** 0.30 - 1.50 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.10 - 1.50 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings
@@ -265,15 +297,17 @@ The #4 bearing (thrust bearing) absorbs axial loads from the high-pressure rotor
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 20-25% | 25-30% | 95% | 104% |
-| N2 (% RPM) | 55-62% | 62-68% | 95% | 101% |
-| EGT (°C) | 350-420 | 420-480 | 850-895 | 900-950 |
-| FuelFlow (kg/s) | 0.10-0.18 | 0.18-0.25 | 0.85-1.10 | 1.20-1.50 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temperature (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 20-25 | 25-30 | 88 (86-90) | 95 | 104 |
+| N2 (%) | 55-62 | 62-68 | — | 95 | 101 |
+| EGT (°C) | 350-420 | 420-480 | 658 (< 678) | < 895 | < 930 |
+| FuelFlow (kg/s) | 0.10-0.18 | 0.18-0.25 | 0.36 (0.33-0.39) | 0.85-1.10 | 1.20-1.50 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
 
 ### 3.4 FADEC System
 
@@ -300,7 +334,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (24% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 6 of the B737-800's 37 engine maintenance events, or 16%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
 
 #### Symptoms
 - Parameter disagree messages on EICAS
@@ -340,7 +376,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Second most common fault (11% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 2 of the B737-800's 37 engine maintenance events, or 5%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Types of Contamination
 
@@ -384,7 +422,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 10% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 4 of the B737-800's 37 engine maintenance events, or 11%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings
@@ -436,7 +476,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 14% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 5 of the B737-800's 37 engine maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-engine-leak -->
 
 #### Leak Classification
 
@@ -470,15 +512,20 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 6 of the B737-800's 37 engine maintenance events, or 16%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits (CFM56-7B)
 
-| Level | N1 Vibration | N2 Vibration | Flight Deck Alert |
-|-------|--------------|--------------|-------------------|
-| Normal | < 2.0 ips | < 1.8 ips | None |
-| Advisory | 2.0-3.5 ips | 1.8-3.0 ips | ENG VIB (amber) |
-| Caution | 3.5-4.5 ips | 3.0-4.0 ips | ENG VIB (amber) |
-| Warning | > 4.5 ips | > 4.0 ips | ENG VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.5 ips | MINOR | ENG VIB (amber) |
+| Caution | 3.5-4.5 ips | MAJOR | ENG VIB (amber) |
+| Warning | ≥ 4.5 ips | CRITICAL | ENG VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Common Root Causes
 
@@ -488,6 +535,81 @@ The Full Authority Digital Engine Control (FADEC) provides:
 | Core imbalance | 1 × N2 | HPC blade loss |
 | Bearing | 1 × N1 or N2 | Bearing degradation |
 | Gear mesh | Multiple of N2 | AGB wear |
+
+### 4.6 Overheat Condition (EGT Exceedance)
+
+**Fault Code:** ENG-OVH-006
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 11 of the B737-800's 37 engine maintenance events, or 30%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
+
+#### Symptoms
+- EGT indication above the normal operating range
+- EICAS caution or warning message
+- EGT margin loss in trend data
+- Possible heat damage found on borescope inspection
+
+#### Immediate Actions
+1. Reduce thrust if flight conditions permit
+2. Monitor the EGT trend for stabilization
+3. If EGT reaches the maximum in the Operating Limits table in section 3.2.3, High-Pressure Turbine, follow the engine shutdown procedure in the QRH
+
+#### Troubleshooting Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review DFDR/QAR data for the EGT exceedance | Document peak temperature and exposure time |
+| 2 | Compare EGT probe readings | Find a failed or drifting probe |
+| 3 | Borescope the combustor and HPT blades | Check for thermal distress and coating loss |
+| 4 | Check fuel nozzle spray patterns | Ensure even fuel distribution |
+| 5 | Review the FADEC fault log via CMC | Rule out a sensor or control fault |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (EGT above the maximum limit):**
+- Ground aircraft pending HPT borescope inspection
+- If blade damage is found, remove the engine for a shop visit
+
+**MAJOR (EGT in the caution band, intermittent):**
+- Perform a hot section inspection within 50 flight hours
+- Replace EGT probes if calibration drift is found
+- Monitor trend data for recurrence
+
+**MINOR (EGT trending high but within limits):**
+- Adjust engine trim if applicable
+- Schedule an inspection at the next C-check
+- Continue monitoring with increased frequency
+
+### 4.7 Fuel Starvation
+
+**Fault Code:** ENG-FUEL-007
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 3 of the B737-800's 37 engine maintenance events, or 8%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
+
+#### Symptoms
+- Fuel flow fluctuation or sudden drop
+- EGT drop with N1/N2 rollback
+- Fuel filter bypass or low fuel pressure EICAS message
+- Possible flameout
+
+#### Immediate Actions
+1. Check fuel quantity and crossfeed configuration
+2. Confirm the fuel boost pumps are on
+3. If flameout occurs, follow the relight procedure in the QRH
+
+#### Diagnostic Procedure
+
+| Step | Action | Check Point |
+|------|--------|-------------|
+| 1 | Verify fuel quantity and feed configuration | Rule out a fuel management error |
+| 2 | Check fuel filter differential pressure | A high reading means a blocked filter |
+| 3 | Compare fuel flow with the Main Fuel Pump flow rate in section 3.2.4 | Low flow points to the pump or metering valve |
+| 4 | Check fuel metering valve operation | FADEC command matches actual position |
+| 5 | Inspect fuel lines for leaks or blockage | Visual and pressure decay test |
+| 6 | Sample fuel for contamination | Water, particulates, microbial growth |
 
 ---
 
@@ -545,6 +667,9 @@ Integrated Multi-Mode Receiver (MMR) providing:
 #### 5.3.1 Sensor Drift (Avionics)
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 5 of the B737-800's 7 avionics maintenance events, or 71%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADC outputs (ADC 1/2/3) via maintenance page
@@ -608,6 +733,9 @@ The trailing edge flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 6 of the B737-800's 7 hydraulics maintenance events, or 86%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -629,6 +757,9 @@ The trailing edge flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 1 of the B737-800's 7 hydraulics maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Limits (NAS 1638):**
 
@@ -646,6 +777,7 @@ The trailing edge flap system uses:
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
@@ -654,26 +786,31 @@ The trailing edge flap system uses:
 | ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
 | ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
 | ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
-| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ | 73 | Check fuel system, filter |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
 | ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADC comparison, calibration |
-| AVN-ELF-002 | Electrical Fault | MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADC comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
 | AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
 | HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
 | HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 
@@ -689,13 +826,17 @@ The trailing edge flap system uses:
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 4.5 ips. The Caution level starts at 3.5 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Advisory
 │
-├─► Is vibration > 4.5 ips (N1) or > 4.0 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust immediately
-│   │          If vibration persists > 4.0 ips, shutdown engine
+│   │          If vibration stays at the Warning level, shutdown engine
 │   │          └─► END: Engine shutdown, ground inspection required
 │   │
 │   └─► NO ─► Continue to next step
@@ -899,22 +1040,38 @@ START: HYD SYS PRESS (System A or B) Warning
 
 #### Engine Parameters (CFM56-7B)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (%) | 20-25 | 25-30 | 95 | 104 |
-| N2 (%) | 55-62 | 62-68 | 95 | 101 |
-| EGT (°C) | 350-420 | 420-480 | 895 | 950 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temp (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 20-25 | 25-30 | 88 (86-90) | 95 | 104 |
+| N2 (%) | 55-62 | 62-68 | — | 95 | 101 |
+| EGT (°C) | 350-420 | 420-480 | 658 (< 678) | < 895 | < 930 |
+| FuelFlow (kg/s) | 0.10-0.18 | 0.18-0.25 | 0.36 (0.33-0.39) | 0.85-1.10 | 1.20-1.50 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
+
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
 
 #### Hydraulic System
 
-| Parameter | System A | System B | Standby |
-|-----------|----------|----------|---------|
-| Pressure | 2,800-3,200 psi | 2,800-3,200 psi | 2,800-3,200 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** System A, System B, and Standby each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 
@@ -976,26 +1133,43 @@ START: HYD SYS PRESS (System A or B) Warning
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Fleet Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The B737-800 has 5 of the aircraft and 51 of the maintenance events.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 370 |
-| Critical Events | 192 (52%) |
-| Major Events | 115 (31%) |
-| Minor Events | 63 (17%) |
-| Engine-Related | 259 (70%) |
-| Hydraulics-Related | 78 (21%) |
-| Avionics-Related | 33 (9%) |
+**Events by Severity:**
 
-**Top Fault Types:**
-1. Overheat (EGT exceedance) — 104 events (28%)
-2. Bearing wear — 93 events (25%)
-3. Vibration exceedance — 74 events (20%)
-4. Sensor drift — 56 events (15%)
-5. Contamination / Leak — 43 events (12%)
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 11 | 22% |
+| Major | 18 | 35% |
+| Minor | 22 | 43% |
+
+**Events by System:**
+
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 37 | 73% |
+| Avionics | 7 | 14% |
+| Hydraulics | 7 | 14% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 11 | 22% |
+| Sensor drift | Engine | 6 | 12% |
+| Vibration exceedance | Engine | 6 | 12% |
+| Leak | Hydraulics | 6 | 12% |
+| Leak | Engine | 5 | 10% |
+| Sensor drift | Avionics | 5 | 10% |
+| Bearing wear | Engine | 4 | 8% |
+| Fuel starvation | Engine | 3 | 6% |
+| Contamination | Engine | 2 | 4% |
+| Electrical fault | Avionics | 2 | 4% |
+| Contamination | Hydraulics | 1 | 2% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

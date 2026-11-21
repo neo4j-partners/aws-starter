@@ -4,7 +4,7 @@
 **Revision:** 1.0
 **Effective Date:** October 1, 2024
 **Applicability:** E190 series aircraft equipped with CF34-10E engines
-**Operator:** ExampleAir (also SkyWays, NorthernJet, RegionalCo)
+**Operator:** ExampleAir, SkyWays, RegionalCo, NorthernJet
 **Fleet:** N10002, N10017, N10023, N10036, N10050, N10068, N10071, N10073, N10084, N10096
 
 ---
@@ -53,14 +53,14 @@
 
 ### 1.2 Fleet Configuration
 
-The E190 fleet operates across four partner carriers in regional jet service. The combined fleet of approximately 10 aircraft is distributed as follows:
+The E190 fleet operates across four partner carriers in regional jet service.
 
-| Operator | Aircraft Count | Primary Routes |
+| Operator | Registrations | Primary Routes |
 |----------|---------------|----------------|
-| ExampleAir | 3 | Domestic regional feeders |
-| SkyWays | 3 | Domestic regional feeders |
-| RegionalCo | 2 | Regional and short-haul |
-| NorthernJet | 2 | Northern domestic regional |
+| ExampleAir | N10002, N10017, N10023 | Domestic regional feeders |
+| SkyWays | N10036, N10050, N10068 | Domestic regional feeders |
+| RegionalCo | N10071, N10073 | Regional and short-haul |
+| NorthernJet | N10084, N10096 | Northern domestic regional |
 
 Aircraft entered service between 2018 and 2022, configured in a two-class layout for 94–100 passengers. Regional operations result in higher cycle-to-flight-hour ratios compared to wide-body or long-haul fleets, making cycle-based inspection compliance particularly important.
 
@@ -86,6 +86,7 @@ This manual covers the following ATA chapters:
 
 Each E190 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (E190)
 │
@@ -105,7 +106,7 @@ AIRCRAFT (E190)
 │
 ├── AVIONICS SYSTEM
 │   ├── Flight Management System (FMS)
-│   ├── Air Data / Inertial Reference Unit (ADIRU)
+│   ├── Air Data and Inertial Reference Unit (ADIRU)
 │   └── Multi-Mode Receiver (MMR)
 │
 └── HYDRAULICS SYSTEM
@@ -113,39 +114,64 @@ AIRCRAFT (E190)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (CF34-10E)
 
-The E190 is powered by two GE Aviation CF34-10E high-bypass turbofan engines, mounted on aft-fuselage pylons in the characteristic E-Jet configuration that provides unobstructed underwing space and a low-slung cabin floor. Each engine produces 18,500 lbf of thrust at takeoff and operates independently with full redundancy. The CF34-10E features a two-spool architecture with a single-stage fan driven by a multi-stage low-pressure turbine and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine, achieving an overall pressure ratio of 27.0:1. The engine incorporates an annular combustor with low-emissions fuel nozzle design. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. The engine systems account for approximately 69% of all maintenance events in the fleet, with the most common issues being sensor drift, contamination, and bearing wear.
+The E190 is powered by two GE Aviation CF34-10E high-bypass turbofan engines, mounted on aft-fuselage pylons in the characteristic E-Jet configuration that provides unobstructed underwing space and a low-slung cabin floor. Each engine produces 18,500 lbf of thrust at takeoff and operates independently with full redundancy. The CF34-10E features a two-spool architecture with a single-stage fan driven by a multi-stage low-pressure turbine and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine, achieving an overall pressure ratio of 27.0:1. The engine incorporates an annular combustor with low-emissions fuel nozzle design. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 48 of the E190's 74 maintenance events, or 65%. The most common engine faults are overheat with 15 events, bearing wear with 12, and sensor drift with 10.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The E190 features the Honeywell Primus Epic EFIS with dual Flight Management Systems providing 4D flight planning, performance calculations, and VNAV/LNAV guidance. Three Air Data / Inertial Reference Units (ADIRU) supply redundant altitude, airspeed, Mach, and inertial reference data integrated with the digital fly-by-wire flight control system. Multi-Mode Receivers (MMR) provide VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive Built-In Test Equipment (BITE). Avionics-related maintenance events comprise approximately 10% of fleet issues, primarily involving sensor drift and FMS anomalies typically resolved through calibration or software updates.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The E190 features the Honeywell Primus Epic EFIS with dual Flight Management Systems providing 4D flight planning, performance calculations, and VNAV/LNAV guidance. Three Air Data / Inertial Reference Units (ADIRU) supply redundant altitude, airspeed, Mach, and inertial reference data integrated with the digital fly-by-wire flight control system. Multi-Mode Receivers (MMR) provide VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive Built-In Test Equipment (BITE).
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 15 of the E190's 74 maintenance events, or 20%. The avionics faults are electrical fault with 10 events and sensor drift with 5.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are typically resolved through calibration or software updates.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The E190 hydraulic system provides power for flight control surfaces, spoilers, leading edge slats, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. The Left system is powered by two engine-driven pumps (one per engine) and one AC motor pump. Each system reservoir holds 4.0 gallons usable capacity. Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. The hydraulics system represents approximately 21% of maintenance events, with leaks and contamination being the primary concerns.
+The E190 hydraulic system provides power for flight control surfaces, spoilers, leading edge slats, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. The Left system is powered by two engine-driven pumps (one per engine) and one AC motor pump. Each system reservoir holds 4.0 gallons usable capacity. Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 11 of the E190's 74 maintenance events, or 15%. The hydraulics faults are leak with 9 events and contamination with 2.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
 ### 2.2 Engine Health Monitoring
 
-Each CF34-10E engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each CF34-10E engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
-| Vibration | Engine Vibration | ips (inches/sec) | Fan frame, turbine frame |
-| N1Speed | Fan Speed N1 | rpm | Fan shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
+| Engine | Vibration | Engine Vibration | ips | Fan frame, turbine frame |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~641°C, warning threshold ~672°C) differ from the instantaneous cockpit EGT readings shown in Section 3.3 and Appendix 10.1, which reflect peak values during takeoff and high-power operations (typically 860–895°C for the CF34-10E7). The trend-monitoring scale detects gradual EGT margin deterioration over weeks and months rather than acute exceedances; the absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the CF34-10E, the trend baseline is 641°C, with Advisory at 661°C, Caution at 671°C, and Warning at 681°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
+
+Instantaneous takeoff EGT for the CF34-10E must stay within the Operating Limits table in section 3.2.3, High-Pressure Turbine.
 
 **FADEC Integration:** The CF34-10E features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation.
 
@@ -153,20 +179,22 @@ Each CF34-10E engine is equipped with four primary monitoring sensors:
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
-Example: AC1003-S01-C03
+Example: AC1004-S01-C03
          │       │    └── Component: High-Pressure Turbine
          │       └─────── System: Engine #1
-         └─────────────── Aircraft: AC1003 (N10002)
+         └─────────────── Aircraft: AC1004 (N10002)
 ```
 
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 
@@ -227,11 +255,13 @@ The 9-stage high-pressure compressor (HPC) achieves a pressure ratio of approxim
 The single-stage HPT drives the high-pressure compressor through a concentric shaft. Turbine blades feature advanced single-crystal alloy construction with thermal barrier coating and film cooling. The nozzle guide vanes are air-cooled with impingement and film cooling optimized for the CF34-10E's turbine inlet temperature.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 870°C | 870-895°C | 900°C |
+| EGT (Takeoff, 5 min) | < 870°C | 870-900°C | 900°C |
 | EGT (Max Continuous) | < 840°C | 840-870°C | 870°C |
 | EGT (Start) | — | — | 730°C |
+<!-- END GENERATED: egt-limits -->
 
 **Life-Limited Parts:**
 - HPT disk: 18,000 cycles
@@ -243,7 +273,9 @@ The single-stage HPT drives the high-pressure compressor through a concentric sh
 
 The engine-driven fuel pump is a positive displacement gear pump providing metered fuel flow to the combustion chamber through the fuel metering valve (FMV). The hydromechanical unit (HMU) integrates the fuel pump with the fuel metering valve under FADEC control.
 
-**Flow Rate:** 0.20 - 1.20 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.08 - 1.20 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings
@@ -265,14 +297,16 @@ The thrust bearing absorbs axial loads from the high-pressure rotor system. The 
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 22-28% | 28-35% | 96% | 100% |
-| EGT (°C) | 330-400 | 400-460 | 840-870 | 870-900 |
-| FuelFlow (kg/s) | 0.08-0.15 | 0.15-0.22 | 0.75-0.95 | 1.00-1.20 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temperature (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 22-28 | 28-35 | 87 (85-89) | 96 | 100 |
+| EGT (°C) | 330-400 | 400-460 | 641 (< 661) | < 840 | < 870 |
+| FuelFlow (kg/s) | 0.08-0.15 | 0.15-0.22 | 0.27 (0.25-0.29) | 0.75-0.95 | 1.00-1.20 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
 
 ### 3.4 FADEC System
 
@@ -299,7 +333,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Most common fault type (22% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 10 of the E190's 48 engine maintenance events, or 21%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
 
 #### Symptoms
 - Parameter disagree messages on EICAS
@@ -339,7 +375,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** Second most common fault (15% of engine events)
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 3 of the E190's 48 engine maintenance events, or 6%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Types of Contamination
 
@@ -383,7 +421,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 12% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 12 of the E190's 48 engine maintenance events, or 25%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings
@@ -435,7 +475,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Fleet Statistics:** 13% of engine maintenance events
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 4 of the E190's 48 engine maintenance events, or 8%.
+<!-- END GENERATED: fault-stats-engine-leak -->
 
 #### Leak Classification
 
@@ -469,15 +511,20 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 4 of the E190's 48 engine maintenance events, or 8%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits (CF34-10E)
 
-| Level | N1 Vibration | N2 Vibration | Flight Deck Alert |
-|-------|--------------|--------------|-------------------|
-| Normal | < 2.0 ips | < 1.8 ips | None |
-| Advisory | 2.0-3.0 ips | 1.8-2.8 ips | ENG VIB (amber) |
-| Caution | 3.0-4.0 ips | 2.8-3.5 ips | ENG VIB (amber) |
-| Warning | > 4.0 ips | > 3.5 ips | ENG VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.0 ips | MINOR | ENG VIB (amber) |
+| Caution | 3.0-4.0 ips | MAJOR | ENG VIB (amber) |
+| Warning | ≥ 4.0 ips | CRITICAL | ENG VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Common Root Causes
 
@@ -487,6 +534,81 @@ The Full Authority Digital Engine Control (FADEC) provides:
 | Core imbalance | 1 × N2 | HPC blade loss |
 | Bearing | 1 × N1 or N2 | Bearing degradation |
 | Gear mesh | Multiple of N2 | AGB wear |
+
+### 4.6 Overheat Condition (EGT Exceedance)
+
+**Fault Code:** ENG-OVH-006
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 15 of the E190's 48 engine maintenance events, or 31%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
+
+#### Symptoms
+- EGT indication above the normal operating range
+- EICAS caution or warning message
+- EGT margin loss in trend data
+- Possible heat damage found on borescope inspection
+
+#### Immediate Actions
+1. Reduce thrust if flight conditions permit
+2. Monitor the EGT trend for stabilization
+3. If EGT reaches the maximum in the Operating Limits table in section 3.2.3, High-Pressure Turbine, follow the engine shutdown procedure in the QRH
+
+#### Troubleshooting Procedure
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Review DFDR/QAR data for the EGT exceedance | Document peak temperature and exposure time |
+| 2 | Compare EGT probe readings | Find a failed or drifting probe |
+| 3 | Borescope the combustor and HPT blades | Check for thermal distress and coating loss |
+| 4 | Check fuel nozzle spray patterns | Ensure even fuel distribution |
+| 5 | Review the FADEC fault log via CMC | Rule out a sensor or control fault |
+
+#### Corrective Actions by Severity
+
+**CRITICAL (EGT above the maximum limit):**
+- Ground aircraft pending HPT borescope inspection
+- If blade damage is found, remove the engine for a shop visit
+
+**MAJOR (EGT in the caution band, intermittent):**
+- Perform a hot section inspection within 50 flight hours
+- Replace EGT probes if calibration drift is found
+- Monitor trend data for recurrence
+
+**MINOR (EGT trending high but within limits):**
+- Adjust engine trim if applicable
+- Schedule an inspection at the next C-check
+- Continue monitoring with increased frequency
+
+### 4.7 Fuel Starvation
+
+**Fault Code:** ENG-FUEL-007
+**Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the E190's 48 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
+
+#### Symptoms
+- Fuel flow fluctuation or sudden drop
+- EGT drop with N1/N2 rollback
+- Fuel filter bypass or low fuel pressure EICAS message
+- Possible flameout
+
+#### Immediate Actions
+1. Check fuel quantity and crossfeed configuration
+2. Confirm the fuel boost pumps are on
+3. If flameout occurs, follow the relight procedure in the QRH
+
+#### Diagnostic Procedure
+
+| Step | Action | Check Point |
+|------|--------|-------------|
+| 1 | Verify fuel quantity and feed configuration | Rule out a fuel management error |
+| 2 | Check fuel filter differential pressure | A high reading means a blocked filter |
+| 3 | Compare fuel flow with the Main Fuel Pump flow rate in section 3.2.4 | Low flow points to the pump or metering valve |
+| 4 | Check fuel metering valve operation | FADEC command matches actual position |
+| 5 | Inspect fuel lines for leaks or blockage | Visual and pressure decay test |
+| 6 | Sample fuel for contamination | Water, particulates, microbial growth |
 
 ---
 
@@ -544,6 +666,9 @@ Integrated Multi-Mode Receiver providing:
 #### 5.3.1 Sensor Drift (Avionics)
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 5 of the E190's 15 avionics maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADIRU outputs (ADIRU 1/2/3) via maintenance page
@@ -607,6 +732,9 @@ The trailing edge flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 9 of the E190's 11 hydraulics maintenance events, or 82%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -628,6 +756,9 @@ The trailing edge flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 2 of the E190's 11 hydraulics maintenance events, or 18%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Limits (NAS 1638):**
 
@@ -645,6 +776,7 @@ The trailing edge flap system uses:
 
 ### 7.1 Engine Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-engine -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | ENG-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 77 | Identify sensor, verify, replace |
@@ -653,26 +785,31 @@ The trailing edge flap system uses:
 | ENG-LEAK-004 | Fluid Leak | CRIT/MAJ/MIN | 79 | Identify source, repair |
 | ENG-VIB-005 | Vibration Exceedance | CRIT/MAJ/MIN | 72 | Fan balance, bearing check |
 | ENG-OVH-006 | Overheat | CRIT/MAJ/MIN | 72 | Reduce thrust, borescope |
-| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ | 73 | Check fuel system, filter |
+| ENG-FUEL-007 | Fuel Starvation | CRIT/MAJ/MIN | 73 | Check fuel system, filter |
 | ENG-ELF-008 | Electrical Fault | CRIT/MAJ/MIN | 77 | FADEC diagnostics, wiring |
+<!-- END GENERATED: fault-codes-engine -->
 
 ### 7.2 Avionics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-avionics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
-| AVN-SDR-001 | Sensor Drift | MAJ/MIN | 34 | ADIRU comparison, calibration |
-| AVN-ELF-002 | Electrical Fault | MAJ/MIN | 34 | Power check, connector inspect |
+| AVN-SDR-001 | Sensor Drift | CRIT/MAJ/MIN | 34 | ADIRU comparison, calibration |
+| AVN-ELF-002 | Electrical Fault | CRIT/MAJ/MIN | 34 | Power check, connector inspect |
 | AVN-FMS-003 | FMS Malfunction | MAJ | 34 | Reset, database reload |
 | AVN-NAV-004 | NAV Receiver Fault | MIN | 34 | Antenna check, LRU swap |
+<!-- END GENERATED: fault-codes-avionics -->
 
 ### 7.3 Hydraulics Fault Codes
 
+<!-- BEGIN GENERATED: fault-codes-hydraulics -->
 | Code | Description | Severity | ATA | Primary Action |
 |------|-------------|----------|-----|----------------|
 | HYD-LEAK-001 | System Leak | CRIT/MAJ/MIN | 29 | Locate, classify, repair |
-| HYD-CNT-002 | Contamination | MAJ/MIN | 29 | Sample analysis, filter |
+| HYD-CNT-002 | Contamination | CRIT/MAJ/MIN | 29 | Sample analysis, filter |
 | HYD-PRS-003 | Low Pressure | CRIT/MAJ | 29 | Pump check, leak check |
 | HYD-QTY-004 | Low Quantity | MAJ | 29 | Check level, leak inspect |
+<!-- END GENERATED: fault-codes-hydraulics -->
 
 ### 7.4 Severity Definitions
 
@@ -688,13 +825,17 @@ The trailing edge flap system uses:
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 4.0 ips. The Caution level starts at 3.0 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Advisory
 │
-├─► Is vibration > 4.0 ips (N1) or > 3.5 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust immediately
-│   │          If vibration persists > 4.0 ips, shutdown engine
+│   │          If vibration stays at the Warning level, shutdown engine
 │   │          └─► END: Engine shutdown, ground inspection required
 │   │
 │   └─► NO ─► Continue to next step
@@ -898,21 +1039,37 @@ START: HYD SYS PRESS (Left or Right) Warning
 
 #### Engine Parameters (CF34-10E)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (%) | 22-28 | 28-35 | 96 | 100 |
-| EGT (°C) | 330-400 | 400-460 | 870 | 900 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temp (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 22-28 | 28-35 | 87 (85-89) | 96 | 100 |
+| EGT (°C) | 330-400 | 400-460 | 641 (< 661) | < 840 | < 870 |
+| FuelFlow (kg/s) | 0.08-0.15 | 0.15-0.22 | 0.27 (0.25-0.29) | 0.75-0.95 | 1.00-1.20 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
+
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
 
 #### Hydraulic System
 
-| Parameter | Left System | Right System | Standby |
-|-----------|-------------|--------------|---------|
-| Pressure | 2,800-3,200 psi | 2,800-3,200 psi | 2,800-3,200 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Left, Right, and Standby systems each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 
@@ -972,27 +1129,42 @@ START: HYD SYS PRESS (Left or Right) Warning
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Fleet Maintenance Statistics Summary
+### 10.5 Fleet Maintenance Statistics
 
-Based on fleet data analysis (July – September 2024):
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The E190 has 10 of the aircraft and 74 of the maintenance events.
 
-| Metric | Value |
-|--------|-------|
-| Total Maintenance Events | 92 |
-| Critical Events | 48 (52%) |
-| Major Events | 29 (31%) |
-| Minor Events | 15 (17%) |
-| Engine-Related | 60 (65%) |
-| Hydraulics-Related | 17 (19%) |
-| Avionics-Related | 15 (16%) |
+**Events by Severity:**
 
-**Top Fault Types:**
-1. Overheat (EGT exceedance) — 25 events (27%)
-2. Sensor drift — 20 events (22%)
-3. Bearing wear — 18 events (20%)
-4. Vibration exceedance — 15 events (16%)
-5. Contamination — 8 events (9%)
-6. Leak — 6 events (6%)
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 16 | 22% |
+| Major | 23 | 31% |
+| Minor | 35 | 47% |
+
+**Events by System:**
+
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 48 | 65% |
+| Avionics | 15 | 20% |
+| Hydraulics | 11 | 15% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 15 | 20% |
+| Bearing wear | Engine | 12 | 16% |
+| Sensor drift | Engine | 10 | 14% |
+| Electrical fault | Avionics | 10 | 14% |
+| Leak | Hydraulics | 9 | 12% |
+| Sensor drift | Avionics | 5 | 7% |
+| Leak | Engine | 4 | 5% |
+| Vibration exceedance | Engine | 4 | 5% |
+| Contamination | Engine | 3 | 4% |
+| Contamination | Hydraulics | 2 | 3% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

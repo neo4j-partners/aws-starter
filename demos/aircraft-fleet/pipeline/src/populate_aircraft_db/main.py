@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TextIO
 
 import typer
 from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 
+from generator.stamp import GenerateRunningError, stale_reason
+
 from .config import Settings
-from .loader import clear_database, load_nodes, load_relationships, verify
+from .loader import clear_database, dataset_mismatch, load_operational_graph, verify
 from .schema import (
     create_constraints,
     create_embedding_indexes,
@@ -30,6 +33,87 @@ app = typer.Typer(
     add_completion=False,
     pretty_exceptions_show_locals=False,
 )
+
+
+class _SysStreamHandler(logging.StreamHandler):
+    """Write each record to sys.stdout or sys.stderr as it is at emit time.
+
+    CliRunner and pytest replace sys.stdout and sys.stderr and can close the
+    old ones, so the handler does not keep the stream it was created with.
+    """
+
+    def __init__(self, stream_name: Literal["stdout", "stderr"]) -> None:
+        self._stream_name = stream_name
+        super().__init__()
+
+    @property
+    def stream(self) -> TextIO:
+        return getattr(sys, self._stream_name)
+
+    @stream.setter
+    def stream(self, value: TextIO) -> None:
+        # StreamHandler.__init__ assigns a stream. The getter ignores it and
+        # always returns the current sys stream.
+        del value
+
+    def emit(self, record: logging.LogRecord) -> None:
+        # When stdout is a block-buffered pipe, as in setup.sh 2>&1 | tee,
+        # earlier print() output can still sit in its buffer. Flushing it
+        # first keeps a stderr record after that output.
+        # stdout can be None (pythonw, a closed descriptor) or a pipe whose
+        # reader has exited. The flush only orders output, so a failure must
+        # not stop the record from reaching stderr.
+        if self._stream_name == "stderr" and (stdout := sys.stdout) is not None:
+            with suppress(OSError, ValueError):
+                stdout.flush()
+        super().emit(record)
+
+
+class _CliFormatter(logging.Formatter):
+    """Format a record as its bare message, after a blank line if it asks for one.
+
+    A library marks the start of a section with extra={"blank_before": True}.
+    Only the CLI turns the mark into a blank line, so other log consumers see
+    the record unchanged.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = super().format(record)
+        return f"\n{message}" if getattr(record, "blank_before", False) else message
+
+
+def _below_warning(record: logging.LogRecord) -> bool:
+    return record.levelno < logging.WARNING
+
+
+def _configure_logging() -> None:
+    """Write this package's records as bare messages.
+
+    INFO records go to stdout, and WARNING and higher go to stderr. A record
+    with extra={"blank_before": True} follows a blank line.
+
+    Only the package logger gets handlers, and its records do not propagate
+    to the root logger. Other libraries keep the root logger's WARNING
+    default, so INFO records from httpx and neo4j stay hidden. A repeat call
+    keeps the existing handlers.
+    """
+    package_logger = logging.getLogger(__package__)
+    package_logger.setLevel(logging.INFO)
+    package_logger.propagate = False
+    if any(isinstance(h, _SysStreamHandler) for h in package_logger.handlers):
+        return
+    stdout_handler = _SysStreamHandler("stdout")
+    stdout_handler.addFilter(_below_warning)
+    stderr_handler = _SysStreamHandler("stderr")
+    stderr_handler.setLevel(logging.WARNING)
+    for handler in (stdout_handler, stderr_handler):
+        handler.setFormatter(_CliFormatter("%(message)s"))
+        package_logger.addHandler(handler)
+
+
+@app.callback()
+def _main() -> None:
+    _configure_logging()
 
 
 def _fmt_elapsed(seconds: float) -> str:
@@ -113,8 +197,7 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
     if provider == "openai":
         if settings.openai_api_key is None:
             raise typer.BadParameter(
-                "OPENAI_API_KEY is required when using OpenAI. "
-                "Set it in .env or as an env var."
+                "OPENAI_API_KEY is required when using OpenAI. Set it in .env or as an env var."
             )
         openai_key = settings.openai_api_key.get_secret_value()
         llm_model = settings.openai_extraction_model
@@ -136,9 +219,7 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
         llm_model = settings.anthropic_extraction_model
         llm_max_tokens = settings.anthropic_extraction_max_tokens
     else:
-        raise typer.BadParameter(
-            f"Unknown provider: {provider!r}. Use 'openai' or 'anthropic'."
-        )
+        raise typer.BadParameter(f"Unknown provider: {provider!r}. Use 'openai' or 'anthropic'.")
 
     embedding_model = settings.openai_embedding_model
     embedding_dims = settings.openai_embedding_dimensions
@@ -169,11 +250,17 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
     )
 
     print("Clearing existing enrichment data (safe re-run)...")
-    clear_enrichment_data(driver)
+    clear_enrichment_data(driver, settings.neo4j_database)
     print()
 
     print("Dropping extraction constraints for pipeline write phase...")
-    drop_extraction_constraints(driver)
+    drop_extraction_constraints(driver, settings.neo4j_database)
+    print()
+
+    # Document and Chunk constraints must exist before the pipeline writes.
+    # create_constraints is idempotent, so a graph loaded earlier is unchanged.
+    print("Creating constraints...")
+    create_constraints(driver, settings.neo4j_database)
     print()
 
     if settings.enrich_sample_size:
@@ -190,6 +277,7 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
 
     process_all_documents(
         driver,
+        settings.neo4j_database,
         settings.document_dir,
         provider=creds.provider,
         openai_api_key=creds.openai_key,
@@ -205,15 +293,28 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
     )
 
     print("\nCreating extraction constraints (post entity-resolution)...")
-    create_extraction_constraints(driver)
+    create_extraction_constraints(driver, settings.neo4j_database)
 
     print("\nCreating embedding indexes...")
-    create_embedding_indexes(driver, creds.embedding_dims)
+    create_embedding_indexes(driver, settings.neo4j_database, creds.embedding_dims)
 
     print("\nLinking to existing graph...")
-    link_to_existing_graph(driver)
+    link_to_existing_graph(driver, settings.neo4j_database)
 
-    validate_enrichment(driver)
+    validate_enrichment(driver, settings.neo4j_database)
+
+
+def _load_csvs(driver: Driver, settings: Settings) -> None:
+    """Load the operational CSVs, or exit 1 with the message if a generate runs.
+
+    Only the held lock becomes a message. Any other error keeps its
+    traceback.
+    """
+    try:
+        load_operational_graph(driver, settings.neo4j_database, settings.data_dir)
+    except GenerateRunningError as exc:
+        print(f"[FAIL] {exc}")
+        raise typer.Exit(code=1) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -234,16 +335,14 @@ def setup_cmd() -> None:
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
         print("Creating constraints...")
-        create_constraints(driver)
+        create_constraints(driver, settings.neo4j_database)
         print("\nCreating indexes...")
-        create_indexes(driver)
+        create_indexes(driver, settings.neo4j_database)
         print("\nCreating fulltext indexes...")
-        create_fulltext_indexes(driver)
+        create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_nodes(driver, settings.data_dir)
-        print()
-        load_relationships(driver, settings.data_dir)
+        _load_csvs(driver, settings)
         print()
 
         try:
@@ -256,7 +355,9 @@ def setup_cmd() -> None:
 
         verify(
             driver,
+            settings.neo4j_database,
             expected_embedding_dimensions=creds.embedding_dims,
+            data_dir=settings.data_dir,
         )
 
     elapsed = time.monotonic() - start
@@ -274,12 +375,29 @@ def verify_cmd(
     """Run comprehensive graph verification (read-only)."""
     settings = Settings()  # type: ignore[call-arg]
 
+    # Two checks: the stamp in generated/ against the current generator code,
+    # and the graph's Dataset node against that stamp. Each says which one
+    # is out of date.
+    status = "[FAIL]" if strict else "[WARN]"
+    code_reason = stale_reason(settings.data_dir)
+    if code_reason:
+        print(f"{status} Generated CSVs are stale: {code_reason}.")
+        print("  Regenerate and reload: ./setup.sh generate, then ./setup.sh load.")
+
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
+        graph_reason = dataset_mismatch(driver, settings.neo4j_database, settings.data_dir)
+        if graph_reason:
+            print(f"{status} The graph does not match the generated CSVs: {graph_reason}.")
+            print("  Reload: ./setup.sh load.")
+        if strict and (code_reason or graph_reason):
+            raise typer.Exit(code=1)
         passed = verify(
             driver,
+            settings.neo4j_database,
             expected_embedding_dimensions=_expected_embedding_dims(settings),
             strict=strict,
+            data_dir=settings.data_dir,
         )
 
     if strict and not passed:
@@ -293,7 +411,7 @@ def clean_cmd() -> None:
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
-        clear_database(driver)
+        clear_database(driver, settings.neo4j_database)
 
     print("\nDone.")
 
@@ -307,7 +425,7 @@ def clean_enrichment_cmd() -> None:
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
-        clear_enrichment_data(driver)
+        clear_enrichment_data(driver, settings.neo4j_database)
 
     print("\nDone.")
 
@@ -324,22 +442,20 @@ def load_operational_cmd() -> None:
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
         print("Creating constraints...")
-        create_constraints(driver)
+        create_constraints(driver, settings.neo4j_database)
         print("\nCreating indexes...")
-        create_indexes(driver)
+        create_indexes(driver, settings.neo4j_database)
         print("\nCreating fulltext indexes...")
-        create_fulltext_indexes(driver)
+        create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_nodes(driver, settings.data_dir)
-        print()
-        load_relationships(driver, settings.data_dir)
+        _load_csvs(driver, settings)
         print()
 
         print("Linking existing enrichment to operational graph...")
-        link_to_existing_graph(driver)
+        link_to_existing_graph(driver, settings.neo4j_database)
 
-        validate_enrichment(driver)
+        validate_enrichment(driver, settings.neo4j_database)
 
     elapsed = time.monotonic() - start
     print(f"\nDone in {_fmt_elapsed(elapsed)}.")
@@ -415,7 +531,7 @@ def samples_cmd() -> None:
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
-        run_all_samples(driver, sample_size=settings.sample_size)
+        run_all_samples(driver, settings.neo4j_database, sample_size=settings.sample_size)
 
 
 @app.command("agent-samples")
@@ -431,6 +547,7 @@ def agent_samples_cmd() -> None:
     with _connect(settings) as driver:
         run_agent_samples(
             driver,
+            settings.neo4j_database,
             provider=creds.provider,
             openai_key=creds.openai_key,
             anthropic_key=creds.anthropic_key,

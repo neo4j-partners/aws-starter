@@ -10,6 +10,9 @@
 #   ./setup.sh clean           # delete all nodes/relationships
 #   ./setup.sh samples         # run showcase queries against the loaded graph
 #
+# load and load-operational first regenerate generated/ when its stamp does
+# not match the GEN_* values or the generator code.
+#
 # All configuration is via the shared ../.env at the aircraft-fleet root
 # (copy from ../.env.sample).
 
@@ -25,10 +28,18 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 # Load the shared .env so the vendored tools and child processes see it.
+# .env.sample promises that existing environment variables are never
+# overridden, so NEO4J_DATABASE=x ./setup.sh load must keep x. Sourcing
+# would overwrite a shell export, so snapshot the exports first and restore
+# them after. .env still fills every key the shell did not export, and
+# export -p quotes each value safely for eval.
+saved_env="$(export -p)"
 set -a
 # shellcheck disable=SC1091
 source "$ENV_FILE"
 set +a
+eval "$saved_env"
+unset saved_env
 
 CMD="${1:-full}"
 
@@ -38,12 +49,12 @@ if [[ "$LOAD_FULL_DATASET" == "true" ]]; then
   DEFAULT_AIRCRAFT=100
   DEFAULT_DAYS=90
 else
-  DEFAULT_AIRCRAFT=20
-  # 90 days: degradation is time-driven, so a shorter window produces zero
-  # MaintenanceEvents (events only fire once sensor series cross model
-  # thresholds, which takes ~45+ days). 20 aircraft x 90 days yields ~111
-  # events and keeps readings ~23M — small-tier friendly, and makes the
-  # graphrag-agent maintenance queries actually return data.
+  # 30 aircraft covers every tail listed in the maintenance manuals.
+  DEFAULT_AIRCRAFT=30
+  # 90 days gives the graphrag-agent maintenance queries enough data.
+  # 30 aircraft x 90 days yields about 230 MaintenanceEvents and about
+  # 778k readings. That is past Aura Free, so use a paid tier or a local
+  # Neo4j.
   DEFAULT_DAYS=90
 fi
 AIRCRAFT="${GEN_AIRCRAFT:-$DEFAULT_AIRCRAFT}"
@@ -68,20 +79,28 @@ sync_deps() {
   uv sync ${UV_SYNC_EXTRA}
 }
 
+# Extra arguments, such as --if-stale, go to generate-data generate.
+# With --if-stale, generate itself says whether it skips or regenerates.
 do_generate() {
-  echo "==> Generating dataset (aircraft=$AIRCRAFT days=$DAYS airports=$AIRPORTS seed=$SEED, full=$LOAD_FULL_DATASET)"
+  local action="Generating"
+  if [[ " $* " == *" --if-stale "* ]]; then
+    action="Checking"
+  fi
+  echo "==> $action dataset (aircraft=$AIRCRAFT days=$DAYS airports=$AIRPORTS seed=$SEED, full=$LOAD_FULL_DATASET)"
   mkdir -p generated
   uv run generate-data generate \
     --aircraft "$AIRCRAFT" \
     --airports "$AIRPORTS" \
     --days "$DAYS" \
     --seed "$SEED" \
-    --output generated
+    --output generated \
+    "$@"
 }
 
+# Dot files such as .generate.lock do not count, only CSVs.
 require_generated() {
-  if [[ ! -d generated || -z "$(ls -A generated 2>/dev/null)" ]]; then
-    echo "ERROR: generated/ is empty. Run './setup.sh generate' first." >&2
+  if ! compgen -G "generated/*.csv" >/dev/null; then
+    echo "ERROR: generated/ has no CSVs. Run './setup.sh generate' first." >&2
     exit 1
   fi
 }
@@ -101,14 +120,14 @@ case "$CMD" in
     ;;
   load)
     sync_deps
-    require_generated
+    do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db setup
     uv run populate-aircraft-db verify --strict
     ;;
   load-operational)
     sync_deps
-    require_generated
+    do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db load-operational
     uv run populate-aircraft-db verify --strict

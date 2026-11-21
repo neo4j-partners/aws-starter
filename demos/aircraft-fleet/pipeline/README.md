@@ -22,6 +22,7 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 ```
 
 - **Shared `.env`:** The file lives in `demos/aircraft-fleet/`. The pipeline and the GraphRAG agent both read it.
+- **Neo4j version:** The whole pipeline needs Neo4j 5.23 or later. The `clean`, `clean-enrichment`, `enrich`, and `samples` commands use the scoped `CALL (x) { ... }` subquery syntax, which older versions reject. Aura runs a newer version.
 - **AWS credentials:** `LLM_PROVIDER=bedrock` is the default. Enrichment uses your AWS credentials from the environment or `~/.aws`. You need no API key.
 - **Dataset size:** Leave `LOAD_FULL_DATASET=false` for a small, fast run.
 
@@ -33,11 +34,39 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 |---------|--------------|
 | `./setup.sh` | Full pipeline: install dependencies, generate, clean, load, enrich, fuse, and verify |
 | `./setup.sh generate` | Stage 1 only: generate CSVs into `generated/` |
-| `./setup.sh load` | Clean, then stages 2 to 5. This needs Bedrock or LLM access. |
-| `./setup.sh load-operational` | Clean, then stage 2 and relinking only. This needs no LLM and no API key. |
+| `./setup.sh load` | Regenerate `generated/` if it is stale, clean, then stages 2 to 5. This needs Bedrock or LLM access. |
+| `./setup.sh load-operational` | Regenerate `generated/` if it is stale, clean, then stage 2 and relinking only. This needs no LLM and no API key. |
 | `./setup.sh verify` | Stage 5 only. This is read-only and runs with `--strict`. |
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |
+
+`generate` writes `generated/.stamp.json` with the generator settings, a hash of
+the generator code, and the Python, Faker, and NumPy versions. The same seed can
+give different CSVs under another version of any of them. `generated/` is stale
+when its stamp does not match the `GEN_*` values, the current code, or the installed
+versions, and `load` and `load-operational` regenerate it then. They print the
+reason, such as `Regenerating, since the stamp has a different config.days.`
+A `generated/` made before stamps existed has no `.stamp.json`, so the first
+`load` after you update regenerates it once. Any files you added to `generated/`
+are kept.
+`generate` writes each run into a `generated/.generating-*` temp directory first.
+A run that fails or is stopped before it finishes leaves the previous CSVs and
+stamp in place. When the run finishes, it removes the old stamp, moves each CSV
+into `generated/`, and writes the new stamp last. A run stopped during that move
+leaves a mix of old and new CSVs with no stamp, so the next `load` regenerates.
+The next run also removes any temp directory that a killed run left behind.
+A run holds a lock on `generated/.generate.lock`, so a second `generate` on the
+same directory stops at once with `another generate is running in generated`.
+The load copies the stamp onto a single `Dataset` node in the graph. `verify` makes
+two checks. It compares the stamp with the current code and versions, and it compares the
+graph's `Dataset` node with the stamp. A graph with no `Dataset` node was loaded
+before stamps existed, from CSVs with no stamp, or by a load that did not finish. Each warning says whether to regenerate or only reload.
+`verify --strict` fails on either mismatch, or when the stamp is missing.
+`verify` also compares each operational label's node count with the row count of
+its CSV, and `--strict` fails on a mismatch. The load merges into whatever the graph
+holds, so a load over an earlier, larger dataset keeps that dataset's extra nodes.
+`./setup.sh load` and `./setup.sh load-operational` run `clean` first. A direct
+`uv run populate-aircraft-db load-operational` does not, so run `clean` before it.
 
 The `uv run populate-aircraft-db` CLI has more commands:
 
@@ -86,13 +115,13 @@ pipeline does all three:
 `./setup.sh` runs all five stages in order against your Neo4j database. Stage 3
 is the only stage that calls a model. It uses Bedrock Titan v2 for embeddings
 and Claude for extraction. The default Claude model is
-`global.anthropic.claude-sonnet-4-6`. Every other stage uses only Neo4j and
+`global.anthropic.claude-sonnet-5-5`. Every other stage uses only Neo4j and
 local compute.
 
 | Stage | Code | Output |
 |-------|------|--------|
-| 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 114 MB. |
-| 2. Load | `loader.py`, `schema.py` | The operational graph: `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`. It also creates uniqueness constraints, property indexes, and fulltext indexes. |
+| 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 180 MB. |
+| 2. Load | `loader.py`, `schema.py` | The operational graph: `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`. It also writes one `Dataset` node with the generator stamp, and creates uniqueness constraints, property indexes, and fulltext indexes. |
 | 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings. It also extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. |
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The `maintenanceChunkEmbeddings` vector index, the `maintenanceChunkText` fulltext index, and typed links into the operational graph |
 | 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report. `--strict` exits with a nonzero code on warnings. |
@@ -162,7 +191,7 @@ no LLM calls and needs no keys.
 
 ### Bedrock settings
 
-- **Models:** Extraction uses `global.anthropic.claude-sonnet-4-6`. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions. You can override both in `.env`.
+- **Models:** Extraction uses `global.anthropic.claude-sonnet-5-5`. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions. You can override both in `.env`.
 - **Embedding dimensions:** Each `clean` and `setup` creates the vector index at the configured dimension. If you change the embedding model, set a matching `BEDROCK_EMBEDDING_DIMENSIONS` and run the pipeline again.
 - **Region:** The pipeline and the agent share one `AWS_REGION` setting. It defaults to `us-east-1`. If you change it, enable the models in that region.
 - **Chunking:** `CHUNK_SIZE` defaults to 800 and `CHUNK_OVERLAP` defaults to 100. Set `ENRICH_SAMPLE_SIZE` to limit chunks per document for fast test runs.
@@ -171,12 +200,16 @@ no LLM calls and needs no keys.
 
 `LOAD_FULL_DATASET` sets the dataset size:
 
-- **`false`:** This default loads about 20 aircraft over 90 days. That is about 23 MB of readings and about 111 maintenance events. It loads in minutes and fits free or small Aura tiers.
-- **`true`:** This option loads about 100 aircraft over 90 days. That is about 114 MB of readings. It is slow to load and needs a larger Aura tier.
+- **`false`:** This default loads 30 aircraft over 90 days. That covers every tail listed in the maintenance manuals. It is about 800,000 nodes and 830,000 relationships, mostly hourly sensor readings. The readings file is about 54 MB, and the run has about 230 maintenance events.
+- **`true`:** This option loads 100 aircraft over 90 days. That is about 2.7 million nodes and about 180 MB of readings. It is slower to load.
 
-The 90-day window matters. Maintenance events start only after sensor wear
-crosses model thresholds. That takes about 45 days or more. A shorter window
-creates no events, so the maintenance queries return nothing.
+Both sizes are past the Aura Free limits of 200,000 nodes and 400,000
+relationships. Use a paid Aura tier or a local Neo4j.
+
+The window length sets how many flights, readings, and events there are. Each
+sensor's wear reaches the same share of its warning limit by the end of any
+window, so a shorter window has fewer events. For example, 20 aircraft over 30
+days creates about 40 maintenance events. The default creates about 230.
 
 You can set `GEN_AIRCRAFT`, `GEN_DAYS`, `GEN_AIRPORTS`, and `GEN_SEED` to
 override single values.
@@ -203,7 +236,7 @@ override single values.
 | `src/populate_aircraft_db/main.py` | The CLI: credential lookup and command wiring |
 | `src/populate_aircraft_db/agent_samples.py` | Chat and embedding calls for the `agent-samples` command |
 | `manuals/` | The maintenance manuals used for enrichment. They are committed. |
-| `generated/` | The CSV output. It is git-ignored. Recreate it with `./setup.sh generate`. |
+| `generated/` | The CSV output and its `.stamp.json`. It is git-ignored. Recreate it with `./setup.sh generate`. |
 | `setup.sh` | One command that drives all five stages |
 
 ## Connect the MCP server and the GraphRAG agent

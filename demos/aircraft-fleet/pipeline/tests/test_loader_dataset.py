@@ -126,7 +126,10 @@ def test_a_graph_without_a_dataset_node_was_loaded_before_stamps(
 
     reason = loader.dataset_mismatch(driver, database, tmp_path)
 
-    assert reason == "the graph has no Dataset node, so it was loaded before stamps"
+    assert reason == (
+        "the graph has no Dataset node (loaded before stamps, from unstamped CSVs,"
+        " or a load did not finish)"
+    )
 
 
 @pytest.mark.usefixtures("no_csv_load")

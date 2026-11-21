@@ -60,7 +60,7 @@ same directory stops at once with `another generate is running in generated`.
 The load copies the stamp onto a single `Dataset` node in the graph. `verify` makes
 two checks. It compares the stamp with the current code and versions, and it compares the
 graph's `Dataset` node with the stamp. A graph with no `Dataset` node was loaded
-before stamps existed. Each warning says whether to regenerate or only reload.
+before stamps existed, from CSVs with no stamp, or by a load that did not finish. Each warning says whether to regenerate or only reload.
 `verify --strict` fails on either mismatch, or when the stamp is missing.
 `verify` also compares each operational label's node count with the row count of
 its CSV, and `--strict` fails on a mismatch. The load merges into whatever the graph

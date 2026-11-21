@@ -473,7 +473,10 @@ def dataset_mismatch(driver: Driver, database: str, data_dir: Path) -> str | Non
             lambda tx: [r["stamp"] for r in tx.run("MATCH (d:Dataset) RETURN d.stamp AS stamp")]
         )
     if not stored:
-        return "the graph has no Dataset node, so it was loaded before stamps"
+        return (
+            "the graph has no Dataset node (loaded before stamps, from unstamped CSVs,"
+            " or a load did not finish)"
+        )
     if len(stored) > 1:
         return f"the graph has {len(stored)} Dataset nodes, where a load writes one"
     local = read_stamp(data_dir)

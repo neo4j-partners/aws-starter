@@ -488,12 +488,15 @@ def _share(count: int, total: int) -> str:
     """count as a whole percent of total, rounded half up.
 
     A share below all of the events shows at most 99%, so 100% means all.
+    A share above none shows at least 1%, so 0% means none.
     """
     if not total:
         return "0%"
     percent = (Decimal(100) * count / total).quantize(Decimal(1), rounding=ROUND_HALF_UP)
     if count < total:
         percent = min(percent, Decimal(99))
+    if count > 0:
+        percent = max(percent, Decimal(1))
     return f"{percent}%"
 
 

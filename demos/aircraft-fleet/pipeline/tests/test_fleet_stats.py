@@ -142,10 +142,13 @@ def test_the_fleet_statistics_name_the_config_and_rank_the_faults() -> None:
         (5, 200, "3%"),  # 2.5 rounds half up, not to the even 2
         (199, 200, "99%"),  # 99.5 would show 100% for a share below all
         (200, 200, "100%"),
+        (1, 200, "1%"),  # 0.5 rounds half up to 1
+        (1, 201, "1%"),  # 0.498 would show 0% for a share above none
+        (0, 300, "0%"),
         (0, 0, "0%"),
     ],
 )
-def test_a_share_rounds_half_up_and_only_all_events_show_100(
+def test_a_share_rounds_half_up_and_only_no_or_all_events_show_0_or_100(
     count: int, total: int, share: str
 ) -> None:
     assert manuals._share(count, total) == share

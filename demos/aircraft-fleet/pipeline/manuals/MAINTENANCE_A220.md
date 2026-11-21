@@ -260,7 +260,7 @@ The 2-stage HPT drives the high-pressure compressor through a concentric shaft. 
 <!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 855°C | 855-880°C | 890°C |
+| EGT (Takeoff, 5 min) | < 855°C | 855-890°C | 890°C |
 | EGT (Max Continuous) | < 820°C | 820-855°C | 855°C |
 | EGT (Start) | — | — | 700°C |
 <!-- END GENERATED: egt-limits -->

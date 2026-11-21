@@ -292,8 +292,8 @@ The two-stage HPT features advanced single-crystal nickel superalloy blades with
 <!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 1,000°C | 1,000-1,040°C | 1,060°C |
-| EGT (Max Continuous) | < 950°C | 950-980°C | 1,000°C |
+| EGT (Takeoff, 5 min) | < 1,000°C | 1,000-1,060°C | 1,060°C |
+| EGT (Max Continuous) | < 950°C | 950-1,000°C | 1,000°C |
 | EGT (Start) | — | — | 750°C |
 <!-- END GENERATED: egt-limits -->
 

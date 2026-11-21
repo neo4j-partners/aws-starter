@@ -240,8 +240,8 @@ The two-stage HPT extracts energy to drive the HPC. Turbine blades feature advan
 <!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 650°C | 650-680°C | 695°C |
-| EGT (Max Continuous) | < 620°C | 620-650°C | 665°C |
+| EGT (Takeoff, 5 min) | < 650°C | 650-695°C | 695°C |
+| EGT (Max Continuous) | < 620°C | 620-665°C | 665°C |
 <!-- END GENERATED: egt-limits -->
 
 #### 3.2.4 Main Fuel Pump
@@ -318,12 +318,12 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 #### Corrective Actions by Severity
 
-**CRITICAL (EGT > 695°C or duration > 5 minutes above 680°C):**
+**CRITICAL (EGT above the takeoff maximum, or more than 5 minutes in the takeoff caution band):**
 - Ground aircraft pending HPT borescope inspection
 - If blade damage found: Engine removal for shop visit
 - Estimated downtime: 5-10 days
 
-**MAJOR (EGT 650-680°C, intermittent):**
+**MAJOR (EGT in the takeoff caution band, intermittent):**
 - Perform hot section inspection within 50 flight hours
 - Replace EGT probes if calibration drift detected
 - Monitor trend data for recurrence

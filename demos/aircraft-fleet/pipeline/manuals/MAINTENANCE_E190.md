@@ -258,7 +258,7 @@ The single-stage HPT drives the high-pressure compressor through a concentric sh
 <!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff, 5 min) | < 870°C | 870-895°C | 900°C |
+| EGT (Takeoff, 5 min) | < 870°C | 870-900°C | 900°C |
 | EGT (Max Continuous) | < 840°C | 840-870°C | 870°C |
 | EGT (Start) | — | — | 730°C |
 <!-- END GENERATED: egt-limits -->

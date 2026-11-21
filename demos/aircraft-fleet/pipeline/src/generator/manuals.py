@@ -342,7 +342,7 @@ def _egt_row(label: str, band: EgtBand) -> tuple[str, ...]:
     return (
         label,
         f"< {band.normal_below:,.0f}°C",
-        f"{band.normal_below:,.0f}-{band.caution_to:,.0f}°C",
+        f"{band.normal_below:,.0f}-{band.maximum:,.0f}°C",
         f"{band.maximum:,.0f}°C",
     )
 

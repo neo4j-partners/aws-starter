@@ -143,7 +143,7 @@ class EgtBand:
     """One row of a manual's turbine operating limits, in °C."""
 
     normal_below: float
-    caution_to: float
+    # Caution runs from normal_below to the maximum. Above it is Warning.
     maximum: float
 
 
@@ -269,8 +269,8 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         egt_limits=EgtLimits(
             ground_idle="350-420",
             flight_idle="420-480",
-            max_continuous=EgtBand(895, 925, 925),
-            takeoff=EgtBand(930, 950, 950),
+            max_continuous=EgtBand(895, 925),
+            takeoff=EgtBand(930, 950),
             start_max=725,
         ),
         phase_limits={
@@ -296,8 +296,8 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         egt_limits=EgtLimits(
             ground_idle="380",
             flight_idle="450",
-            max_continuous=EgtBand(620, 650, 665),
-            takeoff=EgtBand(650, 680, 695),
+            max_continuous=EgtBand(620, 665),
+            takeoff=EgtBand(650, 695),
             start_max=None,
         ),
         phase_limits={
@@ -325,8 +325,8 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         egt_limits=EgtLimits(
             ground_idle="320-400",
             flight_idle="400-480",
-            max_continuous=EgtBand(950, 980, 1000),
-            takeoff=EgtBand(1000, 1040, 1060),
+            max_continuous=EgtBand(950, 1000),
+            takeoff=EgtBand(1000, 1060),
             start_max=750,
         ),
         phase_limits={
@@ -352,8 +352,8 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         egt_limits=EgtLimits(
             ground_idle="330-400",
             flight_idle="400-460",
-            max_continuous=EgtBand(840, 870, 870),
-            takeoff=EgtBand(870, 895, 900),
+            max_continuous=EgtBand(840, 870),
+            takeoff=EgtBand(870, 900),
             start_max=730,
         ),
         phase_limits={
@@ -378,8 +378,8 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         egt_limits=EgtLimits(
             ground_idle="310-380",
             flight_idle="380-440",
-            max_continuous=EgtBand(820, 855, 855),
-            takeoff=EgtBand(855, 880, 890),
+            max_continuous=EgtBand(820, 855),
+            takeoff=EgtBand(855, 890),
             start_max=700,
         ),
         phase_limits={

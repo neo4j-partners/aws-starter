@@ -451,7 +451,7 @@ def test_the_egt_limits_table_is_the_spec_limits(model: str) -> None:
         return [
             label,
             f"< {band.normal_below:,.0f}°C",
-            f"{band.normal_below:,.0f}-{band.caution_to:,.0f}°C",
+            f"{band.normal_below:,.0f}-{band.maximum:,.0f}°C",
             f"{band.maximum:,.0f}°C",
         ]
 
@@ -466,10 +466,24 @@ def test_the_egt_limits_table_is_the_spec_limits(model: str) -> None:
 
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_egt_bands_leave_no_gap(model: str) -> None:
+    # Normal runs to the caution band, and Caution runs to the maximum, so
+    # every temperature has one band. Above the maximum is Warning.
+    table = manuals.RENDERERS["egt-limits"](model, ENGINE_SPECS[model], {})
+    rows = [row for row in _rows(table) if row[0] != "EGT (Start)"]
+
+    assert [row[0] for row in rows] == ["EGT (Takeoff, 5 min)", "EGT (Max Continuous)"]
+    for label, normal, caution, maximum in rows:
+        low, high = caution.removesuffix("°C").split("-")
+        assert normal == f"< {low}°C", label
+        assert maximum == f"{high}°C", label
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
 def test_the_egt_limits_are_ordered_and_above_the_trend_scale(model: str) -> None:
     limits = ENGINE_SPECS[model].egt_limits
     for band in (limits.max_continuous, limits.takeoff):
-        assert band.normal_below < band.caution_to <= band.maximum, band
+        assert band.normal_below < band.maximum, band
     assert limits.max_continuous.maximum <= limits.takeoff.maximum
     # Every trend reading the generator raises an event for stays below the
     # instantaneous max continuous limit.

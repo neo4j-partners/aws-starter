@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import time
 from pathlib import Path
+from typing import Annotated
 
 import numpy as np
 import typer
@@ -109,9 +110,9 @@ def generate(
     airports: int = typer.Option(40, "--airports", help="Number of airports (max 40)."),
     days: int = typer.Option(90, "--days", "-d", help="Days of sensor telemetry."),
     seed: int = typer.Option(42, "--seed", help="Random seed for reproducibility."),
-    output: Path = typer.Option(
-        Path("."), "--output", "-o", help="Output directory for CSV files."
-    ),
+    output: Annotated[
+        Path, typer.Option("--output", "-o", help="Output directory for CSV files.")
+    ] = Path("."),
 ) -> None:
     """Generate all CSV files for the aircraft digital twin dataset."""
     airports = min(airports, 40)
@@ -334,7 +335,9 @@ def _print_summary(
 
 @app.command()
 def validate(
-    directory: Path = typer.Argument(Path("."), help="Directory containing generated CSV files."),
+    directory: Annotated[
+        Path, typer.Argument(help="Directory containing generated CSV files.")
+    ] = Path("."),
 ) -> None:
     """Check referential integrity of generated CSV files."""
     import csv as _csv

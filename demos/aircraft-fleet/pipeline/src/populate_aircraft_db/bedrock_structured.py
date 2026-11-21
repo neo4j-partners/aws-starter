@@ -39,7 +39,7 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Any, Union
+from typing import Any
 
 from neo4j_graphrag.exceptions import LLMGenerationError
 from neo4j_graphrag.llm.bedrock_llm import BedrockLLM
@@ -70,9 +70,9 @@ _TOOL_INSTRUCTION = (
 )
 
 # Types accepted by the inherited invoke/ainvoke, mirroring BedrockLLM.
-_Input = Union[str, list[LLMMessage]]
-_History = Union[list[LLMMessage], MessageHistory, None]
-_ResponseFormat = Union[type[BaseModel], dict[str, Any], None]
+_Input = str | list[LLMMessage]
+_History = list[LLMMessage] | MessageHistory | None
+_ResponseFormat = type[BaseModel] | dict[str, Any] | None
 
 
 class _RawSchemaTool(Tool):

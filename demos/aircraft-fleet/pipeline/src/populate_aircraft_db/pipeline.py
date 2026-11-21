@@ -737,56 +737,39 @@ def validate_enrichment(driver: Driver, database: str) -> None:
         print("           or load CSV data before running enrichment-only validation.")
         return
 
+    # Each query runs only when the graph has the labels and type it names.
     queries = [
         (
             "Document -[:APPLIES_TO]-> Aircraft",
             "MATCH (d:Document)-[:APPLIES_TO]->(a:Aircraft) "
             f"RETURN d.title AS src, a.tail_number AS tgt LIMIT {_SAMPLE_SIZE}",
+            {"Document", "Aircraft", "APPLIES_TO"},
         ),
         (
             "AircraftModel -[:DESCRIBES_MODEL]-> Aircraft",
             "MATCH (am:AircraftModel)-[:DESCRIBES_MODEL]->(a:Aircraft) "
             f"RETURN am.name AS src, a.tail_number AS tgt LIMIT {_SAMPLE_SIZE}",
+            {"AircraftModel", "Aircraft", "DESCRIBES_MODEL"},
         ),
         (
             "ComponentReference -[:DESCRIBES_COMPONENT]-> Component",
             "MATCH (cr:ComponentReference)-[:DESCRIBES_COMPONENT]->(c:Component) "
             f"RETURN cr.name AS src, c.name AS tgt LIMIT {_SAMPLE_SIZE}",
+            {"ComponentReference", "Component", "DESCRIBES_COMPONENT"},
         ),
         (
             "Sensor -[:HAS_LIMIT]-> OperatingLimit",
             "MATCH (s:Sensor)-[:HAS_LIMIT]->(ol:OperatingLimit) "
             f"RETURN s.type AS src, ol.name AS tgt LIMIT {_SAMPLE_SIZE}",
+            {"Sensor", "OperatingLimit", "HAS_LIMIT"},
         ),
     ]
     print("\n  Cross-links to operational graph:")
-    for label, query in queries:
-        if label.startswith("Document") and not {
-            "Document",
-            "Aircraft",
-            "APPLIES_TO",
-        }.issubset(labels | rel_types):
-            rows = []
-        elif label.startswith("AircraftModel") and not {
-            "AircraftModel",
-            "Aircraft",
-            "DESCRIBES_MODEL",
-        }.issubset(labels | rel_types):
-            rows = []
-        elif label.startswith("ComponentReference") and not {
-            "ComponentReference",
-            "Component",
-            "DESCRIBES_COMPONENT",
-        }.issubset(labels | rel_types):
-            rows = []
-        elif label.startswith("Sensor") and not {
-            "Sensor",
-            "OperatingLimit",
-            "HAS_LIMIT",
-        }.issubset(labels | rel_types):
-            rows = []
-        else:
+    for label, query, names in queries:
+        if names <= labels | rel_types:
             rows, _, _ = driver.execute_query(query, database_=database)
+        else:
+            rows = []
         if rows:
             pairs = ", ".join(f"{r['src']}->{r['tgt']}" for r in rows)
             print(f"    {label}: {pairs}")

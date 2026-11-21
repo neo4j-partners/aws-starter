@@ -10,13 +10,14 @@ import shutil
 import tempfile
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager, suppress
+from contextlib import ExitStack, contextmanager, suppress
 from pathlib import Path
 from typing import Annotated
 
 import numpy as np
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from .config import GeneratorConfig
@@ -35,6 +36,11 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+
+class GenerateRunningError(RuntimeError):
+    """Another generate, or a load, holds the output's lock."""
+
 
 # Every file a run writes into the output directory, besides the stamp. A run
 # removes the ones it did not write, so stale files cannot pass as current.
@@ -148,7 +154,14 @@ def generate(
     _check_start_date(config)
     output.mkdir(parents=True, exist_ok=True)
     stamp = stamp_for(config)
-    with _exclusive_lock(output):
+    with ExitStack() as stack:
+        # Only a held lock becomes a message. Any other error keeps its
+        # traceback.
+        try:
+            stack.enter_context(_exclusive_lock(output))
+        except GenerateRunningError as exc:
+            console.print(f"[red]{escape(str(exc))}[/red]", soft_wrap=True)
+            raise typer.Exit(1) from exc
         _remove_orphaned_work_dirs(output)
         if if_stale:
             if (reason := regenerate_reason(output, stamp)) is None:
@@ -179,13 +192,13 @@ def _exclusive_lock(output: Path) -> Iterator[None]:
     a temp dir found while holding it was left by a run that has ended.
 
     Raises:
-        RuntimeError: If another generate holds the lock.
+        GenerateRunningError: If another generate or a load holds the lock.
     """
     with (output / LOCK_NAME).open("a") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise RuntimeError(f"another generate is running in {output}") from exc
+            raise GenerateRunningError(f"another generate is running in {output}") from exc
         yield
 
 

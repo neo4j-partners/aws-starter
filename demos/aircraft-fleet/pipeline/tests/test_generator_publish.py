@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from generator import main as generator_main
 from generator import stamp
@@ -21,6 +22,7 @@ from generator.config import GeneratorConfig
 from populate_aircraft_db.loader import iter_csv_batches
 
 ARGS = {"aircraft": 6, "airports": 40, "days": 2, "seed": 42}
+CLI_ARGS = ["generate", "--aircraft", "6", "--days", "2"]
 MARKER = "edited by the test\n"
 
 
@@ -192,9 +194,12 @@ def test_generate_fails_fast_while_another_generate_runs(tmp_path: Path) -> None
 
     with (output / ".generate.lock").open("a") as held:
         fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with pytest.raises(RuntimeError, match=f"^another generate is running in {output}$"):
-            _generate(output)
+        result = CliRunner().invoke(generator_main.app, [*CLI_ARGS, "--output", str(output)])
 
+    # The CLI prints the message and exits 1, with no traceback.
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert result.output == f"another generate is running in {output}\n"
     assert (live / "nodes_aircraft.csv").read_text() == "partial\n"
     assert stamp.read_stamp(output) is None
 
@@ -204,6 +209,23 @@ def test_generate_takes_the_lock_again_after_a_run(tmp_path: Path) -> None:
     _generate(tmp_path, seed=7)
 
     assert stamp.read_stamp(tmp_path)["config"]["seed"] == 7
+
+
+def test_the_cli_shows_a_traceback_for_other_runtime_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Only the lock error is turned into a message. Any other RuntimeError
+    # is a bug, so it keeps its traceback.
+    def fail(work: Path, output: Path) -> None:
+        raise RuntimeError("publish failed")
+
+    monkeypatch.setattr(generator_main, "_publish", fail)
+
+    result = CliRunner().invoke(generator_main.app, [*CLI_ARGS, "--output", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, RuntimeError)
+    assert str(result.exception) == "publish failed"
 
 
 def test_a_missing_work_dir_does_not_hide_the_real_error(

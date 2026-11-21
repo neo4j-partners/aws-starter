@@ -10,6 +10,7 @@ import fcntl
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from generator import main as generator_main
 from generator.stamp import LOCK_NAME
@@ -72,13 +73,11 @@ def test_the_lock_is_held_for_the_whole_load(
 def test_a_generate_fails_at_once_while_a_load_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    errors: list[str] = []
+    results = []
 
     def generate_during_load(*args: object) -> int:
-        try:
-            generator_main.generate(aircraft=2, airports=40, days=2, seed=42, output=tmp_path)
-        except RuntimeError as exc:
-            errors.append(str(exc))
+        cli_args = ["generate", "--aircraft", "2", "--days", "2", "--output", str(tmp_path)]
+        results.append(CliRunner().invoke(generator_main.app, cli_args))
         return 0
 
     monkeypatch.setattr(loader, "load_nodes", generate_during_load)
@@ -86,4 +85,6 @@ def test_a_generate_fails_at_once_while_a_load_runs(
 
     loader.load_operational_graph(_Driver(), "db", tmp_path)
 
-    assert errors == [f"another generate is running in {tmp_path}"]
+    assert [(r.exit_code, r.output) for r in results] == [
+        (1, f"another generate is running in {tmp_path}\n")
+    ]

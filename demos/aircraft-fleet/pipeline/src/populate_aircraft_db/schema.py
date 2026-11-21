@@ -6,7 +6,7 @@ import logging
 
 from neo4j import Driver
 
-from generator.specs import COMPONENT_TYPES_BY_SYSTEM
+from generator.specs import COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ SYSTEM_TYPES_TEXT = ", ".join(SYSTEM_TYPES)
 
 # The fleet sensor types, which the Sensor HAS_LIMIT join matches to
 # OperatingLimit parameterName.
-SENSOR_PARAMETER_NAMES = "EGT, Vibration, N1Speed, FuelFlow"
+SENSOR_PARAMETER_NAMES = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)
 
 # (label, property) pairs — one uniqueness constraint each.
 CONSTRAINTS: list[tuple[str, str]] = [

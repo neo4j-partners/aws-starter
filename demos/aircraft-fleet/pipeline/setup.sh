@@ -89,9 +89,10 @@ do_generate() {
     "$@"
 }
 
+# Dot files such as .generate.lock do not count, only CSVs.
 require_generated() {
-  if [[ ! -d generated || -z "$(ls -A generated 2>/dev/null)" ]]; then
-    echo "ERROR: generated/ is empty. Run './setup.sh generate' first." >&2
+  if ! compgen -G "generated/*.csv" >/dev/null; then
+    echo "ERROR: generated/ has no CSVs. Run './setup.sh generate' first." >&2
     exit 1
   fi
 }

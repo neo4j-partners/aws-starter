@@ -1,7 +1,9 @@
 """Record which config and generator code produced a generated/ directory.
 
-generate writes .stamp.json after every CSV is in place, and removes it
-first, so a run that fails partway leaves no stamp. The loader's verify
+generate writes each run into a temp directory, stamp included. When the
+run finishes, it removes the old stamp, moves each CSV into place, and moves
+the new stamp in last. A failed run leaves the old CSVs and stamp, and a run
+stopped during the moves leaves no stamp. The loader's verify
 command compares the stamp's code hash and library versions with the
 current ones.
 """

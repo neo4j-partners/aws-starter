@@ -7,7 +7,9 @@ last, so an output caught mid-move has no stamp and reads as stale.
 
 from __future__ import annotations
 
+import fcntl
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -47,7 +49,7 @@ def test_generate_writes_exactly_the_known_outputs(tmp_path: Path) -> None:
     _generate(tmp_path)
 
     names = {p.name for p in tmp_path.iterdir()}
-    assert names == generator_main.OUTPUT_FILES | {stamp.STAMP_NAME}
+    assert names == generator_main.OUTPUT_FILES | {stamp.STAMP_NAME, ".generate.lock"}
 
 
 def test_a_failed_run_leaves_the_previous_output_and_stamp(
@@ -178,3 +180,68 @@ def test_readers_ignore_a_temp_dir_decoy(tmp_path: Path) -> None:
     assert rows == [{":ID(Aircraft)": "AC1001"}]
     assert stamp.read_stamp(tmp_path) is None
     assert "has no .stamp.json" in stamp.stale_reason(tmp_path)
+
+
+def test_generate_fails_fast_while_another_generate_runs(tmp_path: Path) -> None:
+    # The other run's temp dir is live, so the orphan sweep must not touch it.
+    output = tmp_path / "out"
+    live = output / ".generating-live"
+    live.mkdir(parents=True)
+    (live / "nodes_aircraft.csv").write_text("partial\n")
+
+    with (output / ".generate.lock").open("a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(RuntimeError, match=f"^another generate is running in {output}$"):
+            _generate(output)
+
+    assert (live / "nodes_aircraft.csv").read_text() == "partial\n"
+    assert stamp.read_stamp(output) is None
+
+
+def test_generate_takes_the_lock_again_after_a_run(tmp_path: Path) -> None:
+    _generate(tmp_path)
+    _generate(tmp_path, seed=7)
+
+    assert stamp.read_stamp(tmp_path)["config"]["seed"] == 7
+
+
+def test_a_missing_work_dir_does_not_hide_the_real_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(work: Path, output: Path) -> None:
+        shutil.rmtree(work)
+        raise RuntimeError("publish failed")
+
+    monkeypatch.setattr(generator_main, "_publish", fail)
+
+    with pytest.raises(RuntimeError, match="publish failed"):
+        _generate(tmp_path)
+
+
+def test_publish_syncs_files_before_moving_and_the_stamp_after_the_csvs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A power loss must not leave a stamp on disk ahead of its CSVs.
+    output, work = _publish_setup(tmp_path)
+    (work / "nodes_systems.csv").write_text("new systems\n")
+    events: list[tuple[str, str]] = []
+    real_replace = os.replace
+    monkeypatch.setattr(generator_main, "_fsync", lambda path: events.append(("fsync", path.name)))
+
+    def replace(src: Path, dst: Path) -> None:
+        events.append(("replace", Path(dst).name))
+        real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", replace)
+
+    generator_main._publish(work, output)
+
+    moved = ["nodes_aircraft.csv", "nodes_systems.csv"]
+    synced = {("fsync", name) for name in [*moved, stamp.STAMP_NAME]}
+    assert set(events[:3]) == synced
+    assert events[3:] == [
+        *[("replace", name) for name in moved],
+        ("fsync", "out"),
+        ("replace", stamp.STAMP_NAME),
+        ("fsync", "out"),
+    ]

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import random
 import shutil
 import tempfile
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Annotated
 
@@ -37,6 +40,9 @@ console = Console()
 OUTPUT_FILES = frozenset(CSV_COLUMNS) | {"nodes_readings.csv"}
 # Name prefix of the temp directory a run writes into before it publishes.
 _WORK_PREFIX = ".generating-"
+# A run holds an exclusive lock on this file in the output directory, so two
+# runs never write or sweep the same output at once.
+_LOCK_NAME = ".generate.lock"
 
 
 def _fleet_rows(
@@ -144,21 +150,43 @@ def generate(
     _check_start_date(config)
     output.mkdir(parents=True, exist_ok=True)
     stamp = stamp_for(config)
-    _remove_orphaned_work_dirs(output)
-    if if_stale:
-        if (reason := regenerate_reason(output, stamp)) is None:
-            console.print(f"{output.resolve()} is current for this config and code. Skipping.")
-            return
-        console.print(f"Regenerating, since {reason}.")
-    # Write the run into a temp directory, so a failure leaves the
-    # previous output and its stamp as they were.
-    work = Path(tempfile.mkdtemp(dir=output, prefix=_WORK_PREFIX))
-    try:
-        elapsed, summary = _write_dataset(config, work, stamp)
-        _publish(work, output)
-    finally:
-        shutil.rmtree(work)
+    with _exclusive_lock(output):
+        _remove_orphaned_work_dirs(output)
+        if if_stale:
+            if (reason := regenerate_reason(output, stamp)) is None:
+                console.print(f"{output.resolve()} is current for this config and code. Skipping.")
+                return
+            console.print(f"Regenerating, since {reason}.")
+        # Write the run into a temp directory, so a failure leaves the
+        # previous output and its stamp as they were.
+        work = Path(tempfile.mkdtemp(dir=output, prefix=_WORK_PREFIX))
+        try:
+            elapsed, summary = _write_dataset(config, work, stamp)
+            _publish(work, output)
+        finally:
+            # Only a missing work dir is expected here. Any other cleanup
+            # error, such as a permission problem, still shows.
+            with suppress(FileNotFoundError):
+                shutil.rmtree(work)
     _print_summary(config, *summary, elapsed)
+
+
+@contextmanager
+def _exclusive_lock(output: Path) -> Iterator[None]:
+    """Hold the output's generate lock, or fail at once if another run holds it.
+
+    The kernel releases the lock when the process exits, even on SIGKILL, so
+    a temp dir found while holding it was left by a run that has ended.
+
+    Raises:
+        RuntimeError: If another generate holds the lock.
+    """
+    with (output / _LOCK_NAME).open("a") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError(f"another generate is running in {output}") from exc
+        yield
 
 
 def _remove_orphaned_work_dirs(output: Path) -> None:
@@ -186,12 +214,26 @@ def _publish(work: Path, output: Path) -> None:
     written = {p.name for p in work.iterdir()} - {STAMP_NAME}
     if unknown := sorted(written - OUTPUT_FILES):
         raise ValueError(f"{', '.join(unknown)} must be added to OUTPUT_FILES")
+    for name in sorted(written | {STAMP_NAME}):
+        _fsync(work / name)
     clear_stamp(output)
     for name in sorted(OUTPUT_FILES - written):
         (output / name).unlink(missing_ok=True)
     for name in sorted(written):
         os.replace(work / name, output / name)
+    # The CSV moves reach the disk before the stamp's move does.
+    _fsync(output)
     os.replace(work / STAMP_NAME, output / STAMP_NAME)
+    _fsync(output)
+
+
+def _fsync(path: Path) -> None:
+    """Flush a file's or a directory's contents to disk."""
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def _write_dataset(

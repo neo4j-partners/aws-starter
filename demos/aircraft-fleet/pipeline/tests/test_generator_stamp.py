@@ -23,6 +23,25 @@ def _generate(output: Path, *, if_stale: bool = False, **overrides: int) -> None
     generator_main.generate(**{**ARGS, **overrides}, output=output, if_stale=if_stale)
 
 
+def _fake_verify(
+    monkeypatch: pytest.MonkeyPatch, data_dir: Path, *, graph_reason: str | None
+) -> list[bool]:
+    """Stand in for Neo4j in the verify command. Returns a list that records each verify run."""
+    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=data_dir)
+    verified: list[bool] = []
+
+    def fake_verify(*args: object, **kwargs: object) -> bool:
+        verified.append(True)
+        return True
+
+    monkeypatch.setattr(loader_main, "Settings", lambda: settings)
+    monkeypatch.setattr(loader_main, "_connect", lambda s: nullcontext(object()))
+    monkeypatch.setattr(loader_main, "_expected_embedding_dims", lambda s: 1024)
+    monkeypatch.setattr(loader_main, "dataset_mismatch", lambda *args: graph_reason)
+    monkeypatch.setattr(loader_main, "verify", fake_verify)
+    return verified
+
+
 def _mark(output: Path) -> Path:
     path = output / "nodes_aircraft.csv"
     path.write_text(MARKER)
@@ -113,13 +132,7 @@ def test_strict_verify_fails_on_a_stale_stamp(
         (tmp_path / stamp.STAMP_NAME).write_text(written)
     elif written is not None:
         (tmp_path / stamp.STAMP_NAME).write_text(json.dumps(written))
-    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=tmp_path)
-    monkeypatch.setattr(loader_main, "Settings", lambda: settings)
-
-    def no_connect(settings: object) -> None:
-        raise AssertionError("verify connected despite a stale stamp")
-
-    monkeypatch.setattr(loader_main, "_connect", no_connect)
+    _fake_verify(monkeypatch, tmp_path, graph_reason=None)
 
     result = CliRunner().invoke(loader_main.app, ["verify", "--strict"])
 
@@ -132,11 +145,7 @@ def test_strict_verify_fails_on_a_stale_stamp(
 def test_verify_warns_on_a_stale_stamp_without_strict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=tmp_path)
-    monkeypatch.setattr(loader_main, "Settings", lambda: settings)
-    monkeypatch.setattr(loader_main, "_connect", lambda s: nullcontext(object()))
-    monkeypatch.setattr(loader_main, "_expected_embedding_dims", lambda s: 1024)
-    monkeypatch.setattr(loader_main, "verify", lambda *args, **kwargs: True)
+    _fake_verify(monkeypatch, tmp_path, graph_reason=None)
 
     result = CliRunner().invoke(loader_main.app, ["verify"])
 
@@ -147,13 +156,42 @@ def test_verify_warns_on_a_stale_stamp_without_strict(
 
 def test_verify_passes_a_current_stamp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _generate(tmp_path)
-    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=tmp_path)
-    monkeypatch.setattr(loader_main, "Settings", lambda: settings)
-    monkeypatch.setattr(loader_main, "_connect", lambda s: nullcontext(object()))
-    monkeypatch.setattr(loader_main, "_expected_embedding_dims", lambda s: 1024)
-    monkeypatch.setattr(loader_main, "verify", lambda *args, **kwargs: True)
+    verified = _fake_verify(monkeypatch, tmp_path, graph_reason=None)
 
     result = CliRunner().invoke(loader_main.app, ["verify", "--strict"])
 
     assert result.exit_code == 0, result.output
     assert ".stamp.json" not in result.output
+    assert verified == [True]
+
+
+GRAPH_REASON = "the graph was loaded from a run with a different config.days than generated"
+
+
+def test_strict_verify_fails_when_the_graph_does_not_match_the_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generate(tmp_path)
+    verified = _fake_verify(monkeypatch, tmp_path, graph_reason=GRAPH_REASON)
+
+    result = CliRunner().invoke(loader_main.app, ["verify", "--strict"])
+
+    assert result.exit_code == 1, result.output
+    assert f"[FAIL] The graph does not match the generated CSVs: {GRAPH_REASON}." in result.output
+    # The CSVs are current, so only a reload is needed.
+    assert "Reload: ./setup.sh load." in result.output
+    assert "./setup.sh generate" not in result.output
+    assert verified == []
+
+
+def test_verify_reports_a_stale_stamp_and_a_mismatched_graph(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verified = _fake_verify(monkeypatch, tmp_path, graph_reason=GRAPH_REASON)
+
+    result = CliRunner().invoke(loader_main.app, ["verify"])
+
+    assert result.exit_code == 0, result.output
+    assert "[WARN] Generated CSVs are stale" in result.output
+    assert f"[WARN] The graph does not match the generated CSVs: {GRAPH_REASON}." in result.output
+    assert verified == [True]

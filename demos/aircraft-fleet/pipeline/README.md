@@ -43,7 +43,11 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 `generate` writes `generated/.stamp.json` with the generator settings and a hash of
 the generator code. `generated/` is stale when its stamp does not match the `GEN_*`
 values or the current code, and `load` and `load-operational` regenerate it then.
-`verify --strict` fails when the stamp is missing or the code has changed since.
+The load copies the stamp onto a single `Dataset` node in the graph. `verify` makes
+two checks. It compares the stamp with the current code, and it compares the
+graph's `Dataset` node with the stamp. A graph with no `Dataset` node was loaded
+before stamps existed. Each warning says whether to regenerate or only reload.
+`verify --strict` fails on either mismatch, or when the stamp is missing.
 
 The `uv run populate-aircraft-db` CLI has more commands:
 
@@ -98,7 +102,7 @@ local compute.
 | Stage | Code | Output |
 |-------|------|--------|
 | 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 170 MB. |
-| 2. Load | `loader.py`, `schema.py` | The operational graph: `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`. It also creates uniqueness constraints, property indexes, and fulltext indexes. |
+| 2. Load | `loader.py`, `schema.py` | The operational graph: `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`. It also writes one `Dataset` node with the generator stamp, and creates uniqueness constraints, property indexes, and fulltext indexes. |
 | 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings. It also extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. |
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The `maintenanceChunkEmbeddings` vector index, the `maintenanceChunkText` fulltext index, and typed links into the operational graph |
 | 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report. `--strict` exits with a nonzero code on warnings. |

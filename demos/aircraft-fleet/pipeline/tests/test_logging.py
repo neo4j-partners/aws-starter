@@ -13,10 +13,12 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from generator.stamp import write_stamp
 from populate_aircraft_db import loader, main, pipeline
 from populate_aircraft_db.schema import CONSTRAINTS, create_constraints
 
 PACKAGE = "populate_aircraft_db"
+RECORDED = "[OK] Recorded the generator stamp on a Dataset node."
 
 
 class CountDriver:
@@ -24,6 +26,13 @@ class CountDriver:
 
     def execute_query(self, cypher: str, /, **params: Any) -> tuple[list[dict], None, None]:
         return [{"count": 3}], None, None
+
+
+@pytest.fixture
+def stamped_dir(tmp_path: Path) -> Path:
+    """A data directory with a stamp, so a load ends by recording it."""
+    write_stamp(tmp_path, {"config": {}, "generator_hash": "abc"})
+    return tmp_path
 
 
 @pytest.fixture
@@ -77,14 +86,18 @@ def test_load_nodes_logs_progress(
 def test_skipped_readings_log_a_warning(
     package_logs: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
+    stamped_dir: Path,
     skipped: int,
     expected: tuple[int, str],
 ) -> None:
     monkeypatch.setattr(loader, "load_nodes", lambda *args: skipped)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
 
-    loader.load_operational_graph(CountDriver(), "db", None)
-    assert _records(package_logs, "populate_aircraft_db.loader") == [expected]
+    loader.load_operational_graph(CountDriver(), "db", stamped_dir)
+    assert _records(package_logs, "populate_aircraft_db.loader") == [
+        expected,
+        (logging.INFO, RECORDED),
+    ]
 
 
 def test_clear_database_logs_counts(
@@ -316,11 +329,13 @@ _LOADER_LINES = [
     ],
 )
 def test_cli_load_shows_blank_lines_between_load_phases(
-    monkeypatch: pytest.MonkeyPatch, skipped: int, summary: str
+    monkeypatch: pytest.MonkeyPatch, stamped_dir: Path, skipped: int, summary: str
 ) -> None:
-    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=None)
+    settings = SimpleNamespace(
+        neo4j_uri="bolt://example", neo4j_database="db", data_dir=stamped_dir
+    )
     monkeypatch.setattr(main, "Settings", lambda: settings)
-    monkeypatch.setattr(main, "_connect", lambda s: nullcontext(object()))
+    monkeypatch.setattr(main, "_connect", lambda s: nullcontext(CountDriver()))
     for name in ("create_constraints", "create_indexes", "create_fulltext_indexes"):
         monkeypatch.setattr(main, name, lambda driver, database: None)
     monkeypatch.setattr(pipeline, "link_to_existing_graph", lambda driver, database: None)
@@ -331,19 +346,25 @@ def test_cli_load_shows_blank_lines_between_load_phases(
 
     assert result.exit_code == 0, result.output
     loaded = result.output.split("Creating fulltext indexes...\n\n")[1].split("Linking")[0]
-    assert loaded == "\n".join([*_LOADER_LINES[:2], "", *_LOADER_LINES[2:], "", summary, "", ""])
+    assert loaded == "\n".join(
+        [*_LOADER_LINES[:2], "", *_LOADER_LINES[2:], "", summary, RECORDED, "", ""]
+    )
 
 
 @pytest.mark.parametrize("skipped", [0, 3])
 def test_load_phase_records_have_no_empty_messages(
-    package_logs: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch, skipped: int
+    package_logs: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    stamped_dir: Path,
+    skipped: int,
 ) -> None:
     _fake_loader(monkeypatch, skipped)
 
-    loader.load_operational_graph(CountDriver(), "db", None)
+    loader.load_operational_graph(CountDriver(), "db", stamped_dir)
 
     records = [r for r in package_logs.records if r.name == "populate_aircraft_db.loader"]
-    assert [r.getMessage() for r in records][:-1] == _LOADER_LINES
+    assert [r.getMessage() for r in records][:-2] == _LOADER_LINES
+    assert records[-1].getMessage() == RECORDED
     assert all(r.getMessage().strip() for r in records)
     assert [i for i, r in enumerate(records) if getattr(r, "blank_before", False)] == [2, 6]
 

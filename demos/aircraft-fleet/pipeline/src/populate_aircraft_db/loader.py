@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -10,8 +11,10 @@ from itertools import batched
 from pathlib import Path
 from typing import Any
 
-from neo4j import Driver
+from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
+
+from generator.stamp import STAMP_NAME, read_stamp
 
 from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
 
@@ -418,7 +421,14 @@ def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
 
 
 def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
-    """Load all operational nodes, then all relationships, then report skips."""
+    """Load all operational nodes, then all relationships, then report skips.
+
+    The generator stamp is recorded last on a Dataset node, so verify can
+    tell which generated run the graph holds. The old node is removed first,
+    so a load that fails partway leaves none.
+    """
+    stamp = read_stamp(data_dir)
+    driver.execute_query("MATCH (d:Dataset) DETACH DELETE d", database_=database)
     skipped = load_nodes(driver, database, data_dir)
     load_relationships(driver, database, data_dir)
     if skipped:
@@ -429,6 +439,68 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
         )
     else:
         logger.info("[OK] No readings skipped.", extra={"blank_before": True})
+    if stamp is None:
+        logger.warning(
+            "[WARN] %s has no %s, so the graph gets no Dataset node.", data_dir, STAMP_NAME
+        )
+        return
+    driver.execute_query(
+        "CREATE (:Dataset {generator_hash: $hash, stamp: $stamp, loaded_at: datetime()})",
+        hash=stamp.get("generator_hash"),
+        stamp=json.dumps(stamp, sort_keys=True),
+        database_=database,
+    )
+    logger.info("[OK] Recorded the generator stamp on a Dataset node.")
+
+
+def _stamp_differences(graph: dict[str, Any], local: dict[str, Any]) -> list[str]:
+    """Return the stamp keys whose values differ, naming config keys as config.<key>."""
+    keys = []
+    for key in sorted(graph.keys() | local.keys()):
+        old, new = graph.get(key), local.get(key)
+        if isinstance(old, dict) and isinstance(new, dict):
+            keys += [
+                f"{key}.{k}" for k in sorted(old.keys() | new.keys()) if old.get(k) != new.get(k)
+            ]
+        elif old != new:
+            keys.append(key)
+    return keys
+
+
+def dataset_mismatch(driver: Driver, database: str, data_dir: Path) -> str | None:
+    """Return why the graph's Dataset node does not match data_dir's stamp.
+
+    Returns None when they match, or when data_dir has no stamp, since
+    stale_reason already reports that.
+    """
+    # The label or property may not exist yet, so the UNRECOGNIZED notice
+    # is expected noise.
+    with driver.session(
+        database=database,
+        default_access_mode=READ_ACCESS,
+        notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
+    ) as session:
+        stored = session.execute_read(
+            lambda tx: [r["stamp"] for r in tx.run("MATCH (d:Dataset) RETURN d.stamp AS stamp")]
+        )
+    if not stored:
+        return "the graph has no Dataset node, so it was loaded before stamps"
+    if len(stored) > 1:
+        return f"the graph has {len(stored)} Dataset nodes, where a load writes one"
+    local = read_stamp(data_dir)
+    if local is None:
+        return None
+    try:
+        graph = json.loads(stored[0])
+    except (TypeError, ValueError):
+        graph = None
+    if not isinstance(graph, dict):
+        return "the graph's Dataset node has no readable stamp"
+    if differs := _stamp_differences(graph, local):
+        return (
+            f"the graph was loaded from a run with a different {', '.join(differs)} than {data_dir}"
+        )
+    return None
 
 
 # Rows deleted per inner transaction when clearing nodes. DETACH DELETE also

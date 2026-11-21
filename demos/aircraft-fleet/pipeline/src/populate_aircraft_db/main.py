@@ -17,7 +17,7 @@ from neo4j.exceptions import ServiceUnavailable
 from generator.stamp import stale_reason
 
 from .config import Settings
-from .loader import clear_database, load_operational_graph, verify
+from .loader import clear_database, dataset_mismatch, load_operational_graph, verify
 from .schema import (
     create_constraints,
     create_embedding_indexes,
@@ -361,16 +361,23 @@ def verify_cmd(
     """Run comprehensive graph verification (read-only)."""
     settings = Settings()  # type: ignore[call-arg]
 
-    # The graph was loaded from these CSVs, so stale CSVs mean a stale graph.
-    if reason := stale_reason(settings.data_dir):
-        status = "[FAIL]" if strict else "[WARN]"
-        print(f"{status} Generated CSVs are stale: {reason}.")
+    # Two checks: the stamp in generated/ against the current generator code,
+    # and the graph's Dataset node against that stamp. Each says which one
+    # is out of date.
+    status = "[FAIL]" if strict else "[WARN]"
+    code_reason = stale_reason(settings.data_dir)
+    if code_reason:
+        print(f"{status} Generated CSVs are stale: {code_reason}.")
         print("  Regenerate and reload: ./setup.sh generate, then ./setup.sh load.")
-        if strict:
-            raise typer.Exit(code=1)
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:
+        graph_reason = dataset_mismatch(driver, settings.neo4j_database, settings.data_dir)
+        if graph_reason:
+            print(f"{status} The graph does not match the generated CSVs: {graph_reason}.")
+            print("  Reload: ./setup.sh load.")
+        if strict and (code_reason or graph_reason):
+            raise typer.Exit(code=1)
         passed = verify(
             driver,
             settings.neo4j_database,

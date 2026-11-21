@@ -383,7 +383,8 @@ def test_destroy_strips_only_the_exact_secret_variable(project: Path) -> None:
     assert env_local.read_text() == kept
 
 
-def test_destroy_keeps_a_wider_file_mode(project: Path) -> None:
+# The CLI writes .env.local with mode 0600, so the rewrite does the same.
+def test_destroy_narrows_a_wider_file_mode_to_0600(project: Path) -> None:
     env_local = project / "agentcore" / ".env.local"
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
     env_local.chmod(0o644)
@@ -392,7 +393,7 @@ def test_destroy_keeps_a_wider_file_mode(project: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert env_local.read_text() == "A=1\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o644
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
 
 
 def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:

@@ -307,11 +307,13 @@ strip_gateway_secret() {
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
     # The copy sits next to the file, so mv replaces the file in one step.
     # cp -p gives the copy the file's mode before the filtered lines go in.
+    # chmod then sets 0600, the mode the CLI writes .env.local with.
     if ! ENV_STRIP_TMP=$(mktemp "$ENV_LOCAL.XXXXXX") \
         || ! cp -p "$ENV_LOCAL" "$ENV_STRIP_TMP" \
         || ! awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
             '$0 !~ ("^[ \t]*(export[ \t]+)?" name "[ \t]*=") && $0 != comment' \
             "$ENV_LOCAL" > "$ENV_STRIP_TMP" \
+        || ! chmod 600 "$ENV_STRIP_TMP" \
         || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
         remove_strip_copy
         echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2

@@ -129,8 +129,11 @@ def graph_schema(driver: Driver, database: str) -> str:
     lines = ["Node labels and properties:"]
     for label in sorted(properties):
         line = f"- {label} {{{', '.join(sorted(properties[label]))}}}"
-        if note := _LABEL_NOTES.get(label):
-            line += f"  ({note})"
+        # A node with several labels, such as Calibrated:Sensor, gets the
+        # notes of each one.
+        notes = [_LABEL_NOTES[name] for name in label.split(":") if name in _LABEL_NOTES]
+        if notes:
+            line += f"  ({'; '.join(notes)})"
         lines.append(line)
     lines += ["", "Relationships:"]
     lines += [f"- ({a})-[:{rel}]->({b})" for a, rel, b in sorted(relationships)]

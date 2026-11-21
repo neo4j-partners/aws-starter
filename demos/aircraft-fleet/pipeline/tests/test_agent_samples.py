@@ -202,7 +202,8 @@ def test_schema_lists_labels_and_relationships_without_internal_labels() -> None
     assert schema == (
         "Node labels and properties:\n"
         "- Aircraft {aircraft_id, tail_number}\n"
-        "- Calibrated:Sensor {sensor_id}\n"
+        "- Calibrated:Sensor {sensor_id}"
+        f"  (type: {', '.join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)})\n"
         '- Chunk {chunkId, index, text}  (chunkId: "{documentId}:{index}")\n'
         "\n"
         "Relationships:\n"
@@ -210,6 +211,17 @@ def test_schema_lists_labels_and_relationships_without_internal_labels() -> None
         "- (Chunk)-[:NEXT_CHUNK]->(Chunk)\n"
         "- (Fault)-[:FROM_CHUNK]->(Chunk)\n"
     )
+
+
+def test_schema_joins_the_notes_of_each_label_on_a_node() -> None:
+    driver = SchemaDriver(property_rows=[(["Removal", "Chunk"], "chunkId")])
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert (
+        '- Chunk:Removal {chunkId}  (chunkId: "{documentId}:{index}"; '
+        "hours_since_install and flight_hours_at_removal are flight hours)"
+    ) in lines
 
 
 def test_schema_lists_a_label_without_properties() -> None:

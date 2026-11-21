@@ -570,14 +570,16 @@ The gearbox is a life-limited component. Hard-time replacement is required regar
 
 #### Vibration Limits (PW1500G)
 
-| Level | N1 (fan) | N1c (LPC) | Alert |
-|-------|----------|-----------|-------|
-| Normal | < 1.5 ips | < 1.2 ips | None |
-| Advisory | 1.5-2.5 ips | 1.2-2.0 ips | ENG VIB (amber) |
-| Caution | 2.5-3.5 ips | 2.0-3.0 ips | ENG VIB (amber) |
-| Warning | > 3.5 ips | > 3.0 ips | ENG VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 1.5 ips | None | None |
+| Advisory | 1.5-2.5 ips | MINOR | ENG VIB (amber) |
+| Caution | 2.5-3.5 ips | MAJOR | ENG VIB (amber) |
+| Warning | ≥ 3.5 ips | CRITICAL | ENG VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
-**Note:** PW1500G vibration limits are significantly lower than those of conventional turbofans (compare: CFM56-7B warning threshold 4.5 ips N1). The reduction gearbox attenuates fan-rotor excitations before they can propagate into the core structure, so the ambient vibration level at engine mounts is lower in normal operation. Advisory thresholds are set tightly to provide early warning of gearbox anomalies or bearing degradation that might otherwise be masked by the damping effect of the gearbox.
+**Note:** PW1500G vibration limits are significantly lower than those of conventional turbofans such as the CFM56-7B. The reduction gearbox attenuates fan-rotor excitations before they can propagate into the core structure, so the ambient vibration level at engine mounts is lower in normal operation. Advisory thresholds are set tightly to provide early warning of gearbox anomalies or bearing degradation that might otherwise be masked by the damping effect of the gearbox.
 
 #### Common Root Causes
 
@@ -797,10 +799,14 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 3.5 ips. The Caution level starts at 2.5 ips. The Advisory level starts at 1.5 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Advisory
 │
-├─► Is vibration > 3.5 ips (N1 fan) or > 3.0 ips (N1c LPC)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust immediately
 │   │          If vibration persists above warning limits, shutdown engine

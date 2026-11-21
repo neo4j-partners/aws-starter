@@ -16,12 +16,14 @@ from generator import main as generator_main
 from generator import manuals
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
+from generator.maintenance import SEVERITY_BY_LEVEL
 from generator.manuals import ManualBlockError, render_text
 from generator.specs import (
     COMPONENT_ALIASES,
     ENGINE_SPECS,
     MANUAL_FLEET_TAILS,
     SYSTEM_SENSORS,
+    VIBRATION_LEVELS,
     sensors_for,
 )
 from populate_aircraft_db.pipeline import DOCUMENTS, read_manual_text, strip_comments
@@ -317,3 +319,46 @@ def test_the_component_id_example_names_a_generated_component(model: str) -> Non
     codes = re.findall(r"^- (S\d\d): (.+)$", block, re.MULTILINE)
     assert [code for code, _ in codes] == [s.system_id[-3:] for s in aircraft.systems]
     assert [name for _, name in codes][2:] == ["Avionics", "Hydraulics"]
+
+
+def _vibration(model: str):
+    return {s.type: s for s in sensors_for("Engine", model)}["Vibration"]
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_vibration_table_is_the_spec_bands_and_event_severities(model: str) -> None:
+    table = manuals.RENDERERS["vibration-bands"](model, ENGINE_SPECS[model], {})
+    b = _vibration(model).bands
+
+    assert table.splitlines()[0] == "| Level | N1 Vibration | Event Severity | Flight Deck Alert |"
+    assert [row[:3] for row in _rows(table)] == [
+        ["Normal", f"< {b.advisory:.1f} ips", "None"],
+        ["Advisory", f"{b.advisory:.1f}-{b.caution:.1f} ips", SEVERITY_BY_LEVEL[1]],
+        ["Caution", f"{b.caution:.1f}-{b.warning:.1f} ips", SEVERITY_BY_LEVEL[2]],
+        ["Warning", f"≥ {b.warning:.1f} ips", SEVERITY_BY_LEVEL[3]],
+    ]
+    assert [row[0] for row in _rows(table)] == list(VIBRATION_LEVELS)
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_shutdown_note_quotes_the_spec_bands(model: str) -> None:
+    note = manuals.RENDERERS["vibration-shutdown"](model, ENGINE_SPECS[model], {})
+    b = _vibration(model).bands
+
+    for level, value in (("Warning", b.warning), ("Caution", b.caution), ("Advisory", b.advisory)):
+        assert f"The {level} level starts at {value:.1f} ips." in note
+
+
+_BLOCK = re.compile(
+    r"^<!-- BEGIN GENERATED: ([a-z0-9-]+) -->$.*?^<!-- END GENERATED: \1 -->$", re.M | re.S
+)
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_only_generated_blocks_quote_vibration_numbers_in_sections_4_and_8(model: str) -> None:
+    # Hand-written text names a level instead, so the numbers live in one place.
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+    sections = re.findall(r"^## [48]\. .*?(?=^## \d)", _BLOCK.sub("", text), re.M | re.S)
+
+    assert len(sections) == 2
+    assert [line for s in sections for line in re.findall(r"^.*\d ips.*$", s, re.M)] == []

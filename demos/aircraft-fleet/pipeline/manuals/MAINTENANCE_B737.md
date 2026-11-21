@@ -487,12 +487,14 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 #### Vibration Limits (CFM56-7B)
 
-| Level | N1 Vibration | N2 Vibration | Flight Deck Alert |
-|-------|--------------|--------------|-------------------|
-| Normal | < 2.0 ips | < 1.8 ips | None |
-| Advisory | 2.0-3.5 ips | 1.8-3.0 ips | ENG VIB (amber) |
-| Caution | 3.5-4.5 ips | 3.0-4.0 ips | ENG VIB (amber) |
-| Warning | > 4.5 ips | > 4.0 ips | ENG VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.5 ips | MINOR | ENG VIB (amber) |
+| Caution | 3.5-4.5 ips | MAJOR | ENG VIB (amber) |
+| Warning | ≥ 4.5 ips | CRITICAL | ENG VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Common Root Causes
 
@@ -703,13 +705,17 @@ The trailing edge flap system uses:
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 4.5 ips. The Caution level starts at 3.5 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Advisory
 │
-├─► Is vibration > 4.5 ips (N1) or > 4.0 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust immediately
-│   │          If vibration persists > 4.0 ips, shutdown engine
+│   │          If vibration stays at the Warning level, shutdown engine
 │   │          └─► END: Engine shutdown, ground inspection required
 │   │
 │   └─► NO ─► Continue to next step

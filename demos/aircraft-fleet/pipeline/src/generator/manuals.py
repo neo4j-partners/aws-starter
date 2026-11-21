@@ -20,7 +20,15 @@ from typing import Any
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode, SystemNode, generate_fleet
-from .specs import ENGINE_SPECS, MANUAL_FLEET_TAILS, SYSTEM_SENSORS, EngineSpec, sensors_for
+from .maintenance import SEVERITY_BY_LEVEL
+from .specs import (
+    ENGINE_SPECS,
+    MANUAL_FLEET_TAILS,
+    SYSTEM_SENSORS,
+    VIBRATION_LEVELS,
+    EngineSpec,
+    sensors_for,
+)
 
 MANUALS_DIR = Path(__file__).resolve().parent.parent.parent / "manuals"
 
@@ -188,12 +196,69 @@ def _component_ids(model: str, engine: EngineSpec, stats: Stats) -> str:
     return "\n".join(lines)
 
 
+# The flight deck alert at each vibration level above Normal. The Airbus
+# models use ECAM names.
+_BOEING_STYLE_ALERTS = ("ENG VIB (amber)", "ENG VIB (amber)", "ENG VIB (red)")
+_ECAM_ALERTS = ("ENG 1(2) VIB (amber)", "ENG 1(2) VIB HI (amber)", "ENG 1(2) VIB (red)")
+_VIBRATION_ALERTS: dict[str, tuple[str, str, str]] = {
+    "A220-300": _BOEING_STYLE_ALERTS,
+    "A320-200": _ECAM_ALERTS,
+    "A321neo": _ECAM_ALERTS,
+    "B737-800": _BOEING_STYLE_ALERTS,
+    "E190": _BOEING_STYLE_ALERTS,
+}
+
+
+def _vibration_thresholds(engine: EngineSpec) -> tuple[float, float, float]:
+    vibration = next(s for s in engine.sensors if s.type == "Vibration")
+    b = vibration.bands
+    return b.advisory, b.caution, b.warning
+
+
+def _vibration_bands(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§4: the Vibration Limits table, with the event severity of each level."""
+    advisory, caution, warning = _vibration_thresholds(engine)
+    ranges = (
+        f"< {advisory:.1f} ips",
+        f"{advisory:.1f}-{caution:.1f} ips",
+        f"{caution:.1f}-{warning:.1f} ips",
+        f"≥ {warning:.1f} ips",
+    )
+    severities = ("None", *(SEVERITY_BY_LEVEL[level] for level in (1, 2, 3)))
+    alerts = ("None", *_VIBRATION_ALERTS[model])
+    lines = [
+        "| Level | N1 Vibration | Event Severity | Flight Deck Alert |",
+        "|-------|--------------|----------------|-------------------|",
+        *(
+            f"| {level} | {band} | {severity} | {alert} |"
+            for level, band, severity, alert in zip(
+                VIBRATION_LEVELS, ranges, severities, alerts, strict=True
+            )
+        ),
+    ]
+    return "\n".join(lines)
+
+
+def _vibration_shutdown(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§8.1: the vibration levels the decision tree below names."""
+    advisory, caution, warning = _vibration_thresholds(engine)
+    return (
+        "**Vibration thresholds:** The levels come from the Vibration Limits table in "
+        "the Vibration Exceedance section. They apply to N1 vibration, the channel the "
+        f"digital twin records. The Warning level starts at {warning:.1f} ips. The "
+        f"Caution level starts at {caution:.1f} ips. The Advisory level starts at "
+        f"{advisory:.1f} ips. The tree below names these levels."
+    )
+
+
 # Block id -> renderer. Each takes (model, engine spec, fleet stats).
 RENDERERS: dict[str, Renderer] = {
     "sensor-table": _sensor_table,
     "egt-trend-note": _egt_trend_note,
     "component-tree": _component_tree,
     "component-ids": _component_ids,
+    "vibration-bands": _vibration_bands,
+    "vibration-shutdown": _vibration_shutdown,
 }
 
 # Blocks every manual must have, once each.

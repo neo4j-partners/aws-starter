@@ -315,12 +315,14 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 #### Vibration Limits
 
-| Level | N1 Vibration | N2 Vibration | Action Required |
-|-------|--------------|--------------|-----------------|
-| Normal | < 2.0 ips | < 1.5 ips | Continue operations |
-| Caution | 2.0-3.5 ips | 1.5-2.5 ips | Increase monitoring |
-| Warning | 3.5-5.0 ips | 2.5-4.0 ips | Return to base |
-| Limit | > 5.0 ips | > 4.0 ips | Shutdown engine |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.5 ips | MINOR | ENG 1(2) VIB (amber) |
+| Caution | 3.5-5.0 ips | MAJOR | ENG 1(2) VIB HI (amber) |
+| Warning | ≥ 5.0 ips | CRITICAL | ENG 1(2) VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Troubleshooting Procedure
 
@@ -599,10 +601,14 @@ Linear hydraulic actuator providing:
 
 ### 8.1 Engine Vibration Diagnostic Flow
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 5.0 ips. The Caution level starts at 3.5 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Vibration Warning Received
 │
-├─► Is vibration > 5.0 ips (N1) or > 4.0 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES: Shutdown engine per QRH
 │   │        Ground aircraft
@@ -611,7 +617,7 @@ START: Vibration Warning Received
 │   │
 │   └─► NO: Continue to next step
 │
-├─► Is vibration > 3.5 ips (N1) or > 2.5 ips (N2)?
+├─► Is vibration at or above the Caution level?
 │   │
 │   ├─► YES: Plan return to base at earliest opportunity
 │   │        Do not cycle thrust unnecessarily

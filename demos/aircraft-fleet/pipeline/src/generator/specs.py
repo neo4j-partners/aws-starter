@@ -123,6 +123,11 @@ class SensorSpec:
                 return (b.advisory, b.caution, b.warning)
 
 
+# The vibration levels every manual's Vibration Limits table uses, in band
+# order. Advisory, Caution, and Warning start at a sensor's three bands.
+VIBRATION_LEVELS: tuple[str, str, str, str] = ("Normal", "Advisory", "Caution", "Warning")
+
+
 @dataclass(frozen=True)
 class EngineSpec:
     engine_type: str

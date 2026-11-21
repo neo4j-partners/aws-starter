@@ -386,12 +386,14 @@ The LEAP-1A's lightweight composite fan and high bypass ratio make vibration mon
 
 #### Vibration Limits (LEAP-1A Specific)
 
-| Level | N1 Vibration | N2 Vibration | ECAM Alert |
-|-------|--------------|--------------|------------|
-| Normal | < 2.0 ips | < 1.8 ips | None |
-| Caution | 2.0-3.0 ips | 1.8-2.5 ips | ENG 1(2) VIB (amber) |
-| Warning | 3.0-4.0 ips | 2.5-3.5 ips | ENG 1(2) VIB HI (amber) |
-| Limit | > 4.0 ips | > 3.5 ips | ENG 1(2) VIB (red) |
+<!-- BEGIN GENERATED: vibration-bands -->
+| Level | N1 Vibration | Event Severity | Flight Deck Alert |
+|-------|--------------|----------------|-------------------|
+| Normal | < 2.0 ips | None | None |
+| Advisory | 2.0-3.0 ips | MINOR | ENG 1(2) VIB (amber) |
+| Caution | 3.0-4.0 ips | MAJOR | ENG 1(2) VIB HI (amber) |
+| Warning | ≥ 4.0 ips | CRITICAL | ENG 1(2) VIB (red) |
+<!-- END GENERATED: vibration-bands -->
 
 #### Common Root Causes (LEAP-1A)
 
@@ -428,14 +430,14 @@ The LEAP-1A has experienced ice crystal icing events in high-altitude convective
 
 #### Corrective Actions by Severity
 
-**CRITICAL (Vibration > 4.0 ips N1 or > 3.5 ips N2):**
+**CRITICAL (Warning level):**
 - Ground aircraft immediately
 - Comprehensive borescope inspection all stages
 - If blade damage found: Engine removal likely
 - If ice event suspected: Document and monitor after inspection clears
 - Estimated downtime: 24-72 hours minimum
 
-**MAJOR (Vibration 2.5-4.0 ips):**
+**MAJOR (Caution level):**
 - Detailed fan blade inspection
 - Borescope HPC and HPT
 - Fan balance check and correction if needed
@@ -803,6 +805,10 @@ The A321neo flap system uses:
 
 ### 8.1 Engine Vibration Diagnostic Flow (LEAP-1A)
 
+<!-- BEGIN GENERATED: vibration-shutdown -->
+**Vibration thresholds:** The levels come from the Vibration Limits table in the Vibration Exceedance section. They apply to N1 vibration, the channel the digital twin records. The Warning level starts at 4.0 ips. The Caution level starts at 3.0 ips. The Advisory level starts at 2.0 ips. The tree below names these levels.
+<!-- END GENERATED: vibration-shutdown -->
+
 ```
 START: Engine Vibration Warning/Caution
 │
@@ -816,7 +822,7 @@ START: Engine Vibration Warning/Caution
 │   │
 │   └─► NO ─► Continue to vibration analysis
 │
-├─► Is vibration > 4.0 ips (N1) or > 3.5 ips (N2)?
+├─► Is vibration at or above the Warning level?
 │   │
 │   ├─► YES ─► Reduce thrust to idle
 │   │          If vibration remains high: Shutdown engine

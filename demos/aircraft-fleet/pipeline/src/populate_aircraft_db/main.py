@@ -344,6 +344,7 @@ def setup_cmd() -> None:
             driver,
             settings.neo4j_database,
             expected_embedding_dimensions=creds.embedding_dims,
+            data_dir=settings.data_dir,
         )
 
     elapsed = time.monotonic() - start
@@ -383,6 +384,7 @@ def verify_cmd(
             settings.neo4j_database,
             expected_embedding_dimensions=_expected_embedding_dims(settings),
             strict=strict,
+            data_dir=settings.data_dir,
         )
 
     if strict and not passed:

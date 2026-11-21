@@ -62,6 +62,11 @@ two checks. It compares the stamp with the current code and versions, and it com
 graph's `Dataset` node with the stamp. A graph with no `Dataset` node was loaded
 before stamps existed. Each warning says whether to regenerate or only reload.
 `verify --strict` fails on either mismatch, or when the stamp is missing.
+`verify` also compares each operational label's node count with the row count of
+its CSV, and `--strict` fails on a mismatch. The load merges into whatever the graph
+holds, so a load over an earlier, larger dataset keeps that dataset's extra nodes.
+`./setup.sh load` and `./setup.sh load-operational` run `clean` first. A direct
+`uv run populate-aircraft-db load-operational` does not, so run `clean` before it.
 
 The `uv run populate-aircraft-db` CLI has more commands:
 

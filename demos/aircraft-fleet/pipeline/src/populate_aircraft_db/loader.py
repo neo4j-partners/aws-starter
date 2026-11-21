@@ -700,6 +700,46 @@ def _check_counts(
         result.check(enrichment_counts[label] > 0, f"{label} has no enrichment nodes")
 
 
+def _csv_row_count(path: Path) -> int:
+    """Count a CSV's records the way the loader reads them."""
+    with path.open(newline="", encoding="utf-8") as f:
+        return sum(1 for _ in csv.DictReader(f))
+
+
+def _check_csv_counts(label_counts: dict[str, int], data_dir: Path, result: _VerifyResult) -> None:
+    """Compare each operational label's node count with its CSV's row count.
+
+    The load MERGEs into whatever the graph holds, so a direct load over an
+    earlier, larger dataset leaves extra nodes. They show up here.
+    """
+    files = [(label, filename) for label, filename, _ in _NODE_DEFINITIONS]
+    if not any((data_dir / filename).is_file() for _, filename in files):
+        result.check(
+            False, f"{data_dir} has no node CSVs, so node counts were not compared with them"
+        )
+        return
+    matched = True
+    for label, filename in files:
+        path = data_dir / filename
+        if not path.is_file():
+            matched = False
+            result.check(
+                False,
+                f"{filename} is missing from {data_dir}, so the {label} count was not compared",
+            )
+            continue
+        rows = _csv_row_count(path)
+        nodes = label_counts.get(label, 0)
+        if nodes != rows:
+            matched = False
+            result.check(
+                False,
+                f"{label} has {nodes:,} nodes, but {filename} in {data_dir} has {rows:,} rows",
+            )
+    if matched:
+        print(f"\n[OK] Node counts match the CSVs in {data_dir}.")
+
+
 def _check_embeddings(
     driver: Driver,
     database: str,
@@ -878,8 +918,13 @@ def verify(
     *,
     expected_embedding_dimensions: int = 1536,
     strict: bool = False,
+    data_dir: Path | None = None,
 ) -> bool:
-    """Print comprehensive graph verification and return whether it passed."""
+    """Print comprehensive graph verification and return whether it passed.
+
+    With data_dir, it also compares each operational label's node count
+    with the row count of its CSV there.
+    """
     result = _VerifyResult(strict=strict)
 
     label_counts = _get_label_counts(driver, database)
@@ -891,6 +936,8 @@ def verify(
     print("Verification")
     print("=" * 60)
     _check_counts(label_counts, rel_counts, result)
+    if data_dir is not None:
+        _check_csv_counts(label_counts, data_dir, result)
     with_embedding = _check_embeddings(
         driver, database, label_counts.get("Chunk", 0), expected_embedding_dimensions, result
     )

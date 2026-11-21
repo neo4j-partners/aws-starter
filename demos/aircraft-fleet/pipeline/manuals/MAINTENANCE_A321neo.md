@@ -297,7 +297,7 @@ The two-stage HPT features advanced single-crystal nickel superalloy blades with
 | EGT (Start) | — | — | 750°C |
 <!-- END GENERATED: egt-limits -->
 
-**Inter-turbine temperature:** Normal is below 1,100°C. Caution is 1,100-1,150°C. The maximum is 1,200°C.
+**Inter-turbine temperature:** Normal is below 1,100°C. Caution is 1,100-1,200°C. The maximum is 1,200°C.
 
 #### 3.2.4 Main Fuel Pump
 **Part Number:** LEAP-FP-1A32-400

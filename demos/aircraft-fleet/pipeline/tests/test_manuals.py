@@ -480,6 +480,24 @@ def test_the_egt_bands_leave_no_gap(model: str) -> None:
         assert maximum == f"{high}°C", label
 
 
+# A hand-written band in prose: "Normal is below a. Caution is a-b. The
+# maximum is c."
+_PROSE_BANDS = re.compile(
+    r"Normal is below ([\d,]+)°C\. Caution is ([\d,]+)-([\d,]+)°C\. "
+    r"The maximum is ([\d,]+)°C\."
+)
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_a_hand_written_temperature_band_leaves_no_gap(model: str) -> None:
+    for normal, low, high, maximum in _PROSE_BANDS.findall(_manual(model)):
+        assert (normal, high) == (low, maximum)
+
+
+def test_the_a321neo_states_its_itt_bands() -> None:
+    assert _PROSE_BANDS.search(_manual("A321neo"))
+
+
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
 def test_the_egt_limits_are_ordered_and_above_the_trend_scale(model: str) -> None:
     limits = ENGINE_SPECS[model].egt_limits

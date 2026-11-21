@@ -10,27 +10,41 @@ Memory is required. These variables configure it:
 The settings are built once per process. If Neo4j rejects the password,
 :func:`forget_memory_settings` drops them so the next build reads the
 password again. A request that failed with a password another request
-already replaced leaves the newer settings in place. Each request gets its own
-:class:`Neo4jSessionManager`, and the caller must close it when the request
-ends. Each manager runs its own event-loop thread, and its Neo4j driver is
-bound to that loop, so managers cannot share one client.
+already replaced leaves the newer settings in place.
+
+One :class:`SharedMemory` holds the memory client and its event-loop thread
+for the process. It opens on the first request. Each request gets a
+:class:`MemorySession` with its own session manager on that client, and the
+caller must close it when the request ends. A rejected password retires the
+client. A retired client closes once its last session closes, on a
+background thread, so no request waits for it. :func:`close_shared_memory`
+closes every client at shutdown.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory import MemorySettings
 from neo4j_agent_memory.config.settings import ExtractionConfig, ExtractorType, Neo4jConfig
-from neo4j_agent_memory.integrations.strands import Neo4jRetrievalConfig, Neo4jSessionManager
+from neo4j_agent_memory.integrations.strands import (
+    Neo4jRetrievalConfig,
+    Neo4jSessionManager,
+    SharedMemory,
+)
 from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, BedrockProvider
 from pydantic import SecretStr
 
 from fleet_supervisor.core.config import AWS_REGION, ConfigError
 from fleet_supervisor.core.secrets import forget_secrets, password_from
+
+logger = logging.getLogger(__name__)
 
 MEM_NEO4J_URI = "MEM_NEO4J_URI"
 
@@ -41,6 +55,12 @@ EMBEDDING_DIMENSIONS = 1024
 EXTRACTION_MODEL = "bedrock/global.anthropic.claude-sonnet-5-5"
 # Only memories at least this similar to the question are added to it.
 RETRIEVAL_MIN_SCORE = 0.75
+# How long shutdown waits for open sessions before it closes the clients.
+SHUTDOWN_WAIT_SECONDS = 30.0
+
+# Called with a task name when background memory work starts. Returns the
+# function to call when it ends.
+BackgroundHook = Callable[[str], Callable[[], None]]
 
 
 def memory_password() -> str:
@@ -72,13 +92,15 @@ def forget_memory_settings(failed: MemorySettings) -> None:
     Concurrent requests can fail with the same old password. The first one
     drops it, and the next build reads the password again. A later one finds
     the settings already dropped or rebuilt with another password, and keeps
-    them.
+    them. The shared client is retired the same way, if it opened with
+    ``failed``'s password.
     """
     global _settings
     with _settings_lock:
         if _settings is not None and _password(_settings) == _password(failed):
             _settings = None
             forget_secrets()
+    _retire_shared(failed)
 
 
 def _password(settings: MemorySettings) -> str:
@@ -175,20 +197,222 @@ def _build_memory_settings() -> MemorySettings:
     )
 
 
-def build_session_manager(
-    session_id: str, user_id: str, settings: MemorySettings
-) -> Neo4jSessionManager:
-    """Return the memory session manager for one request, built from ``settings``.
+@dataclass(eq=False)
+class _Shared:
+    """A shared client, the settings it opened with, and its open sessions.
 
-    It connects when the agent that owns it is built. The caller must call
-    ``close()`` when the request ends, on every path.
+    Change ``open_sessions``, ``retired`` and ``closing`` only under
+    ``_shared_lock``.
     """
-    return Neo4jSessionManager(
-        session_id,
-        settings=settings,
-        user_id=user_id,
-        retrieval_config=Neo4jRetrievalConfig(min_score=RETRIEVAL_MIN_SCORE),
-        # Set explicitly, because defaults can change between releases.
-        extract_entities=True,
-        record_tool_calls=False,
-    )
+
+    memory: SharedMemory
+    settings: MemorySettings
+    open_sessions: int = 0
+    retired: bool = False
+    closing: bool = False
+
+
+@dataclass
+class _Open:
+    """One open of the shared client in progress, which concurrent callers wait on."""
+
+    done: threading.Event = field(default_factory=threading.Event)
+    error: BaseException | None = None
+
+
+# The client new sessions use, or None until the next open. The open in
+# progress, if any. Retired clients that still have open sessions. The
+# threads closing retired clients. Read and change all four only under
+# _shared_lock, which _sessions_closed also uses.
+_shared: _Shared | None = None
+_shared_open: _Open | None = None
+_retired: set[_Shared] = set()
+_closers: set[threading.Thread] = set()
+_shared_lock = threading.Lock()
+_sessions_closed = threading.Condition(_shared_lock)
+
+
+class MemorySession:
+    """One request's session manager on the shared memory client.
+
+    Call ``close()`` once when the request ends, on every path. It writes the
+    manager's messages, then releases the request's hold on the client.
+    """
+
+    def __init__(self, manager: Neo4jSessionManager, shared: _Shared) -> None:
+        self.manager = manager
+        self._shared = shared
+        self._released = False
+
+    def close(self) -> None:
+        """Close the manager, then release the client, even if the close fails."""
+        try:
+            self.manager.close()
+        finally:
+            if not self._released:
+                self._released = True
+                _release(self._shared)
+
+
+def build_session_manager(
+    session_id: str,
+    user_id: str,
+    settings: MemorySettings,
+    background_hook: BackgroundHook | None,
+) -> MemorySession:
+    """Return the memory session for one request, on the shared client.
+
+    The first call opens the shared client with ``settings`` and
+    ``background_hook``. Later calls use that client. Entity extraction runs
+    after each write, in the background, and ``background_hook`` reports it.
+    The manager restores the session history when the agent that owns it is
+    built. The caller must call ``close()`` when the request ends, on every
+    path.
+
+    Raises the open's error when the shared client cannot open. A caller
+    that waited on another caller's open raises a RuntimeError caused by it.
+    """
+    shared = _acquire(settings, background_hook)
+    try:
+        manager = shared.memory.session_manager(
+            session_id,
+            user_id=user_id,
+            retrieval_config=Neo4jRetrievalConfig(min_score=RETRIEVAL_MIN_SCORE),
+            # Set explicitly, because defaults can change between releases.
+            extract_entities=True,
+            defer_extraction=True,
+            record_tool_calls=False,
+        )
+    except BaseException:
+        _release(shared)
+        raise
+    return MemorySession(manager, shared)
+
+
+def _acquire(settings: MemorySettings, background_hook: BackgroundHook | None) -> _Shared:
+    """Return the shared client with one more open session, opening it if needed.
+
+    Concurrent callers share one open. A failed open is not cached, so the
+    next call opens again.
+    """
+    global _shared, _shared_open
+    while True:
+        with _shared_lock:
+            if _shared is not None:
+                _shared.open_sessions += 1
+                return _shared
+            opening = _shared_open
+            if opening is None:
+                opening = _shared_open = _Open()
+                break
+        opening.done.wait()
+        if opening.error is not None:
+            raise RuntimeError("Opening the shared memory client failed.") from opening.error
+        # The client opened, but a rejected password may have retired it
+        # already, so look again.
+    opened: _Shared | None = None
+    try:
+        memory = SharedMemory.open(settings, background_hook=background_hook)
+        opened = _Shared(memory, settings, open_sessions=1)
+    except BaseException as error:
+        # Every failure, even an interrupt, must reach the waiters.
+        opening.error = error
+        raise
+    finally:
+        with _shared_lock:
+            if opened is not None:
+                _shared = opened
+            _shared_open = None
+            _sessions_closed.notify_all()
+        opening.done.set()
+    return opened
+
+
+def _release(shared: _Shared) -> None:
+    """Drop one open session. Close a retired client when its last session closes."""
+    with _shared_lock:
+        shared.open_sessions -= 1
+        _sessions_closed.notify_all()
+        if not (shared.retired and shared.open_sessions == 0 and not shared.closing):
+            return
+        shared.closing = True
+        _retired.discard(shared)
+    _close_in_background(shared)
+
+
+def _retire_shared(failed: MemorySettings) -> None:
+    """Retire the current client if it opened with ``failed``'s password.
+
+    New sessions then open a new client. The retired one closes when its
+    last session closes, or at once when it has none.
+    """
+    global _shared
+    with _shared_lock:
+        shared = _shared
+        if shared is None or _password(shared.settings) != _password(failed):
+            return
+        _shared = None
+        shared.retired = True
+        if shared.open_sessions:
+            _retired.add(shared)
+            return
+        shared.closing = True
+    _close_in_background(shared)
+
+
+def _close_in_background(shared: _Shared) -> None:
+    """Close ``shared`` on its own thread, so the caller does not wait for it."""
+    closer = threading.Thread(target=_close_logged, args=(shared,), name="memory-close")
+    with _shared_lock:
+        _closers.add(closer)
+    closer.start()
+
+
+def _close_logged(shared: _Shared) -> None:
+    """Close a shared client, logging a failure.
+
+    The close waits for the client's background work, such as entity
+    extraction, before it closes the client.
+    """
+    try:
+        shared.memory.close()
+    except Exception:
+        logger.exception("Error while closing the shared memory client")
+    finally:
+        with _shared_lock:
+            _closers.discard(threading.current_thread())
+
+
+def close_shared_memory() -> None:
+    """Close the current client and every retired one still open. Blocks.
+
+    It first waits up to ``SHUTDOWN_WAIT_SECONDS`` for an open in progress
+    and for open sessions to close, since a session writes its messages on
+    the client. Then it closes the clients anyway, and waits for closes
+    already running on other threads.
+    """
+    global _shared
+    deadline = time.monotonic() + SHUTDOWN_WAIT_SECONDS
+    with _shared_lock:
+        while True:
+            clients = [shared for shared in (_shared, *_retired) if shared is not None]
+            open_sessions = sum(shared.open_sessions for shared in clients)
+            busy = open_sessions or _shared_open is not None
+            if not busy or not _sessions_closed.wait(deadline - time.monotonic()):
+                break
+        if open_sessions:
+            logger.warning(
+                "Closing the memory clients with %d memory session(s) still open after %ss.",
+                open_sessions,
+                SHUTDOWN_WAIT_SECONDS,
+            )
+        closing = [shared for shared in clients if not shared.closing]
+        for shared in closing:
+            shared.closing = True
+        _shared = None
+        _retired.clear()
+        running = list(_closers)
+    for shared in closing:
+        _close_logged(shared)
+    for closer in running:
+        closer.join()

@@ -11,8 +11,10 @@ on the first request. The client is rebuilt if its MCP session ends. A tool
 call that finds the session ended rebuilds it and retries once. See
 ``fleet_supervisor.core.gateway_tools``. The agents are built per request.
 See ``fleet_supervisor.core.agents`` for why. Each request also gets its own
-memory session manager on the supervisor, closed when the request ends. See
-``fleet_supervisor.core.memory``.
+memory session manager on the supervisor, closed when the request ends. The
+managers share one memory client, opened on the first request and closed at
+shutdown. Entity extraction runs after the reply, and the health check reports
+busy until it ends. See ``fleet_supervisor.core.memory``.
 
 Local testing:
     uv run fleet-supervisor-server
@@ -28,8 +30,10 @@ import logging
 import os
 import threading
 import uuid
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from functools import cache
+from functools import cache, partial
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +50,6 @@ load_dotenv(ENV_FILE)
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 from neo4j_agent_memory import MemorySettings  # noqa: E402
-from neo4j_agent_memory.integrations.strands import Neo4jSessionManager  # noqa: E402
 from strands import Agent  # noqa: E402
 from strands.models import BedrockModel  # noqa: E402
 
@@ -66,7 +69,9 @@ from fleet_supervisor.core.mcp import (  # noqa: E402
     build_mcp_client,
 )
 from fleet_supervisor.core.memory import (  # noqa: E402
+    MemorySession,
     build_session_manager,
+    close_shared_memory,
     forget_memory_settings,
     memory_settings,
     password_rejected,
@@ -85,7 +90,30 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 GENERIC_ERROR = "The agent could not complete this request. Check the server logs for details."
 NO_PROMPT_ERROR = "No prompt provided. Include 'prompt' in the request."
 
-app = BedrockAgentCoreApp()
+
+@asynccontextmanager
+async def _lifespan(app: BedrockAgentCoreApp) -> AsyncIterator[None]:
+    """Close the shared memory client when the server stops.
+
+    The close waits for open memory sessions, then for background
+    extraction, so a request cancelled at shutdown still writes its memory.
+    """
+    yield
+    await asyncio.to_thread(close_shared_memory)
+
+
+app = BedrockAgentCoreApp(lifespan=_lifespan)
+
+
+def track_background_task(name: str) -> Callable[[], None]:
+    """Mark the server busy while background memory work runs.
+
+    The memory client calls this when a task such as entity extraction
+    starts, and calls the returned function once when it ends. While any
+    task runs, the health check reports busy, so AgentCore Runtime does not
+    stop the session in the middle of it.
+    """
+    return partial(app.complete_async_task, app.add_async_task(name))
 
 
 @dataclass
@@ -254,23 +282,25 @@ def extract_prompt(payload: Any) -> str | None:
 _cleanups: set[asyncio.Task[None]] = set()
 
 
-def _close_logged(manager: Neo4jSessionManager) -> None:
-    """Close a memory session manager, logging a failure. Blocks on Neo4j."""
+def _close_logged(session: MemorySession) -> None:
+    """Close a memory session, logging a failure. Blocks on Neo4j."""
     try:
-        manager.close()
+        session.close()
     except Exception:
         logger.exception("Error while closing the memory session manager")
 
 
 def _build_agent(
     runtime: Runtime, session_id: str, user_id: str
-) -> tuple[Agent, Neo4jSessionManager | None]:
-    """Build the memory session manager and the supervisor. Blocks on Neo4j.
+) -> tuple[Agent, MemorySession | None]:
+    """Build the memory session and the supervisor. Blocks on Neo4j.
 
-    The supervisor's constructor connects the manager and restores the
-    session history. If Neo4j rejects the password, the cached one may
-    predate a secret rotation. So this drops it, unless another request
-    already replaced it, and builds once more with the current settings.
+    The first request opens the shared memory client. The supervisor's
+    constructor restores the session history on the client's event loop. If
+    Neo4j rejects the password, the cached one may predate a secret
+    rotation. So this drops it and retires the client that opened with it,
+    unless another request already did, and builds once more with the
+    current settings.
     """
     settings = memory_settings()
     try:
@@ -286,35 +316,37 @@ def _build_agent(
 
 def _build_agent_once(
     runtime: Runtime, settings: MemorySettings, session_id: str, user_id: str
-) -> tuple[Agent, Neo4jSessionManager | None]:
-    """Build the manager and the supervisor once.
+) -> tuple[Agent, MemorySession | None]:
+    """Build the memory session and the supervisor once.
 
-    If the build fails, this closes the manager before raising, so the
-    caller only closes a manager it gets back.
+    If the build fails, this closes the session before raising, so the
+    caller only closes a session it gets back.
     """
-    manager = build_session_manager(session_id, user_id, settings)
+    session = build_session_manager(session_id, user_id, settings, track_background_task)
     try:
-        supervisor = build_supervisor(runtime.model, runtime.tools, manager)
+        supervisor = build_supervisor(
+            runtime.model, runtime.tools, session.manager if session is not None else None
+        )
     except BaseException:
-        if manager is not None:
-            _close_logged(manager)
+        if session is not None:
+            _close_logged(session)
         raise
-    return supervisor, manager
+    return supervisor, session
 
 
-async def _close_after_build(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]) -> None:
-    """Wait for the build to finish, then close the manager it returned."""
+async def _close_after_build(build: asyncio.Task[tuple[Agent, MemorySession | None]]) -> None:
+    """Wait for the build to finish, then close the memory session it returned."""
     try:
-        _, manager = await build
+        _, session = await build
     except BaseException:
-        # _build_agent closed the manager and the request logged the error.
+        # _build_agent closed the session and the request logged the error.
         return
-    if manager is not None:
-        await asyncio.to_thread(_close_logged, manager)
+    if session is not None:
+        await asyncio.to_thread(_close_logged, session)
 
 
-async def _release(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]) -> None:
-    """Close the request's manager once its build ends, even if cancelled.
+async def _release(build: asyncio.Task[tuple[Agent, MemorySession | None]]) -> None:
+    """Close the request's memory session once its build ends, even if cancelled.
 
     A client disconnect cancels the request. The AgentCore SDK calls
     ``task.cancel()`` once, which interrupts whichever await in this finally
@@ -322,8 +354,7 @@ async def _release(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]
     cancelled too. So the wait for the build and the close run as one task
     under one shield, and that task finishes on its own if the request is
     cancelled. Closing before the build ends would race the constructor,
-    which connects the manager after the close and leaves the connection
-    open.
+    which restores history on the shared client's event loop after the close.
     """
     cleanup = asyncio.create_task(_close_after_build(build))
     _cleanups.add(cleanup)
@@ -334,7 +365,7 @@ async def _release(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]
 @app.entrypoint
 async def invoke(payload: Any, context):
     """Stream the supervisor's answer as SSE events."""
-    build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]] | None = None
+    build: asyncio.Task[tuple[Agent, MemorySession | None]] | None = None
     # Everything runs inside the try, so no input can raise past the handler
     # and send exception text to the client.
     try:

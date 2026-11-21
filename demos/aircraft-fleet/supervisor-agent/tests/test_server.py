@@ -54,7 +54,9 @@ def supervisor(monkeypatch):
     fake.calls = calls
     monkeypatch.setattr(server, "build_supervisor", lambda model, tools, manager=None: fake)
     monkeypatch.setattr(server, "memory_settings", lambda: None)
-    monkeypatch.setattr(server, "build_session_manager", lambda session_id, user_id, settings: None)
+    monkeypatch.setattr(
+        server, "build_session_manager", lambda session_id, user_id, settings, background_hook: None
+    )
     return fake
 
 
@@ -62,6 +64,11 @@ class FakeManager:
     def __init__(self, close_error: Exception | None = None):
         self.close_error = close_error
         self.closed = 0
+
+    @property
+    def manager(self) -> "FakeManager":
+        """The fake is its own session and manager."""
+        return self
 
     def close(self) -> None:
         self.closed += 1
@@ -75,8 +82,9 @@ def manager(monkeypatch, supervisor):
     fake = FakeManager()
     built: dict = {}
 
-    def fake_build_session_manager(session_id, user_id, settings):
+    def fake_build_session_manager(session_id, user_id, settings, background_hook):
         built["session_id"], built["user_id"] = session_id, user_id
+        built["hook"] = background_hook
         return fake
 
     def fake_build_supervisor(model, tools, manager=None):
@@ -94,7 +102,12 @@ def test_memory_manager_goes_to_the_supervisor_and_is_closed(supervisor, manager
         server.invoke({"prompt": "q", "user_id": "u1"}, SimpleNamespace(session_id="s1"))
     )
     assert events[-1] == {"type": "complete"}
-    assert manager.built == {"session_id": "s1", "user_id": "u1", "manager": manager}
+    assert manager.built == {
+        "session_id": "s1",
+        "user_id": "u1",
+        "hook": server.track_background_task,
+        "manager": manager,
+    }
     assert manager.closed == 1
 
 
@@ -302,7 +315,7 @@ def password_retry(monkeypatch, supervisor):
     managers: list[FakeManager] = []
     forgotten: list[bool] = []
 
-    def new_manager(session_id, user_id, settings):
+    def new_manager(session_id, user_id, settings, background_hook):
         managers.append(FakeManager())
         return managers[-1]
 
@@ -338,7 +351,7 @@ def test_concurrent_rejections_of_one_password_read_it_again_once(supervisor, mo
     forgotten: list[bool] = []
     monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
 
-    def new_manager(session_id, user_id, settings):
+    def new_manager(session_id, user_id, settings, background_hook):
         manager = FakeManager()
         manager.password = settings.neo4j.password.get_secret_value()
         return manager
@@ -421,6 +434,28 @@ def test_no_memory_manager_when_memory_is_off(supervisor, monkeypatch):
     monkeypatch.setattr(server, "build_supervisor", fake_build_supervisor)
     collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
     assert seen == {"manager": None}
+
+
+# Deferred extraction outlives the request. The hook marks the server busy
+# while it runs, so AgentCore Runtime does not reclaim the session.
+def test_the_background_hook_marks_the_server_busy_until_done():
+    before = server.app.get_async_task_info()["active_count"]
+    done = server.track_background_task("extract:s1")
+    assert server.app.get_async_task_info()["active_count"] == before + 1
+    done()
+    assert server.app.get_async_task_info()["active_count"] == before
+
+
+def test_shutdown_closes_the_shared_memory(monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(server, "close_shared_memory", lambda: calls.append("closed"))
+
+    async def serve_then_stop():
+        async with server.app.router.lifespan_context(server.app):
+            assert calls == []
+        assert calls == ["closed"]
+
+    asyncio.run(serve_then_stop())
 
 
 def test_streams_agent_chunk_and_complete(supervisor):

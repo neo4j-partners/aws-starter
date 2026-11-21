@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
+from types import SimpleNamespace
 
 import pytest
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory.config.settings import ExtractorType
 from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
-from neo4j_agent_memory.integrations.strands import Neo4jSessionManager
 from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, BedrockProvider
 
 from fleet_supervisor.core import memory, secrets
@@ -30,6 +31,10 @@ def _clean(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(memory, "_settings", None)
     monkeypatch.setattr(memory, "_settings_build", None)
+    monkeypatch.setattr(memory, "_shared", None)
+    monkeypatch.setattr(memory, "_shared_open", None)
+    monkeypatch.setattr(memory, "_retired", set())
+    monkeypatch.setattr(memory, "_closers", set())
     secrets._read_secret.cache_clear()
 
 
@@ -111,28 +116,272 @@ def test_settings_are_built_once(memory_on) -> None:
     assert memory.memory_settings() is memory.memory_settings()
 
 
-def test_session_manager_uses_settings_and_retrieval_config(memory_on) -> None:
-    manager = memory.build_session_manager("s1", "u1", memory.memory_settings())
-    try:
-        assert isinstance(manager, Neo4jSessionManager)
-        assert manager.session_id == "s1"
-        assert manager._user_id == "u1"
-        assert manager._retrieval_config.min_score == memory.RETRIEVAL_MIN_SCORE
-        assert manager._extract_entities is True
-        assert manager._record_tool_calls is False
-    finally:
-        # Never connected, so close only stops the unused bridge.
-        manager.close()
+class FakeManager:
+    def __init__(self, close_error: Exception | None = None) -> None:
+        self.close_error = close_error
+        self.closes = 0
+
+    def close(self) -> None:
+        self.closes += 1
+        if self.close_error:
+            raise self.close_error
 
 
-def test_each_request_gets_its_own_manager(memory_on) -> None:
-    first = memory.build_session_manager("s1", "u1", memory.memory_settings())
-    second = memory.build_session_manager("s1", "u1", memory.memory_settings())
-    try:
-        assert first is not second
-    finally:
-        first.close()
-        second.close()
+class FakeShared:
+    """Stands in for SharedMemory. Records its managers and its closes."""
+
+    def __init__(self, settings, background_hook) -> None:
+        self.settings = settings
+        self.background_hook = background_hook
+        self.managers: list[dict] = []
+        self.closes = 0
+        self.closed = threading.Event()
+        self.manager_close_error: Exception | None = None
+
+    def session_manager(self, session_id: str, **kwargs) -> FakeManager:
+        self.managers.append({"session_id": session_id, **kwargs})
+        return FakeManager(self.manager_close_error)
+
+    def close(self) -> None:
+        self.closes += 1
+        self.closed.set()
+
+
+@pytest.fixture
+def opened(monkeypatch: pytest.MonkeyPatch) -> list[FakeShared]:
+    """Replace SharedMemory.open; return every object it opened, in order."""
+    opened: list[FakeShared] = []
+
+    def fake_open(settings, *, background_hook=None):
+        opened.append(FakeShared(settings, background_hook))
+        return opened[-1]
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=fake_open))
+    return opened
+
+
+def hook(name: str):
+    return lambda: None
+
+
+def _closes_settle() -> None:
+    """Give a close started on a background thread time to run."""
+    time.sleep(0.1)
+
+
+def test_a_session_runs_on_the_shared_client(memory_on, opened) -> None:
+    settings = memory.memory_settings()
+    session = memory.build_session_manager("s1", "u1", settings, hook)
+    [shared] = opened
+    assert shared.settings is settings
+    assert shared.background_hook is hook
+    [kwargs] = shared.managers
+    assert kwargs.pop("retrieval_config").min_score == memory.RETRIEVAL_MIN_SCORE
+    assert kwargs == {
+        "session_id": "s1",
+        "user_id": "u1",
+        "extract_entities": True,
+        "defer_extraction": True,
+        "record_tool_calls": False,
+    }
+    assert isinstance(session.manager, FakeManager)
+
+
+def test_requests_share_one_client(memory_on, opened) -> None:
+    first = memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    second = memory.build_session_manager("s2", "u1", memory.memory_settings(), hook)
+    assert len(opened) == 1
+    assert first.manager is not second.manager
+
+
+def test_closing_a_session_closes_its_manager_but_not_the_client(memory_on, opened) -> None:
+    session = memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    session.close()
+    _closes_settle()
+    assert session.manager.closes == 1
+    assert opened[0].closes == 0
+
+
+def test_concurrent_first_requests_open_one_client(memory_on, monkeypatch) -> None:
+    opened: list[FakeShared] = []
+
+    def slow_open(settings, *, background_hook=None):
+        time.sleep(BUILD_SECONDS)
+        opened.append(FakeShared(settings, background_hook))
+        return opened[-1]
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=slow_open))
+    settings = memory.memory_settings()
+
+    results, elapsed = _concurrent(
+        5, lambda: memory.build_session_manager("s1", "u1", settings, hook)
+    )
+
+    assert len(opened) == 1
+    assert len(opened[0].managers) == 5
+    assert elapsed < 2 * BUILD_SECONDS
+
+
+def test_concurrent_requests_share_one_failed_open(memory_on, monkeypatch) -> None:
+    attempts: list[bool] = []
+
+    def rejected_open(settings, *, background_hook=None):
+        attempts.append(True)
+        time.sleep(BUILD_SECONDS)
+        raise AuthError("unauthorized")
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=rejected_open))
+    settings = memory.memory_settings()
+
+    results, elapsed = _concurrent(
+        3, lambda: memory.build_session_manager("s1", "u1", settings, hook)
+    )
+
+    assert len(attempts) == 1
+    assert elapsed < 2 * BUILD_SECONDS
+    waiters = [result for result in results if not isinstance(result, AuthError)]
+    assert len(waiters) == 2
+    assert all(isinstance(waiter, RuntimeError) for waiter in waiters)
+    # Each waiter still sees the rejected password, so it reads it again.
+    assert all(memory.password_rejected(waiter) for waiter in waiters)
+
+
+def test_a_failed_open_is_not_cached(memory_on, monkeypatch) -> None:
+    outcomes: list[object] = [MemoryConnectionError("Neo4j service unavailable")]
+
+    def open_once_failing(settings, *, background_hook=None):
+        if outcomes:
+            raise outcomes.pop()
+        return FakeShared(settings, background_hook)
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=open_once_failing))
+
+    with pytest.raises(MemoryConnectionError):
+        memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    session = memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    assert isinstance(session.manager, FakeManager)
+
+
+def test_a_failed_manager_build_releases_the_client(memory_on, opened, monkeypatch) -> None:
+    settings = memory.memory_settings()
+    memory.build_session_manager("s1", "u1", settings, hook).close()
+
+    def failing_manager(session_id, **kwargs):
+        raise TypeError("bad keyword")
+
+    monkeypatch.setattr(opened[0], "session_manager", failing_manager)
+    with pytest.raises(TypeError):
+        memory.build_session_manager("s2", "u1", settings, hook)
+    # No session holds the client, so retiring it closes it at once.
+    memory.forget_memory_settings(settings)
+    assert opened[0].closed.wait(5)
+
+
+def test_a_rejected_password_retires_an_idle_client_at_once(memory_on, opened) -> None:
+    settings = memory.memory_settings()
+    memory.build_session_manager("s1", "u1", settings, hook).close()
+
+    memory.forget_memory_settings(settings)
+
+    assert opened[0].closed.wait(5)
+    _closes_settle()
+    assert opened[0].closes == 1
+    memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    assert len(opened) == 2
+
+
+def test_a_retired_client_closes_once_after_its_last_session(memory_on, opened) -> None:
+    settings = memory.memory_settings()
+    session = memory.build_session_manager("s1", "u1", settings, hook)
+
+    memory.forget_memory_settings(settings)
+    _closes_settle()
+    assert opened[0].closes == 0
+
+    session.close()
+    assert opened[0].closed.wait(5)
+    # A second close of the session releases nothing more.
+    session.close()
+    memory.close_shared_memory()
+    _closes_settle()
+    assert opened[0].closes == 1
+
+
+def test_a_late_rejection_of_the_old_password_keeps_the_new_client(
+    monkeypatch: pytest.MonkeyPatch, memory_on, opened
+) -> None:
+    old = memory.memory_settings()
+    memory.forget_memory_settings(old)
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "rotated-pw")
+    memory.build_session_manager("s1", "u1", memory.memory_settings(), hook).close()
+
+    memory.forget_memory_settings(old)
+
+    _closes_settle()
+    assert opened[0].closes == 0
+    memory.build_session_manager("s2", "u1", memory.memory_settings(), hook)
+    assert len(opened) == 1
+
+
+def test_a_failed_manager_close_still_releases_the_client(memory_on, opened) -> None:
+    settings = memory.memory_settings()
+    memory.build_session_manager("s0", "u1", settings, hook).close()
+    opened[0].manager_close_error = RuntimeError("flush failed")
+    session = memory.build_session_manager("s1", "u1", settings, hook)
+    memory.forget_memory_settings(settings)
+
+    with pytest.raises(RuntimeError, match="flush failed"):
+        session.close()
+
+    assert opened[0].closed.wait(5)
+
+
+def test_shutdown_closes_the_current_and_the_retired_clients(
+    monkeypatch: pytest.MonkeyPatch, memory_on, opened, caplog
+) -> None:
+    monkeypatch.setattr(memory, "SHUTDOWN_WAIT_SECONDS", 0.2)
+    old = memory.memory_settings()
+    old_session = memory.build_session_manager("s1", "u1", old, hook)
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "rotated-pw")
+    memory.forget_memory_settings(old)
+    memory.build_session_manager("s2", "u1", memory.memory_settings(), hook).close()
+
+    memory.close_shared_memory()
+
+    assert [shared.closes for shared in opened] == [1, 1]
+    # The old session was still open, so shutdown waited for it, then closed anyway.
+    assert "1 memory session(s) still open" in caplog.text
+    old_session.close()
+    _closes_settle()
+    assert [shared.closes for shared in opened] == [1, 1]
+
+
+def test_shutdown_waits_for_open_sessions(memory_on, opened) -> None:
+    session = memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    order: list[str] = []
+    real_close = opened[0].close
+
+    def recording_close() -> None:
+        order.append("client")
+        real_close()
+
+    opened[0].close = recording_close
+
+    def close_session_later() -> None:
+        time.sleep(0.2)
+        order.append("session")
+        session.close()
+
+    closer = threading.Thread(target=close_session_later)
+    closer.start()
+    memory.close_shared_memory()
+    closer.join(5)
+
+    assert order == ["session", "client"]
+
+
+def test_shutdown_with_no_client_does_nothing(memory_on) -> None:
+    memory.close_shared_memory()
 
 
 def test_forget_memory_settings_reads_the_password_again(
@@ -199,7 +448,12 @@ BUILD_SECONDS = 0.5
 
 
 def _concurrent_calls(count: int) -> tuple[list[object], float]:
-    """Call memory_settings from ``count`` threads at once.
+    """Call memory_settings from ``count`` threads at once. See ``_concurrent``."""
+    return _concurrent(count, memory.memory_settings)
+
+
+def _concurrent(count: int, target: Callable[[], object]) -> tuple[list[object], float]:
+    """Call ``target`` from ``count`` threads at once.
 
     Returns each thread's result or exception, and the seconds until the
     last one finished.
@@ -210,7 +464,7 @@ def _concurrent_calls(count: int) -> tuple[list[object], float]:
     def call(index: int) -> None:
         start.wait(timeout=10)
         try:
-            results[index] = memory.memory_settings()
+            results[index] = target()
         except Exception as error:
             results[index] = error
 
@@ -314,3 +568,28 @@ def test_a_call_after_a_failed_build_builds_again(monkeypatch: pytest.MonkeyPatc
 
     assert outcomes == []
     assert memory.memory_settings() is rebuilt
+
+
+def test_shutdown_waits_for_an_open_in_progress(memory_on, monkeypatch) -> None:
+    opened: list[FakeShared] = []
+    started = threading.Event()
+
+    def slow_open(settings, *, background_hook=None):
+        started.set()
+        time.sleep(0.2)
+        opened.append(FakeShared(settings, background_hook))
+        return opened[-1]
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=slow_open))
+    settings = memory.memory_settings()
+
+    def request() -> None:
+        memory.build_session_manager("s1", "u1", settings, hook).close()
+
+    worker = threading.Thread(target=request)
+    worker.start()
+    assert started.wait(5)
+    memory.close_shared_memory()
+    worker.join(5)
+
+    assert [shared.closes for shared in opened] == [1]

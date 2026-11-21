@@ -165,7 +165,7 @@ uv run fleet-supervisor-cli "Compare fault counts with delay counts"
 ```
 
 - **Memory settings:** Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `demos/aircraft-fleet/.env`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. They point at the memory database, not the fleet graph. The server stops at startup if the URI or the password is missing.
-- **Memory package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.2, a build of the `neo4j-partners/agent-memory` fork. Its entity extractor runs on Claude Sonnet 5.5. Sonnet 5.5 rejects a temperature and a forced tool choice, so the extractor sends no temperature and lets the model choose the tool. For now `pyproject.toml` pins the wheel by a local path, so `uv sync` works only where that file exists. The pin moves to the published wheel's URL before the merge. Memory stores the user and assistant text of each turn but no specialist calls, so the supervisor prompt says that a restored turn without one does not mean no specialist ran.
+- **Memory package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.4, a build of the `neo4j-partners/agent-memory` fork. Its entity extractor runs on Claude Sonnet 5.5. Sonnet 5.5 rejects a temperature and a forced tool choice, so the extractor sends no temperature and lets the model choose the tool. For now `pyproject.toml` pins the wheel by a local path, so `uv sync` works only where that file exists. The pin moves to the published wheel's URL before the merge. Memory stores the user and assistant text of each turn but no specialist calls, so the supervisor prompt says that a restored turn without one does not mean no specialist ran. The server holds one memory client per process. It opens on the first request and closes at shutdown. Each request gets its own session manager on that client. Entity extraction runs after the reply, in the background. The health check reports busy until it finishes, so AgentCore Runtime does not stop the session in the middle of it.
 - **Shared .env:** The server loads `demos/aircraft-fleet/.env` at startup. The path comes from the package, so it works from any working directory. Set `FLEET_ENV_FILE` to use another file. A value already set in the environment wins.
 - **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server`. Set `AGENT_PORT` to change the port.
 - **Runtime entrypoint:** `uv run python main.py` starts the same server on 8080, the port AgentCore Runtime uses.
@@ -202,7 +202,7 @@ The script passes the secret to the CLI on stdin, never on the command line. The
 
 Never run a bare `agentcore deploy` in this folder. Without the entry, the CLI treats the provider as orphaned and deletes it, and the runtime loses its grant. If it happens, run `./agent.sh deploy` again. That recreates the provider and the grants.
 
-The runtime role has two `secretsmanager:GetSecretValue` resources. The `bedrock-agentcore-identity!*` wildcard comes from the AgentCore construct's own grant for the credential provider, not from `cdk-stack.ts`. The other is the memory password secret.
+The runtime role has two `secretsmanager:GetSecretValue` resources. The `bedrock-agentcore-identity!*` wildcard comes from the AgentCore construct's own grant for the credential provider, not from `cdk-stack.ts`. The other is the memory password secret. The server reads it once. If Neo4j rejects the password, the server reads the secret again and reopens the shared memory client with it.
 
 Then run these commands:
 

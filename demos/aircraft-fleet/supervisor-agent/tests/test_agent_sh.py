@@ -68,6 +68,11 @@ case "$1 $2" in
             && ps -o command= -p "$parent" | grep -qF /agent.sh; do
             owner=$parent
         done
+        # A signal to agent.sh alone, while this stub goes on to exit
+        # normally.
+        if [ -n "${STUB_LOOKUP_SIGNAL_SCRIPT:-}" ]; then
+            kill -s "$STUB_LOOKUP_SIGNAL_SCRIPT" "$owner"
+        fi
         strip_copy="agentcore/.env.local.strip.$owner"
         case "${STUB_LOOKUP_PLANT_STRIP:-}" in
             fifo) mkfifo "$strip_copy" ;;
@@ -706,6 +711,23 @@ def test_an_interrupt_during_an_aws_lookup_leaves_no_temporary_file(project: Pat
     # death by SIGINT, not the restore trap's exit 130.
     assert result.returncode == -SIGINT
     assert "Cleanup complete" not in result.stdout
+    assert not list((project.parent / "tmp").iterdir())
+
+
+# A SIGINT sent to agent.sh alone, while its child exits normally, does not
+# stop bash once end_spec_restore resets the INT trap. A trap left in place
+# would exit through on_exit and die by SIGINT instead.
+def test_an_interrupt_to_the_script_alone_after_the_restore_lets_it_finish(
+    project: Path,
+) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_LOOKUP_SIGNAL_SCRIPT="INT")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Cleanup complete" in result.stdout
+    assert spec.read_bytes() == tracked
     assert not list((project.parent / "tmp").iterdir())
 
 

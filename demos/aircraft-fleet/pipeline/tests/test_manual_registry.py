@@ -8,8 +8,15 @@ from pathlib import Path
 
 import pytest
 
+from generator import fleet as fleet_module
 from generator.config import GeneratorConfig
-from generator.fleet import _distribute, _registry_fleet, entry_into_service, generate_fleet
+from generator.fleet import (
+    _distribute,
+    _registry_fleet,
+    entry_into_service,
+    generate_fleet,
+    icao24,
+)
 from generator.specs import (
     ENTRY_INTO_SERVICE_RANGES,
     MANUAL_FLEET_TAILS,
@@ -159,3 +166,24 @@ def test_every_entry_into_service_is_in_its_model_range() -> None:
         assert aircraft.entry_into_service == entry_into_service(
             aircraft.model, aircraft.tail_number
         )
+
+
+def test_icao24_collision_rehashes_the_later_tail(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Two hex digits leave 256 addresses, so 60 tails must collide.
+    monkeypatch.setattr(fleet_module, "_ICAO24_HEX_DIGITS", 2)
+    aircraft = generate_fleet(GeneratorConfig(n_aircraft=60))
+    codes = [ac.icao24 for ac in aircraft]
+
+    assert len(set(codes)) == len(codes)
+    rehashed = [i for i, ac in enumerate(aircraft) if ac.icao24 != icao24(ac.tail_number)]
+    assert rehashed, "expected at least one collision at 2 hex digits"
+    for i in rehashed:
+        tail = aircraft[i].tail_number
+        # The plain hash belongs to an earlier aircraft, and the address is
+        # the first free counter suffix.
+        assert icao24(tail) in codes[:i]
+        attempt = next(n for n in range(1, 256) if icao24(tail, n) == codes[i])
+        assert all(icao24(tail, n) in codes[:i] for n in range(attempt))
+    # A smaller fleet is a prefix, so its addresses do not change.
+    smaller = generate_fleet(GeneratorConfig(n_aircraft=40))
+    assert [ac.icao24 for ac in smaller] == codes[:40]

@@ -22,14 +22,38 @@ from .specs import (
     OperatorProfile,
 )
 
+# Six hex digits are 24 bits. Tests shrink this to force collisions.
+_ICAO24_HEX_DIGITS = 6
 
-def icao24(tail_number: str) -> str:
+
+def icao24(tail_number: str, attempt: int = 0) -> str:
     """Return a 24-bit address as six hex digits, from SHA-256 of the tail.
 
-    The address does not depend on the RNG, the seed, or the fleet size, so
-    the A220 manual can list it.
+    The address does not depend on the RNG or the seed, so the A220 manual
+    can list it. Attempt 0 hashes the tail itself. A later attempt hashes
+    "<tail>#<attempt>" and is used only after a collision.
     """
-    return hashlib.sha256(tail_number.encode()).hexdigest()[:6]
+    key = tail_number if attempt == 0 else f"{tail_number}#{attempt}"
+    return hashlib.sha256(key.encode()).hexdigest()[:_ICAO24_HEX_DIGITS]
+
+
+def _unique_icao24s(tail_numbers: list[str]) -> list[str]:
+    """Return one address per tail, unique across the fleet.
+
+    Tails are taken in fleet order. A tail whose address is already taken is
+    rehashed with the next attempt number until the address is free. The
+    manual registry tails come first, so they always keep attempt 0. A
+    smaller fleet is a prefix of a larger one, so each tail keeps its address
+    as the fleet grows.
+    """
+    codes: list[str] = []
+    taken: set[str] = set()
+    for tail in tail_numbers:
+        code = next(code for n in count() if (code := icao24(tail, n)) not in taken)
+        taken.add(code)
+        codes.append(code)
+    assert len(taken) == len(tail_numbers), "icao24 addresses must be unique"
+    return codes
 
 
 def entry_into_service(model: str, tail_number: str) -> date:
@@ -179,7 +203,7 @@ def _build_system(
 
 
 def _build_aircraft(
-    index: int, model: str, tail_number: str, operator: OperatorProfile
+    index: int, model: str, tail_number: str, address: str, operator: OperatorProfile
 ) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
     engine_names = _ENGINE_NAMES[model]
@@ -187,7 +211,7 @@ def _build_aircraft(
     aircraft = AircraftNode(
         aircraft_id=aircraft_id,
         tail_number=tail_number,
-        icao24=icao24(tail_number),
+        icao24=address,
         model=model,
         manufacturer=MANUFACTURER[model],
         operator=operator.name,
@@ -236,7 +260,10 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
         *extra_operators,
     ]
 
+    icao24s = _unique_icao24s([tail for _, tail in plan])
     return [
-        _build_aircraft(i, model, tail, op)
-        for i, ((model, tail), op) in enumerate(zip(plan, operator_assignments, strict=True))
+        _build_aircraft(i, model, tail, code, op)
+        for i, ((model, tail), code, op) in enumerate(
+            zip(plan, icao24s, operator_assignments, strict=True)
+        )
     ]

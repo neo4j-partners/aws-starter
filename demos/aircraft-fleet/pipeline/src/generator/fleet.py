@@ -53,7 +53,6 @@ def _unique_icao24s(tail_numbers: list[str]) -> list[str]:
         code = next(code for n in count() if (code := icao24(tail, n)) not in taken)
         taken.add(code)
         codes.append(code)
-    assert len(taken) == len(tail_numbers), "icao24 addresses must be unique"
     return codes
 
 
@@ -61,8 +60,9 @@ def entry_into_service(model: str, tail_number: str) -> date:
     """Return the tail's entry-into-service date.
 
     A tail with a manual date gets that date. Any other tail gets a day in
-    its model's range, picked from a SHA-256 hash of the tail number, so the
-    date does not depend on the RNG, the seed, or the fleet size.
+    its model's range, picked from a SHA-256 hash of the tail number. The
+    date of a (model, tail) pair is fixed. Which model a generated tail gets
+    depends on the seed, so its date can change with the seed.
     """
     if tail_number in MANUAL_TAIL_ENTRY_INTO_SERVICE:
         return MANUAL_TAIL_ENTRY_INTO_SERVICE[tail_number]

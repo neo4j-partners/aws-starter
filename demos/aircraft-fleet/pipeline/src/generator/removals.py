@@ -39,9 +39,17 @@ _MIN_HOURS_SINCE_INSTALL = 720
 # hours - 1]. The latest entry into service, at the lowest rate, must still
 # give more airframe hours than that minimum by the start of the data window.
 _LATEST_ENTRY_INTO_SERVICE = max(last for _, last in ENTRY_INTO_SERVICE_RANGES.values())
-assert (
-    GeneratorConfig().start_date.date() - _LATEST_ENTRY_INTO_SERVICE
-).days * _UTILIZATION_HOURS_PER_DAY[0] > _MIN_HOURS_SINCE_INSTALL
+
+
+def _check_start_date(config: GeneratorConfig) -> None:
+    """Raise ValueError if the window opens too soon after the latest entry into service."""
+    days = (config.start_date.date() - _LATEST_ENTRY_INTO_SERVICE).days
+    if days * _UTILIZATION_HOURS_PER_DAY[0] <= _MIN_HOURS_SINCE_INSTALL:
+        raise ValueError(
+            f"start_date {config.start_date.date()} is too soon after the latest entry "
+            f"into service, {_LATEST_ENTRY_INTO_SERVICE}: an aircraft needs more than "
+            f"{_MIN_HOURS_SINCE_INSTALL} airframe hours when the data window opens"
+        )
 
 
 def _part_number(rng: random.Random) -> str:
@@ -65,7 +73,10 @@ def generate_removals(
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """
     Returns (removal_nodes, rels_aircraft_removal, rels_component_removal).
+
+    Raises ValueError if config.start_date leaves too few airframe hours.
     """
+    _check_start_date(config)
     _fake.seed_instance(config.seed + 999)
 
     # Count critical events per aircraft to modulate removal rate

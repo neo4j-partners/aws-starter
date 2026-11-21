@@ -347,6 +347,19 @@ def test_a_missing_targets_file_fails_before_any_call(project: Path, args: tuple
     assert calls(project) == []
 
 
+def test_a_dangling_targets_link_has_its_own_message(project: Path) -> None:
+    path = project / "agentcore" / "aws-targets.json"
+    path.unlink()
+    path.symlink_to(project.parent / "gone" / "aws-targets.json")
+
+    result = run_destroy(project)
+
+    assert result.returncode == 1
+    assert "agentcore/aws-targets.json is a broken symlink to " in result.stdout
+    assert "No deployment is recorded" not in result.stdout
+    assert calls(project) == []
+
+
 def test_missing_aws_cli_fails(project: Path) -> None:
     (project.parent / "bin" / "aws").unlink()
 

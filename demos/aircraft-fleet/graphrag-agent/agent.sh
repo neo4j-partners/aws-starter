@@ -211,7 +211,12 @@ caller_account() {
 require_target_account() {
     local entry account target_region caller
     # The first deploy writes this file, and git ignores it, so a fresh
-    # checkout has none.
+    # checkout has none. -e follows a symlink, so a link to a missing file
+    # is told apart from no file.
+    if [ -L "$TARGETS_FILE" ] && [ ! -e "$TARGETS_FILE" ]; then
+        echo -e "${RED}$TARGETS_FILE is a broken symlink to $(readlink "$TARGETS_FILE"). Fix the link, or run destroy from the checkout that deployed.${NC}"
+        exit 1
+    fi
     if [ ! -e "$TARGETS_FILE" ]; then
         echo -e "${RED}No deployment is recorded in this checkout: $TARGETS_FILE is missing. Run destroy from the checkout that deployed.${NC}"
         exit 1

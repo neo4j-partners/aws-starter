@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import re
 
-from generator.fleet import _SENSOR_TYPES
-from generator.specs import COMPONENT_TYPES_BY_SYSTEM
+from generator.specs import COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
 from populate_aircraft_db.pipeline import EXTRACTION_PROMPT
 from populate_aircraft_db.schema import SYSTEM_TYPE_BY_COMPONENT_TYPE, build_extraction_schema
 
@@ -41,7 +40,7 @@ def test_prompt_lists_every_system_type() -> None:
 
 def test_prompt_sensor_names_are_the_fleet_sensor_types() -> None:
     listed = _rule(4).split("fleet sensor types ")[1].split(" when the limit")[0]
-    assert listed.split(", ") == [sensor_type for sensor_type, _, _ in _SENSOR_TYPES]
+    assert listed.split(", ") == [sensor_type for sensor_type, _, _ in SENSOR_TYPES]
     assert "Use Vibration for every engine vibration limit" in _rule(4)
 
 
@@ -61,7 +60,7 @@ def test_schema_descriptions_list_the_same_types() -> None:
     )
     parameter = _property_description("OperatingLimit", "parameterName")
     listed = parameter.split("for one: ")[1].split(". ")[0]
-    assert listed.split(", ") == [sensor_type for sensor_type, _, _ in _SENSOR_TYPES]
+    assert listed.split(", ") == [sensor_type for sensor_type, _, _ in SENSOR_TYPES]
 
 
 def test_each_component_type_maps_to_its_system() -> None:

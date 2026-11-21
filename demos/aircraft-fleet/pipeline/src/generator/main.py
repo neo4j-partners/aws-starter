@@ -17,6 +17,7 @@ from .maintenance import generate_maintenance_events
 from .operations import generate_operations
 from .removals import generate_removals
 from .sensors import EngineSeries, generate_engine_readings
+from .specs import EVENT_SEVERITIES
 from .writers import write_csv
 
 app = typer.Typer(
@@ -313,7 +314,7 @@ def _print_summary(
     # Maintenance severity breakdown
     sev_counts = Counter(row["severity"] for row in maintenance_rows)
     console.print("\n[bold]Maintenance severity:[/bold]")
-    for sev in ["CRITICAL", "MAJOR", "MINOR"]:
+    for sev in EVENT_SEVERITIES:
         console.print(f"  {sev:<10} {sev_counts.get(sev, 0)}")
 
     # Degradation spread (operator breakdown)

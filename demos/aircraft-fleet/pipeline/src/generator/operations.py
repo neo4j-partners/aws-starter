@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
-from .specs import AIRPORTS
+from .specs import AIRPORTS, DELAY_CAUSES
 
 # Flights per aircraft per day — drawn uniformly from this range
 _FLIGHTS_PER_DAY_RANGE = (3, 6)
@@ -22,8 +22,7 @@ _FLIGHTS_PER_DAY_RANGE = (3, 6)
 _MIN_BLOCK_HOURS = 1.0
 _MAX_BLOCK_HOURS = 5.5
 
-# Delay causes with realistic weights
-_DELAY_CAUSES = ["Weather", "Maintenance", "NAS", "Carrier"]
+# Weights for DELAY_CAUSES, in the same order
 _DELAY_WEIGHTS = [0.30, 0.25, 0.25, 0.20]
 
 # Delay duration ranges (minutes) by cause
@@ -125,7 +124,7 @@ def generate_operations(
                 # Delays — probability scaled by operator quality
                 if rng.random() < delay_rate:
                     delay_counter += 1
-                    cause = rng.choices(_DELAY_CAUSES, weights=_DELAY_WEIGHTS)[0]
+                    cause = rng.choices(DELAY_CAUSES, weights=_DELAY_WEIGHTS)[0]
                     lo, hi = _DELAY_MINUTES[cause]
                     minutes = rng.randint(lo, hi)
                     delay_id = f"DLY{delay_counter:05d}"

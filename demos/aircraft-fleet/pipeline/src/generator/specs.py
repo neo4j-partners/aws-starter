@@ -700,6 +700,20 @@ AIRPORTS: list[AirportSpec] = [
 ]
 
 
+# Sensors on every Engine system, as (type, name, unit).
+SENSOR_TYPES: list[tuple[str, str, str]] = [
+    ("EGT", "Exhaust Gas Temperature", "C"),
+    ("Vibration", "Engine Vibration", "ips"),
+    ("N1Speed", "Fan Speed N1", "rpm"),
+    ("FuelFlow", "Fuel Flow", "kg/s"),
+]
+
+# Flight delay causes. operations.py weights them in this order.
+DELAY_CAUSES: list[str] = ["Weather", "Maintenance", "NAS", "Carrier"]
+
+# Maintenance event severities, most severe first.
+EVENT_SEVERITIES: list[str] = ["CRITICAL", "MAJOR", "MINOR"]
+
 # Which sensor type triggers which fault types (fault, severity)
 SENSOR_FAULT_MAP: dict[str, list[tuple[str, str]]] = {
     "EGT": [

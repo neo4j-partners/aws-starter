@@ -19,6 +19,7 @@ from .specs import (
     MANUFACTURER,
     MODEL_DISTRIBUTION,
     OPERATORS,
+    SENSOR_TYPES,
     OperatorProfile,
 )
 
@@ -143,13 +144,6 @@ class AircraftNode:
     systems: list[SystemNode] = field(default_factory=list)
 
 
-_SENSOR_TYPES: list[tuple[str, str, str]] = [
-    ("EGT", "Exhaust Gas Temperature", "C"),
-    ("Vibration", "Engine Vibration", "ips"),
-    ("N1Speed", "Fan Speed N1", "rpm"),
-    ("FuelFlow", "Fuel Flow", "kg/s"),
-]
-
 _ENGINE_NAMES: dict[str, list[str]] = {
     "B737-800": ["CFM56-7B #1", "CFM56-7B #2"],
     "A320-200": ["CFM56-5B #1", "CFM56-5B #2"],
@@ -188,7 +182,7 @@ def _build_system(
 
     # Sensors (engines only)
     if system_type == "Engine":
-        for sensor_index, (s_type, s_name, s_unit) in enumerate(_SENSOR_TYPES, start=1):
+        for sensor_index, (s_type, s_name, s_unit) in enumerate(SENSOR_TYPES, start=1):
             system.sensors.append(
                 SensorNode(
                     sensor_id=f"{system_id}-SN{sensor_index:02d}",

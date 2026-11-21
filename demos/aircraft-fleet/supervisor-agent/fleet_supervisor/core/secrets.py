@@ -51,12 +51,13 @@ def _read_secret(secret_arn: str, secret_arn_var: str) -> str:
         client = boto3.client("secretsmanager", region_name=region)
         response = client.get_secret_value(SecretId=secret_arn)
     except (ClientError, BotoCoreError) as e:
-        # The botocore message can name the role and the secret ARN. It stays
-        # in the log, and the error names only the variable and the failure.
-        logger.error("Could not read the secret in %s: %s", secret_arn_var, e)
-        raise ConfigError(
-            f"Could not read the secret in {secret_arn_var} ({_failure_class(e)})."
-        ) from e
+        # The botocore message can name the role, the account, and the secret
+        # ARN, so neither the log nor the error includes it. Both name only
+        # the variable and the AWS error code. "from None" keeps the botocore
+        # error out of the traceback that a startup failure prints.
+        failure = _failure_class(e)
+        logger.error("Could not read the secret in %s (%s)", secret_arn_var, failure)
+        raise ConfigError(f"Could not read the secret in {secret_arn_var} ({failure}).") from None
     return _parse_secret(response.get("SecretString"), secret_arn_var)
 
 

@@ -155,8 +155,13 @@ def test_aws_errors_become_config_errors(
     assert message == f"Could not read the secret in {ARN_VAR} ({failure})."
     assert ROLE not in message
     assert ARN not in message
-    # The botocore detail stays in the log.
-    assert str(error) in caplog.text
+    # The log names only the failure, and nothing chains the botocore error
+    # into a traceback that logger.exception or a startup failure prints.
+    assert f"Could not read the secret in {ARN_VAR} ({failure})" in caplog.text
+    assert ROLE not in caplog.text
+    assert ARN not in caplog.text
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
 
 
 def test_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:

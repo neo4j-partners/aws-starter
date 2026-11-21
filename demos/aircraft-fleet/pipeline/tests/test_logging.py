@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import logging
 from collections.abc import Iterator
 from contextlib import nullcontext
@@ -130,16 +129,16 @@ def test_clear_enrichment_logs_the_total(
 
 
 @pytest.mark.usefixtures("restore_package_logger")
-def test_cli_logging_shows_package_info_and_hides_other_info() -> None:
-    first, second = io.StringIO(), io.StringIO()
-    main._configure_logging(first)
-    main._configure_logging(second)
+def test_cli_logging_shows_package_info_and_hides_other_info(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    main._configure_logging()
+    main._configure_logging()
 
     logging.getLogger("populate_aircraft_db.loader").info("  [OK] package line")
     logging.getLogger("httpx").info("HTTP Request: other library")
 
-    assert first.getvalue() == ""
-    assert second.getvalue() == "  [OK] package line\n"
+    assert capsys.readouterr().out == "  [OK] package line\n"
 
 
 @pytest.mark.usefixtures("restore_package_logger")
@@ -159,3 +158,27 @@ def test_cli_command_prints_library_log_lines(monkeypatch: pytest.MonkeyPatch) -
 
     assert result.exit_code == 0, result.output
     assert result.output == ("Connecting to bolt://example...\n  [OK] Database cleared\n\nDone.\n")
+
+
+@pytest.mark.usefixtures("restore_package_logger")
+def test_cli_logs_to_each_invocations_stdout(monkeypatch: pytest.MonkeyPatch) -> None:
+    # CliRunner gives each invoke its own stdout and closes it afterwards,
+    # so the second invoke must not touch the first one's stream.
+    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db")
+    monkeypatch.setattr(main, "Settings", lambda: settings)
+    monkeypatch.setattr(main, "_connect", lambda s: nullcontext(object()))
+    monkeypatch.setattr(
+        main,
+        "clear_database",
+        lambda driver, database: logging.getLogger("populate_aircraft_db.loader").info(
+            "  [OK] Database cleared"
+        ),
+    )
+    runner = CliRunner()
+
+    results = [runner.invoke(main.app, ["clean"]) for _ in range(2)]
+
+    for result in results:
+        assert result.exit_code == 0, result.output
+        assert result.output.count("  [OK] Database cleared\n") == 1
+    assert logging.getLogger(PACKAGE).propagate is False

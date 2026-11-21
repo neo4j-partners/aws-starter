@@ -35,20 +35,38 @@ app = typer.Typer(
 _LOG_HANDLER_NAME = "populate-aircraft-db-cli"
 
 
-def _configure_logging(stream: TextIO) -> None:
-    """Write this package's INFO and higher records to stream as bare messages.
+class _StdoutHandler(logging.StreamHandler):
+    """Write each record to sys.stdout as it is when the record is emitted.
 
-    Only the package logger gets a handler. Other libraries keep the root
-    logger's WARNING default, so INFO records from httpx and neo4j stay
-    hidden. A repeat call points the existing handler at the new stream.
+    CliRunner and pytest replace sys.stdout and can close the old one, so the
+    handler does not keep the stream it was created with.
+    """
+
+    @property
+    def stream(self) -> TextIO:
+        return sys.stdout
+
+    @stream.setter
+    def stream(self, value: TextIO) -> None:
+        # StreamHandler.__init__ assigns a stream. The getter ignores it and
+        # always returns the current sys.stdout.
+        del value
+
+
+def _configure_logging() -> None:
+    """Write this package's INFO and higher records to stdout as bare messages.
+
+    Only the package logger gets a handler, and its records do not propagate
+    to the root logger. Other libraries keep the root logger's WARNING
+    default, so INFO records from httpx and neo4j stay hidden. A repeat call
+    keeps the one handler.
     """
     package_logger = logging.getLogger(__package__)
     package_logger.setLevel(logging.INFO)
-    for handler in package_logger.handlers:
-        if handler.get_name() == _LOG_HANDLER_NAME:
-            handler.setStream(stream)
-            return
-    handler = logging.StreamHandler(stream)
+    package_logger.propagate = False
+    if any(h.get_name() == _LOG_HANDLER_NAME for h in package_logger.handlers):
+        return
+    handler = _StdoutHandler()
     handler.set_name(_LOG_HANDLER_NAME)
     handler.setFormatter(logging.Formatter("%(message)s"))
     package_logger.addHandler(handler)
@@ -56,7 +74,7 @@ def _configure_logging(stream: TextIO) -> None:
 
 @app.callback()
 def _main() -> None:
-    _configure_logging(sys.stdout)
+    _configure_logging()
 
 
 def _fmt_elapsed(seconds: float) -> str:

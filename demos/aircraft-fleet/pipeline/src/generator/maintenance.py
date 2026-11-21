@@ -30,7 +30,8 @@ from .specs import CORRECTIVE_ACTIONS, Direction, FaultRoute, SensorSpec, sensor
 _EVENT_PROB: dict[int, float] = {1: 0.012, 2: 0.024, 3: 0.036}
 SEVERITY_BY_LEVEL: dict[int, str] = {1: "MINOR", 2: "MAJOR", 3: "CRITICAL"}
 
-# Minimum hours between events of one fault on one system.
+# Minimum hours between events of one fault on one system, unless the new
+# event is more severe than the last one. An escalation is always reported.
 _MIN_EVENT_SPACING_HOURS = 72
 
 
@@ -56,10 +57,17 @@ def _band_levels(spec: SensorSpec, values: np.ndarray) -> tuple[np.ndarray, np.n
     return levels, sides
 
 
-def _entries(levels: np.ndarray) -> np.ndarray:
-    """Keep each hour's level only where it is higher than the hour before."""
+def _entries(levels: np.ndarray, sides: np.ndarray) -> np.ndarray:
+    """Keep each hour's level only where the reading enters a band.
+
+    A reading enters a band when its level is higher than the hour before,
+    or when it is in a band on the other side of the baseline from the
+    hour before.
+    """
     previous = np.concatenate(([0], levels[:-1]))
-    return np.where(levels > previous, levels, 0)
+    previous_sides = np.concatenate((sides[:1], sides[:-1]))
+    entered = (levels > previous) | ((sides != previous_sides) & (levels > 0))
+    return np.where(entered, levels, 0)
 
 
 def _pick_route(routes: list[FaultRoute], rng: random.Random) -> FaultRoute:
@@ -94,9 +102,9 @@ def generate_maintenance_events(
         scans = []
         for sensor in system.sensors:
             levels, sides = _band_levels(specs[sensor.type], series[sensor.type])
-            scans.append((sensor, specs[sensor.type], _entries(levels), sides))
+            scans.append((sensor, specs[sensor.type], _entries(levels, sides), sides))
 
-        last_event_hour: dict[str, int] = {}  # fault -> last event hour on this system
+        last_event: dict[str, tuple[int, int]] = {}  # fault -> (hour, level) on this system
         for h in range(config.n_hours):
             for sensor, spec, levels, sides in scans:
                 level = int(levels[h])
@@ -107,9 +115,8 @@ def generate_maintenance_events(
                 if not routes:
                     continue
                 route = _pick_route(routes, rng)
-                if h - last_event_hour.get(route.fault, -_MIN_EVENT_SPACING_HOURS) < (
-                    _MIN_EVENT_SPACING_HOURS
-                ):
+                last_hour, last_level = last_event.get(route.fault, (-_MIN_EVENT_SPACING_HOURS, 0))
+                if h - last_hour < _MIN_EVENT_SPACING_HOURS and level <= last_level:
                     continue
                 component = _pick_component(system, route, rng)
                 if component is None:
@@ -127,6 +134,6 @@ def generate_maintenance_events(
                     "corrective_action": CORRECTIVE_ACTIONS[route.fault],
                 }
                 events.append(MaintenanceEvent(row=row, sensor_id=sensor.sensor_id))
-                last_event_hour[route.fault] = h
+                last_event[route.fault] = (h, level)
 
     return events

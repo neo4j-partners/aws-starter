@@ -15,7 +15,7 @@ import pytest
 from generator.config import GeneratorConfig
 from generator.fleet import AircraftNode, generate_fleet
 from generator.main import generate
-from generator.maintenance import MaintenanceEvent, generate_maintenance_events
+from generator.maintenance import MaintenanceEvent, _entries, generate_maintenance_events
 from generator.sensors import generate_system_readings
 from generator.specs import (
     COMPONENTS_BY_SYSTEM,
@@ -104,10 +104,15 @@ def test_event_severity_is_exactly_the_band_of_its_trigger_reading(in_memory) ->
         level, side = _level(spec, value)
         assert level >= 1, event
         assert event.row["severity"] == SEVERITY_BY_LEVEL[level], (event, value)
-        # An event marks a band entry, so the hour before sits in a lower band.
+        # An event marks a band entry: the hour before sits in a lower band,
+        # or on the other side of the baseline.
         if hour > 0:
-            previous, _ = _level(spec, _written(values[hour - 1]))
-            assert previous < level, (event, values[hour - 1], value)
+            previous, previous_side = _level(spec, _written(values[hour - 1]))
+            assert previous < level or previous_side is not side, (
+                event,
+                values[hour - 1],
+                value,
+            )
 
         routes = [r for r in spec.faults if r.side is side]
         assert event.row["fault"] in {r.fault for r in routes}, (event, side)
@@ -116,6 +121,15 @@ def test_event_severity_is_exactly_the_band_of_its_trigger_reading(in_memory) ->
         )
         allowed = {t for r in routes if r.fault == event.row["fault"] for t in r.components}
         assert component.type in allowed, (event, component.type)
+
+
+def test_a_jump_across_the_baseline_is_a_band_entry() -> None:
+    # A deviation sensor can go from the high caution band straight to the
+    # low caution band. That is a new entry, though the level did not rise.
+    levels = np.array([0, 2, 2, 2, 0, 1])
+    sides = np.array([1.0, 1.0, -1.0, -1.0, 1.0, -1.0])
+
+    assert _entries(levels, sides).tolist() == [0, 2, 2, 0, 0, 1]
 
 
 def test_severity_mix_is_near_the_historic_mix(default_run: Path) -> None:
@@ -141,16 +155,58 @@ def test_every_fault_occurs(year_dataset: Path) -> None:
     assert faults == set(CORRECTIVE_ACTIONS)
 
 
-def test_events_of_one_fault_on_one_system_are_72_hours_apart(default_run: Path) -> None:
-    times: dict[tuple[str, str], list[datetime]] = {}
+def test_events_of_one_fault_on_one_system_are_72_hours_apart_unless_worse(
+    default_run: Path,
+) -> None:
+    rank = {severity: level for level, severity in SEVERITY_BY_LEVEL.items()}
+    events: dict[tuple[str, str], list[tuple[datetime, int]]] = {}
     for e in _rows(default_run / "nodes_maintenance.csv"):
-        times.setdefault((e["system_id"], e["fault"]), []).append(
-            datetime.fromisoformat(e["reported_at"])
+        events.setdefault((e["system_id"], e["fault"]), []).append(
+            (datetime.fromisoformat(e["reported_at"]), rank[e["severity"]])
         )
-    for key, stamps in times.items():
-        stamps.sort()
-        gaps = [(b - a).total_seconds() / 3600 for a, b in pairwise(stamps)]
-        assert all(g >= 72 for g in gaps), (key, gaps)
+    for key, timeline in events.items():
+        timeline.sort()
+        for (t0, level0), (t1, level1) in pairwise(timeline):
+            gap = (t1 - t0).total_seconds() / 3600
+            assert gap >= 72 or level1 > level0, (key, t0, t1, level0, level1)
+
+
+class _AlwaysFires(random.Random):
+    """An rng whose every draw raises the event and picks the first route."""
+
+    def random(self) -> float:
+        return 0.0
+
+
+def test_an_escalation_within_72_hours_raises_a_new_event() -> None:
+    # Advisory at hour 10, warning at 20, back to normal at 30, and warning
+    # again at 40. The warning at 20 is worse than the advisory, so it is a
+    # new event inside the 72 hours. The second warning at 40 is not worse.
+    config = GeneratorConfig(n_aircraft=1, n_days=5, seed=SEED)
+    aircraft = generate_fleet(config)[0]
+    system = next(s for s in aircraft.systems if s.type == "Engine")
+    specs = {s.type: s for s in sensors_for(system.type, aircraft.model)}
+    series = {s.type: np.full(config.n_hours, specs[s.type].baseline) for s in system.sensors}
+    sensor = next(s for s in system.sensors if specs[s.type].direction is Direction.HIGH)
+    spec = specs[sensor.type]
+    advisory, _, warning = (spec.baseline + offset for offset in spec.offsets())
+    series[sensor.type][10:] = advisory
+    series[sensor.type][20:] = warning
+    series[sensor.type][30:40] = spec.baseline
+
+    events = generate_maintenance_events(
+        aircraft, {system.system_id: series}, config, [0], _AlwaysFires(SEED)
+    )
+
+    hours = [
+        (datetime.fromisoformat(e.row["reported_at"]) - config.start_date).total_seconds() // 3600
+        for e in events
+    ]
+    assert [(e.row["severity"], h) for e, h in zip(events, hours, strict=True)] == [
+        ("MINOR", 10),
+        ("CRITICAL", 20),
+    ]
+    assert events[0].row["fault"] == events[1].row["fault"]
 
 
 def test_every_bad_side_has_a_route_to_a_component_on_every_model() -> None:

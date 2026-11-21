@@ -426,6 +426,9 @@ def test_destroy_strips_only_the_exact_secret_variable(project: Path) -> None:
         "export AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
         "  AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
         "\texport\tAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET = value\n"
+        # The CLI's \s also matches a vertical tab and a form feed.
+        "\x0bAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
+        "export\x0cAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET\x0b=value\n"
     )
     env_local.write_text(kept + removed)
 

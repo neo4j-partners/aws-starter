@@ -301,8 +301,9 @@ ENV_STRIP_TMP="$ENV_LOCAL.strip.$$"
 # Remove the client secret line, and the comment the CLI writes above it,
 # from agentcore/.env.local. Every other line is kept. The secret line is
 # matched in each form the CLI reads: optional leading space, an optional
-# export, the exact variable name, then optional space before the =. The
-# comment must match the whole line. A failure before a deploy is tried
+# export, the exact variable name, then optional space before the =. Space
+# is [[:space:]], which covers the ASCII characters that \s matches in the
+# CLI's pattern. The comment must match the whole line. A failure before a deploy is tried
 # again by the restore, so only restore_project, the last try, says to
 # delete the line by hand.
 strip_gateway_secret() {
@@ -321,7 +322,7 @@ strip_gateway_secret() {
         || ! (umask 077 && set -C && : > "$ENV_STRIP_TMP") \
         || [ ! -f "$ENV_STRIP_TMP" ] || [ -L "$ENV_STRIP_TMP" ] \
         || ! awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
-            '$0 !~ ("^[ \t]*(export[ \t]+)?" name "[ \t]*=") && $0 != comment' \
+            '$0 !~ ("^[[:space:]]*(export[[:space:]]+)?" name "[[:space:]]*=") && $0 != comment' \
             "$ENV_LOCAL" >> "$ENV_STRIP_TMP" \
         || ! chmod 600 "$ENV_STRIP_TMP" \
         || [ -L "$ENV_LOCAL" ] \

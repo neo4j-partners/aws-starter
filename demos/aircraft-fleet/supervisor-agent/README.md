@@ -231,6 +231,25 @@ the active AWS credentials belong to the account recorded for the target in
 there. The first deploy writes that file, and git ignores it. If the file is
 missing, destroy stops and says to run it from the checkout that deployed.
 
+**Upgrading a checkout that already deployed:** Git used to track
+`agentcore/aws-targets.json`, and the first deploy edited it. So a `git pull`
+in that checkout can stop with "Your local changes would be overwritten". Keep
+the file, because destroy needs it. Run these commands from this folder:
+
+```bash
+cp agentcore/aws-targets.json ~/aws-targets.json.bak
+git checkout -- agentcore/aws-targets.json
+git pull
+cp ~/aws-targets.json.bak agentcore/aws-targets.json
+```
+
+After the pull, git ignores the file. If the backup is lost, recreate the file
+with the account and region you deployed to:
+
+```json
+[{"name": "default", "account": "<12-digit account ID>", "region": "<region>"}]
+```
+
 The CLI has no destroy command. `./agent.sh destroy` removes the runtime from
 the spec and deploys. A deploy with nothing to deploy deletes the target's
 stack. It also deletes each credential provider that the CLI's state records

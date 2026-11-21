@@ -1,0 +1,103 @@
+"""SystemReference and ComponentReference link on exact type, ignoring case.
+
+This test writes to Neo4j, so it runs only when NEO4J_TEST_URI points at a
+local server. Set NEO4J_TEST_PASSWORD, and optionally NEO4J_TEST_USERNAME
+and NEO4J_TEST_DATABASE. It removes the nodes it creates.
+"""
+
+from __future__ import annotations
+
+import os
+from collections.abc import Iterator
+from urllib.parse import urlparse
+
+import pytest
+from neo4j import Driver, GraphDatabase
+
+from populate_aircraft_db.pipeline import link_to_existing_graph
+
+TEST_URI = os.environ.get("NEO4J_TEST_URI", "")
+LOCAL_HOSTS = {"localhost", "127.0.0.1"}
+MODEL = "PYTEST-LINK"
+
+pytestmark = pytest.mark.skipif(not TEST_URI, reason="NEO4J_TEST_URI is not set")
+
+# One aircraft with an Engine (Turbine, Control Unit) and Hydraulics (Pump).
+_SETUP = """
+CREATE (a:Aircraft {aircraft_id: $model + '-A', model: $model})
+CREATE (a)-[:HAS_SYSTEM]->(e:System {system_id: $model + '-E', type: 'Engine'})
+CREATE (a)-[:HAS_SYSTEM]->(h:System {system_id: $model + '-H', type: 'Hydraulics'})
+CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E1', type: 'Turbine', name: 'Turbine'})
+CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E2', type: 'Control Unit', name: 'Control Unit'})
+CREATE (h)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-H1', type: 'Pump', name: 'Pump'})
+WITH 1 AS _
+UNWIND $systems AS sr
+CREATE (n:SystemReference {name: sr.name + ' - ' + $model, aircraftType: $model})
+SET n.systemType = sr.type
+WITH count(*) AS _
+UNWIND $components AS cr
+CREATE (n:ComponentReference {name: cr.name + ' - ' + $model, aircraftType: $model})
+SET n.componentType = cr.type
+"""
+
+_SYSTEMS = [
+    {"name": "Engine", "type": "engine"},
+    {"name": "Fuel System", "type": "Fuel"},
+    {"name": "Hydraulics", "type": None},
+]
+_COMPONENTS = [
+    {"name": "High-Pressure Turbine", "type": "turbine"},
+    {"name": "FADEC", "type": "Control Unit"},
+    {"name": "Engine-Driven Pump", "type": "PUMP"},
+    {"name": "Fuel Pump", "type": "Fuel Pump"},
+    {"name": "Turbine", "type": None},
+    # The type decides the link, not the name.
+    {"name": "Control Unit", "type": "Turbine"},
+]
+
+
+@pytest.fixture
+def driver() -> Iterator[Driver]:
+    assert urlparse(TEST_URI).hostname in LOCAL_HOSTS, "link tests only run against localhost"
+    auth = (os.environ.get("NEO4J_TEST_USERNAME", "neo4j"), os.environ["NEO4J_TEST_PASSWORD"])
+    with GraphDatabase.driver(TEST_URI, auth=auth) as drv:
+        yield drv
+
+
+@pytest.fixture
+def database(driver: Driver) -> Iterator[str]:
+    db = os.environ.get("NEO4J_TEST_DATABASE", "neo4j")
+    cleanup = """
+    MATCH (n) WHERE n.model = $model OR n.aircraftType = $model
+       OR n.system_id STARTS WITH $model OR n.component_id STARTS WITH $model
+    DETACH DELETE n
+    """
+    driver.execute_query(cleanup, model=MODEL, database_=db)
+    yield db
+    driver.execute_query(cleanup, model=MODEL, database_=db)
+
+
+def test_references_link_on_exact_type(driver: Driver, database: str) -> None:
+    driver.execute_query(
+        _SETUP, model=MODEL, systems=_SYSTEMS, components=_COMPONENTS, database_=database
+    )
+
+    link_to_existing_graph(driver, database)
+
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (r)-[:DESCRIBES_SYSTEM|DESCRIBES_COMPONENT]->(t)
+        WHERE r.aircraftType = $model
+        RETURN r.name AS ref, coalesce(t.component_id, t.system_id) AS target
+        ORDER BY ref
+        """,
+        model=MODEL,
+        database_=database,
+    )
+    assert [(r["ref"], r["target"]) for r in records] == [
+        (f"Control Unit - {MODEL}", f"{MODEL}-E1"),
+        (f"Engine - {MODEL}", f"{MODEL}-E"),
+        (f"Engine-Driven Pump - {MODEL}", f"{MODEL}-H1"),
+        (f"FADEC - {MODEL}", f"{MODEL}-E2"),
+        (f"High-Pressure Turbine - {MODEL}", f"{MODEL}-E1"),
+    ]

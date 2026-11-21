@@ -4,6 +4,38 @@ from __future__ import annotations
 
 from neo4j import Driver
 
+from generator.specs import COMPONENT_TYPES_BY_SYSTEM
+
+# ---------------------------------------------------------------------------
+# Fleet type vocabulary for extraction
+# ---------------------------------------------------------------------------
+# The cross-link joins in pipeline.link_to_existing_graph match a
+# SystemReference systemType and a ComponentReference componentType to the
+# operational System and Component types. The extraction prompt and schema
+# give the LLM the same lists, from the generator specs, so the values match.
+
+SYSTEM_TYPES: list[str] = list(COMPONENT_TYPES_BY_SYSTEM)
+
+# Lowercase component type -> the system type that has it.
+SYSTEM_TYPE_BY_COMPONENT_TYPE: dict[str, str] = {
+    component.lower(): system
+    for system, components in COMPONENT_TYPES_BY_SYSTEM.items()
+    for component in components
+}
+assert len(SYSTEM_TYPE_BY_COMPONENT_TYPE) == sum(
+    len(components) for components in COMPONENT_TYPES_BY_SYSTEM.values()
+), "a component type must belong to one system type"
+
+# "Engine: Turbine, Compressor, ...; Avionics: ...; Hydraulics: ..."
+COMPONENT_TYPES_TEXT = "; ".join(
+    f"{system}: {', '.join(components)}" for system, components in COMPONENT_TYPES_BY_SYSTEM.items()
+)
+SYSTEM_TYPES_TEXT = ", ".join(SYSTEM_TYPES)
+
+# The fleet sensor types, which the Sensor HAS_LIMIT join matches to
+# OperatingLimit parameterName.
+SENSOR_PARAMETER_NAMES = "EGT, Vibration, N1Speed, FuelFlow"
+
 # (label, property) pairs — one uniqueness constraint each.
 CONSTRAINTS: list[tuple[str, str]] = [
     ("Aircraft", "aircraft_id"),
@@ -209,7 +241,10 @@ def build_extraction_schema():
                 PropertyType(
                     name="systemType",
                     type="STRING",
-                    description="System category, e.g. Engine, Avionics, Hydraulics.",
+                    description=(
+                        f"Fleet system type, exactly one of: {SYSTEM_TYPES_TEXT}. "
+                        "Omit it for any other system."
+                    ),
                 ),
                 PropertyType(
                     name="aircraftType",
@@ -231,7 +266,11 @@ def build_extraction_schema():
                 PropertyType(
                     name="componentType",
                     type="STRING",
-                    description="Generic component or part type.",
+                    description=(
+                        "Fleet component type, exactly one of the types listed "
+                        f"for the part's system ({COMPONENT_TYPES_TEXT}). "
+                        "Omit it when no listed type fits."
+                    ),
                 ),
                 PropertyType(
                     name="partNumber",
@@ -319,8 +358,9 @@ def build_extraction_schema():
                     name="parameterName",
                     type="STRING",
                     description=(
-                        "Base parameter name matching sensor type, e.g. EGT, "
-                        "Vibration, N1Speed, FuelFlow"
+                        f"Fleet sensor type when the limit is for one: {SENSOR_PARAMETER_NAMES}. "
+                        "Use Vibration for N1 and N2 vibration. "
+                        "Otherwise a short sensor-style parameter name."
                     ),
                 ),
                 PropertyType(name="unit", type="STRING", description="Unit of measurement"),

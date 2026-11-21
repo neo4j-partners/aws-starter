@@ -13,6 +13,12 @@ from neo4j_graphrag.components.types import TextChunks
 from neo4j_graphrag.embeddings.openai import OpenAIEmbeddings
 
 from .loader import detach_delete_nodes
+from .schema import (
+    COMPONENT_TYPES_TEXT,
+    SENSOR_PARAMETER_NAMES,
+    SYSTEM_TYPE_BY_COMPONENT_TYPE,
+    SYSTEM_TYPES_TEXT,
+)
 
 # Labels for extracted entity nodes (used by clear/verify logic).
 EXTRACTED_LABELS = [
@@ -150,9 +156,11 @@ class DimensionAwareOpenAIEmbeddings(OpenAIEmbeddings):
 # manuals and keeps extracted manual entities model-scoped.
 #
 # Placeholders: {schema}, {examples}, {text} (required by ERExtractionTemplate).
-# Literal braces must be doubled for Python str.format().
+# Literal braces must be doubled for Python str.format(). The f-string parts
+# add the fleet type lists from schema.py and contain no braces of their own.
 
-EXTRACTION_PROMPT = """\
+EXTRACTION_PROMPT = (
+    """\
 You are an expert aviation engineer extracting structured maintenance-manual \
 knowledge to build an aircraft digital twin graph.
 
@@ -162,7 +170,7 @@ according to the schema below.
 Return result as JSON using this format:
 {{"nodes": [
   {{"id": "0", "label": "AircraftModel", "properties": {{"name": "A320-200"}}}},
-  {{"id": "1", "label": "ComponentReference", "properties": {{"name": "EGT Sensor - A320-200", "componentType": "EGT Sensor", "aircraftType": "A320-200"}}}},
+  {{"id": "1", "label": "ComponentReference", "properties": {{"name": "High-Pressure Turbine - A320-200", "componentType": "Turbine", "aircraftType": "A320-200"}}}},
   {{"id": "2", "label": "OperatingLimit", "properties": {{"name": "EGT - A320-200", "parameterName": "EGT", "aircraftType": "A320-200", "unit": "°C", "maxValue": "695"}}}}
 ],
 "relationships": [
@@ -191,10 +199,16 @@ components, faults, procedures, and operating limits when they are explicitly \
 mentioned in the text. Do not invent part numbers, fault codes, intervals, or \
 limits that are not present.
 
-4. PARAMETER NAMES: For OperatingLimit, `parameterName` should use short \
-sensor names from monitoring tables (e.g. EGT, Vibration, N1Speed, FuelFlow). \
-Prefer concise sensor-style names over verbose descriptions.
+"""
+    + f"""\
+4. PARAMETER NAMES: For OperatingLimit, `parameterName` must be one of the \
+fleet sensor types {SENSOR_PARAMETER_NAMES} when the limit is for that \
+measurement. Use Vibration for every engine vibration limit, including N1 and \
+N2 vibration, and name the shaft in `name` instead. For any other parameter, \
+use a concise sensor-style name.
 
+"""
+    + """\
 5. ENTITY NAME FORMAT: For SystemReference, ComponentReference, Fault, \
 MaintenanceProcedure, and OperatingLimit, the `name` property must follow \
 "<specific name> - <aircraftType>" (e.g. "EGT - A320-200"). AircraftModel \
@@ -207,6 +221,17 @@ SystemReference HAS_COMPONENT ComponentReference, ComponentReference HAS_FAULT \
 Fault, Fault CORRECTED_BY MaintenanceProcedure, and component/system HAS_LIMIT \
 OperatingLimit.
 
+"""
+    + f"""\
+7. FLEET TYPES: Set SystemReference `systemType` to exactly one of \
+{SYSTEM_TYPES_TEXT}, and omit it for any other system. Set ComponentReference \
+`componentType` to exactly one of the types listed for the part's system: \
+{COMPONENT_TYPES_TEXT}. Use the type the part is or belongs to, for example \
+Turbine for a high-pressure turbine stage. Omit `componentType` when no listed \
+type fits, such as a fuel pump or a gearbox. Never invent other values.
+
+"""
+    + """\
 Assign a unique ID (string) to each node and reuse it for relationships.
 
 Output rules:
@@ -223,6 +248,7 @@ Input text:
 
 {text}
 """
+)
 
 
 # ---------------------------------------------------------------------------
@@ -566,15 +592,14 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     print(f"  [OK] {records[0]['count']} AircraftModel -[:DESCRIBES_MODEL]-> Aircraft")
 
     # SystemReference -[:DESCRIBES_SYSTEM]-> System
-    # (conservative model + system type/name match)
+    # (same aircraft model, systemType equals the System type, ignoring case;
+    # the extraction prompt limits systemType to the fleet system types)
     records, _, _ = driver.execute_query(
         """
         MATCH (sr:SystemReference)
-        WHERE sr.aircraftType IS NOT NULL
-        WITH sr, toLower(replace(sr.name, ' - ' + sr.aircraftType, '')) AS refName
-        MATCH (a:Aircraft {model: sr.aircraftType})-[:HAS_SYSTEM]->(s:System)
-        WHERE toLower(s.type) = toLower(coalesce(sr.systemType, ''))
-           OR toLower(s.name) = refName
+        WHERE sr.aircraftType IS NOT NULL AND sr.systemType IS NOT NULL
+        MATCH (:Aircraft {model: sr.aircraftType})-[:HAS_SYSTEM]->(s:System)
+        WHERE toLower(s.type) = toLower(sr.systemType)
         MERGE (sr)-[:DESCRIBES_SYSTEM]->(s)
         RETURN count(*) AS count
     """,
@@ -583,22 +608,22 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     print(f"  [OK] {records[0]['count']} SystemReference -[:DESCRIBES_SYSTEM]-> System")
 
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
-    # (model + component type/name match)
+    # (same aircraft model, componentType equals the Component type, ignoring
+    # case, within the System type that has that component type in specs)
     records, _, _ = driver.execute_query(
         """
         MATCH (cr:ComponentReference)
-        WHERE cr.aircraftType IS NOT NULL
-        WITH cr,
-             toLower(replace(cr.name, ' - ' + cr.aircraftType, '')) AS refName,
-             toLower(coalesce(cr.componentType, '')) AS refType
-        MATCH (a:Aircraft {model: cr.aircraftType})
-            -[:HAS_SYSTEM]->(:System)
+        WHERE cr.aircraftType IS NOT NULL AND cr.componentType IS NOT NULL
+        WITH cr, $system_types[toLower(cr.componentType)] AS systemType
+        WHERE systemType IS NOT NULL
+        MATCH (:Aircraft {model: cr.aircraftType})
+            -[:HAS_SYSTEM]->(:System {type: systemType})
             -[:HAS_COMPONENT]->(c:Component)
-        WHERE toLower(c.type) IN [refName, refType]
-           OR toLower(c.name) IN [refName, refType]
+        WHERE toLower(c.type) = toLower(cr.componentType)
         MERGE (cr)-[:DESCRIBES_COMPONENT]->(c)
         RETURN count(*) AS count
     """,
+        system_types=SYSTEM_TYPE_BY_COMPONENT_TYPE,
         database_=database,
     )
     print(f"  [OK] {records[0]['count']} ComponentReference -[:DESCRIBES_COMPONENT]-> Component")

@@ -329,7 +329,8 @@ strip_gateway_secret() {
     # writes .env.local with. chmod sets 0600 again before any line lands.
     # On Linux a directory's default POSIX ACL overrides umask, see acl(5),
     # and the copy could otherwise be group-readable. A macOS ACE does not
-    # widen the mode, so no test here can catch a missing chmod. The copy
+    # widen the mode, so the tests here can check only that chmod runs
+    # before any line lands, not that it narrows a mode. The copy
     # must then be a regular file, not a link. .env.local is checked for a
     # link again right before mv, which would replace the link and leave
     # the secret in its target.

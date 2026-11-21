@@ -94,19 +94,25 @@ esac
 # a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
 # name right after the Nth rm of that name, or with STUB_PLANT_DEVNULL a link
 # to /dev/null. STUB_SKIP_STRIP_CHMOD makes chmod of the copy succeed without
-# running. STUB_RECORD_STRIP_MODE makes awk
-# record the copy's mode while the copy exists. STUB_RECORD_STRIP_SIZE makes
-# chmod record the copy's size in bytes before it changes the mode.
+# running. STUB_RECORD_STRIP_MODE and STUB_RECORD_STRIP_SIZE make chmod
+# record the copy's mode and its size in bytes before it changes the mode.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
 real=/bin/"$name"
 [ -x "$real" ] || real=/usr/bin/"$name"
-if [ "$name" = chmod ] && [ -n "${STUB_RECORD_STRIP_SIZE:-}" ]; then
-    case "${!#}" in
-        *.env.local.strip.*)
-            wc -c < "${!#}" | tr -d ' ' >> "${STUB_LOG%/*}/strip-sizes" ;;
-    esac
-fi
+case "$name:${!#}" in
+    chmod:*.env.local.strip.*)
+        if [ -n "${STUB_RECORD_STRIP_SIZE:-}" ]; then
+            wc -c < "${!#}" | tr -d ' ' >> "${STUB_LOG%/*}/strip-sizes"
+        fi
+        # stat's flags differ between macOS and Linux, so Python reads it.
+        if [ -n "${STUB_RECORD_STRIP_MODE:-}" ]; then
+            python3 -c 'import os, stat, sys
+print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "${!#}" \
+                >> "${STUB_LOG%/*}/strip-modes"
+        fi
+        ;;
+esac
 case "$name:${STUB_SKIP_STRIP_CHMOD:-}:${!#}" in
     chmod:?*:*.env.local.strip.*) status=0 ;;
     *) "$real" "$@"; status=$? ;;
@@ -138,14 +144,6 @@ if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
             fi
             ;;
     esac
-fi
-if [ "$name" = awk ] && [ -n "${STUB_RECORD_STRIP_MODE:-}" ]; then
-    for copy in agentcore/.env.local.strip.*; do
-        # stat's flags differ between macOS and Linux, so Python reads it.
-        [ -f "$copy" ] && python3 -c 'import os, stat, sys
-print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$copy" \
-            >> "${STUB_LOG%/*}/strip-modes"
-    done
 fi
 exit "$status"
 """
@@ -629,8 +627,8 @@ def test_a_link_to_a_device_made_at_the_copy_name_is_refused(project: Path) -> N
     assert not list(env_local.parent.glob(".env.local.*"))
 
 
-# umask 077 creates the copy with mode 0600, so the filtered lines are never
-# readable by others, even before chmod.
+# umask 077 creates the copy with mode 0600, so the copy is never readable
+# by others, even before chmod.
 def test_the_copy_is_0600_while_it_exists_under_a_wide_umask(project: Path) -> None:
     env_local = project / "agentcore" / ".env.local"
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")

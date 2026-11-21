@@ -11,6 +11,7 @@ import shutil
 import stat
 import subprocess
 from pathlib import Path
+from signal import SIGINT
 
 import pytest
 
@@ -696,7 +697,9 @@ def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lo
 def test_an_interrupt_during_an_aws_lookup_leaves_no_temporary_file(project: Path) -> None:
     result = run_destroy(project, STUB_LOOKUP_SIGNAL="INT")
 
-    assert result.returncode != 0
+    # end_spec_restore reset the INT trap, so the lookups after it end in a
+    # death by SIGINT, not the restore trap's exit 130.
+    assert result.returncode == -SIGINT
     assert "Cleanup complete" not in result.stdout
     assert not list((project.parent / "tmp").iterdir())
 

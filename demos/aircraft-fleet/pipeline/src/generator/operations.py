@@ -68,8 +68,8 @@ def generate_operations(
         # Each aircraft starts at a random hub airport
         current_airport = rng.choices([ap for ap in airports if ap.is_hub])[0]
 
-        # Legs a day, so the day's block time is about hours_per_day.
-        n_flights = max(1, round(aircraft.hours_per_day / aircraft.hours_per_cycle))
+        # One leg is one cycle, so the legs flown match the cycles counted.
+        n_flights = aircraft.legs_per_day
         current_time = config.start_date
 
         for day in range(config.n_days):

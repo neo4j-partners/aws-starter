@@ -103,3 +103,21 @@ def test_airframe_hours_between_removals_match_the_flights(
             assert abs(gained - flown) <= tolerance, (aircraft, gained, flown)
             pairs += 1
     assert pairs, "expected an aircraft with two removals"
+
+
+def test_cycles_between_removals_match_the_legs_flown(
+    flights_by_aircraft, removals_by_aircraft
+) -> None:
+    # A cycle is one leg. Cycles grow continuously and legs in daily blocks,
+    # so the two can differ by up to one day's legs, plus 1 for rounding.
+    pairs = 0
+    for aircraft, removals in removals_by_aircraft.items():
+        legs = flights_by_aircraft[aircraft]
+        tolerance = len(legs) / DAYS + 1
+        for first, last in zip(removals, removals[1:], strict=False):
+            start, end = _ts(first["removal_date"]), _ts(last["removal_date"])
+            flown = sum(1 for dep, _ in legs if start <= dep < end)
+            gained = int(last["flight_cycles_at_removal"]) - int(first["flight_cycles_at_removal"])
+            assert abs(gained - flown) <= tolerance, (aircraft, gained, flown)
+            pairs += 1
+    assert pairs, "expected an aircraft with two removals"

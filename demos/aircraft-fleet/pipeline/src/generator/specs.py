@@ -446,9 +446,10 @@ MANUAL_TAIL_OPERATORS: dict[str, str] = {
 class Utilization:
     """How hard each aircraft flies.
 
-    Each aircraft draws its flight hours per calendar day from hours_per_day,
-    and its hours per cycle from its model's value with +/- cycle_jitter.
-    Flights, airframe hours, and cycles all follow those two draws.
+    Each aircraft draws its hours per cycle from its model's value with
+    +/- cycle_jitter. It then flies a whole number of legs a day, drawn so
+    the day's hours fall in hours_per_day. Flights, airframe hours, and
+    cycles all follow those draws.
     """
 
     hours_per_day: tuple[float, float]

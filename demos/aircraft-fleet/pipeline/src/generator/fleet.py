@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import random
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -143,10 +144,13 @@ class AircraftNode:
     operator_profile: OperatorProfile
     # Internal only: not written to the CSVs or the graph.
     entry_into_service: date
-    # Flight hours per calendar day, and flight hours per cycle. Flights,
-    # airframe hours, and cycles all follow these. Internal only.
+    # Flight hours per calendar day, flight hours per cycle, and legs per
+    # day. hours_per_day is legs_per_day * hours_per_cycle, so a day's
+    # cycles are its legs. Flights, airframe hours, and cycles all follow
+    # these. Internal only.
     hours_per_day: float
     hours_per_cycle: float
+    legs_per_day: int
     systems: list[SystemNode] = field(default_factory=list)
 
 
@@ -200,7 +204,7 @@ def _build_aircraft(
     tail_number: str,
     address: str,
     operator: OperatorProfile,
-    utilization: tuple[float, float],
+    utilization: tuple[float, float, int],
 ) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
     engine_type = ENGINE_SPECS[model].engine_type
@@ -216,6 +220,7 @@ def _build_aircraft(
         entry_into_service=entry_into_service(model, tail_number),
         hours_per_day=utilization[0],
         hours_per_cycle=utilization[1],
+        legs_per_day=utilization[2],
     )
 
     # Two engines
@@ -233,6 +238,25 @@ def _build_aircraft(
     )
 
     return aircraft
+
+
+def _utilization(model: str, rng: random.Random) -> tuple[float, float, int]:
+    """Draw hours per day, hours per cycle, and a whole number of legs per day.
+
+    The legs are a whole number whose block hours fall in the hours-per-day
+    range. Hours per day is then exactly legs * hours per cycle.
+    """
+    jitter = UTILIZATION.cycle_jitter
+    hours_per_cycle = UTILIZATION.hours_per_cycle[model] * rng.uniform(1 - jitter, 1 + jitter)
+    low, high = UTILIZATION.hours_per_day
+    fewest, most = math.ceil(low / hours_per_cycle), math.floor(high / hours_per_cycle)
+    if fewest > most:
+        raise ValueError(
+            f"{model}: no whole number of {hours_per_cycle:.2f}-hour legs "
+            f"fills {low}-{high} hours a day"
+        )
+    legs = rng.randint(fewest, most)
+    return legs * hours_per_cycle, hours_per_cycle, legs
 
 
 def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
@@ -262,14 +286,7 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     ]
 
     icao24s = _unique_icao24s([tail for _, tail in plan])
-    jitter = UTILIZATION.cycle_jitter
-    utilizations = [
-        (
-            rng.uniform(*UTILIZATION.hours_per_day),
-            UTILIZATION.hours_per_cycle[model] * rng.uniform(1 - jitter, 1 + jitter),
-        )
-        for model, _ in plan
-    ]
+    utilizations = [_utilization(model, rng) for model, _ in plan]
     return [
         _build_aircraft(i, model, tail, code, op, utilization)
         for i, ((model, tail), code, op, utilization) in enumerate(

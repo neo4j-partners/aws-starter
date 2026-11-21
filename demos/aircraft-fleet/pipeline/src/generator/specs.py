@@ -718,6 +718,20 @@ class DelayCauseSpec:
     min_minutes: int
     max_minutes: int
 
+    def __post_init__(self) -> None:
+        if self.weight < 0:
+            raise ValueError(f"delay cause {self.cause!r}: weight {self.weight} is negative")
+        if self.min_minutes < 0 or self.max_minutes < 0:
+            raise ValueError(
+                f"delay cause {self.cause!r}: minutes {self.min_minutes} to "
+                f"{self.max_minutes} include a negative"
+            )
+        if self.min_minutes > self.max_minutes:
+            raise ValueError(
+                f"delay cause {self.cause!r}: min_minutes {self.min_minutes} "
+                f"is above max_minutes {self.max_minutes}"
+            )
+
 
 # Flight delay causes, each with its weight and duration range in minutes.
 DELAY_CAUSE_SPECS: tuple[DelayCauseSpec, ...] = (

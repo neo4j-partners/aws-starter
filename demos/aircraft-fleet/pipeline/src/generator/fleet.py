@@ -20,6 +20,7 @@ from .specs import (
     MODEL_DISTRIBUTION,
     OPERATORS,
     SENSOR_TYPES,
+    UTILIZATION,
     OperatorProfile,
 )
 
@@ -141,6 +142,10 @@ class AircraftNode:
     operator_profile: OperatorProfile
     # Internal only: not written to the CSVs or the graph.
     entry_into_service: date
+    # Flight hours per calendar day, and flight hours per cycle. Flights,
+    # airframe hours, and cycles all follow these. Internal only.
+    hours_per_day: float
+    hours_per_cycle: float
     systems: list[SystemNode] = field(default_factory=list)
 
 
@@ -197,7 +202,12 @@ def _build_system(
 
 
 def _build_aircraft(
-    index: int, model: str, tail_number: str, address: str, operator: OperatorProfile
+    index: int,
+    model: str,
+    tail_number: str,
+    address: str,
+    operator: OperatorProfile,
+    utilization: tuple[float, float],
 ) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
     engine_names = _ENGINE_NAMES[model]
@@ -211,6 +221,8 @@ def _build_aircraft(
         operator=operator.name,
         operator_profile=operator,
         entry_into_service=entry_into_service(model, tail_number),
+        hours_per_day=utilization[0],
+        hours_per_cycle=utilization[1],
     )
 
     # Two engines
@@ -255,9 +267,17 @@ def generate_fleet(config: GeneratorConfig) -> list[AircraftNode]:
     ]
 
     icao24s = _unique_icao24s([tail for _, tail in plan])
+    jitter = UTILIZATION.cycle_jitter
+    utilizations = [
+        (
+            rng.uniform(*UTILIZATION.hours_per_day),
+            UTILIZATION.hours_per_cycle[model] * rng.uniform(1 - jitter, 1 + jitter),
+        )
+        for model, _ in plan
+    ]
     return [
-        _build_aircraft(i, model, tail, code, op)
-        for i, ((model, tail), code, op) in enumerate(
-            zip(plan, icao24s, operator_assignments, strict=True)
+        _build_aircraft(i, model, tail, code, op, utilization)
+        for i, ((model, tail), code, op, utilization) in enumerate(
+            zip(plan, icao24s, operator_assignments, utilizations, strict=True)
         )
     ]

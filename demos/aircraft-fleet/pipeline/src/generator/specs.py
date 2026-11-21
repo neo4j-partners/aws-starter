@@ -193,6 +193,36 @@ MANUAL_TAIL_OPERATORS: dict[str, str] = {
     "N20005": "ExampleAir",
 }
 
+
+@dataclass(frozen=True)
+class Utilization:
+    """How hard each aircraft flies.
+
+    Each aircraft draws its flight hours per calendar day from hours_per_day,
+    and its hours per cycle from its model's value with +/- cycle_jitter.
+    Flights, airframe hours, and cycles all follow those two draws.
+    """
+
+    hours_per_day: tuple[float, float]
+    hours_per_cycle: dict[str, float]
+    cycle_jitter: float
+
+
+# Typical short-haul stage lengths: the E190 flies the shortest legs and the
+# A321neo the longest.
+UTILIZATION = Utilization(
+    hours_per_day=(8.0, 10.0),
+    hours_per_cycle={
+        "B737-800": 1.9,
+        "A320-200": 1.8,
+        "A321neo": 2.2,
+        "E190": 1.4,
+        "A220-300": 1.6,
+    },
+    cycle_jitter=0.10,
+)
+
+
 # Entry-into-service range for each model, first and last day inclusive.
 # B737, A320, and E190 come from "entered service between" in each manual's
 # §1.2 Fleet Configuration, and A321neo from its §1.3. The A220 manual gives

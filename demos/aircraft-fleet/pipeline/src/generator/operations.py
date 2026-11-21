@@ -15,12 +15,9 @@ from .config import GeneratorConfig
 from .fleet import AircraftNode
 from .specs import AIRPORTS, DELAY_CAUSE_SPECS
 
-# Flights per aircraft per day — drawn uniformly from this range
-_FLIGHTS_PER_DAY_RANGE = (3, 6)
-
-# Minimum block time (hours) and range for variation
-_MIN_BLOCK_HOURS = 1.0
-_MAX_BLOCK_HOURS = 5.5
+# Each leg's block time is first drawn in this range of the aircraft's hours
+# per cycle. The day's legs are then scaled to sum to its hours per day.
+_BLOCK_SPREAD = (0.75, 1.25)
 
 _DELAY_WEIGHTS = [spec.weight for spec in DELAY_CAUSE_SPECS]
 
@@ -71,12 +68,23 @@ def generate_operations(
         # Each aircraft starts at a random hub airport
         current_airport = rng.choices([ap for ap in airports if ap.is_hub])[0]
 
-        for day in range(config.n_days):
-            n_flights = rng.randint(*_FLIGHTS_PER_DAY_RANGE)
-            # Stagger first departure between 06:00 and 09:00
-            current_time = config.start_date + timedelta(days=day, hours=rng.uniform(6.0, 9.0))
+        # Legs a day, so the day's block time is about hours_per_day.
+        n_flights = max(1, round(aircraft.hours_per_day / aircraft.hours_per_cycle))
+        current_time = config.start_date
 
-            for _ in range(n_flights):
+        for day in range(config.n_days):
+            raw_blocks = [
+                rng.uniform(*_BLOCK_SPREAD) * aircraft.hours_per_cycle for _ in range(n_flights)
+            ]
+            scale = aircraft.hours_per_day / sum(raw_blocks)
+            # First departure between 06:00 and 09:00, but never before the
+            # previous day's last leg has landed and turned around.
+            current_time = max(
+                current_time,
+                config.start_date + timedelta(days=day, hours=rng.uniform(6.0, 9.0)),
+            )
+
+            for raw_block in raw_blocks:
                 # Weighted destination selection — hubs attract more traffic
                 candidates = [ap for ap in airports if ap.airport_id != current_airport.airport_id]
                 candidate_weights = [_HUB_WEIGHT if ap.is_hub else 1.0 for ap in candidates]
@@ -84,7 +92,7 @@ def generate_operations(
 
                 flight_counter += 1
                 flight_id = f"FL{flight_counter:05d}"
-                block_hours = rng.uniform(_MIN_BLOCK_HOURS, _MAX_BLOCK_HOURS)
+                block_hours = raw_block * scale
                 departure = current_time
                 arrival = departure + timedelta(hours=block_hours)
 

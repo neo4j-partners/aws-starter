@@ -14,7 +14,7 @@ from faker import Faker
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
-from .specs import ENTRY_INTO_SERVICE_RANGES
+from .specs import ENTRY_INTO_SERVICE_RANGES, UTILIZATION
 
 _fake = Faker()
 _fake.seed_instance(0)  # overridden per-call via seed
@@ -28,10 +28,8 @@ _WARRANTY_WEIGHTS = [0.35, 0.65]
 # Removals per aircraft per year (approx) — scaled to config.n_days
 _BASE_REMOVALS_PER_YEAR = 4
 
-# Flight hours per calendar day. Each aircraft draws one rate, which turns
-# days since entry into service into airframe hours, and flight hours since
-# install into days since install.
-_UTILIZATION_HOURS_PER_DAY = (8.0, 10.0)
+# Each aircraft's hours_per_day turns days since entry into service into
+# airframe hours, and flight hours since install into days since install.
 # Fewest flight hours since install: about 90 days at 8 hours a day.
 _MIN_HOURS_SINCE_INSTALL = 720
 
@@ -44,7 +42,7 @@ _LATEST_ENTRY_INTO_SERVICE = max(last for _, last in ENTRY_INTO_SERVICE_RANGES.v
 def _check_start_date(config: GeneratorConfig) -> None:
     """Raise ValueError if the window opens too soon after the latest entry into service."""
     days = (config.start_date.date() - _LATEST_ENTRY_INTO_SERVICE).days
-    if days * _UTILIZATION_HOURS_PER_DAY[0] <= _MIN_HOURS_SINCE_INSTALL:
+    if days * UTILIZATION.hours_per_day[0] <= _MIN_HOURS_SINCE_INSTALL:
         raise ValueError(
             f"start_date {config.start_date.date()} is too soon after the latest entry "
             f"into service, {_LATEST_ENTRY_INTO_SERVICE}: an aircraft needs more than "
@@ -101,7 +99,7 @@ def generate_removals(
 
         all_components = [comp for system in aircraft.systems for comp in system.components]
         # One rate per aircraft, so airframe hours grow with the removal date.
-        utilization = rng.uniform(*_UTILIZATION_HOURS_PER_DAY)
+        utilization = aircraft.hours_per_day
         in_service = datetime.combine(aircraft.entry_into_service, datetime.min.time())
 
         # Each component is removed at most once in the window, so its install
@@ -145,7 +143,10 @@ def generate_removals(
                     "serial_number": _serial_number(),
                     "time_since_install": hours_since_install,
                     "flight_hours_at_removal": flight_hours_at_removal,
-                    "flight_cycles_at_removal": rng.randint(200, 4000),
+                    # Cycles follow airframe hours, so they rise together.
+                    "flight_cycles_at_removal": int(
+                        flight_hours_at_removal / aircraft.hours_per_cycle
+                    ),
                     "replacement_required": rng.random() < 0.85,
                     "shop_visit_required": rng.random() < 0.60,
                     "warranty_status": warranty,

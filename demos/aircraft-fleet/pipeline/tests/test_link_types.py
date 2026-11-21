@@ -1,4 +1,4 @@
-"""SystemReference and ComponentReference link on exact type, ignoring case.
+"""Reference nodes and operating limits link on exact type, ignoring case.
 
 This test writes to Neo4j, so it runs only when NEO4J_TEST_URI points at a
 local server. Set NEO4J_TEST_PASSWORD, and optionally NEO4J_TEST_USERNAME
@@ -70,6 +70,7 @@ def database(driver: Driver) -> Iterator[str]:
     cleanup = """
     MATCH (n) WHERE n.model = $model OR n.aircraftType = $model
        OR n.system_id STARTS WITH $model OR n.component_id STARTS WITH $model
+       OR n.sensor_id STARTS WITH $model
     DETACH DELETE n
     """
     driver.execute_query(cleanup, model=MODEL, database_=db)
@@ -101,3 +102,48 @@ def test_references_link_on_exact_type(driver: Driver, database: str) -> None:
         (f"FADEC - {MODEL}", f"{MODEL}-E2"),
         (f"High-Pressure Turbine - {MODEL}", f"{MODEL}-E1"),
     ]
+
+
+# One aircraft with an engine EGT sensor, and operating limits.
+_SENSOR_SETUP = """
+CREATE (a:Aircraft {aircraft_id: $model + '-A', model: $model})
+CREATE (a)-[:HAS_SYSTEM]->(e:System {system_id: $model + '-E', type: 'Engine'})
+CREATE (e)-[:HAS_SENSOR]->(:Sensor {sensor_id: $model + '-SN1', type: 'EGT'})
+WITH 1 AS _
+UNWIND $limits AS ol
+CREATE (:OperatingLimit {name: ol.name, parameterName: ol.parameter, aircraftType: ol.model})
+"""
+
+_LIMITS = [
+    {"name": "EGT exact", "parameter": "EGT", "model": MODEL},
+    {"name": "EGT lower", "parameter": "egt", "model": MODEL},
+    {"name": "Vibration", "parameter": "Vibration", "model": MODEL},
+    {"name": "EGT other model", "parameter": "EGT", "model": MODEL + "-OTHER"},
+]
+
+
+def test_sensor_links_to_limits_on_parameter_name_ignoring_case(
+    driver: Driver, database: str
+) -> None:
+    driver.execute_query(_SENSOR_SETUP, model=MODEL, limits=_LIMITS, database_=database)
+
+    try:
+        link_to_existing_graph(driver, database)
+
+        records, _, _ = driver.execute_query(
+            """
+            MATCH (s:Sensor)-[:HAS_LIMIT]->(ol:OperatingLimit)
+            WHERE s.sensor_id STARTS WITH $model
+            RETURN ol.name AS limit
+            ORDER BY limit
+            """,
+            model=MODEL,
+            database_=database,
+        )
+    finally:
+        driver.execute_query(
+            "MATCH (ol:OperatingLimit {aircraftType: $other}) DETACH DELETE ol",
+            other=MODEL + "-OTHER",
+            database_=database,
+        )
+    assert [r["limit"] for r in records] == ["EGT exact", "EGT lower"]

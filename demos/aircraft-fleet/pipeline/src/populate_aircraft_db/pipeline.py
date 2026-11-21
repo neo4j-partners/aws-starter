@@ -637,11 +637,13 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         "  [OK] %d ComponentReference -[:DESCRIBES_COMPONENT]-> Component", records[0]["count"]
     )
 
-    # Sensor -[:HAS_LIMIT]-> OperatingLimit (match parameterName + aircraftType)
+    # Sensor -[:HAS_LIMIT]-> OperatingLimit
+    # (same aircraft model, parameterName equals the Sensor type, ignoring case)
     records, _, _ = driver.execute_query(
         """
-        MATCH (a:Aircraft)-[:HAS_SYSTEM]->(sys:System)-[:HAS_SENSOR]->(s:Sensor)
-        MATCH (ol:OperatingLimit {parameterName: s.type, aircraftType: a.model})
+        MATCH (a:Aircraft)-[:HAS_SYSTEM]->(:System)-[:HAS_SENSOR]->(s:Sensor)
+        MATCH (ol:OperatingLimit {aircraftType: a.model})
+        WHERE toLower(ol.parameterName) = toLower(s.type)
         MERGE (s)-[:HAS_LIMIT]->(ol)
         RETURN count(*) AS count
     """,

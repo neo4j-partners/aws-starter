@@ -331,6 +331,10 @@ async def invoke(
                 # the stream's cleanup. A flush that fails there replaces the
                 # CancelledError, so restore the cancel. Otherwise the handlers
                 # below would send an error and end the request normally.
+                # cancelling() counts cancel requests not yet undone by
+                # uncancel(). The check assumes no earlier cancel was caught
+                # and swallowed without uncancel(). Nothing in this module
+                # catches CancelledError.
                 task = asyncio.current_task()
                 if task is None or not task.cancelling():
                     raise

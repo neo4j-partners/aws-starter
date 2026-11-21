@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import os
 import random
@@ -221,9 +222,22 @@ def _publish(work: Path, output: Path) -> None:
     for name in sorted(written):
         os.replace(work / name, output / name)
     # The CSV moves reach the disk before the stamp's move does.
-    _fsync(output)
+    _fsync_dir(output)
     os.replace(work / STAMP_NAME, output / STAMP_NAME)
-    _fsync(output)
+    _fsync_dir(output)
+
+
+def _fsync_dir(path: Path) -> None:
+    """Flush a directory's entries to disk, where the filesystem allows it.
+
+    Some filesystems reject fsync on a directory with EINVAL. The moves then
+    go to disk when that filesystem chooses, so only that error is ignored.
+    """
+    try:
+        _fsync(path)
+    except OSError as exc:
+        if exc.errno != errno.EINVAL:
+            raise
 
 
 def _fsync(path: Path) -> None:

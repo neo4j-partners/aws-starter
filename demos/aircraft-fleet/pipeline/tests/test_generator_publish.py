@@ -7,6 +7,7 @@ last, so an output caught mid-move has no stamp and reads as stale.
 
 from __future__ import annotations
 
+import errno
 import fcntl
 import os
 import shutil
@@ -245,3 +246,59 @@ def test_publish_syncs_files_before_moving_and_the_stamp_after_the_csvs(
         ("replace", stamp.STAMP_NAME),
         ("fsync", "out"),
     ]
+
+
+def _fail_dir_fsync(monkeypatch: pytest.MonkeyPatch, code: int) -> None:
+    """Make _fsync raise OSError with the given errno on directories only."""
+    real = generator_main._fsync
+
+    def fsync(path: Path) -> None:
+        if path.is_dir():
+            raise OSError(code, os.strerror(code))
+        real(path)
+
+    monkeypatch.setattr(generator_main, "_fsync", fsync)
+
+
+def test_publish_ignores_einval_from_a_directory_fsync(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Some filesystems reject fsync on a directory with EINVAL.
+    output, work = _publish_setup(tmp_path)
+    _fail_dir_fsync(monkeypatch, errno.EINVAL)
+
+    generator_main._publish(work, output)
+
+    assert stamp.read_stamp(output) == {"generator_hash": "new"}
+
+
+@pytest.mark.parametrize("code", [errno.EIO, errno.EACCES])
+def test_publish_raises_other_directory_fsync_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    output, work = _publish_setup(tmp_path)
+    _fail_dir_fsync(monkeypatch, code)
+
+    with pytest.raises(OSError) as raised:
+        generator_main._publish(work, output)
+
+    assert raised.value.errno == code
+
+
+def test_publish_raises_einval_from_a_file_fsync(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Only the directory fsync may be skipped. A file that cannot be synced
+    # must not be published as if it were on disk.
+    output, work = _publish_setup(tmp_path)
+
+    def fsync(path: Path) -> None:
+        if path.is_file():
+            raise OSError(errno.EINVAL, os.strerror(errno.EINVAL))
+
+    monkeypatch.setattr(generator_main, "_fsync", fsync)
+
+    with pytest.raises(OSError) as raised:
+        generator_main._publish(work, output)
+
+    assert raised.value.errno == errno.EINVAL

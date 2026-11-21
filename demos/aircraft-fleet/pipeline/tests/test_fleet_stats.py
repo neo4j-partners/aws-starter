@@ -266,6 +266,71 @@ def _root_cause_sections(text: str) -> list[str]:
     )
 
 
+# A generated block, markers included.
+_GENERATED_BLOCK = re.compile(
+    r"^<!-- BEGIN GENERATED: (\S+) -->$.*?^<!-- END GENERATED: \1 -->$", re.M | re.S
+)
+# A hand-written share in prose, such as "40% of cases".
+_PROSE_SHARE = re.compile(r"\d\s*%\s*of\s+(?:cases|events|failures)\b", re.IGNORECASE)
+# A share in a table cell. Vibration frequencies such as "1.0 × N1" are not.
+_SHARE_CELL = re.compile(r"\d\s*%|\b(?:common|uncommon|rare|occasional|frequent)\b", re.IGNORECASE)
+
+
+def _cells(row: str) -> list[str]:
+    return [cell.strip() for cell in row.strip().strip("|").split("|")]
+
+
+def _hand_written_frequencies(text: str) -> list[str]:
+    """Each hand-written share outside the generated blocks.
+
+    A table column headed Frequency counts only when its header has a % or
+    its cells hold shares, so a bearing's vibration frequency passes.
+    """
+    text = _GENERATED_BLOCK.sub("", text)
+    found = _PROSE_SHARE.findall(text)
+    tables = re.findall(r"^\|.*\|[ \t]*\n\|[-:| \t]+\|[ \t]*\n(?:\|.*\n?)*", text, re.M)
+    for table in tables:
+        header, _, *body = table.splitlines()
+        for i, name in enumerate(_cells(header)):
+            if not re.search(r"\bfrequency\b", name, re.IGNORECASE):
+                continue
+            column = [cells[i] for cells in map(_cells, body) if i < len(cells)]
+            if "%" in name or any(_SHARE_CELL.search(cell) for cell in column):
+                found.append(header)
+    return found
+
+
+@pytest.mark.parametrize(
+    ("text", "found"),
+    [
+        ("- Fan blade damage (40% of cases)\n", True),
+        ("Bearings cause 12 % of Failures.\n", True),
+        ("about 5% of events\n", True),
+        ("| Cause | Frequency |\n|---|---|\n| Bearing | 40% |\n", True),
+        ("| Cause | Frequency |\n|---|---|\n| Bearing | Common |\n", True),
+        ("| Frequency (%) | Cause |\n|---|---|\n| 40 | Bearing |\n", True),
+        ("| Bearing | Frequency |\n|---|---|\n| #1 | 1.0 × N1 |\n", False),
+        ("| Cause | Frequency Signature |\n|---|---|\n| Fan | 1 × N1 |\n", False),
+        ("| 1 | Identify vibration frequency spectrum | Isolate rotor source |\n", False),
+        ("Sensor drift above 10% needs a check.\n", False),
+        ("Motor the engine to 20% N2.\n", False),
+        (
+            "<!-- BEGIN GENERATED: x -->\nIt is 8% of events.\n<!-- END GENERATED: x -->\n",
+            False,
+        ),
+    ],
+)
+def test_the_frequency_guard_flags_hand_written_shares(text: str, found: bool) -> None:
+    assert bool(_hand_written_frequencies(text)) is found
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_no_manual_quotes_a_hand_written_frequency(model: str) -> None:
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+
+    assert _hand_written_frequencies(text) == []
+
+
 def test_a_percentage_in_a_root_cause_section_is_found() -> None:
     text = "#### Common Root Causes\n- Fan blade damage (40% of cases)\n\n### 4.3 Next\n"
 

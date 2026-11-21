@@ -381,3 +381,33 @@ def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
         assert "ZZQ" in _prompt_line(schema, "Airport IATA codes")
     finally:
         driver.execute_query(cleanup, database_=database)
+
+
+def test_bedrock_embeds_with_the_configured_model_dimensions_and_region(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import boto3
+    from neo4j_graphrag.embeddings import bedrock
+
+    created: list[dict[str, Any]] = []
+
+    class FakeEmbeddings:
+        def __init__(self, **kwargs: Any) -> None:
+            created.append(kwargs)
+
+        def embed_query(self, text: str) -> list[float]:
+            return [float(len(text))]
+
+    monkeypatch.setattr(bedrock, "BedrockEmbeddings", FakeEmbeddings)
+    monkeypatch.setattr(boto3, "client", lambda *args, **kwargs: object())
+
+    _, embed = agent_samples._create_llm_client(
+        "bedrock",
+        region="eu-west-1",
+        llm_model="chat-model",
+        embedding_model="embed-model",
+        embedding_dimensions=256,
+    )
+
+    assert created == [{"model_id": "embed-model", "dimensions": 256, "region_name": "eu-west-1"}]
+    assert embed("four") == [4.0]

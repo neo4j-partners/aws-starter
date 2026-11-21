@@ -10,8 +10,10 @@ import asyncio
 import threading
 from collections.abc import Callable, Iterator
 
+import neo4j
 import pytest
 from neo4j_agent_memory import ExtractorType
+from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
 from neo4j_agent_memory.integrations.base import AsyncBridge
 from neo4j_agent_memory.integrations.strands import SharedMemory
 from neo4j_agent_memory.llm.adapters.bedrock import (
@@ -43,6 +45,7 @@ def _reset_memory() -> None:
     memory._opening = None
     memory._open_thread = None
     memory._closed = False
+    memory._auth_failure = None
 
 
 @pytest.fixture
@@ -246,6 +249,49 @@ def test_failed_open_is_logged_without_a_traceback(
     assert record.levelname == "WARNING"
     assert record.getMessage() == "Memory open failed: memory is down"
     assert record.exc_info is None
+
+
+def _wrapped(driver_error: Exception) -> Exception:
+    """The memory library's ConnectionError, raised from ``driver_error``."""
+    try:
+        raise MemoryConnectionError(f"Failed: {driver_error}") from driver_error
+    except MemoryConnectionError as e:
+        return e
+
+
+def test_rejected_password_is_kept_until_restart(
+    fake_shared: type[_FakeShared], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A retry reads the same password, so it cannot succeed and risks a lockout."""
+    rejected = _wrapped(neo4j.exceptions.AuthError("bad password"))
+    fake_shared.fail.append(rejected)
+
+    async def call_three_times() -> None:
+        for _ in range(3):
+            with pytest.raises(MemoryConnectionError) as raised:
+                await memory.shared_memory(_hook)
+            assert raised.value is rejected
+
+    asyncio.run(call_three_times())
+    assert fake_shared.opened == []
+    assert len([r for r in caplog.records if r.name == memory.__name__]) == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [_wrapped(neo4j.exceptions.ServiceUnavailable("down")), TimeoutError("slow")],
+    ids=["unreachable", "timeout"],
+)
+def test_other_open_failures_are_retried(fake_shared: type[_FakeShared], error: Exception) -> None:
+    fake_shared.fail.append(error)
+
+    async def fail_then_open() -> object:
+        with pytest.raises(type(error)):
+            await memory.shared_memory(_hook)
+        return await memory.shared_memory(_hook)
+
+    shared = asyncio.run(fail_then_open())
+    assert fake_shared.opened == [shared]
 
 
 def test_cancelled_first_caller_keeps_the_open(fake_shared: type[_FakeShared]) -> None:

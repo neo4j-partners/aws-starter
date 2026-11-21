@@ -8,7 +8,9 @@ reach the fleet schema that Text2Cypher reads.
 ``MEM_NEO4J_*`` variables. :func:`shared_memory` opens one ``SharedMemory``
 per process on the first request that needs it. It holds the memory client
 and the event-loop thread that every manager runs on. A failed open is not
-kept, so the next request tries again. :func:`close_memory` closes it at
+kept, so the next request tries again. A rejected password is kept until the
+process restarts. The settings are read once, so a retry would send the same
+password. :func:`close_memory` closes it at
 shutdown, and no request opens it after that.
 
 AgentCore runs requests on its own worker event loop and the server lifespan
@@ -50,6 +52,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import (
 from pydantic import SecretStr
 
 from fleet_graphrag.agent.config import ConfigError, settings
+from fleet_graphrag.agent.neo4j_errors import is_auth_error
 from fleet_graphrag.agent.secrets import memory_password
 
 logger = logging.getLogger(__name__)
@@ -76,6 +79,8 @@ _opening: concurrent.futures.Future[SharedMemory] | None = None
 _open_thread: threading.Thread | None = None
 # Set by close_memory. No open starts after it.
 _closed = False
+# A rejected password. Every later call raises it, with no new open.
+_auth_failure: Exception | None = None
 
 
 class MemoryClosedError(neo4j.exceptions.ServiceUnavailable):
@@ -128,7 +133,8 @@ async def shared_memory(background_hook: BackgroundHook) -> SharedMemory:
     Concurrent first callers, on any event loop, wait for the same open. The
     open runs on its own thread, so a caller that is cancelled does not stop
     it, and the next caller gets the memory it opened. A failed open raises
-    to every caller waiting for it and is not kept.
+    to every caller waiting for it and is not kept, except a rejected
+    password, which every later call raises until the process restarts.
 
     Raises :class:`MemoryClosedError` after :func:`close_memory`.
     """
@@ -136,6 +142,9 @@ async def shared_memory(background_hook: BackgroundHook) -> SharedMemory:
     with _lock:
         if _closed:
             raise MemoryClosedError("The memory is closed. The server is shutting down.")
+        if _auth_failure is not None:
+            # Drop the traceback of the earlier raise, so it does not grow.
+            raise _auth_failure.with_traceback(None)
         if _shared is not None:
             return _shared
         if _opening is None:
@@ -155,7 +164,7 @@ def _open(
     opening: concurrent.futures.Future[SharedMemory], background_hook: BackgroundHook
 ) -> None:
     """Open the shared memory and settle ``opening``. Runs on its own thread."""
-    global _shared, _opening
+    global _shared, _opening, _auth_failure
     # A running future cannot be cancelled, so no waiter can drop the open.
     opening.set_running_or_notify_cancel()
     try:
@@ -166,6 +175,10 @@ def _open(
         logger.warning("Memory open failed: %s", e)
         with _lock:
             _opening = None
+            if is_auth_error(e):
+                # Retrying sends the same password. It cannot succeed and
+                # counts toward the server's failed-login lockout.
+                _auth_failure = e
         opening.set_exception(e)
         return
     with _lock:

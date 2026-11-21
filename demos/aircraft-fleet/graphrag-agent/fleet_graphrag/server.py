@@ -331,7 +331,8 @@ async def invoke(
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(schema=schema)
 
         # The first request opens the shared memory. A failed open raises
-        # here and the next request tries again. The data modes above never
+        # here and the next request tries again, unless the password was
+        # rejected, which is kept until restart. The data modes above never
         # need it, so they keep working while the memory is down. The open
         # logs its own failure, so it is not logged again here.
         try:

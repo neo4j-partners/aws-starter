@@ -41,6 +41,7 @@ def _reset_memory() -> None:
     memory._opening = None
     memory._open_thread = None
     memory._closed = False
+    memory._auth_failure = None
 
 
 def _run(payload: dict | None, session_id: str | None = None) -> list[dict]:

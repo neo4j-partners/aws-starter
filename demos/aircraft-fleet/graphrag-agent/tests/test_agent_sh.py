@@ -302,8 +302,8 @@ def test_a_failed_identity_check_fails(project: Path) -> None:
     assert "Cleanup complete" not in result.stdout
 
 
-def _targets(account: object) -> str:
-    return json.dumps([{"name": "default", "account": account, "region": "us-east-1"}])
+def _targets(account: object = ACCOUNT, region: object = "us-east-1") -> str:
+    return json.dumps([{"name": "default", "account": account, "region": region}])
 
 
 @pytest.mark.parametrize(
@@ -316,6 +316,9 @@ def _targets(account: object) -> str:
         _targets("12345"),
         _targets("1111 2222 3333"),
         _targets(111122223333),
+        # A region must be a non-empty string.
+        _targets(region=""),
+        _targets(region=None),
     ],
 )
 def test_an_unknown_target_account_fails(project: Path, targets: str) -> None:

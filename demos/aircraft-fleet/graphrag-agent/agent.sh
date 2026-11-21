@@ -189,10 +189,12 @@ except (OSError, ValueError, TypeError, AttributeError, KeyError) as error:
 if len(entries) != 1:
     sys.exit(f"{sys.argv[1]} has {len(entries)} entries for this target.")
 account, region = entries[0]
-# An AWS account ID is 12 digits. An empty one would shift the region into
-# the account when the shell reads this line.
+# An AWS account ID is 12 digits, and the region is one word. An empty or
+# spaced value would shift the fields when the shell reads this line.
 if not isinstance(account, str) or not re.fullmatch(r"[0-9]{12}", account):
     sys.exit(f"{sys.argv[1]} has no 12-digit account for this target.")
+if not isinstance(region, str) or not re.fullmatch(r"\S+", region):
+    sys.exit(f"{sys.argv[1]} has no region for this target.")
 print(account, region)
 ' "$TARGETS_FILE" "$TARGET"
 }

@@ -155,7 +155,7 @@ def test_manuals_in_sync(model: str) -> None:
 def manuals_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(manuals, "RENDERERS", RENDERERS)
     monkeypatch.setattr(manuals, "REQUIRED_BLOCKS", ("greeting",))
-    monkeypatch.setattr(manuals, "load_stats", dict)
+    monkeypatch.setattr(manuals, "load_stats", lambda manuals_dir: {})
     for model, filename in manuals.MANUAL_FILES.items():
         body = f"Hello from the {model}."
         (tmp_path / filename).write_text(f"# {model}\n" + _block("greeting", body))

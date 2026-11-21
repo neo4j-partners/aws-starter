@@ -118,19 +118,33 @@ AIRCRAFT (E190)
 
 #### 2.1.1 Engine Systems (CF34-10E)
 
-The E190 is powered by two GE Aviation CF34-10E high-bypass turbofan engines, mounted on aft-fuselage pylons in the characteristic E-Jet configuration that provides unobstructed underwing space and a low-slung cabin floor. Each engine produces 18,500 lbf of thrust at takeoff and operates independently with full redundancy. The CF34-10E features a two-spool architecture with a single-stage fan driven by a multi-stage low-pressure turbine and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine, achieving an overall pressure ratio of 27.0:1. The engine incorporates an annular combustor with low-emissions fuel nozzle design. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. In typical industry data, engine systems account for about 65% of maintenance events. The most common issues are overheat conditions, sensor drift, and bearing wear.
+The E190 is powered by two GE Aviation CF34-10E high-bypass turbofan engines, mounted on aft-fuselage pylons in the characteristic E-Jet configuration that provides unobstructed underwing space and a low-slung cabin floor. Each engine produces 18,500 lbf of thrust at takeoff and operates independently with full redundancy. The CF34-10E features a two-spool architecture with a single-stage fan driven by a multi-stage low-pressure turbine and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine, achieving an overall pressure ratio of 27.0:1. The engine incorporates an annular combustor with low-emissions fuel nozzle design. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 48 of the E190's 74 maintenance events, or 65%. The most common engine faults are overheat with 15 events, bearing wear with 12, and sensor drift with 10.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The E190 features the Honeywell Primus Epic EFIS with dual Flight Management Systems providing 4D flight planning, performance calculations, and VNAV/LNAV guidance. Three Air Data / Inertial Reference Units (ADIRU) supply redundant altitude, airspeed, Mach, and inertial reference data integrated with the digital fly-by-wire flight control system. Multi-Mode Receivers (MMR) provide VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive Built-In Test Equipment (BITE). In typical industry data, avionics accounts for about 16% of maintenance events. Most involve sensor drift and FMS anomalies, which are typically resolved through calibration or software updates.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The E190 features the Honeywell Primus Epic EFIS with dual Flight Management Systems providing 4D flight planning, performance calculations, and VNAV/LNAV guidance. Three Air Data / Inertial Reference Units (ADIRU) supply redundant altitude, airspeed, Mach, and inertial reference data integrated with the digital fly-by-wire flight control system. Multi-Mode Receivers (MMR) provide VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 digital data buses with comprehensive Built-In Test Equipment (BITE).
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 15 of the E190's 74 maintenance events, or 20%. The avionics faults are electrical fault with 10 events and sensor drift with 5.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are typically resolved through calibration or software updates.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The E190 hydraulic system provides power for flight control surfaces, spoilers, leading edge slats, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. The Left system is powered by two engine-driven pumps (one per engine) and one AC motor pump. Each system reservoir holds 4.0 gallons usable capacity. Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. In typical industry data, the hydraulics system accounts for about 19% of maintenance events. Leaks and contamination are the primary concerns.
+The E190 hydraulic system provides power for flight control surfaces, spoilers, leading edge slats, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated Left and Right, each operating at 3,000 psi, plus a standby system for emergency backup. The Left system is powered by two engine-driven pumps (one per engine) and one AC motor pump. Each system reservoir holds 4.0 gallons usable capacity. Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 11 of the E190's 74 maintenance events, or 15%. The hydraulics faults are leak with 9 events and contamination with 2.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -317,7 +331,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the second most common fault type, at about 22% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 10 of the E190's 48 engine maintenance events, or 21%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
 
 #### Symptoms
 - Parameter disagree messages on EICAS
@@ -357,7 +373,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the fifth most common fault type, at about 9% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 3 of the E190's 48 engine maintenance events, or 6%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Types of Contamination
 
@@ -401,7 +419,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 20% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 12 of the E190's 48 engine maintenance events, or 25%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings
@@ -453,7 +473,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 6% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 4 of the E190's 48 engine maintenance events, or 8%.
+<!-- END GENERATED: fault-stats-engine-leak -->
 
 #### Leak Classification
 
@@ -487,6 +509,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 4 of the E190's 48 engine maintenance events, or 8%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits (CF34-10E)
 
@@ -564,6 +589,9 @@ Integrated Multi-Mode Receiver providing:
 #### 5.3.1 Sensor Drift (Avionics)
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 5 of the E190's 15 avionics maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADIRU outputs (ADIRU 1/2/3) via maintenance page
@@ -627,6 +655,9 @@ The trailing edge flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 9 of the E190's 11 hydraulics maintenance events, or 82%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -648,6 +679,9 @@ The trailing edge flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 2 of the E190's 11 hydraulics maintenance events, or 18%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Limits (NAS 1638):**
 
@@ -1010,27 +1044,42 @@ The bands apply to every hydraulic system.
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Typical Industry Maintenance Statistics
+### 10.5 Fleet Maintenance Statistics
 
-These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The E190 has 10 of the aircraft and 74 of the maintenance events.
 
 **Events by Severity:**
-- Critical: about 52%
-- Major: about 31%
-- Minor: about 17%
+
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 16 | 22% |
+| Major | 23 | 31% |
+| Minor | 35 | 47% |
 
 **Events by System:**
-- Engine: about 65%
-- Hydraulics: about 19%
-- Avionics: about 16%
 
-**Top Fault Types:**
-1. Overheat (EGT exceedance): about 27%
-2. Sensor drift: about 22%
-3. Bearing wear: about 20%
-4. Vibration exceedance: about 16%
-5. Contamination: about 9%
-6. Leak: about 6%
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 48 | 65% |
+| Avionics | 15 | 20% |
+| Hydraulics | 11 | 15% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 15 | 20% |
+| Bearing wear | Engine | 12 | 16% |
+| Sensor drift | Engine | 10 | 14% |
+| Electrical fault | Avionics | 10 | 14% |
+| Leak | Hydraulics | 9 | 12% |
+| Sensor drift | Avionics | 5 | 7% |
+| Leak | Engine | 4 | 5% |
+| Vibration exceedance | Engine | 4 | 5% |
+| Contamination | Engine | 3 | 4% |
+| Contamination | Hydraulics | 2 | 3% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

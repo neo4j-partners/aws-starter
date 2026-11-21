@@ -5,6 +5,7 @@ from __future__ import annotations
 import difflib
 import errno
 import fcntl
+import json
 import os
 import random
 import shutil
@@ -38,6 +39,7 @@ from .stamp import (
     stamp_for,
     write_stamp,
 )
+from .stats import STATS_CONFIG, fleet_stats
 from .writers import CSV_COLUMNS, write_csv
 
 app = typer.Typer(
@@ -510,7 +512,7 @@ def render_manuals(
     ] = manuals.MANUALS_DIR,
 ) -> None:
     """Render the generated blocks of every maintenance manual from specs."""
-    stats = manuals.load_stats()
+    stats = manuals.load_stats(manuals_dir)
     drifted: list[str] = []
     for model, filename in manuals.MANUAL_FILES.items():
         path = manuals_dir / filename
@@ -541,6 +543,22 @@ def render_manuals(
         raise typer.Exit(1)
     if not drifted:
         console.print(f"{len(manuals.MANUAL_FILES)} manuals in sync")
+
+
+@app.command()
+def stats(
+    manuals_dir: Annotated[
+        Path, typer.Option("--manuals-dir", help="Directory holding the manuals.")
+    ] = manuals.MANUALS_DIR,
+) -> None:
+    """Count the default dataset's maintenance events for the manuals' statistics."""
+    path = manuals_dir / manuals.STATS_NAME
+    path.write_text(json.dumps(fleet_stats(), indent=2) + "\n", encoding="utf-8")
+    console.print(
+        f"Wrote {escape(str(path))} for {STATS_CONFIG.n_aircraft} aircraft over "
+        f"{STATS_CONFIG.n_days} days, seed {STATS_CONFIG.seed}. "
+        "Run `uv run generate-data render-manuals` to update the manuals."
+    )
 
 
 @app.command()

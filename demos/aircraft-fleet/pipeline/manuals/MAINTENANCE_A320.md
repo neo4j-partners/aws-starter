@@ -116,19 +116,33 @@ AIRCRAFT (A320-200)
 
 #### 2.1.1 Engine Systems (V2500-A1)
 
-The A320-200 is powered by two International Aero Engines (IAE) V2500-A1 high-bypass turbofan engines, mounted in underwing nacelles. Each engine produces 25,000 lbf of thrust and operates independently with full redundancy. The V2500 features a two-spool design with a single-stage fan, 4-stage low-pressure compressor, 10-stage high-pressure compressor, annular combustor, 2-stage high-pressure turbine, and 5-stage low-pressure turbine. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. In typical industry data, engine systems account for about 58% of maintenance events. The most common issues are overheat conditions, vibration exceedances, and bearing wear.
+The A320-200 is powered by two International Aero Engines (IAE) V2500-A1 high-bypass turbofan engines, mounted in underwing nacelles. Each engine produces 25,000 lbf of thrust and operates independently with full redundancy. The V2500 features a two-spool design with a single-stage fan, 4-stage low-pressure compressor, 10-stage high-pressure compressor, annular combustor, 2-stage high-pressure turbine, and 5-stage low-pressure turbine. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 21 of the A320-200's 36 maintenance events, or 58%. The most common engine faults are overheat with 7 events, vibration exceedance with 7, and sensor drift with 4.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The system is built around dual Flight Management Systems (FMS) that handle flight planning, navigation computation, performance optimization, and guidance commands. Three Air Data Computers (ADC) provide redundant altitude, airspeed, and Mach number calculations using pitot-static inputs. The Navigation Receiver integrates VOR, ILS localizer, glideslope, and marker beacon reception for precision approaches. All avionics components communicate via ARINC 429 digital data buses with built-in test equipment (BITE) for fault detection. In typical industry data, avionics accounts for about 22% of maintenance events. Most involve sensor drift and electrical faults, which are often resolved through software patches or calibration adjustments.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The system is built around dual Flight Management Systems (FMS) that handle flight planning, navigation computation, performance optimization, and guidance commands. Three Air Data Computers (ADC) provide redundant altitude, airspeed, and Mach number calculations using pitot-static inputs. The Navigation Receiver integrates VOR, ILS localizer, glideslope, and marker beacon reception for precision approaches. All avionics components communicate via ARINC 429 digital data buses with built-in test equipment (BITE) for fault detection.
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 6 of the A320-200's 36 maintenance events, or 17%. The avionics faults are sensor drift with 4 events and electrical fault with 2.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are often resolved through software patches or calibration adjustments.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A320-200 hydraulic system provides power for flight control surfaces, landing gear operation, brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi. This manual focuses on the Green system, which is powered by an engine-driven pump on Engine #1. The system includes a main hydraulic pump capable of 26 gpm flow rate, a 14.5-liter reservoir with integrated quantity indication, and multiple actuators including the flap actuator assembly for high-lift device operation. Hydraulic fluid (Skydrol LD-4) requires regular monitoring for contamination and proper fluid levels. In typical industry data, the hydraulics system accounts for about 20% of maintenance events. Leaks and fluid contamination are the most common issues.
+The A320-200 hydraulic system provides power for flight control surfaces, landing gear operation, brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi. This manual focuses on the Green system, which is powered by an engine-driven pump on Engine #1. The system includes a main hydraulic pump capable of 26 gpm flow rate, a 14.5-liter reservoir with integrated quantity indication, and multiple actuators including the flap actuator assembly for high-lift device operation. Hydraulic fluid (Skydrol LD-4) requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 9 of the A320-200's 36 maintenance events, or 25%. The hydraulics faults are leak with 7 events and contamination with 2.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -276,6 +290,9 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 **Fault Code:** ENG-OVH-006
 **Severity Classification:** CRITICAL / MAJOR / MINOR (based on temperature and duration)
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 7 of the A320-200's 21 engine maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
 
 #### Symptoms
 - EGT indication above normal operating range
@@ -318,6 +335,9 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 7 of the A320-200's 21 engine maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits
 
@@ -350,6 +370,9 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 **Fault Code:** ENG-FUEL-007
 **Severity Classification:** CRITICAL / MAJOR
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A320-200's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
@@ -375,6 +398,9 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 3 of the A320-200's 21 engine maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Oil debris monitoring (chip detectors, spectrographic analysis)
@@ -450,6 +476,9 @@ Integrated VOR/ILS receiver providing:
 #### 5.3.1 Sensor Drift
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 4 of the A320-200's 6 avionics maintenance events, or 67%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 Sensor drift manifests as gradual deviation between redundant sensor inputs or comparison with known references.
 
@@ -467,6 +496,9 @@ Sensor drift manifests as gradual deviation between redundant sensor inputs or c
 #### 5.3.2 Electrical Fault
 
 **Fault Code:** AVN-ELF-002
+<!-- BEGIN GENERATED: fault-stats-avionics-electrical-fault -->
+**Fleet Statistics:** In the generated fleet data, electrical fault accounts for 2 of the A320-200's 6 avionics maintenance events, or 33%.
+<!-- END GENERATED: fault-stats-avionics-electrical-fault -->
 
 **Common Causes:**
 - Power supply irregularities
@@ -522,6 +554,9 @@ Linear hydraulic actuator providing:
 #### 6.3.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 7 of the A320-200's 9 hydraulics maintenance events, or 78%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Inspection Points:**
 | Location | Access Panel | Common Leak Source |
@@ -539,6 +574,9 @@ Linear hydraulic actuator providing:
 #### 6.3.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 2 of the A320-200's 9 hydraulics maintenance events, or 22%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Sources:**
 - Water ingress (humidity, rain)
@@ -891,34 +929,40 @@ The bands apply to every hydraulic system.
 | Engineering Support | engineering@skyways.aero | 24/7 |
 | Parts Supply | parts@skyways.aero | 24/7 |
 
-### 10.5 Typical Industry Maintenance Statistics
+### 10.5 Fleet Maintenance Statistics
 
-These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The A320-200 has 5 of the aircraft and 36 of the maintenance events.
 
 **Events by Severity:**
-- Critical: about 52%
-- Major: about 31%
-- Minor: about 17%
+
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 7 | 19% |
+| Major | 7 | 19% |
+| Minor | 22 | 61% |
 
 **Events by System:**
-- Engine: about 58%
-- Avionics: about 22%
-- Hydraulics: about 20%
 
-**Top Fault Types:**
-1. Overheat (EGT exceedance): about 27%
-2. Bearing wear: about 23%
-3. Vibration exceedance: about 19%
-4. Sensor drift: about 14%
-5. Contamination: about 10%
-6. Leak: about 7%
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 21 | 58% |
+| Avionics | 6 | 17% |
+| Hydraulics | 9 | 25% |
 
-**Corrective Action Distribution:**
-1. Inspected and cleared: about 26%
-2. Replaced component: about 25%
-3. Cleaned and reassembled: about 22%
-4. Software patch applied: about 17%
-5. Adjusted tolerance: about 10%
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 7 | 19% |
+| Vibration exceedance | Engine | 7 | 19% |
+| Leak | Hydraulics | 7 | 19% |
+| Sensor drift | Engine | 4 | 11% |
+| Sensor drift | Avionics | 4 | 11% |
+| Bearing wear | Engine | 3 | 8% |
+| Electrical fault | Avionics | 2 | 6% |
+| Contamination | Hydraulics | 2 | 6% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

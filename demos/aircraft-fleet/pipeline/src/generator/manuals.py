@@ -13,6 +13,7 @@ every other line. The loader strips the markers before chunking.
 from __future__ import annotations
 
 import functools
+import json
 import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -23,6 +24,7 @@ from .fleet import AircraftNode, SystemNode, generate_fleet
 from .maintenance import SEVERITY_BY_LEVEL
 from .specs import (
     ENGINE_SPECS,
+    EVENT_SEVERITIES,
     FAULT_CODES,
     MANUAL_FLEET_TAILS,
     PHASES,
@@ -37,6 +39,8 @@ from .specs import (
 )
 
 MANUALS_DIR = Path(__file__).resolve().parent.parent.parent / "manuals"
+# The fleet statistics file, in the manuals directory.
+STATS_NAME = "fleet-stats.json"
 
 # Aircraft model -> manual file. Matches the loader's document registry.
 MANUAL_FILES: dict[str, str] = {
@@ -442,6 +446,123 @@ def _fault_codes(system: str, model: str, engine: EngineSpec, stats: Stats) -> s
     return _table(("Code", "Description", "Severity", "ATA", "Primary Action"), rows)
 
 
+def _share(count: int, total: int) -> str:
+    return f"{round(100 * count / total)}%" if total else "0%"
+
+
+def _events(count: int) -> str:
+    return f"{count} event" if count == 1 else f"{count} events"
+
+
+def _join(items: list[str]) -> str:
+    if len(items) <= 2:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + ", and " + items[-1]
+
+
+# The subject of each system's share sentence in §2.1.
+_SHARE_SUBJECTS = {
+    "Engine": "engine systems account",
+    "Avionics": "avionics accounts",
+    "Hydraulics": "the hydraulics system accounts",
+}
+# How many faults a share sentence names.
+_TOP_FAULTS = 3
+
+
+def _system_shares(system: str, model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§2.1.x: a system's share of the model's events, and its top faults."""
+    counts = stats["models"][model]
+    count, total = counts["by_system"][system], counts["events"]
+    lines = [
+        f"In the generated fleet data, {_SHARE_SUBJECTS[system]} for {count} of the "
+        f"{model}'s {total} maintenance events, or {_share(count, total)}."
+    ]
+    # Most events first. A tie keeps the faults in name order.
+    ranked = sorted(
+        ((n, fault) for fault, n in counts["by_fault"][system].items() if n),
+        key=lambda item: (-item[0], item[1]),
+    )
+    named = [
+        f"{fault.lower()} with {_events(n) if i == 0 else n}"
+        for i, (n, fault) in enumerate(ranked[:_TOP_FAULTS])
+    ]
+    system_word = system.lower()
+    if len(ranked) == 1:
+        lines.append(f"All of them are {ranked[0][1].lower()}.")
+    elif len(ranked) > _TOP_FAULTS:
+        lines.append(f"The most common {system_word} faults are {_join(named)}.")
+    elif ranked:
+        lines.append(f"The {system_word} faults are {_join(named)}.")
+    return " ".join(lines)
+
+
+FAULT_STATS_PREFIX = "fault-stats-"
+
+
+def fault_stats_id(code: FaultCode) -> str:
+    """The id of the statistics block in the §4 to §6 section of a fault code."""
+    return f"{FAULT_STATS_PREFIX}{code.system.lower()}-{code.fault.lower().replace(' ', '-')}"
+
+
+def _fault_stats(code: FaultCode, model: str, engine: EngineSpec, stats: Stats) -> str:
+    """The statistics line of a fault's troubleshooting section."""
+    system = code.system.lower()
+    fault = code.fault.lower()
+    if not code.generated:
+        return (
+            f"**Fleet Statistics:** The generated fleet data has no {system} {fault} events, "
+            "because the data generator does not raise this fault."
+        )
+    counts = stats["models"][model]
+    count, total = counts["by_fault"][code.system][code.fault], counts["by_system"][code.system]
+    return (
+        f"**Fleet Statistics:** In the generated fleet data, {fault} accounts for {count} of "
+        f"the {model}'s {total} {system} maintenance events, or {_share(count, total)}."
+    )
+
+
+def _fleet_statistics(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§10.5: the model's events by severity, system, and fault."""
+    config, counts = stats["config"], stats["models"][model]
+    total = counts["events"]
+    intro = (
+        "These figures are counts from this demo's generated fleet data: "
+        f"{config['aircraft']} aircraft over {config['days']} days, seed {config['seed']}. "
+        f"The {model} has {counts['aircraft']} of the aircraft and {total} of the "
+        "maintenance events."
+    )
+    by_severity, by_system = counts["by_severity"], counts["by_system"]
+    severities = [
+        (s.title(), str(by_severity[s]), _share(by_severity[s], total)) for s in EVENT_SEVERITIES
+    ]
+    systems = [(s, str(by_system[s]), _share(by_system[s], total)) for s in SYSTEM_SENSORS]
+    # Most events first. A tie goes in system order, then fault name order.
+    faults = sorted(
+        (
+            (n, rank, fault, system)
+            for rank, system in enumerate(SYSTEM_SENSORS)
+            for fault, n in counts["by_fault"][system].items()
+            if n
+        ),
+        key=lambda item: (-item[0], item[1], item[2]),
+    )
+    return "\n\n".join(
+        (
+            intro,
+            "**Events by Severity:**",
+            _table(("Severity", "Events", "Share"), severities),
+            "**Events by System:**",
+            _table(("System", "Events", "Share"), systems),
+            "**Events by Fault:**",
+            _table(
+                ("Fault", "System", "Events", "Share"),
+                [(fault, system, str(n), _share(n, total)) for n, _, fault, system in faults],
+            ),
+        )
+    )
+
+
 # Block id -> renderer. Each takes (model, engine spec, fleet stats).
 RENDERERS: dict[str, Renderer] = {
     "sensor-table": _sensor_table,
@@ -457,10 +578,19 @@ RENDERERS: dict[str, Renderer] = {
     "fault-codes-engine": functools.partial(_fault_codes, "Engine"),
     "fault-codes-avionics": functools.partial(_fault_codes, "Avionics"),
     "fault-codes-hydraulics": functools.partial(_fault_codes, "Hydraulics"),
+    **{
+        f"system-shares-{system.lower()}": functools.partial(_system_shares, system)
+        for system in SYSTEM_SENSORS
+    },
+    **{fault_stats_id(code): functools.partial(_fault_stats, code) for code in FAULT_CODES},
+    "fleet-statistics": _fleet_statistics,
 }
 
-# Blocks every manual must have, once each.
-REQUIRED_BLOCKS: tuple[str, ...] = tuple(RENDERERS)
+# Blocks every manual must have, once each. A manual has a fault's statistics
+# block only in the section of that fault.
+REQUIRED_BLOCKS: tuple[str, ...] = tuple(
+    block_id for block_id in RENDERERS if not block_id.startswith(FAULT_STATS_PREFIX)
+)
 
 _MARKER = re.compile(r"^<!-- (BEGIN|END) GENERATED: ([a-z0-9-]+) -->$")
 # A line that looks like a marker but does not match _MARKER exactly.
@@ -471,9 +601,9 @@ class ManualBlockError(ValueError):
     """A manual's block markers are malformed, unknown, or missing."""
 
 
-def load_stats() -> Stats:
+def load_stats(manuals_dir: Path = MANUALS_DIR) -> Stats:
     """The fleet statistics the stats blocks render from."""
-    return {}
+    return json.loads((manuals_dir / STATS_NAME).read_text(encoding="utf-8"))
 
 
 def render_text(

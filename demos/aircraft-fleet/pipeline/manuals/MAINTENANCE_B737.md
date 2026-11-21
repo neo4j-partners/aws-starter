@@ -118,19 +118,33 @@ AIRCRAFT (B737-800)
 
 #### 2.1.1 Engine Systems (CFM56-7B)
 
-The B737-800 is powered by two CFM International CFM56-7B high-bypass turbofan engines, mounted in close-coupled underwing nacelles with distinctive flat-bottomed nacelle design characteristic of the 737NG series. Each engine produces 26,300 lbf of thrust at takeoff and operates independently with full redundancy. The CFM56-7B features a single-spool low-pressure system and single-spool high-pressure system, with a 3-stage low-pressure compressor driven by a 4-stage low-pressure turbine, and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine. The engine incorporates a dual annular combustor (DAC) option for reduced emissions. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate. In typical industry data, engine systems account for about 70% of maintenance events. The most common issues are overheat conditions, bearing wear, and vibration exceedances.
+The B737-800 is powered by two CFM International CFM56-7B high-bypass turbofan engines, mounted in close-coupled underwing nacelles with distinctive flat-bottomed nacelle design characteristic of the 737NG series. Each engine produces 26,300 lbf of thrust at takeoff and operates independently with full redundancy. The CFM56-7B features a single-spool low-pressure system and single-spool high-pressure system, with a 3-stage low-pressure compressor driven by a 4-stage low-pressure turbine, and a 9-stage high-pressure compressor driven by a single-stage high-pressure turbine. The engine incorporates a dual annular combustor (DAC) option for reduced emissions. Engine health is continuously monitored via four dedicated sensors per engine measuring exhaust gas temperature (EGT), vibration levels, fan speed (N1), and fuel flow rate.
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 37 of the B737-800's 51 maintenance events, or 73%. The most common engine faults are overheat with 11 events, sensor drift with 6, and vibration exceedance with 6.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The B737-800 features the Honeywell FMC with dual Flight Management Computers providing flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Three Air Data Computers (ADC) supply redundant altitude, airspeed, and Mach calculations via pitot-static inputs integrated with the Digital Flight Control System (DFCS). The multi-mode Navigation Receiver provides VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 and ARINC 629 digital data buses with comprehensive Built-In Test Equipment (BITE). In typical industry data, avionics accounts for about 9% of maintenance events. Most involve sensor drift, which is typically resolved through calibration or software updates.
+The avionics system provides flight management, navigation, and air data computation functions essential for safe aircraft operation. The B737-800 features the Honeywell FMC with dual Flight Management Computers providing flight planning, 4D navigation, performance calculations, and VNAV/LNAV guidance. Three Air Data Computers (ADC) supply redundant altitude, airspeed, and Mach calculations via pitot-static inputs integrated with the Digital Flight Control System (DFCS). The multi-mode Navigation Receiver provides VOR/DME, ILS (localizer, glideslope, marker beacon), and GPS position data. All avionics communicate via ARINC 429 and ARINC 629 digital data buses with comprehensive Built-In Test Equipment (BITE).
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 7 of the B737-800's 51 maintenance events, or 14%. The avionics faults are sensor drift with 5 events and electrical fault with 2.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are typically resolved through calibration or software updates.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The B737-800 hydraulic system provides power for flight control surfaces, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated System A and System B, each operating at 3,000 psi, plus a standby system for emergency backup. This manual focuses on System A, which is powered by two engine-driven pumps (one per engine) and one AC motor pump. The system includes main hydraulic pumps capable of 28 gpm flow rate at 3,000 psi, a reservoir with 5.5 gallon usable capacity, and multiple actuators including the flap actuator assemblies (inboard and outboard). Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels. In typical industry data, the hydraulics system accounts for about 21% of maintenance events. Leaks and contamination are the primary concerns.
+The B737-800 hydraulic system provides power for flight control surfaces, leading edge devices, trailing edge flaps, landing gear, wheel brakes, thrust reversers, and nose wheel steering. The aircraft employs two primary hydraulic systems designated System A and System B, each operating at 3,000 psi, plus a standby system for emergency backup. This manual focuses on System A, which is powered by two engine-driven pumps (one per engine) and one AC motor pump. The system includes main hydraulic pumps capable of 28 gpm flow rate at 3,000 psi, a reservoir with 5.5 gallon usable capacity, and multiple actuators including the flap actuator assemblies (inboard and outboard). Hydraulic fluid (MIL-PRF-83282 or Skydrol 5) requires regular monitoring for contamination and proper fluid levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 7 of the B737-800's 51 maintenance events, or 14%. The hydraulics faults are leak with 6 events and contamination with 1.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -318,7 +332,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-SDR-001
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the fourth most common fault type, at about 15% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 6 of the B737-800's 37 engine maintenance events, or 16%.
+<!-- END GENERATED: fault-stats-engine-sensor-drift -->
 
 #### Symptoms
 - Parameter disagree messages on EICAS
@@ -358,7 +374,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, contamination and leaks together are the fifth most common fault type, at about 12% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 2 of the B737-800's 37 engine maintenance events, or 5%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Types of Contamination
 
@@ -402,7 +420,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-BRG-003
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 25% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-bearing-wear -->
+**Fleet Statistics:** In the generated fleet data, bearing wear accounts for 4 of the B737-800's 37 engine maintenance events, or 11%.
+<!-- END GENERATED: fault-stats-engine-bearing-wear -->
 
 #### Detection Methods
 - Magnetic chip detector (MCD) warnings
@@ -454,7 +474,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-LEAK-004
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 12% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 5 of the B737-800's 37 engine maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-engine-leak -->
 
 #### Leak Classification
 
@@ -488,6 +510,9 @@ The Full Authority Digital Engine Control (FADEC) provides:
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 6 of the B737-800's 37 engine maintenance events, or 16%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 #### Vibration Limits (CFM56-7B)
 
@@ -565,6 +590,9 @@ Integrated Multi-Mode Receiver (MMR) providing:
 #### 5.3.1 Sensor Drift (Avionics)
 
 **Fault Code:** AVN-SDR-001
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 5 of the B737-800's 7 avionics maintenance events, or 71%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADC outputs (ADC 1/2/3) via maintenance page
@@ -628,6 +656,9 @@ The trailing edge flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 6 of the B737-800's 7 hydraulics maintenance events, or 86%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -649,6 +680,9 @@ The trailing edge flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 1 of the B737-800's 7 hydraulics maintenance events, or 14%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Limits (NAS 1638):**
 
@@ -1014,26 +1048,43 @@ The bands apply to every hydraulic system.
 | Engineering Support | engineering@exampleair.com | 24/7 |
 | Parts Supply | parts@exampleair.com | 24/7 |
 
-### 10.5 Typical Industry Maintenance Statistics
+### 10.5 Fleet Maintenance Statistics
 
-These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The B737-800 has 5 of the aircraft and 51 of the maintenance events.
 
 **Events by Severity:**
-- Critical: about 52%
-- Major: about 31%
-- Minor: about 17%
+
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 11 | 22% |
+| Major | 18 | 35% |
+| Minor | 22 | 43% |
 
 **Events by System:**
-- Engine: about 70%
-- Hydraulics: about 21%
-- Avionics: about 9%
 
-**Top Fault Types:**
-1. Overheat (EGT exceedance): about 28%
-2. Bearing wear: about 25%
-3. Vibration exceedance: about 20%
-4. Sensor drift: about 15%
-5. Contamination / Leak: about 12%
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 37 | 73% |
+| Avionics | 7 | 14% |
+| Hydraulics | 7 | 14% |
+
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Overheat | Engine | 11 | 22% |
+| Sensor drift | Engine | 6 | 12% |
+| Vibration exceedance | Engine | 6 | 12% |
+| Leak | Hydraulics | 6 | 12% |
+| Leak | Engine | 5 | 10% |
+| Sensor drift | Avionics | 5 | 10% |
+| Bearing wear | Engine | 4 | 8% |
+| Fuel starvation | Engine | 3 | 6% |
+| Contamination | Engine | 2 | 4% |
+| Electrical fault | Avionics | 2 | 4% |
+| Contamination | Hydraulics | 1 | 2% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

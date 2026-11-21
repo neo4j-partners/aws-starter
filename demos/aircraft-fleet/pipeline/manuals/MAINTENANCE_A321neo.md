@@ -130,19 +130,33 @@ AIRCRAFT (A321neo)
 
 #### 2.1.1 Engine Systems (LEAP-1A)
 
-The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU). In typical industry data, engine systems account for about 61% of maintenance events. Bearing wear, overheat conditions, and vibration exceedances are the most common issues.
+The A321neo is powered by two CFM International LEAP-1A high-bypass turbofan engines, representing the most significant advancement in narrow-body propulsion in decades. Each engine produces up to 32,900 lbf of thrust and delivers 15% better fuel efficiency than previous generation engines. The LEAP-1A features revolutionary 3D woven carbon fiber composite fan blades—a first for commercial aviation—reducing weight while improving durability and foreign object damage resistance. The engine incorporates a twin-annular, pre-mixing swirler (TAPS II) combustor for reduced NOx emissions, ceramic matrix composite (CMC) shrouds in the high-pressure turbine, and an advanced active clearance control system. Engine health monitoring via the FADEC provides real-time data on exhaust gas temperature (EGT), vibration, fan speed (N1), and fuel flow, with enhanced diagnostic capabilities through the Engine Monitoring Unit (EMU).
+
+<!-- BEGIN GENERATED: system-shares-engine -->
+In the generated fleet data, engine systems account for 21 of the A321neo's 36 maintenance events, or 58%. The most common engine faults are sensor drift with 6 events, vibration exceedance with 6, and overheat with 5.
+<!-- END GENERATED: system-shares-engine -->
 
 **ATA Reference:** Chapters 71 (Powerplant), 72 (Engine), 73 (Engine Fuel and Control), 77 (Engine Indicating), 79 (Oil)
 
 #### 2.1.2 Avionics System
 
-The A321neo features the latest Airbus avionics suite built on enhanced fly-by-wire architecture with improved system integration. The system centers on dual Flight Management Systems (FMS) providing Required Navigation Performance (RNP) 0.1 capability, enabling precision approaches without ground-based navigation aids. Three Air Data and Inertial Reference Units (ADIRU) provide redundant altitude, airspeed, attitude, and position data through integrated air data modules and laser ring gyroscopes. The Multi-Mode Receiver (MMR) integrates VOR/ILS, GPS (L1/L5), SBAS, and GBAS capabilities for worldwide navigation. The cockpit features six LCD displays with enhanced vision system (EVS) compatibility. All avionics communicate via AFDX (Avionics Full-Duplex Switched Ethernet) data network with comprehensive Built-In Test Equipment (BITE). In typical industry data, avionics accounts for about 20% of maintenance events. Electrical faults and sensor drift are the primary concerns. They are addressed through software patches and calibration.
+The A321neo features the latest Airbus avionics suite built on enhanced fly-by-wire architecture with improved system integration. The system centers on dual Flight Management Systems (FMS) providing Required Navigation Performance (RNP) 0.1 capability, enabling precision approaches without ground-based navigation aids. Three Air Data and Inertial Reference Units (ADIRU) provide redundant altitude, airspeed, attitude, and position data through integrated air data modules and laser ring gyroscopes. The Multi-Mode Receiver (MMR) integrates VOR/ILS, GPS (L1/L5), SBAS, and GBAS capabilities for worldwide navigation. The cockpit features six LCD displays with enhanced vision system (EVS) compatibility. All avionics communicate via AFDX (Avionics Full-Duplex Switched Ethernet) data network with comprehensive Built-In Test Equipment (BITE).
+
+<!-- BEGIN GENERATED: system-shares-avionics -->
+In the generated fleet data, avionics accounts for 3 of the A321neo's 36 maintenance events, or 8%. All of them are sensor drift.
+<!-- END GENERATED: system-shares-avionics -->
+
+Avionics faults are addressed through software patches and calibration.
 
 **ATA Reference:** Chapter 34 (Navigation)
 
 #### 2.1.3 Hydraulics System
 
-The A321neo hydraulic system provides power for flight control surfaces, slats/flaps, landing gear, wheel brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi with enhanced redundancy compared to earlier A320 variants. The Green system is powered by an engine-driven pump on Engine #1, the Yellow system by Engine #2, and the Blue system by an electric pump with RAT (Ram Air Turbine) backup. Each system includes variable-displacement pumps capable of 34 gpm flow rate, a pressurized reservoir with bootstrap design, and multiple actuators including the flap Power Control Unit (PCU). Hydraulic fluid (Skydrol LD-4 or HyJet V) requires regular monitoring for contamination and proper levels. In typical industry data, the hydraulics system accounts for about 19% of maintenance events. Leaks and contamination are the primary concerns.
+The A321neo hydraulic system provides power for flight control surfaces, slats/flaps, landing gear, wheel brakes, thrust reversers, and cargo doors. The aircraft employs three independent hydraulic systems designated Green, Blue, and Yellow, each operating at 3,000 psi with enhanced redundancy compared to earlier A320 variants. The Green system is powered by an engine-driven pump on Engine #1, the Yellow system by Engine #2, and the Blue system by an electric pump with RAT (Ram Air Turbine) backup. Each system includes variable-displacement pumps capable of 34 gpm flow rate, a pressurized reservoir with bootstrap design, and multiple actuators including the flap Power Control Unit (PCU). Hydraulic fluid (Skydrol LD-4 or HyJet V) requires regular monitoring for contamination and proper levels.
+
+<!-- BEGIN GENERATED: system-shares-hydraulics -->
+In the generated fleet data, the hydraulics system accounts for 12 of the A321neo's 36 maintenance events, or 33%. The hydraulics faults are leak with 7 events and contamination with 5.
+<!-- END GENERATED: system-shares-hydraulics -->
 
 **ATA Reference:** Chapter 29 (Hydraulic Power)
 
@@ -384,7 +398,9 @@ The LEAP-1A Full Authority Digital Engine Control provides:
 
 **Fault Code:** ENG-VIB-005
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the third most common fault type, at about 16% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-vibration-exceedance -->
+**Fleet Statistics:** In the generated fleet data, vibration exceedance accounts for 6 of the A321neo's 21 engine maintenance events, or 29%.
+<!-- END GENERATED: fault-stats-engine-vibration-exceedance -->
 
 The LEAP-1A's lightweight composite fan and high bypass ratio make vibration monitoring particularly critical.
 
@@ -456,7 +472,9 @@ The LEAP-1A has experienced ice crystal icing events in high-altitude convective
 
 **Fault Code:** ENG-CNT-002
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this is the fourth most common fault type, at about 14% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 0 of the A321neo's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-contamination -->
 
 #### Contamination Types
 
@@ -509,7 +527,9 @@ The LEAP engine is approved for on-wing water wash to restore performance:
 
 **Fault Code:** ENG-OVH-006
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 20% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-overheat -->
+**Fleet Statistics:** In the generated fleet data, overheat accounts for 5 of the A321neo's 21 engine maintenance events, or 24%.
+<!-- END GENERATED: fault-stats-engine-overheat -->
 
 #### EGT Exceedance Categories
 
@@ -545,7 +565,9 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 **Fault Code:** ENG-ELF-008
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 12% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-electrical-fault -->
+**Fleet Statistics:** The generated fleet data has no engine electrical fault events, because the data generator does not raise this fault.
+<!-- END GENERATED: fault-stats-engine-electrical-fault -->
 
 #### Common Electrical Issues
 
@@ -589,7 +611,9 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 
 **Fault Code:** ENG-FUEL-007
 **Severity Classification:** CRITICAL / MAJOR / MINOR
-**Industry Statistics:** In typical industry data, this fault accounts for about 6% of events.
+<!-- BEGIN GENERATED: fault-stats-engine-fuel-starvation -->
+**Fleet Statistics:** In the generated fleet data, fuel starvation accounts for 0 of the A321neo's 21 engine maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-engine-fuel-starvation -->
 
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
@@ -659,7 +683,9 @@ Multi-Mode Receiver providing:
 #### 5.3.1 Sensor Drift
 
 **Fault Code:** AVN-SDR-001
-**Industry Statistics:** In typical industry data, this fault accounts for about 11% of avionics events.
+<!-- BEGIN GENERATED: fault-stats-avionics-sensor-drift -->
+**Fleet Statistics:** In the generated fleet data, sensor drift accounts for 3 of the A321neo's 3 avionics maintenance events, or 100%.
+<!-- END GENERATED: fault-stats-avionics-sensor-drift -->
 
 **Diagnostic Steps:**
 1. Compare ADIRU 1/2/3 outputs on maintenance page
@@ -671,7 +697,9 @@ Multi-Mode Receiver providing:
 #### 5.3.2 Electrical Faults (Avionics)
 
 **Fault Code:** AVN-ELF-002
-**Industry Statistics:** In typical industry data, this fault accounts for about 15% of avionics events.
+<!-- BEGIN GENERATED: fault-stats-avionics-electrical-fault -->
+**Fleet Statistics:** In the generated fleet data, electrical fault accounts for 0 of the A321neo's 3 avionics maintenance events, or 0%.
+<!-- END GENERATED: fault-stats-avionics-electrical-fault -->
 
 **Common Causes:**
 - Power supply interruption
@@ -732,7 +760,9 @@ The A321neo flap system uses:
 #### 6.4.1 Leak Detection
 
 **Fault Code:** HYD-LEAK-001
-**Industry Statistics:** In typical industry data, this fault accounts for about 50% of hydraulics events.
+<!-- BEGIN GENERATED: fault-stats-hydraulics-leak -->
+**Fleet Statistics:** In the generated fleet data, leak accounts for 7 of the A321neo's 12 hydraulics maintenance events, or 58%.
+<!-- END GENERATED: fault-stats-hydraulics-leak -->
 
 **Common Leak Locations:**
 
@@ -747,7 +777,9 @@ The A321neo flap system uses:
 #### 6.4.2 Contamination
 
 **Fault Code:** HYD-CNT-002
-**Industry Statistics:** In typical industry data, this fault accounts for about 22% of hydraulics events.
+<!-- BEGIN GENERATED: fault-stats-hydraulics-contamination -->
+**Fleet Statistics:** In the generated fleet data, contamination accounts for 5 of the A321neo's 12 hydraulics maintenance events, or 42%.
+<!-- END GENERATED: fault-stats-hydraulics-contamination -->
 
 **Contamination Analysis (NAS 1638):**
 
@@ -1110,35 +1142,40 @@ The bands apply to every hydraulic system.
 | Engineering Support | engineering@regionalco.com | 24/7 |
 | Parts Supply | parts@regionalco.com | 24/7 |
 
-### 10.5 Typical Industry Maintenance Statistics
+### 10.5 Fleet Maintenance Statistics
 
-These figures are typical industry shares for this aircraft type. They are not counts from this fleet's records.
+<!-- BEGIN GENERATED: fleet-statistics -->
+These figures are counts from this demo's generated fleet data: 30 aircraft over 90 days, seed 42. The A321neo has 5 of the aircraft and 36 of the maintenance events.
 
 **Events by Severity:**
-- Critical: about 52%
-- Major: about 31%
-- Minor: about 17%
+
+| Severity | Events | Share |
+|----------|--------|-------|
+| Critical | 7 | 19% |
+| Major | 9 | 25% |
+| Minor | 20 | 56% |
 
 **Events by System:**
-- Engine: about 61%
-- Avionics: about 20%
-- Hydraulics: about 19%
 
-**Top Fault Types:**
-1. Bearing wear: about 22%
-2. Overheat (EGT exceedance): about 20%
-3. Vibration exceedance: about 16%
-4. Contamination: about 14%
-5. Electrical fault: about 12%
-6. Sensor drift: about 10%
-7. Fuel starvation: about 6%
+| System | Events | Share |
+|--------|--------|-------|
+| Engine | 21 | 58% |
+| Avionics | 3 | 8% |
+| Hydraulics | 12 | 33% |
 
-**Corrective Action Distribution:**
-1. Replaced component: about 28%
-2. Cleaned and reassembled: about 23%
-3. Inspected and cleared: about 22%
-4. Software patch applied: about 17%
-5. Adjusted tolerance: about 10%
+**Events by Fault:**
+
+| Fault | System | Events | Share |
+|-------|--------|--------|-------|
+| Leak | Hydraulics | 7 | 19% |
+| Sensor drift | Engine | 6 | 17% |
+| Vibration exceedance | Engine | 6 | 17% |
+| Overheat | Engine | 5 | 14% |
+| Contamination | Hydraulics | 5 | 14% |
+| Bearing wear | Engine | 3 | 8% |
+| Sensor drift | Avionics | 3 | 8% |
+| Leak | Engine | 1 | 3% |
+<!-- END GENERATED: fleet-statistics -->
 
 ### 10.6 Revision History Log
 

@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import csv
+import errno
 import fcntl
 import json
 import logging
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from itertools import batched
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
@@ -443,15 +444,40 @@ def _shared_lock(data_dir: Path) -> Iterator[None]:
     A generate publishes its CSVs one at a time under the exclusive lock, so
     a load without this lock could read a mix of old and new files.
 
+    When the lock file is missing and data_dir is read-only, the load runs
+    without the lock. A generate cannot publish into that directory either.
+
     Raises:
         RuntimeError: If a generate holds the lock.
     """
-    with (data_dir / LOCK_NAME).open("a") as handle:
+    path = data_dir / LOCK_NAME
+    if (handle := _open_lock_file(path)) is None:
+        logger.warning("[WARN] Cannot create %s, so the load runs without the generate lock.", path)
+        yield
+        return
+    with handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise RuntimeError(f"a generate is running in {data_dir}") from exc
         yield
+
+
+def _open_lock_file(path: Path) -> TextIO | None:
+    """Open the lock file read-only, creating it only when it is missing.
+
+    flock works on a read-only file, so a load never needs write access to
+    an existing lock. Returns None when the file is missing and its
+    directory refuses new files with EACCES or EROFS.
+    """
+    with suppress(FileNotFoundError):
+        return path.open("r")
+    try:
+        return path.open("a")
+    except OSError as exc:
+        if exc.errno in (errno.EACCES, errno.EROFS):
+            return None
+        raise
 
 
 def _load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:

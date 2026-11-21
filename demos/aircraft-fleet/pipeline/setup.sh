@@ -72,8 +72,13 @@ sync_deps() {
 }
 
 # Extra arguments, such as --if-stale, go to generate-data generate.
+# With --if-stale, generate itself says whether it skips or regenerates.
 do_generate() {
-  echo "==> Generating dataset (aircraft=$AIRCRAFT days=$DAYS airports=$AIRPORTS seed=$SEED, full=$LOAD_FULL_DATASET)"
+  local action="Generating"
+  if [[ " $* " == *" --if-stale "* ]]; then
+    action="Checking"
+  fi
+  echo "==> $action dataset (aircraft=$AIRCRAFT days=$DAYS airports=$AIRPORTS seed=$SEED, full=$LOAD_FULL_DATASET)"
   mkdir -p generated
   uv run generate-data generate \
     --aircraft "$AIRCRAFT" \

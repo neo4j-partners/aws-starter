@@ -28,3 +28,21 @@ def test_default_start_date_is_accepted() -> None:
     removals, _, _ = generate_removals(generate_fleet(config), [], config, random.Random(0))
 
     assert removals
+
+
+def test_each_component_is_removed_at_most_once() -> None:
+    # 200 critical events raise the first aircraft's removal count above its
+    # component count, so drawing with replacement would repeat a component.
+    config = GeneratorConfig(n_aircraft=2, n_days=90)
+    fleet = generate_fleet(config)
+    busy = fleet[0]
+    events = [{"aircraft_id": busy.aircraft_id, "severity": "CRITICAL"}] * 200
+
+    removals, _, _ = generate_removals(fleet, events, config, random.Random(0))
+
+    component_ids = [r["component_id"] for r in removals]
+    assert len(component_ids) == len(set(component_ids))
+    busy_components = {c.component_id for s in busy.systems for c in s.components}
+    assert {r["component_id"] for r in removals if r["aircraft_id"] == busy.aircraft_id} == (
+        busy_components
+    )

@@ -104,11 +104,14 @@ def generate_removals(
         utilization = rng.uniform(*_UTILIZATION_HOURS_PER_DAY)
         in_service = datetime.combine(aircraft.entry_into_service, datetime.min.time())
 
-        for _ in range(n_removals):
+        # Each component is removed at most once in the window, so its install
+        # and removal dates never overlap another removal of the same part.
+        removed = rng.sample(all_components, min(n_removals, len(all_components)))
+
+        for component in removed:
             removal_counter += 1
             removal_id = f"RE{removal_counter:06d}"
 
-            component = rng.choice(all_components)
             removal_date = config.start_date + timedelta(
                 days=rng.randint(0, config.n_days - 1),
                 hours=rng.randint(6, 18),

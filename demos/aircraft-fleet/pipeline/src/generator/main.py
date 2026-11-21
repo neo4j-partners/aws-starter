@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import errno
 import fcntl
 import os
@@ -20,6 +21,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
+from . import manuals
 from .config import GeneratorConfig
 from .fleet import AircraftNode, generate_fleet
 from .maintenance import generate_maintenance_events
@@ -496,6 +498,49 @@ def _print_summary(
         "[dim]GDS notes: cross-model kNN clusters are most visible with ≥80 aircraft. "
         "Louvain community count scales with n_aircraft × degradation variance.[/dim]\n"
     )
+
+
+@app.command("render-manuals")
+def render_manuals(
+    check: Annotated[
+        bool, typer.Option("--check", help="Exit 1 with a diff if a manual has drifted.")
+    ] = False,
+    manuals_dir: Annotated[
+        Path, typer.Option("--manuals-dir", help="Directory holding the manuals.")
+    ] = manuals.MANUALS_DIR,
+) -> None:
+    """Render the generated blocks of every maintenance manual from specs."""
+    stats = manuals.load_stats()
+    drifted: list[str] = []
+    for model, filename in manuals.MANUAL_FILES.items():
+        path = manuals_dir / filename
+        text = path.read_text(encoding="utf-8")
+        try:
+            rendered = manuals.render_text(text, model, stats)
+        except manuals.ManualBlockError as exc:
+            console.print(f"[red]{escape(filename)}: {escape(str(exc))}[/red]", soft_wrap=True)
+            raise typer.Exit(1) from exc
+        if rendered == text:
+            continue
+        drifted.append(filename)
+        if check:
+            diff = difflib.unified_diff(
+                text.splitlines(keepends=True),
+                rendered.splitlines(keepends=True),
+                fromfile=f"{filename} (committed)",
+                tofile=f"{filename} (rendered)",
+            )
+            # Plain print: rich would read the diff's [brackets] as markup.
+            print("".join(diff), end="")
+            console.print(f"[red]{escape(filename)} has drifted[/red]")
+        else:
+            path.write_text(rendered, encoding="utf-8")
+            console.print(f"Rendered {escape(filename)}")
+    if check and drifted:
+        console.print("Run `uv run generate-data render-manuals` to update them.")
+        raise typer.Exit(1)
+    if not drifted:
+        console.print(f"{len(manuals.MANUAL_FILES)} manuals in sync")
 
 
 @app.command()

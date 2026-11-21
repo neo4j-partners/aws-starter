@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,22 @@ DOCUMENTS: list[DocumentMeta] = [
         title="A220-300 Maintenance and Troubleshooting Manual",
     ),
 ]
+
+
+# A comment that fills its lines, such as a generated-block marker, goes with
+# its line break. Any other comment goes alone.
+_LINE_COMMENT = re.compile(r"^[ \t]*<!--.*?-->[ \t]*(?:\n|\Z)", re.MULTILINE | re.DOTALL)
+_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+
+
+def strip_comments(text: str) -> str:
+    """Drop HTML comments, so block markers never reach chunks or the LLM."""
+    return _COMMENT.sub("", _LINE_COMMENT.sub("", text))
+
+
+def read_manual_text(path: Path) -> str:
+    """A manual's text as the pipeline chunks it."""
+    return strip_comments(path.read_text(encoding="utf-8")).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +471,7 @@ def debug_extract_chunks(
     schema = build_extraction_schema()
 
     async def _run() -> bool:
-        text = (document_dir / filename).read_text(encoding="utf-8").strip()
+        text = read_manual_text(document_dir / filename)
         chunks = await splitter.run(text)
         logger.info("Document: %s", filename)
         logger.info("Total chunks: %d", len(chunks.chunks))
@@ -538,7 +555,7 @@ def process_all_documents(
         for meta in DOCUMENTS:
             logger.info("Processing: %s", meta.filename, extra={"blank_before": True})
             filepath = document_dir / meta.filename
-            text = filepath.read_text(encoding="utf-8").strip()
+            text = read_manual_text(filepath)
             logger.info("  Read %s characters.", f"{len(text):,}")
 
             if max_chars and len(text) > max_chars:

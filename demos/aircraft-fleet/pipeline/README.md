@@ -120,7 +120,7 @@ local compute.
 
 | Stage | Code | Output |
 |-------|------|--------|
-| 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 170 MB. |
+| 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 180 MB. |
 | 2. Load | `loader.py`, `schema.py` | The operational graph: `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`. It also writes one `Dataset` node with the generator stamp, and creates uniqueness constraints, property indexes, and fulltext indexes. |
 | 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings. It also extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. |
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The `maintenanceChunkEmbeddings` vector index, the `maintenanceChunkText` fulltext index, and typed links into the operational graph |
@@ -200,12 +200,16 @@ no LLM calls and needs no keys.
 
 `LOAD_FULL_DATASET` sets the dataset size:
 
-- **`false`:** This default loads 30 aircraft over 90 days. That covers every tail listed in the maintenance manuals. It is about 54 MB of readings and about 240 maintenance events. It loads in minutes and fits free or small Aura tiers.
-- **`true`:** This option loads about 100 aircraft over 90 days. That is about 170 MB of readings. It is slow to load and needs a larger Aura tier.
+- **`false`:** This default loads 30 aircraft over 90 days. That covers every tail listed in the maintenance manuals. It is about 800,000 nodes and 830,000 relationships, mostly hourly sensor readings. The readings file is about 54 MB, and the run has about 230 maintenance events.
+- **`true`:** This option loads 100 aircraft over 90 days. That is about 2.7 million nodes and about 180 MB of readings. It is slower to load.
 
-The 90-day window matters. Sensor wear grows over time, and most maintenance
-events come from that wear. A shorter window creates far fewer events. For
-example, 20 aircraft over 30 days creates about 11 events.
+Both sizes are past the Aura Free limits of 200,000 nodes and 400,000
+relationships. Use a paid Aura tier or a local Neo4j.
+
+The window length sets how many flights, readings, and events there are. Each
+sensor's wear reaches the same share of its warning limit by the end of any
+window, so a shorter window has fewer events. For example, 20 aircraft over 30
+days creates about 40 maintenance events. The default creates about 230.
 
 You can set `GEN_AIRCRAFT`, `GEN_DAYS`, `GEN_AIRPORTS`, and `GEN_SEED` to
 override single values.

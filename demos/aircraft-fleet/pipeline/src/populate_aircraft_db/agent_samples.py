@@ -4,13 +4,13 @@ configured LLM, generating Cypher or vector searches, and executing them."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 from neo4j import Driver, RoutingControl
 
 from generator.specs import AIRPORTS, MANUAL_FLEET_TAILS, MODEL_DISTRIBUTION, OPERATORS
 
-_W = 70
+from .display import WIDTH, header, records_table, show_cypher
 
 # ---------------------------------------------------------------------------
 # Graph schema description fed to the LLM for Cypher generation
@@ -199,52 +199,6 @@ SAMPLE_QUESTIONS: list[SampleQuestion] = [
 
 
 # ---------------------------------------------------------------------------
-# Formatting helpers (matching samples.py style)
-# ---------------------------------------------------------------------------
-
-
-def _header(title: str, description: str) -> None:
-    print(f"\n{'=' * _W}")
-    print(f"  {title}")
-    print(f"{'=' * _W}")
-    print(f"\n  {description}\n")
-
-
-def _cypher_block(query: str) -> None:
-    lines = query.strip().splitlines()
-    indents = [len(ln) - len(ln.lstrip()) for ln in lines if ln.strip()]
-    base = min(indents) if indents else 0
-    print("  Generated Cypher:")
-    for ln in lines:
-        print(f"    {ln[base:]}")
-    print()
-
-
-def _result_table(records: list[dict[str, Any]], max_rows: int = 10) -> None:
-    if not records:
-        print("  (no results)\n")
-        return
-    keys = list(records[0].keys())
-    widths = []
-    for k in keys:
-        col_max = len(k)
-        for row in records[:max_rows]:
-            col_max = max(col_max, len(str(row.get(k, ""))))
-        widths.append(min(col_max + 1, 50))
-    print("  " + "  ".join(k.ljust(w) for k, w in zip(keys, widths, strict=False)))
-    print("  " + "  ".join("\u2500" * w for w in widths))
-    for row in records[:max_rows]:
-        cells = []
-        for k, w in zip(keys, widths, strict=False):
-            s = str(row.get(k, "")) if row.get(k) is not None else "\u2014"
-            if len(s) > w:
-                s = s[: w - 1] + "\u2026"
-            cells.append(s.ljust(w))
-        print("  " + "  ".join(cells))
-    print()
-
-
-# ---------------------------------------------------------------------------
 # LLM client abstraction
 # ---------------------------------------------------------------------------
 
@@ -410,7 +364,7 @@ def _run_text2cypher(
         print("  [SKIP] LLM returned empty Cypher after retries.\n")
         return
 
-    _cypher_block(cypher)
+    show_cypher(cypher, label="Generated Cypher")
 
     # LLM-generated Cypher runs in a read transaction, so the server rejects
     # any write it contains.
@@ -419,7 +373,7 @@ def _run_text2cypher(
             cypher, database_=database, routing_=RoutingControl.READ
         )
         rows = [dict(r) for r in records]
-        _result_table(rows)
+        records_table(rows)
     except Exception as exc:
         print(f"  [ERROR] Cypher execution failed: {exc}\n")
 
@@ -474,7 +428,7 @@ LIMIT $top_k"""
         if rows:
             for r in rows:
                 r["score"] = f"{r['score']:.4f}"
-        _result_table(rows)
+        records_table(rows)
     except Exception as exc:
         print(f"  [ERROR] Vector search failed: {exc}\n")
         print("  (vector index may not be available \u2014 run 'setup' first)\n")
@@ -513,9 +467,9 @@ def run_agent_samples(
     if sample_size > 0:
         questions = questions[:sample_size]
 
-    print(f"\n{'#' * _W}")
+    print(f"\n{'#' * WIDTH}")
     print("  Aircraft Digital Twin \u2014 Agent Simulation")
-    print(f"{'#' * _W}")
+    print(f"{'#' * WIDTH}")
     print(f"\n  LLM: {provider}/{llm_model}")
     print(f"  Questions: {len(questions)}\n")
 
@@ -523,13 +477,13 @@ def run_agent_samples(
     for i, sq in enumerate(questions, 1):
         if sq.category != current_category:
             current_category = sq.category
-            _header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
+            header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
 
         if sq.tool == "text2cypher":
             _run_text2cypher(driver, database, chat_fn, sq.question)
         elif sq.tool == "similarity_search":
             _run_similarity_search(driver, database, chat_fn, embed_fn, sq.question)
 
-    print(f"{'#' * _W}")
+    print(f"{'#' * WIDTH}")
     print("  Agent simulation complete.")
-    print(f"{'#' * _W}\n")
+    print(f"{'#' * WIDTH}\n")

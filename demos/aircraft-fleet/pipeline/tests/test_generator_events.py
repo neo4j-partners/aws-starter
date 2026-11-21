@@ -140,20 +140,26 @@ def test_same_seed_gives_identical_output(dataset: Path, tmp_path: Path) -> None
         assert (dataset / name).read_bytes() == (rerun / name).read_bytes(), name
 
 
+# 45 aircraft run past the 30 registry tails, so the extra aircraft's model
+# and operator shuffles, generated tails, and icao24 assignment all run.
+HASH_AIRCRAFT, HASH_DAYS = 45, 3
+
 _GENERATE_SCRIPT = (
     "import sys; from pathlib import Path; from generator.main import generate; "
-    f"generate(aircraft={AIRCRAFT}, airports=40, days={DAYS}, seed={SEED}, "
+    f"generate(aircraft={HASH_AIRCRAFT}, airports=40, days={HASH_DAYS}, seed={SEED}, "
     "output=Path(sys.argv[1]))"
 )
 
 
-def test_same_seed_is_identical_across_hash_seeds(dataset: Path, tmp_path: Path) -> None:
+def test_same_seed_is_identical_across_hash_seeds(tmp_path: Path) -> None:
     """Two processes with different string hashing write the same bytes.
 
     String hashing changes set and dict-of-set iteration order between
     processes, which an in-process rerun cannot catch.
     """
-    files = sorted(p.name for p in dataset.glob("*.csv"))
+    baseline = tmp_path / "in_process"
+    generate(aircraft=HASH_AIRCRAFT, airports=40, days=HASH_DAYS, seed=SEED, output=baseline)
+    files = sorted(p.name for p in baseline.glob("*.csv"))
     for hash_seed in ("0", "1"):
         output = tmp_path / f"hash_{hash_seed}"
         subprocess.run(
@@ -164,4 +170,7 @@ def test_same_seed_is_identical_across_hash_seeds(dataset: Path, tmp_path: Path)
         )
         assert files == sorted(p.name for p in output.glob("*.csv"))
         for name in files:
-            assert (dataset / name).read_bytes() == (output / name).read_bytes(), (hash_seed, name)
+            assert (baseline / name).read_bytes() == (output / name).read_bytes(), (
+                hash_seed,
+                name,
+            )

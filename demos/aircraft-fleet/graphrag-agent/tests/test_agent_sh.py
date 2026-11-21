@@ -81,8 +81,6 @@ shift 3
 exec "$STUB_PYTHON" "$@"
 """
 
-# macOS /usr/bin/mktemp ignores TMPDIR here, so without this stub a test of
-# temp file cleanup would pass on code that leaks.
 # npm logs its arguments and working folder. `npm ci` writes
 # node_modules/.package-lock.json, as a complete real install does, unless
 # STUB_NPM_EXIT makes it fail.
@@ -93,6 +91,8 @@ mkdir -p node_modules
 echo "{}" > node_modules/.package-lock.json
 """
 
+# macOS /usr/bin/mktemp ignores TMPDIR here, so without this stub a test of
+# temp file cleanup would pass on code that leaks.
 STUB_MKTEMP = r"""#!/bin/bash
 exec /usr/bin/mktemp "$@" "$STUB_TMP/tmp.XXXXXX"
 """

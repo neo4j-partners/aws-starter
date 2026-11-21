@@ -5,14 +5,16 @@ from __future__ import annotations
 import csv
 import random
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from itertools import pairwise
 from pathlib import Path
 
 import pytest
 
+from generator import removals as removal_module
 from generator.config import GeneratorConfig
 from generator.fleet import AircraftNode, generate_fleet
+from generator.main import generate
 from generator.removals import (
     _BASE_REMOVALS_PER_YEAR,
     _MIN_HOURS_SINCE_INSTALL,
@@ -30,6 +32,19 @@ def test_start_date_too_soon_after_entry_into_service_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="start_date"):
         generate_removals(fleet, [], config, random.Random(0))
+
+
+def test_generate_checks_the_start_date_before_writing_anything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Removals come last, so without an early check a bad start date fails
+    # only after the readings and flights are written.
+    monkeypatch.setattr(removal_module, "_LATEST_ENTRY_INTO_SERVICE", date(2030, 1, 1))
+
+    with pytest.raises(ValueError, match="start_date"):
+        generate(aircraft=6, airports=40, days=2, seed=42, output=tmp_path)
+
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_default_start_date_is_accepted() -> None:

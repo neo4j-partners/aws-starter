@@ -16,7 +16,7 @@ from .config import GeneratorConfig
 from .fleet import AircraftNode, generate_fleet
 from .maintenance import generate_maintenance_events
 from .operations import generate_operations
-from .removals import generate_removals
+from .removals import _check_start_date, generate_removals
 from .sensors import generate_system_readings
 from .specs import EVENT_SEVERITIES
 from .stamp import clear_stamp, read_stamp, stamp_for, write_stamp
@@ -124,8 +124,6 @@ def generate(
 ) -> None:
     """Generate all CSV files for the aircraft digital twin dataset."""
     airports = min(airports, 40)
-    output.mkdir(parents=True, exist_ok=True)
-
     config = GeneratorConfig(
         n_aircraft=aircraft,
         n_airports=airports,
@@ -133,6 +131,9 @@ def generate(
         seed=seed,
         output_dir=output,
     )
+    # Removals are generated last. Check their start date before any work.
+    _check_start_date(config)
+    output.mkdir(parents=True, exist_ok=True)
     stamp = stamp_for(config)
     if if_stale and read_stamp(output) == stamp:
         console.print(f"{output.resolve()} is current for this config and code. Skipping.")

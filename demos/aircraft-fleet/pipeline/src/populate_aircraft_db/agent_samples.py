@@ -14,7 +14,7 @@ from neo4j import (
     Record,
     RoutingControl,
 )
-from neo4j.exceptions import Neo4jError
+from neo4j.exceptions import DriverError, Neo4jError
 
 from generator.specs import (
     COMPONENT_TYPES_BY_SYSTEM,
@@ -586,6 +586,11 @@ def _text2cypher_prompt(driver: Driver, database: str) -> str | None:
         return system_prompt(graph_schema(driver, database))
     except Neo4jError as exc:
         print(f"  [ERROR] Schema read failed: {exc.code}: {exc.message}")
+        print("  (the text2cypher questions are skipped)\n")
+        return None
+    except DriverError as exc:
+        # A dropped connection, such as ServiceUnavailable, has no code.
+        print(f"  [ERROR] Schema read failed: {exc}")
         print("  (the text2cypher questions are skipped)\n")
         return None
 

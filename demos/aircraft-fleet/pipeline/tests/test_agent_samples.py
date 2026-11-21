@@ -19,7 +19,7 @@ from neo4j import (
     Query,
     RoutingControl,
 )
-from neo4j.exceptions import Forbidden
+from neo4j.exceptions import Forbidden, ServiceUnavailable, SessionExpired
 
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
@@ -565,6 +565,25 @@ def test_schema_read_error_skips_only_the_text2cypher_questions(
 
     out = capsys.readouterr().out
     assert f"[ERROR] Schema read failed: {error.code}: {error.message}" in out
+    assert out.count("[SKIP] No graph schema") == len(_questions("text2cypher"))
+    similarity = [sq.question for sq in _questions("similarity_search")]
+    assert [user for _, user in chats] == similarity
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(ServiceUnavailable("connection lost"), id="service-unavailable"),
+        pytest.param(SessionExpired("session expired"), id="session-expired"),
+    ],
+)
+def test_schema_read_connection_error_skips_only_the_text2cypher_questions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], error: Exception
+) -> None:
+    chats = _run_samples(monkeypatch, SchemaDriver(schema_error=error))
+
+    out = capsys.readouterr().out
+    assert f"[ERROR] Schema read failed: {error}" in out
     assert out.count("[SKIP] No graph schema") == len(_questions("text2cypher"))
     similarity = [sq.question for sq in _questions("similarity_search")]
     assert [user for _, user in chats] == similarity

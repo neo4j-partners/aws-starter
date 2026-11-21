@@ -52,6 +52,7 @@ STUB_AWS = r"""#!/bin/bash
 echo "aws $*" >> "$STUB_LOG"
 if [ "$1 $2" != "cloudformation describe-stacks" ]; then exit 99; fi
 if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
+if [ -n "$STUB_AWS_WARNING" ]; then echo "$STUB_AWS_WARNING" >&2; fi
 if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
 echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
 exit 254
@@ -59,8 +60,10 @@ exit 254
 
 # agent.sh runs its JSON helpers with `uv run --quiet python`. The stub runs
 # them with the test's interpreter, so no project environment is built.
+# STUB_UV_WARNING stands in for a uv warning on stderr.
 STUB_UV = r"""#!/bin/bash
 if [ "$1 $2 $3" != "run --quiet python" ]; then exit 99; fi
+if [ -n "$STUB_UV_WARNING" ]; then echo "$STUB_UV_WARNING" >&2; fi
 shift 3
 exec "$STUB_PYTHON" "$@"
 """
@@ -208,6 +211,29 @@ def test_an_aws_error_other_than_not_found_fails(project: Path) -> None:
     assert f"Could not check stack {STACK} in us-east-1 with CloudFormation." in result.stdout
     assert "ExpiredToken" in result.stderr
     assert "Cleanup complete" not in result.stdout
+
+
+def test_aws_stderr_on_success_is_not_read_as_the_stack_status(project: Path) -> None:
+    result = run_destroy(
+        project, STUB_STACK_STATUS="DELETE_COMPLETE", STUB_AWS_WARNING="Warning: CLI upgrade"
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Cleanup complete. Stack {STACK} does not exist in us-east-1." in result.stdout
+    assert "Warning: CLI upgrade" in result.stderr
+    assert leftover_temp_files(project) == []
+
+
+def test_uv_stderr_is_not_read_as_the_region(project: Path) -> None:
+    result = run_destroy(project, STUB_UV_WARNING="warning: VIRTUAL_ENV does not match")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Cleanup complete. Stack {STACK} does not exist in us-east-1." in result.stdout
+    assert any(
+        c.startswith(f"aws cloudformation describe-stacks --stack-name {STACK} --region us-east-1")
+        for c in calls(project)
+    )
+    assert leftover_temp_files(project) == []
 
 
 def test_missing_aws_cli_fails(project: Path) -> None:

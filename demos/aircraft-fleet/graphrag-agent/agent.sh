@@ -165,25 +165,33 @@ print(f"AgentCore-{name}-{sys.argv[2]}".replace("_", "-"))
 }
 
 # Print the stack status, "absent" when the stack does not exist, or fail.
+# stderr goes to its own file, so a CLI warning cannot be read as the status.
 stack_status() {
-    local stack="$1" region="$2" output
+    local stack="$1" region="$2" output err_file err
     if ! command -v aws >/dev/null 2>&1; then
         echo "The aws CLI is not installed." >&2
         return 1
     fi
+    err_file=$(mktemp)
     if output=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" \
-            --query 'Stacks[0].StackStatus' --output text 2>&1); then
+            --query 'Stacks[0].StackStatus' --output text 2>"$err_file"); then
+        cat "$err_file" >&2
+        rm -f "$err_file"
         echo "$output"
-    elif [[ "$output" == *"does not exist"* ]]; then
+        return 0
+    fi
+    err=$(cat "$err_file")
+    rm -f "$err_file"
+    if [[ "$err" == *"does not exist"* ]]; then
         echo "absent"
     else
-        echo "$output" >&2
+        echo "$err" >&2
         return 1
     fi
 }
 
 report_remaining() {
-    local status parsed region remaining status_err stack cfn_status
+    local status parsed region remaining status_err parse_err stack cfn_status
     # stderr goes to its own file, so a CLI banner or warning cannot break
     # the JSON. It is printed only when the call fails.
     status_err=$(mktemp)
@@ -196,7 +204,9 @@ report_remaining() {
     fi
     rm -f "$status_err"
     # The first line is the target region. Each later line is a resource that
-    # status does not report as local-only.
+    # status does not report as local-only. stderr goes to its own file, so a
+    # uv warning cannot be read as the region.
+    parse_err=$(mktemp)
     if ! parsed=$(printf '%s' "$status" | uv run --quiet python -c '
 import json
 import sys
@@ -220,12 +230,15 @@ if not isinstance(region, str) or not region or not isinstance(resources, list):
     sys.exit("The status output has no region or no resources list.")
 print(region)
 walk(resources)
-' 2>&1); then
+' 2>"$parse_err"); then
         echo -e "${RED}Could not read the agentcore status output:${NC}"
-        echo "$parsed"
+        cat "$parse_err"
         echo "$status"
+        rm -f "$parse_err"
         exit 1
     fi
+    cat "$parse_err" >&2
+    rm -f "$parse_err"
     region=$(head -n 1 <<<"$parsed")
     remaining=$(tail -n +2 <<<"$parsed")
     # agentcore status reads agentcore/.cli/deployed-state.json. If that file

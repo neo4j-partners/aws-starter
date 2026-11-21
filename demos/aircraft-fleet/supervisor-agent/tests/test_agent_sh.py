@@ -11,7 +11,7 @@ import shutil
 import stat
 import subprocess
 from pathlib import Path
-from signal import SIGINT
+from signal import SIGHUP, SIGINT, SIGTERM
 
 import pytest
 
@@ -408,8 +408,11 @@ def test_destroy_needs_no_credentials_file_and_restores_the_spec(project: Path) 
     assert spec.read_bytes() == tracked
 
 
-# Each signal exits with 128 plus its number, as the shell reports it.
-@pytest.mark.parametrize(("signal", "code"), [("INT", 130), ("TERM", 143), ("HUP", 129)])
+# The run dies by the signal that stopped it, so a calling shell sees a
+# signal death and stops too.
+@pytest.mark.parametrize(
+    ("signal", "code"), [("INT", -SIGINT), ("TERM", -SIGTERM), ("HUP", -SIGHUP)]
+)
 def test_an_interrupt_during_deploy_restores_the_spec_once(
     project: Path, signal: str, code: int
 ) -> None:
@@ -659,7 +662,7 @@ def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> N
     # The strip's awk has written the copy, and mv has not replaced the file.
     result = run_destroy(project, STUB_INTERRUPT_AFTER="awk:1")
 
-    assert result.returncode == 130, result.stdout + result.stderr
+    assert result.returncode == -SIGINT, result.stdout + result.stderr
     assert env_local.read_text() == "A=1\n"
     assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
@@ -740,7 +743,7 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
 
     result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:1")
 
-    assert result.returncode == 130
+    assert result.returncode == -SIGINT
     assert spec.read_bytes() == tracked
     assert "Could not restore" not in result.stderr
     assert not list((project.parent / "tmp").iterdir())
@@ -782,7 +785,7 @@ def test_a_second_interrupt_during_the_restore_still_finishes_it(project: Path) 
     # restores it from the EXIT trap, so the second lands mid-restore.
     result = run_destroy(project, STUB_DEPLOY_SIGNAL="INT", STUB_INTERRUPT_AFTER="cp:2")
 
-    assert result.returncode == 130
+    assert result.returncode == -SIGINT
     assert spec.read_bytes() == tracked
     assert env_local.read_text() == "A=1\n"
     assert "Could not restore" not in result.stderr

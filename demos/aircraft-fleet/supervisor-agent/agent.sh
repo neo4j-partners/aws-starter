@@ -275,9 +275,15 @@ KEEP_TMP_ROOT=""
 # Set while a deploy or destroy has the tracked spec changed.
 RESTORE_ARMED=""
 
+# The signal that stopped the run while the restore was armed, which on_exit
+# raises again.
+STOP_SIGNAL=""
+
 # The EXIT trap for the whole run, Ctrl+C included. It ignores INT, TERM,
 # and HUP first, so a second Ctrl+C, a kill, or a closed terminal cannot
-# stop the restore halfway. A failed restore exits 1.
+# stop the restore halfway. A failed restore exits 1. Otherwise, if one of
+# those signals stopped the run, the script dies by that same signal, so a
+# calling shell loop sees a signal death and stops too.
 on_exit() {
     local failed=0
     trap '' INT TERM HUP
@@ -290,6 +296,10 @@ on_exit() {
     fi
     if [ "$failed" -ne 0 ]; then
         exit 1
+    fi
+    if [ -n "$STOP_SIGNAL" ]; then
+        trap - "$STOP_SIGNAL"
+        kill -s "$STOP_SIGNAL" "$$"
     fi
 }
 
@@ -384,17 +394,18 @@ restore_project() {
 }
 
 # Back up the tracked spec and arm the restore. INT, TERM, and HUP exit
-# through on_exit with 128 plus the signal number, so Ctrl+C, a kill, and a
-# closed terminal restore too. The restore is not armed yet when the
+# through on_exit, so Ctrl+C, a kill, and a closed terminal restore too.
+# Each records its signal for on_exit and exits with 128 plus the signal
+# number, the status left if the signal cannot be raised again. The restore is not armed yet when the
 # backup fails, and on_exit removes a partial backup with TMP_ROOT.
 begin_spec_restore() {
     if ! SPEC_BACKUP=$(make_temp) || ! cp "$PROJECT_SPEC" "$SPEC_BACKUP"; then
         exit 1
     fi
     RESTORE_ARMED=1
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
-    trap 'exit 129' HUP
+    trap 'STOP_SIGNAL=INT; exit 130' INT
+    trap 'STOP_SIGNAL=TERM; exit 143' TERM
+    trap 'STOP_SIGNAL=HUP; exit 129' HUP
 }
 
 # Restore while the restore is still armed, so an interrupt during it still

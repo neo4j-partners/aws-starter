@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
@@ -983,6 +984,8 @@ class DelayCauseSpec:
     max_minutes: int
 
     def __post_init__(self) -> None:
+        if not math.isfinite(self.weight):
+            raise ValueError(f"delay cause {self.cause!r}: weight {self.weight} is not finite")
         if self.weight < 0:
             raise ValueError(f"delay cause {self.cause!r}: weight {self.weight} is negative")
         if self.min_minutes < 0 or self.max_minutes < 0:
@@ -997,12 +1000,21 @@ class DelayCauseSpec:
             )
 
 
+def _positive_weight_sum(specs: tuple[DelayCauseSpec, ...]) -> tuple[DelayCauseSpec, ...]:
+    """Return specs unchanged, or raise if their weights cannot drive a weighted draw."""
+    if (total := sum(spec.weight for spec in specs)) <= 0:
+        raise ValueError(f"delay cause weights sum to {total:g}; at least one must be positive")
+    return specs
+
+
 # Flight delay causes, each with its weight and duration range in minutes.
-DELAY_CAUSE_SPECS: tuple[DelayCauseSpec, ...] = (
-    DelayCauseSpec("Weather", 0.30, 20, 180),
-    DelayCauseSpec("Maintenance", 0.25, 30, 240),
-    DelayCauseSpec("NAS", 0.25, 15, 90),
-    DelayCauseSpec("Carrier", 0.20, 10, 60),
+DELAY_CAUSE_SPECS: tuple[DelayCauseSpec, ...] = _positive_weight_sum(
+    (
+        DelayCauseSpec("Weather", 0.30, 20, 180),
+        DelayCauseSpec("Maintenance", 0.25, 30, 240),
+        DelayCauseSpec("NAS", 0.25, 15, 90),
+        DelayCauseSpec("Carrier", 0.20, 10, 60),
+    )
 )
 DELAY_CAUSES: tuple[str, ...] = tuple(spec.cause for spec in DELAY_CAUSE_SPECS)
 

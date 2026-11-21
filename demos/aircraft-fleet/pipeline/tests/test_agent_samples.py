@@ -790,6 +790,15 @@ def test_graph_schema_reads_the_live_database(
             """,
             database_=database,
         )
+        # This number is too large for a Cypher integer. It has no number to
+        # sort by, so its model comes after every numbered one.
+        driver.execute_query(
+            """
+            CREATE (:Aircraft {aircraft_id: 'AC99999999999999999999', tail_number: 'N6PYT',
+                               model: 'PYTEST-HUGE'})
+            """,
+            database_=database,
+        )
 
         with caplog.at_level(logging.INFO, logger="neo4j.notifications"):
             schema = graph_schema(driver, database)
@@ -808,6 +817,7 @@ def test_graph_schema_reads_the_live_database(
             "N5PYT (PYTEST-TIE2)",
             "N3PYT (PYTEST-TIE)",
             "N1PYT (PYTEST-MODEL)",
+            "N6PYT (PYTEST-HUGE)",
         ]
         assert "PytestAir" in _prompt_line(schema, "Operators")
         assert "ZZQ" in _prompt_line(schema, "Airport IATA codes")

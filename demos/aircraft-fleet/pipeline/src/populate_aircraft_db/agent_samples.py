@@ -108,7 +108,7 @@ def _domain_label(labels: list[str]) -> str | None:
 
 
 def _printable(name: str) -> str:
-    """Escape each character the terminal would not print, such as NUL or a newline.
+    r"""Escape each character the terminal would not print, such as NUL or a newline.
 
     A literal backslash is doubled too, so a name with the text \x00 cannot
     print like one with a real NUL.

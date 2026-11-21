@@ -509,6 +509,19 @@ def test_schema_skips_the_pattern_check_without_relationships() -> None:
     assert lines[lines.index("Relationships:") + 1 :] == []
 
 
+def test_docstrings_hold_only_printable_text() -> None:
+    # A non-raw docstring that spells out an escape such as \x00 holds the
+    # real character, which then reaches help() and the docs.
+    docs = {
+        name: obj.__doc__
+        for name, obj in vars(agent_samples).items()
+        if getattr(obj, "__module__", None) == agent_samples.__name__
+    }
+    docs["module"] = agent_samples.__doc__
+    for name, doc in docs.items():
+        assert doc is None or all(c.isprintable() or c == "\n" for c in doc), name
+
+
 def test_schema_leaves_out_the_dataset_metadata_node() -> None:
     # The load records its stamp on a Dataset node. That describes the load,
     # not the fleet, so the text2cypher prompt does not list it.

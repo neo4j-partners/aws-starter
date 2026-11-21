@@ -25,7 +25,6 @@ from generator.specs import (
     COMPONENT_TYPES_BY_SYSTEM,
     DELAY_CAUSES,
     EVENT_SEVERITIES,
-    MODEL_DISTRIBUTION,
     SENSOR_TYPES,
 )
 from populate_aircraft_db import agent_samples
@@ -67,6 +66,7 @@ class SchemaDriver:
         self,
         property_rows: list[tuple[list[str], str]] = (),
         relationship_rows: list[tuple[list[str], str, list[str]]] = (),
+        models: list[str] = (),
         tail_rows: list[tuple[str, str]] = (),
         operators: list[str] = (),
         airports: list[str] = (),
@@ -78,6 +78,7 @@ class SchemaDriver:
             agent_samples._RELATIONSHIPS_Q: [
                 {"from_labels": a, "type": rel, "to_labels": b} for a, rel, b in relationship_rows
             ],
+            agent_samples._MODELS_Q: [{"model": model} for model in models],
             agent_samples._SAMPLE_TAILS_Q: [
                 {"model": model, "tail": tail} for model, tail in tail_rows
             ],
@@ -116,8 +117,9 @@ def _prompt_line(schema: str, label: str) -> list[str]:
     return schema.split(f"\n{label}: ")[1].split(".\n")[0].split(", ")
 
 
-def test_prompt_takes_tails_operators_and_airports_from_the_database() -> None:
+def test_prompt_takes_models_tails_operators_and_airports_from_the_database() -> None:
     driver = SchemaDriver(
+        models=["B737-800", "E190"],
         tail_rows=[("B737-800", "N1TEST"), ("E190", "N2TEST")],
         operators=["TestAir"],
         airports=["ZZA", "ZZB"],
@@ -125,7 +127,7 @@ def test_prompt_takes_tails_operators_and_airports_from_the_database() -> None:
 
     schema = graph_schema(driver, "db")
 
-    assert _prompt_line(schema, "Aircraft models") == [model for model, _ in MODEL_DISTRIBUTION]
+    assert _prompt_line(schema, "Aircraft models") == ["B737-800", "E190"]
     assert _prompt_line(schema, "Sample tail numbers") == ["N1TEST (B737-800)", "N2TEST (E190)"]
     assert _prompt_line(schema, "Operators") == ["TestAir"]
     assert _prompt_line(schema, "Airport IATA codes") == ["ZZA", "ZZB"]
@@ -134,7 +136,7 @@ def test_prompt_takes_tails_operators_and_airports_from_the_database() -> None:
 def test_prompt_leaves_out_facts_the_database_does_not_have() -> None:
     schema = graph_schema(SchemaDriver(), "db")
 
-    assert "\nAircraft models: " in schema
+    assert "Aircraft models" not in schema
     assert "Sample tail numbers" not in schema
     assert "Operators" not in schema
     assert "Airport IATA codes" not in schema
@@ -191,7 +193,7 @@ def test_schema_lists_labels_and_relationships_without_internal_labels() -> None
 
     schema = graph_schema(driver, "db")
 
-    assert schema.startswith(
+    assert schema == (
         "Node labels and properties:\n"
         "- Aircraft {aircraft_id, tail_number}\n"
         "- Calibrated:Sensor {sensor_id}\n"
@@ -201,8 +203,6 @@ def test_schema_lists_labels_and_relationships_without_internal_labels() -> None
         "- (Aircraft)-[:HAS_SYSTEM]->(System)\n"
         "- (Chunk)-[:NEXT_CHUNK]->(Chunk)\n"
         "- (Fault)-[:FROM_CHUNK]->(Chunk)\n"
-        "\n"
-        "Aircraft models: "
     )
 
 
@@ -373,6 +373,7 @@ def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
         assert "- PytestSchemaTo {pytest_to}" in lines
         assert "- (PytestSchemaFrom)-[:PYTEST_SCHEMA_LINK]->(PytestSchemaTo)" in lines
         assert not any("__PytestInternal__" in line for line in lines)
+        assert "PYTEST-MODEL" in _prompt_line(schema, "Aircraft models")
         tails = _prompt_line(schema, "Sample tail numbers")
         assert "N1PYT (PYTEST-MODEL)" in tails
         assert "N2PYT (PYTEST-MODEL)" not in tails

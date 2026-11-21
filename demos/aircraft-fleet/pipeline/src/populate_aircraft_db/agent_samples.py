@@ -14,7 +14,6 @@ from generator.specs import (
     DELAY_CAUSES,
     EVENT_SEVERITIES,
     MANUAL_FLEET_TAILS,
-    MODEL_DISTRIBUTION,
     SENSOR_TYPES,
 )
 
@@ -52,6 +51,12 @@ _RELATIONSHIPS_Q = """\
 MATCH (a)-[r]->(b)
 RETURN DISTINCT labels(a) AS from_labels, type(r) AS type, labels(b) AS to_labels"""
 
+_MODELS_Q = """\
+MATCH (a:Aircraft)
+WHERE a.model IS NOT NULL
+RETURN DISTINCT a.model AS model
+ORDER BY model"""
+
 # The tail of each model's lowest aircraft_id, which is its first registry
 # tail in a generated fleet.
 _SAMPLE_TAILS_Q = """\
@@ -86,8 +91,8 @@ def graph_schema(driver: Driver, database: str) -> str:
 
     Labels and properties come from db.schema.nodeTypeProperties and the
     relationship patterns from the data, so the description matches the
-    database. The sample tails, operators, and airport codes come from the
-    data too. Value hints and the model list come from the generator specs.
+    database. The models, sample tails, operators, and airport codes come
+    from the data too. Value hints come from the generator specs.
     """
     # db.schema.nodeTypeProperties warns that its propertyTypes field will
     # change. The query does not use that field, so the warning is noise.
@@ -98,6 +103,7 @@ def graph_schema(driver: Driver, database: str) -> str:
     ) as session:
         property_rows = session.run(_NODE_PROPERTIES_Q).data()
         relationship_rows = session.run(_RELATIONSHIPS_Q).data()
+        model_rows = session.run(_MODELS_Q).data()
         tail_rows = session.run(_SAMPLE_TAILS_Q).data()
         operator_rows = session.run(_OPERATORS_Q).data()
         airport_rows = session.run(_AIRPORTS_Q).data()
@@ -125,13 +131,14 @@ def graph_schema(driver: Driver, database: str) -> str:
 
     # A fact the database has no values for is left out.
     facts = {
-        "Aircraft models": [model for model, _ in MODEL_DISTRIBUTION],
+        "Aircraft models": [row["model"] for row in model_rows],
         "Sample tail numbers": [f"{row['tail']} ({row['model']})" for row in tail_rows],
         "Operators": [row["operator"] for row in operator_rows],
         "Airport IATA codes": [row["iata"] for row in airport_rows],
     }
-    lines.append("")
-    lines += [f"{name}: {', '.join(values)}." for name, values in facts.items() if values]
+    fact_lines = [f"{name}: {', '.join(values)}." for name, values in facts.items() if values]
+    if fact_lines:
+        lines += ["", *fact_lines]
     return "\n".join(lines) + "\n"
 
 

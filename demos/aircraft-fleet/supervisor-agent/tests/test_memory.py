@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import threading
 import time
 from collections.abc import Callable
@@ -770,7 +771,9 @@ def test_shutdown_closes_the_clients_in_parallel(
 def test_shutdown_stops_waiting_at_its_bound(
     monkeypatch: pytest.MonkeyPatch, memory_on, opened, caplog
 ) -> None:
-    monkeypatch.setattr(memory, "SHUTDOWN_SECONDS", 0.3)
+    monkeypatch.setattr(memory, "SESSION_WAIT_SECONDS", 0.1)
+    monkeypatch.setattr(memory, "CLIENT_CLOSE_SECONDS", 0.1)
+    monkeypatch.setattr(memory, "SHUTDOWN_MARGIN_SECONDS", 0.1)
     memory.build_session_manager("s1", "u1", memory.memory_settings(), hook).close()
     _slow_closes(opened, 1.0)
 
@@ -813,3 +816,121 @@ def test_shutdown_wakes_when_an_open_in_progress_fails(memory_on, monkeypatch) -
     assert len(errors) == 1
     # The failed open wakes shutdown, so it does not wait out the timeout.
     assert elapsed < 2
+
+
+def test_shutdown_joins_a_retired_client_closing_as_it_wakes(
+    monkeypatch: pytest.MonkeyPatch, memory_on, opened
+) -> None:
+    """The last session of a retired client wakes shutdown as its close starts.
+
+    Shutdown must still find that close and wait for it.
+    """
+    settings = memory.memory_settings()
+    session = memory.build_session_manager("s1", "u1", settings, hook)
+    memory.forget_memory_settings(settings)
+    _slow_closes(opened, 0.2)
+    real_closer = memory._closer
+
+    def slow_closer(shared):
+        time.sleep(0.2)
+        return real_closer(shared)
+
+    monkeypatch.setattr(memory, "_closer", slow_closer)
+    shutdown = threading.Thread(target=memory.close_shared_memory)
+    shutdown.start()
+    time.sleep(0.1)
+    session.close()
+    shutdown.join(5)
+
+    assert opened[0].closes == 1
+
+
+def test_the_shutdown_bound_covers_the_library_close() -> None:
+    """The restated close bound matches the library, so no close is cut short."""
+    from neo4j_agent_memory.integrations.base import _SHUTDOWN_TIMEOUT_SECONDS
+
+    drain = inspect.signature(memory.SharedMemory.close).parameters["timeout"].default
+    request = inspect.signature(memory.SharedMemory.open).parameters["request_timeout"].default
+    assert drain + _SHUTDOWN_TIMEOUT_SECONDS + request == memory.CLIENT_CLOSE_SECONDS
+
+
+def test_shutdown_joins_a_close_inside_the_library_bound(
+    monkeypatch: pytest.MonkeyPatch, memory_on, opened, caplog
+) -> None:
+    """A close slower than the session wait but inside the close bound is joined."""
+    monkeypatch.setattr(memory, "SESSION_WAIT_SECONDS", 0.1)
+    monkeypatch.setattr(memory, "CLIENT_CLOSE_SECONDS", 0.8)
+    monkeypatch.setattr(memory, "SHUTDOWN_MARGIN_SECONDS", 0.1)
+    session = memory.build_session_manager("s1", "u1", memory.memory_settings(), hook)
+    _slow_closes(opened, 0.5)
+
+    memory.close_shared_memory()
+
+    assert opened[0].closes == 1
+    assert "still running" not in caplog.text
+    session.close()
+
+
+class _Interrupt(BaseException):
+    pass
+
+
+def test_a_late_open_whose_close_is_interrupted_still_ends_the_open(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    monkeypatch.setattr(memory, "SESSION_WAIT_SECONDS", 5.0)
+    started = threading.Event()
+    openings: list = []
+
+    def slow_open(settings, *, background_hook=None):
+        openings.append(memory._shared_open)
+        started.set()
+        time.sleep(0.2)
+        return FakeShared(settings, background_hook)
+
+    def interrupted_close(shared) -> None:
+        raise _Interrupt
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=slow_open))
+    monkeypatch.setattr(memory, "_close_logged", interrupted_close)
+    settings = memory.memory_settings()
+    errors: list[BaseException] = []
+
+    def request() -> None:
+        try:
+            memory.build_session_manager("s1", "u1", settings, hook)
+        except BaseException as error:
+            errors.append(error)
+
+    worker = threading.Thread(target=request)
+    worker.start()
+    assert started.wait(5)
+    begun = time.monotonic()
+    memory.close_shared_memory()
+    elapsed = time.monotonic() - begun
+    worker.join(5)
+
+    assert [type(error) for error in errors] == [_Interrupt]
+    assert memory._shared_open is None
+    assert openings[0].done.is_set()
+    assert elapsed < 2
+
+
+def test_passwords_are_compared_in_constant_time(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    compared: list[tuple[bytes, bytes]] = []
+    real = memory.hmac.compare_digest
+
+    def recording(a: bytes, b: bytes) -> bool:
+        compared.append((a, b))
+        return real(a, b)
+
+    monkeypatch.setattr(memory.hmac, "compare_digest", recording)
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "pässwörd")
+    settings = memory.memory_settings()
+
+    memory.forget_memory_settings(settings)
+
+    assert compared
+    assert all(isinstance(a, bytes) and isinstance(b, bytes) for a, b in compared)

@@ -99,8 +99,9 @@ async def _lifespan(app: BedrockAgentCoreApp) -> AsyncIterator[None]:
 
     The close waits up to 30 seconds for open memory sessions. A request
     cancelled at shutdown still writes its memory only if its session closes
-    in that time. Then the close waits for background extraction. Shutdown
-    takes 60 seconds at most in all.
+    in that time. Then the close waits for background extraction. Closing
+    the memory clients takes at most about 100 seconds. An extraction still
+    running at that deadline is lost.
     """
     yield
     await asyncio.to_thread(close_shared_memory)

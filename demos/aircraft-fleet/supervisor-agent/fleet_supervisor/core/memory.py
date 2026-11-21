@@ -23,6 +23,7 @@ closes every client at shutdown, and no request opens one after it starts.
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 import threading
@@ -57,8 +58,14 @@ EXTRACTION_MODEL = "bedrock/global.anthropic.claude-sonnet-5-5"
 RETRIEVAL_MIN_SCORE = 0.75
 # How long shutdown waits for open sessions before it closes the clients.
 SESSION_WAIT_SECONDS = 30.0
-# The most time shutdown takes in all, with the closes.
-SHUTDOWN_SECONDS = 60.0
+# The longest SharedMemory.close() takes. It waits up to its default timeout
+# of 30 s for background extraction, gives cancelled tasks the library's
+# _SHUTDOWN_TIMEOUT_SECONDS of 5 s to unwind, then closes the driver within
+# the default request_timeout of 30 s. The library does not export these, so
+# they are restated here, and a test checks them against the library.
+CLIENT_CLOSE_SECONDS = 30.0 + 5.0 + 30.0
+# Time for the close's own thread work beyond those waits.
+SHUTDOWN_MARGIN_SECONDS = 5.0
 # The error a request gets when it needs a client after shutdown started.
 SHUT_DOWN = "The memory clients are shut down."
 
@@ -101,7 +108,7 @@ def forget_memory_settings(failed: MemorySettings) -> None:
     """
     global _settings
     with _settings_lock:
-        if _settings is not None and _password(_settings) == _password(failed):
+        if _settings is not None and _same_password(_settings, failed):
             _settings = None
             forget_secrets()
     _retire_shared(failed)
@@ -109,6 +116,11 @@ def forget_memory_settings(failed: MemorySettings) -> None:
 
 def _password(settings: MemorySettings) -> str:
     return settings.neo4j.password.get_secret_value()
+
+
+def _same_password(first: MemorySettings, second: MemorySettings) -> bool:
+    """Compare two settings' passwords in constant time."""
+    return hmac.compare_digest(_password(first).encode("utf-8"), _password(second).encode("utf-8"))
 
 
 def password_rejected(error: BaseException) -> bool:
@@ -346,7 +358,7 @@ def _acquire(settings: MemorySettings, background_hook: BackgroundHook | None) -
                 opening = _shared_open = _Open(settings)
                 break
         opening.done.wait()
-        if opening.error is not None and _password(opening.settings) == _password(settings):
+        if opening.error is not None and _same_password(opening.settings, settings):
             raise SharedMemoryOpenError(opening.settings) from opening.error
         # The client opened, or failed with a password this caller no longer
         # uses. A rejected password may have retired the client already. So
@@ -370,14 +382,21 @@ def _acquire(settings: MemorySettings, background_hook: BackgroundHook | None) -
                 _shared_open = None
                 # Wakes shutdown when the open failed while it waited.
                 _sessions_closed.notify_all()
-        if late:
-            # Shutdown started during the open, so the client never goes
-            # into use. Shutdown still waits on the open while it closes.
-            _close_logged(opened)
-            with _shared_lock:
-                _shared_open = None
-                _sessions_closed.notify_all()
-        opening.done.set()
+        try:
+            if late:
+                # Shutdown started during the open, so the client never goes
+                # into use. Shutdown waits on the open while it closes, unless
+                # the open outlasted the session wait. Then this close runs
+                # after shutdown returns, on the request's daemon worker
+                # thread, and the process may exit first. No session used the
+                # client, so nothing is lost.
+                _close_logged(opened)
+        finally:
+            if late:
+                with _shared_lock:
+                    _shared_open = None
+                    _sessions_closed.notify_all()
+            opening.done.set()
     if late:
         raise RuntimeError(SHUT_DOWN)
     return opened
@@ -392,7 +411,7 @@ def _release(shared: _Shared) -> None:
             return
         shared.closing = True
         _retired.discard(shared)
-    _close_in_background(shared)
+        _start_close(shared)
 
 
 def _retire_shared(failed: MemorySettings) -> None:
@@ -404,7 +423,7 @@ def _retire_shared(failed: MemorySettings) -> None:
     global _shared
     with _shared_lock:
         shared = _shared
-        if shared is None or _password(shared.settings) != _password(failed):
+        if shared is None or not _same_password(shared.settings, failed):
             return
         _shared = None
         shared.retired = True
@@ -412,16 +431,20 @@ def _retire_shared(failed: MemorySettings) -> None:
             _retired.add(shared)
             return
         shared.closing = True
-    _close_in_background(shared)
+        _start_close(shared)
 
 
-def _close_in_background(shared: _Shared) -> None:
-    """Close ``shared`` on its own thread, so the caller does not wait for it."""
+def _start_close(shared: _Shared) -> None:
+    """Close ``shared`` on its own thread, so the caller does not wait for it.
+
+    Call it with ``_shared_lock`` held, in the same critical section that
+    marks the client closing. Shutdown then finds the close in ``_closers``
+    whenever it no longer finds the client, and never joins an unstarted
+    thread.
+    """
     closer = _closer(shared)
-    with _shared_lock:
-        _closers.add(closer)
-        # Started under the lock, so shutdown never joins an unstarted thread.
-        closer.start()
+    _closers.add(closer)
+    closer.start()
 
 
 def _closer(shared: _Shared) -> threading.Thread:
@@ -455,13 +478,14 @@ def close_shared_memory() -> None:
     ``SESSION_WAIT_SECONDS`` for an open in progress and for open sessions
     to close, since a session writes its messages on the client. Then it
     closes the clients anyway, in parallel, and waits for them and for
-    closes already running. It returns within ``SHUTDOWN_SECONDS`` in all,
-    and logs any close still running then.
+    closes already running. It returns within ``SESSION_WAIT_SECONDS`` plus
+    ``CLIENT_CLOSE_SECONDS`` plus ``SHUTDOWN_MARGIN_SECONDS``, about 100
+    seconds, and logs any close still running then.
     """
     global _shared, _shutting_down
     started = time.monotonic()
-    deadline = started + SHUTDOWN_SECONDS
-    session_deadline = min(started + SESSION_WAIT_SECONDS, deadline)
+    session_deadline = started + SESSION_WAIT_SECONDS
+    deadline = session_deadline + CLIENT_CLOSE_SECONDS + SHUTDOWN_MARGIN_SECONDS
     with _shared_lock:
         _shutting_down = True
         while True:
@@ -492,7 +516,7 @@ def close_shared_memory() -> None:
     still_closing = sum(closer.is_alive() for closer in closers)
     if still_closing:
         logger.warning(
-            "Shutdown stopped waiting after %ss with %d memory client close(s) still running.",
-            SHUTDOWN_SECONDS,
+            "Shutdown stopped waiting after %.0fs with %d memory client close(s) still running.",
+            deadline - started,
             still_closing,
         )

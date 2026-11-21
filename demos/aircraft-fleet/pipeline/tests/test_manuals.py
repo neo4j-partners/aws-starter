@@ -742,7 +742,7 @@ _REFERENCES = {
 }
 # A task card shares the code shape. Its id is valid in the manual that
 # defines it, so fault sections can refer to it.
-_TASK_CARD = re.compile(r"^#### Task Card: (\S+)", re.MULTILINE)
+_TASK_CARD = re.compile(r"^#### Task Card: ([A-Z]{2,4}-TC-\d{3})\b", re.MULTILINE)
 # Part numbers and the document number share it too. Each is valid only in
 # its own field.
 _PART_NUMBER_FIELD = re.compile(
@@ -829,6 +829,11 @@ def test_a_task_card_counts_only_in_the_manual_that_defines_it() -> None:
 
     assert _unknown_codes(card + reference) == []
     assert _unknown_codes(reference) == ["ENG-TC-009"]
+
+
+def test_a_task_card_heading_validates_only_a_task_card_id() -> None:
+    assert _unknown_codes("#### Task Card: ENG-OHV-006 - Overheat\n") == ["ENG-OHV-006"]
+    assert _unknown_codes("#### Task Card: ENG-TC-009, Borescope\nSee ENG-TC-009.\n") == []
 
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))

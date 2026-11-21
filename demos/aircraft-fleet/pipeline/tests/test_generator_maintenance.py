@@ -30,7 +30,9 @@ from generator.specs import (
 )
 
 SEED = 42
-# The manuals' historic MINOR/MAJOR/CRITICAL shares, in percent.
+# The manuals' historic MINOR/MAJOR/CRITICAL shares, in percent. The test
+# checks them, within 8 points, on the default run only. Other seeds spread
+# wider; over 16 seeds at 30x90 the mean is about 50/32/18.
 TARGET_MIX = {"MINOR": 52, "MAJOR": 31, "CRITICAL": 17}
 SEVERITY_BY_LEVEL = {1: "MINOR", 2: "MAJOR", 3: "CRITICAL"}
 

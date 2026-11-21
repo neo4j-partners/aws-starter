@@ -461,6 +461,27 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
     assert not list((project.parent / "tmp").iterdir())
 
 
+def test_an_interrupt_during_the_restore_after_a_failed_deploy_still_finishes_it(
+    project: Path,
+) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+
+    # The failed deploy exits through set -e while the INT trap still exits
+    # 130. cp 1 backs up the spec and cp 2 restores it, so the Ctrl+C lands
+    # mid-restore and only the EXIT trap ignoring INT lets the restore finish.
+    result = run_destroy(project, STUB_DEPLOY_EXIT="1", STUB_INTERRUPT_AFTER="cp:2")
+
+    assert result.returncode == 1
+    assert spec.read_bytes() == tracked
+    assert env_local.read_text() == "A=1\n"
+    assert "Could not restore" not in result.stderr
+    assert not list(env_local.parent.glob(".env.local.*"))
+    assert not list((project.parent / "tmp").iterdir())
+
+
 def test_a_second_interrupt_during_the_restore_still_finishes_it(project: Path) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()

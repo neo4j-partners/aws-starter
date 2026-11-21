@@ -89,11 +89,12 @@ case "$1 $2" in
 esac
 """
 
-# rm, cp, mv, awk, and chmod pass through to the real command. STUB_INTERRUPT_AFTER
-# =cmd:N sends SIGINT to agent.sh right after the Nth call of cmd, the same as
-# a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
-# name right after the Nth rm of that name, or with STUB_PLANT_DEVNULL a link
-# to /dev/null. STUB_SKIP_STRIP_CHMOD makes chmod of the copy succeed without
+# rm, cp, mv, awk, and chmod pass through to the real command.
+# STUB_INTERRUPT_AFTER=cmd:N sends SIGINT to agent.sh right after the Nth
+# call of cmd, the same as a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead.
+# STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's name right
+# after the Nth rm of that name, or with STUB_PLANT_DEVNULL a link to
+# /dev/null. STUB_SKIP_STRIP_CHMOD makes chmod of the copy succeed without
 # running. STUB_RECORD_STRIP_MODE and STUB_RECORD_STRIP_SIZE make chmod
 # record the copy's mode and its size in bytes before it changes the mode.
 STUB_PASSTHROUGH = r"""#!/bin/bash

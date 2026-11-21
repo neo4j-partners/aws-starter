@@ -313,9 +313,9 @@ ENV_STRIP_TMP="$ENV_LOCAL.strip.$$"
 # matched in each form the CLI reads: optional leading space, an optional
 # export, the exact variable name, then optional space before the =. Space
 # is [[:space:]], which covers the ASCII characters that \s matches in the
-# CLI's pattern. The comment must match the whole line. A failure before a deploy is tried
-# again by the restore, so only restore_project, the last try, says to
-# delete the line by hand.
+# CLI's pattern. The comment must match the whole line. A failure before a
+# deploy is tried again by the restore, so only restore_project, the last
+# try, says to delete the line by hand.
 strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
@@ -397,8 +397,9 @@ restore_project() {
 # Back up the tracked spec and arm the restore. INT, TERM, and HUP exit
 # through on_exit, so Ctrl+C, a kill, and a closed terminal restore too.
 # Each records its signal for on_exit and exits with 128 plus the signal
-# number, the status left if the signal cannot be raised again. The restore is not armed yet when the
-# backup fails, and on_exit removes a partial backup with TMP_ROOT.
+# number, the status left if the signal cannot be raised again. The
+# restore is not armed yet when the backup fails, and on_exit removes a
+# partial backup with TMP_ROOT.
 begin_spec_restore() {
     if ! SPEC_BACKUP=$(make_temp) || ! cp "$PROJECT_SPEC" "$SPEC_BACKUP"; then
         exit 1

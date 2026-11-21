@@ -131,6 +131,70 @@ def test_references_link_on_exact_type(driver: Driver, database: str) -> None:
     ]
 
 
+# The same aircraft, with component references under system references.
+_PARENT_SETUP = """
+CREATE (a:Aircraft {aircraft_id: $model + '-A', model: $model})
+CREATE (a)-[:HAS_SYSTEM]->(e:System {system_id: $model + '-E', type: 'Engine'})
+CREATE (a)-[:HAS_SYSTEM]->(h:System {system_id: $model + '-H', type: 'Hydraulics'})
+CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E2', type: 'Main Fuel Pump', name: 'Main Fuel Pump'})
+CREATE (h)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-H1', type: 'Hydraulic Pump', name: 'Main Hydraulic Pump'})
+WITH 1 AS _
+UNWIND $parents AS parent
+CREATE (sr:SystemReference {name: parent.name + ' - ' + $model, aircraftType: $model})
+SET sr.systemType = parent.type
+WITH sr, parent
+UNWIND parent.components AS cr
+CREATE (sr)-[:HAS_COMPONENT]->(n:ComponentReference {
+    name: cr.name + ' - ' + $model, aircraftType: $model, componentType: cr.type
+})
+"""
+
+_PARENTS = [
+    {
+        "name": "Engine",
+        "type": "Engine",
+        "components": [
+            {"name": "Fuel Pump", "type": "Main Fuel Pump"},
+            # A pump typed for another system than its parent links nowhere.
+            {"name": "Engine-Driven Pump", "type": "Hydraulic Pump"},
+        ],
+    },
+    {
+        "name": "Hydraulic System",
+        "type": "Hydraulics",
+        "components": [{"name": "Main Hydraulic Pump", "type": "Hydraulic Pump"}],
+    },
+    {
+        # A parent without a fleet system type does not block the link.
+        "name": "Fuel System",
+        "type": None,
+        "components": [{"name": "Boost Pump", "type": "Hydraulic Pump"}],
+    },
+]
+
+
+def test_component_links_only_within_its_parent_system_type(driver: Driver, database: str) -> None:
+    driver.execute_query(_PARENT_SETUP, model=MODEL, parents=_PARENTS, database_=database)
+
+    link_to_existing_graph(driver, database)
+
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (r:ComponentReference)-[:DESCRIBES_COMPONENT]->(c)
+        WHERE r.aircraftType = $model
+        RETURN r.name AS ref, c.component_id AS target
+        ORDER BY ref
+        """,
+        model=MODEL,
+        database_=database,
+    )
+    assert [(r["ref"], r["target"]) for r in records] == [
+        (f"Boost Pump - {MODEL}", f"{MODEL}-H1"),
+        (f"Fuel Pump - {MODEL}", f"{MODEL}-E2"),
+        (f"Main Hydraulic Pump - {MODEL}", f"{MODEL}-H1"),
+    ]
+
+
 # One aircraft with an engine EGT sensor, and operating limits.
 _SENSOR_SETUP = """
 CREATE (a:Aircraft {aircraft_id: $model + '-A', model: $model})

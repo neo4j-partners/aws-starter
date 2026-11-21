@@ -621,7 +621,8 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
     # (same aircraft model; componentType, ignoring case, is a component type
     # or one of its manual names, and the Component has that type, within the
-    # System type that has that component type in specs)
+    # System type that has that component type in specs. A parent
+    # SystemReference with another systemType blocks the link.)
     records, _, _ = driver.execute_query(
         """
         MATCH (cr:ComponentReference)
@@ -629,6 +630,9 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         WITH cr, $component_type_by_alias[toLower(cr.componentType)] AS ctype
         WHERE ctype IS NOT NULL
         WITH cr, ctype, $system_types[toLower(ctype)] AS systemType
+        OPTIONAL MATCH (sr:SystemReference)-[:HAS_COMPONENT]->(cr)
+        WITH cr, ctype, systemType, collect(sr.systemType) AS parentTypes
+        WHERE all(t IN parentTypes WHERE toLower(t) = toLower(systemType))
         MATCH (:Aircraft {model: cr.aircraftType})
             -[:HAS_SYSTEM]->(:System {type: systemType})
             -[:HAS_COMPONENT]->(c:Component {type: ctype})

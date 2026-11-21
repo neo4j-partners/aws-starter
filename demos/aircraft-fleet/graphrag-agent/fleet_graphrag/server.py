@@ -337,6 +337,9 @@ async def invoke(
                 logger.exception("The agent stream failed while closing")
                 raise asyncio.CancelledError from e
             finally:
+                # Closes the stream when the loop ends early. On the paths
+                # above the stream is already closed, and aclose() on a
+                # closed generator does nothing.
                 await events.aclose()
         finally:
             await _close_after_build(build)

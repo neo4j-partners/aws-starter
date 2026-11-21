@@ -233,18 +233,28 @@ missing, destroy stops and says to run it from the checkout that deployed.
 
 **Upgrading a checkout that already deployed:** Git used to track
 `agentcore/aws-targets.json`, and the first deploy edited it. So a `git pull`
-in that checkout can stop with "Your local changes would be overwritten". Keep
-the file, because destroy needs it. Run these commands from this folder:
+in that checkout can stop with one of these errors:
+
+- A merge or fast-forward pull stops with "Your local changes to the
+  following files would be overwritten by merge".
+- A rebase pull stops with "cannot pull with rebase: You have unstaged
+  changes".
+
+Keep the file, because destroy needs it. Run these commands from this folder
+in one shell. The backup gets its own temporary name, which the first command
+prints:
 
 ```bash
-cp agentcore/aws-targets.json ~/aws-targets.json.bak
+backup=$(mktemp) && echo "Backup: $backup"
+cp agentcore/aws-targets.json "$backup"
 git checkout -- agentcore/aws-targets.json
 git pull
-cp ~/aws-targets.json.bak agentcore/aws-targets.json
+cp "$backup" agentcore/aws-targets.json && rm -f "$backup"
 ```
 
-After the pull, git ignores the file. If the backup is lost, recreate the file
-with the account and region you deployed to:
+After the pull, git ignores the file. If the pull fails, copy the printed
+backup back by hand. If the backup is lost, recreate the file with the account
+and region you deployed to:
 
 ```json
 [{"name": "default", "account": "<12-digit account ID>", "region": "<region>"}]

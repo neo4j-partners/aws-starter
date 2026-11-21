@@ -206,8 +206,11 @@ def graph_schema(driver: Driver, database: str) -> str:
         bookmarks = session.last_bookmarks()
     # On a partial database the fact queries can name a label or property
     # key that does not exist yet. The empty result is expected, so the
-    # UNRECOGNIZED warning is noise. The first session's bookmarks make this
-    # one read at least the state that one saw.
+    # UNRECOGNIZED warning is noise. The filter is per session, so it is off
+    # for every query here, the pattern checks included. That hides nothing
+    # real: the pattern checks only name labels and types that
+    # db.schema.visualization just returned, so they always exist. The first
+    # session's bookmarks make this one read at least the state that one saw.
     with driver.session(
         database=database,
         default_access_mode=READ_ACCESS,

@@ -96,6 +96,11 @@ RETURN DISTINCT ap.iata AS iata
 ORDER BY iata"""
 
 
+# Labels that describe the load rather than the fleet. The loader records the
+# generator stamp on a Dataset node. The prompt leaves these out.
+METADATA_LABELS = frozenset({"Dataset"})
+
+
 def _domain_label(labels: list[str]) -> str | None:
     """Join a node's labels, leaving out internal ones such as __KGBuilder__."""
     domain = sorted(label for label in labels if not label.startswith("__"))
@@ -123,7 +128,8 @@ def _warn_skipped(triples: set[tuple[str, str, str]], reason: str) -> None:
 def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
     """Return the (start label, type, end label) triples the count store allows.
 
-    Triples with an internal label, such as __KGBuilder__, are left out.
+    Triples with an internal label, such as __KGBuilder__, or a metadata
+    label, such as Dataset, are left out.
     So are triples with a backslash in any name. Inside backticks Cypher
     decodes an escape such as \\u0060 to a backtick, so doubling backticks
     cannot keep such a name inside its quotes. Triples with a character
@@ -138,7 +144,9 @@ def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
     with_unprintable = set()
     for rel in visualization["relationships"]:
         triple = (names[rel.start_node.element_id], rel.type, names[rel.end_node.element_id])
-        if triple[0].startswith("__") or triple[2].startswith("__"):
+        if any(
+            label.startswith("__") or label in METADATA_LABELS for label in (triple[0], triple[2])
+        ):
             continue
         if any("\\" in name for name in triple):
             with_backslash.add(triple)
@@ -236,6 +244,8 @@ def graph_schema(driver: Driver, database: str) -> str:
     # propertyName. It is listed with an empty property set.
     properties: dict[str, set[str]] = {}
     for row in property_rows:
+        if METADATA_LABELS.intersection(row["nodeLabels"]):
+            continue
         if label := _domain_label(row["nodeLabels"]):
             names = properties.setdefault(label, set())
             if row["propertyName"] is not None:

@@ -509,6 +509,30 @@ def test_schema_skips_the_pattern_check_without_relationships() -> None:
     assert lines[lines.index("Relationships:") + 1 :] == []
 
 
+def test_schema_leaves_out_the_dataset_metadata_node() -> None:
+    # The load records its stamp on a Dataset node. That describes the load,
+    # not the fleet, so the text2cypher prompt does not list it.
+    driver = SchemaDriver(
+        property_rows=[
+            (["Dataset"], "generator_hash"),
+            (["Dataset"], "stamp"),
+            (["Aircraft"], "tail_number"),
+        ],
+        relationship_rows=[
+            (["Dataset"], "DESCRIBES", ["Aircraft"]),
+            (["Aircraft"], "HAS_SYSTEM", ["System"]),
+        ],
+    )
+
+    schema = graph_schema(driver, "db")
+
+    assert "Dataset" not in schema
+    assert not any("Dataset" in query for query in driver.check_queries)
+    lines = schema.splitlines()
+    assert "- Aircraft {tail_number}" in lines
+    assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+
+
 def test_schema_lists_a_label_without_properties() -> None:
     # nodeTypeProperties returns one row with a null propertyName for a
     # label whose nodes have no properties.

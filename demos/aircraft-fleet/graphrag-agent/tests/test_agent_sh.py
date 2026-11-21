@@ -3,7 +3,8 @@
 Each test copies agent.sh and the tracked agentcore.json into a temporary
 folder. PATH holds only the stub folder, /usr/bin, and /bin, so no real
 agentcore or aws CLI can run and nothing reaches AWS. The stubs log every call
-to calls.log and act on STUB_* environment variables.
+to calls.log and act on STUB_* environment variables. Each run gets its own
+process group, so STUB_INTERRUPT can send SIGINT to it, as Ctrl+C does.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ STUB_AGENTCORE = r"""#!/bin/bash
 echo "agentcore $*" >> "$STUB_LOG"
 case "$1" in
     status)
+        if [ "$STUB_INTERRUPT" = status ]; then kill -INT 0; sleep 5; fi
         echo "Update available" >&2
         printf '%s\n' "$STUB_STATUS_JSON"
         exit "${STUB_STATUS_EXIT:-0}"
@@ -61,6 +63,7 @@ if [ "$1 $2" = "sts get-caller-identity" ]; then
     exit 0
 fi
 if [ "$1 $2" != "cloudformation describe-stacks" ]; then exit 99; fi
+if [ "$STUB_INTERRUPT" = describe-stacks ]; then kill -INT 0; sleep 5; fi
 if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
 if [ -n "$STUB_AWS_WARNING" ]; then echo "$STUB_AWS_WARNING" >&2; fi
 if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
@@ -135,6 +138,7 @@ def run_destroy(
         env=env,
         timeout=60,
         check=False,
+        start_new_session=True,
     )
 
 
@@ -211,6 +215,15 @@ def test_failed_status_call_fails_and_removes_its_temp_file(project: Path) -> No
     assert result.returncode == 1
     assert "Could not check what remains deployed" in result.stdout
     assert "Update available" in result.stdout
+    assert leftover_temp_files(project) == []
+
+
+@pytest.mark.parametrize("step", ["status", "describe-stacks"])
+def test_ctrl_c_during_the_report_removes_the_temp_files(project: Path, step: str) -> None:
+    result = run_destroy(project, STUB_INTERRUPT=step)
+
+    assert result.returncode != 0
+    assert "Cleanup complete" not in result.stdout
     assert leftover_temp_files(project) == []
 
 

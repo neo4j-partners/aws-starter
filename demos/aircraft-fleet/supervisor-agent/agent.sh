@@ -330,10 +330,13 @@ on_exit() {
     fi
 }
 
-# The copy strip_gateway_secret writes before it replaces .env.local. It
-# holds the file's other lines. The name is fixed before the copy exists, so
-# on_exit removes a copy an interrupt left behind.
-ENV_STRIP_TMP="$ENV_LOCAL.strip.$$"
+# The copy strip_gateway_secret writes before it replaces .env.local holds
+# the file's other lines. Its name is this prefix, which ends in the PID,
+# plus a random suffix from mktemp. on_exit removes every name with this
+# prefix, so a copy whose name an interrupt lost inside $(mktemp) is removed
+# too, and another run's copy is not.
+ENV_STRIP_PREFIX="$ENV_LOCAL.strip.$$"
+ENV_STRIP_TMP=""
 
 # Remove the client secret line, and the comment the CLI writes above it,
 # from agentcore/.env.local. Every other line is kept. The secret line is
@@ -347,27 +350,18 @@ strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
     # The copy sits next to the file, so mv replaces the file in one step.
-    # Anything already at the copy's name is removed first. A FIFO there
-    # would hang the open, and a link would send the lines elsewhere. The
-    # copy is opened once, on fd 3, and the filtered lines go in through
-    # that fd, so nothing can swap the file between the create and the
-    # write. set -C refuses a file that appears at the name after the
-    # remove. umask 077 creates the copy with mode 0600, the mode the CLI
-    # writes .env.local with. chmod sets 0600 again before any line lands.
-    # On Linux a directory's default POSIX ACL overrides umask, see acl(5),
-    # and the copy could otherwise be group-readable. A macOS ACE does not
-    # widen the mode, so the tests here can check only that chmod runs
-    # before any line lands, not that it narrows a mode. The copy
-    # must then be a regular file, not a link. .env.local is checked for a
-    # link again right before mv, which would replace the link and leave
-    # the secret in its target.
-    if ! remove_strip_copy \
-        || ! (umask 077 && set -C && {
-                chmod 600 "$ENV_STRIP_TMP" \
-                    && awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
-                        '$0 !~ ("^[[:space:]]*(export[[:space:]]+)?" name "[[:space:]]*=") && $0 != comment' \
-                        "$ENV_LOCAL" >&3
-            } 3> "$ENV_STRIP_TMP") \
+    # mktemp makes the copy with a random suffix, refuses a name that
+    # already exists, and creates it with mode 0600, the mode the CLI writes
+    # .env.local with. Nothing can be planted at the name ahead of time. The
+    # umask 077 subshells keep the copy 0600 even so. The copy must then be
+    # a regular file, not a link. .env.local is checked for a link again
+    # right before mv, which would replace the link and leave the secret in
+    # its target.
+    if ! ENV_STRIP_TMP=$(umask 077 && mktemp "$ENV_STRIP_PREFIX.XXXXXX") \
+        || ! (umask 077 \
+                && awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
+                    '$0 !~ ("^[[:space:]]*(export[[:space:]]+)?" name "[[:space:]]*=") && $0 != comment' \
+                    "$ENV_LOCAL" > "$ENV_STRIP_TMP") \
         || [ ! -f "$ENV_STRIP_TMP" ] || [ -L "$ENV_STRIP_TMP" ] \
         || [ -L "$ENV_LOCAL" ] \
         || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
@@ -390,9 +384,11 @@ refuse_linked_env_local() {
     fi
 }
 
-# The name is fixed, so removing a copy that is already gone is harmless.
+# Remove this run's copies by their prefix. The dot after the PID keeps out
+# a run whose PID starts with the same digits. A copy that is already gone
+# leaves the pattern unmatched, and rm -f ignores it.
 remove_strip_copy() {
-    rm -f "$ENV_STRIP_TMP"
+    rm -f "$ENV_STRIP_PREFIX".*
 }
 
 # Put back the tracked agentcore.json and remove the secret line. Returns

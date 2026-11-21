@@ -7,6 +7,7 @@ log every call to calls.log and act on STUB_* environment variables.
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -61,8 +62,8 @@ case "$1 $2" in
         # Ctrl+C reaches the whole foreground group, so the stub dies too.
         # bash ignores a SIGINT when its child exits normally.
         if [ -n "$STUB_LOOKUP_SIGNAL" ]; then kill -s "$STUB_LOOKUP_SIGNAL" "$PPID" "$$"; fi
-        # Leave something at the strip copy's name for agent.sh's pid. A
-        # $(...) subshell may sit between, so climb to the outermost agent.sh.
+        # A $(...) subshell may sit between this stub and agent.sh, so climb
+        # to the outermost agent.sh.
         owner=$PPID
         while parent=$(ps -o ppid= -p "$owner" | tr -d ' ') \
             && ps -o command= -p "$parent" | grep -qF /agent.sh; do
@@ -73,12 +74,11 @@ case "$1 $2" in
         if [ -n "${STUB_LOOKUP_SIGNAL_SCRIPT:-}" ]; then
             kill -s "$STUB_LOOKUP_SIGNAL_SCRIPT" "$owner"
         fi
-        strip_copy="agentcore/.env.local.strip.$owner"
+        # Leave a file that is not this run's copy: one at the old fixed
+        # name, or another run's copy whose PID starts with this run's.
         case "${STUB_LOOKUP_PLANT_STRIP:-}" in
-            fifo) mkfifo "$strip_copy" ;;
-            dangling) ln -s "$STUB_TMP/missing" "$strip_copy" ;;
-            devnull) ln -s /dev/null "$strip_copy" ;;
-            stale) printf 'STALE=1\n' > "$strip_copy" ;;
+            old) printf 'OLD=1\n' > "agentcore/.env.local.strip.$owner" ;;
+            other) printf 'OTHER=1\n' > "agentcore/.env.local.strip.${owner}0.AbC123" ;;
         esac
         if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
         if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
@@ -94,35 +94,35 @@ case "$1 $2" in
 esac
 """
 
-# rm, cp, mv, awk, and chmod pass through to the real command.
+# rm, cp, mv, and awk pass through to the real command.
 # STUB_INTERRUPT_AFTER=cmd:N sends SIGINT to agent.sh right after the Nth
 # call of cmd, the same as a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead.
-# STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's name right
-# after the Nth rm of that name, or with STUB_PLANT_DEVNULL a link to
-# /dev/null. STUB_SKIP_STRIP_CHMOD makes chmod of the copy succeed without
-# running. STUB_RECORD_STRIP_MODE and STUB_RECORD_STRIP_SIZE make chmod
-# record the copy's mode and its size in bytes before it changes the mode.
+# STUB_RECORD_STRIP_MODE records the strip copy's mode and size in bytes
+# while it holds the lines: awk's after awk writes them to its standard
+# output, which is the copy, and mv's before mv moves the copy.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
 real=/bin/"$name"
 [ -x "$real" ] || real=/usr/bin/"$name"
-case "$name:${!#}" in
-    chmod:*.env.local.strip.*)
-        if [ -n "${STUB_RECORD_STRIP_SIZE:-}" ]; then
-            wc -c < "${!#}" | tr -d ' ' >> "${STUB_LOG%/*}/strip-sizes"
-        fi
-        # stat's flags differ between macOS and Linux, so Python reads it.
-        if [ -n "${STUB_RECORD_STRIP_MODE:-}" ]; then
-            python3 -c 'import os, stat, sys
-print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "${!#}" \
-                >> "${STUB_LOG%/*}/strip-modes"
-        fi
-        ;;
-esac
-case "$name:${STUB_SKIP_STRIP_CHMOD:-}:${!#}" in
-    chmod:?*:*.env.local.strip.*) status=0 ;;
-    *) "$real" "$@"; status=$? ;;
-esac
+# stat's flags differ between macOS and Linux, so Python reads the mode. It
+# reads its own standard output when no file is named.
+record_strip() {
+    python3 -c 'import os, stat, sys
+st = os.stat(sys.argv[3]) if len(sys.argv) > 3 else os.fstat(1)
+with open(sys.argv[1], "a") as log:
+    print(sys.argv[2], format(stat.S_IMODE(st.st_mode), "o"), st.st_size, file=log)' \
+        "${STUB_LOG%/*}/strip-modes" "$@"
+}
+if [ -n "${STUB_RECORD_STRIP_MODE:-}" ] && [ "$name" = mv ]; then
+    case "${@: -2:1}" in
+        *.env.local.strip.*) record_strip mv "${@: -2:1}" ;;
+    esac
+fi
+"$real" "$@"
+status=$?
+if [ -n "${STUB_RECORD_STRIP_MODE:-}" ] && [ "$name" = awk ]; then
+    record_strip awk
+fi
 counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
@@ -134,22 +134,6 @@ if [ "${STUB_INTERRUPT_AFTER:-}" = "$name:$count" ]; then
         owner=$parent
     done
     kill -s "${STUB_INTERRUPT_SIGNAL:-INT}" "$owner"
-fi
-if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
-    case "${!#}" in
-        *.env.local.strip.*)
-            counter="${STUB_LOG%/*}/strip-rm-calls"
-            count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
-            echo "$count" > "$counter"
-            if [ "$count" = "$STUB_PLANT_AFTER_STRIP_RM" ]; then
-                if [ -n "${STUB_PLANT_DEVNULL:-}" ]; then
-                    ln -s /dev/null "${!#}"
-                else
-                    printf 'PLANTED=1\n' > "${!#}"
-                fi
-            fi
-            ;;
-    esac
 fi
 exit "$status"
 """
@@ -212,7 +196,6 @@ def project(tmp_path: Path) -> Path:
         ("cp", STUB_PASSTHROUGH),
         ("mv", STUB_PASSTHROUGH),
         ("awk", STUB_PASSTHROUGH),
-        ("chmod", STUB_PASSTHROUGH),
         ("uv", "#!/bin/bash\n"),
     ):
         stub = bin_dir / name
@@ -567,90 +550,37 @@ def ready_to_deploy(project: Path) -> None:
     )
 
 
-# Whatever sits at the copy's name is removed first, so the copy is always a
-# new regular file. Before, a FIFO hung the open, a link to /dev/null took
-# the lines, and a dangling link or a stale copy stopped the deploy.
-@pytest.mark.parametrize("planted", ["fifo", "dangling", "devnull", "stale"])
-def test_anything_left_at_the_copy_name_does_not_stop_the_strip(
-    project: Path, planted: str
+# The copy's name is this run's PID plus a random suffix, so on_exit removes
+# only this run's copies. A file at the old fixed name, or another run's copy
+# whose PID starts with this run's digits, is left as it is.
+@pytest.mark.parametrize(
+    ("planted", "name", "content"),
+    [
+        ("old", r"\.env\.local\.strip\.\d+", "OLD=1\n"),
+        ("other", r"\.env\.local\.strip\.\d+0\.AbC123", "OTHER=1\n"),
+    ],
+)
+def test_on_exit_leaves_a_strip_copy_name_that_is_not_this_runs(
+    project: Path, planted: str, name: str, content: str
 ) -> None:
-    ready_to_deploy(project)
     env_local = project / "agentcore" / ".env.local"
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
     env_local.chmod(0o600)
 
-    result = run_agent(
-        project,
-        "deploy",
-        STUB_STACK_STATUS="https://cognito-idp.example/.well-known/openid-configuration",
-        STUB_LOOKUP_PLANT_STRIP=planted,
-    )
+    result = run_destroy(project, STUB_LOOKUP_PLANT_STRIP=planted)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert not env_local.is_symlink()
     assert env_local.read_text() == "A=1\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
-    assert not list(env_local.parent.glob(".env.local.*"))
+    left = list(env_local.parent.glob(".env.local.*"))
+    assert len(left) == 1, left
+    assert re.fullmatch(name, left[0].name)
+    assert left[0].read_text() == content
 
 
-# set -C refuses a file that appears at the copy's name between the strip's
-# remove and its create. The deploy stops, and on_exit's restore strips the
-# line with a fresh copy.
-def test_a_file_made_at_the_copy_name_after_the_remove_is_refused(project: Path) -> None:
-    ready_to_deploy(project)
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o600)
-
-    result = run_agent(
-        project,
-        "deploy",
-        STUB_STACK_STATUS="https://cognito-idp.example/.well-known/openid-configuration",
-        STUB_PLANT_AFTER_STRIP_RM="1",
-    )
-
-    assert result.returncode == 1
-    assert "cannot overwrite existing file" in result.stderr
-    # The restore removed the line, so nothing is left to do by hand.
-    assert "by hand" not in result.stderr
-    assert not any(
-        call.startswith(("agentcore add", "agentcore deploy")) for call in calls(project)
-    )
-    assert env_local.read_text() == "A=1\n"
-    assert not list(env_local.parent.glob(".env.local.*"))
-
-
-# set -C opens a link to a device. chmod of the root-owned /dev/null would
-# fail, so the stub skips it, and only the regular-file check stops mv from
-# putting the link in place of .env.local.
-def test_a_link_to_a_device_made_at_the_copy_name_is_refused(project: Path) -> None:
-    ready_to_deploy(project)
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o600)
-
-    result = run_agent(
-        project,
-        "deploy",
-        STUB_STACK_STATUS="https://cognito-idp.example/.well-known/openid-configuration",
-        STUB_PLANT_AFTER_STRIP_RM="1",
-        STUB_PLANT_DEVNULL="1",
-        STUB_SKIP_STRIP_CHMOD="1",
-    )
-
-    assert result.returncode == 1
-    assert "Could not remove" in result.stderr
-    assert not any(
-        call.startswith(("agentcore add", "agentcore deploy")) for call in calls(project)
-    )
-    assert not env_local.is_symlink()
-    assert env_local.read_text() == "A=1\n"
-    assert not list(env_local.parent.glob(".env.local.*"))
-
-
-# umask 077 creates the copy with mode 0600, so the copy is never readable
-# by others, even before chmod.
-def test_the_copy_is_0600_while_it_exists_under_a_wide_umask(project: Path) -> None:
+# mktemp creates the copy with mode 0600, under umask 077 as well. The copy
+# holds the lines only after awk writes them and until mv moves it, and it
+# is 0600 at both points.
+def test_the_copy_is_0600_while_it_holds_data_under_a_wide_umask(project: Path) -> None:
     env_local = project / "agentcore" / ".env.local"
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
     env_local.chmod(0o600)
@@ -658,22 +588,9 @@ def test_the_copy_is_0600_while_it_exists_under_a_wide_umask(project: Path) -> N
     result = run_destroy(project, umask=0o022, STUB_RECORD_STRIP_MODE="1")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (project.parent / "strip-modes").read_text() == "600\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
-
-
-# A default ACL on Linux can override umask 077, so chmod must set 0600
-# before any line lands in the copy.
-def test_the_copy_is_0600_before_any_line_is_written(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o600)
-
-    result = run_destroy(project, STUB_RECORD_STRIP_SIZE="1")
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert (project.parent / "strip-sizes").read_text() == "0\n"
+    assert (project.parent / "strip-modes").read_text() == "awk 600 4\nmv 600 4\n"
     assert env_local.read_text() == "A=1\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
 
 
 def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:
@@ -824,9 +741,10 @@ def test_destroy_installs_missing_cdk_dependencies_before_removing(project: Path
     )
 
 
-# destroy makes six temporary files: the spec backup, the status errors, and
-# an output and an errors file for each of the two AWS lookups.
-@pytest.mark.parametrize("lost", range(1, 7))
+# destroy makes seven temporary files: the spec backup, the strip copy, the
+# status errors, and an output and an errors file for each of the two AWS
+# lookups.
+@pytest.mark.parametrize("lost", range(1, 8))
 def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lost: int) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()

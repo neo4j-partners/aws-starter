@@ -302,3 +302,40 @@ def test_publish_raises_einval_from_a_file_fsync(
         generator_main._publish(work, output)
 
     assert raised.value.errno == errno.EINVAL
+
+
+def _record_syncs(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Record which sync call _fsync makes, without running it."""
+    calls: list[str] = []
+    monkeypatch.setattr(os, "fsync", lambda fd: calls.append("fsync"))
+
+    def fcntl_call(fd: int, cmd: int, *args: object) -> int:
+        assert cmd == fcntl.F_FULLFSYNC
+        calls.append("F_FULLFSYNC")
+        return 0
+
+    monkeypatch.setattr(fcntl, "fcntl", fcntl_call)
+    return calls
+
+
+def test_fsync_uses_full_fsync_where_the_platform_has_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # On macOS, fsync leaves data in the drive's cache. F_FULLFSYNC flushes it.
+    monkeypatch.setattr(fcntl, "F_FULLFSYNC", 51, raising=False)
+    calls = _record_syncs(monkeypatch)
+
+    generator_main._fsync(tmp_path)
+
+    assert calls == ["F_FULLFSYNC"]
+
+
+def test_fsync_falls_back_to_os_fsync_without_full_fsync(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delattr(fcntl, "F_FULLFSYNC", raising=False)
+    calls = _record_syncs(monkeypatch)
+
+    generator_main._fsync(tmp_path)
+
+    assert calls == ["fsync"]

@@ -241,10 +241,17 @@ def _fsync_dir(path: Path) -> None:
 
 
 def _fsync(path: Path) -> None:
-    """Flush a file's or a directory's contents to disk."""
+    """Flush a file's or a directory's contents to disk.
+
+    On macOS, os.fsync can leave the data in the drive's own cache, so
+    F_FULLFSYNC is used where the platform has it.
+    """
     fd = os.open(path, os.O_RDONLY)
     try:
-        os.fsync(fd)
+        if hasattr(fcntl, "F_FULLFSYNC"):
+            fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+        else:
+            os.fsync(fd)
     finally:
         os.close(fd)
 

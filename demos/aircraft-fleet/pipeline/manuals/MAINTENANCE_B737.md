@@ -86,6 +86,7 @@ This manual covers the following ATA chapters:
 
 Each B737-800 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (B737-800)
 │
@@ -113,6 +114,7 @@ AIRCRAFT (B737-800)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (CFM56-7B)
 
@@ -163,6 +165,7 @@ Instantaneous takeoff EGT peaks are typically 850–950°C for the CFM56-7B.
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
@@ -175,8 +178,9 @@ Example: AC1001-S01-C03
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 

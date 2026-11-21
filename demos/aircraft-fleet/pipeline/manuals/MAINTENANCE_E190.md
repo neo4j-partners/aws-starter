@@ -86,6 +86,7 @@ This manual covers the following ATA chapters:
 
 Each E190 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (E190)
 │
@@ -105,7 +106,7 @@ AIRCRAFT (E190)
 │
 ├── AVIONICS SYSTEM
 │   ├── Flight Management System (FMS)
-│   ├── Air Data / Inertial Reference Unit (ADIRU)
+│   ├── Air Data and Inertial Reference Unit (ADIRU)
 │   └── Multi-Mode Receiver (MMR)
 │
 └── HYDRAULICS SYSTEM
@@ -113,6 +114,7 @@ AIRCRAFT (E190)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (CF34-10E)
 
@@ -163,6 +165,7 @@ Instantaneous takeoff EGT peaks are typically 860–895°C for the CF34-10E7.
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
@@ -175,8 +178,9 @@ Example: AC1004-S01-C03
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 

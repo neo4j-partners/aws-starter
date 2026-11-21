@@ -98,6 +98,7 @@ This manual covers the following ATA chapters:
 
 Each A321neo aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (A321neo)
 │
@@ -125,6 +126,7 @@ AIRCRAFT (A321neo)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (LEAP-1A)
 
@@ -179,11 +181,12 @@ Instantaneous takeoff EGT peaks are typically 950–1,040°C for the LEAP-1A.
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
 Example: AC1003-S01-C01
-         │       │    └── Component: Fan Module
+         │       │    └── Component: Fan Module (Carbon Fiber Composite)
          │       └─────── System: Engine #1
          └─────────────── Aircraft: AC1003 (N54980C)
 ```
@@ -191,8 +194,9 @@ Example: AC1003-S01-C01
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 

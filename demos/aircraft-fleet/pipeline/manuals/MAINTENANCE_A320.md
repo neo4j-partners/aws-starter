@@ -84,6 +84,7 @@ This manual covers the following ATA chapters:
 
 Each A320-200 aircraft comprises four primary monitored system groups:
 
+<!-- BEGIN GENERATED: component-tree -->
 ```
 AIRCRAFT (A320-200)
 │
@@ -111,6 +112,7 @@ AIRCRAFT (A320-200)
     ├── Hydraulic Reservoir
     └── Flap Actuator Assembly
 ```
+<!-- END GENERATED: component-tree -->
 
 #### 2.1.1 Engine Systems (V2500-A1)
 
@@ -157,6 +159,7 @@ Each V2500-A1 engine carries four monitoring sensors. The Avionics and Hydraulic
 
 Components are identified using the following nomenclature:
 
+<!-- BEGIN GENERATED: component-ids -->
 ```
 [Aircraft ID]-[System]-[Component]
 
@@ -169,8 +172,9 @@ Example: AC1002-S01-C03
 **System Codes:**
 - S01: Engine #1 (Left)
 - S02: Engine #2 (Right)
-- S03: Avionics Suite
-- S04: Hydraulics System
+- S03: Avionics
+- S04: Hydraulics
+<!-- END GENERATED: component-ids -->
 
 ---
 

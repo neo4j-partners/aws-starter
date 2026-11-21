@@ -6,6 +6,7 @@ them and leaves every other line as it was.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -13,8 +14,16 @@ from typer.testing import CliRunner
 
 from generator import main as generator_main
 from generator import manuals
+from generator.config import GeneratorConfig
+from generator.fleet import generate_fleet
 from generator.manuals import ManualBlockError, render_text
-from generator.specs import ENGINE_SPECS, SYSTEM_SENSORS, sensors_for
+from generator.specs import (
+    COMPONENT_ALIASES,
+    ENGINE_SPECS,
+    MANUAL_FLEET_TAILS,
+    SYSTEM_SENSORS,
+    sensors_for,
+)
 from populate_aircraft_db.pipeline import DOCUMENTS, read_manual_text, strip_comments
 
 MODEL = "B737-800"
@@ -253,3 +262,58 @@ def test_the_egt_note_quotes_the_spec_baseline_and_bands(model: str) -> None:
         f"Caution at {b.caution:g}°C, and Warning at {b.warning:g}°C"
     ) in note
     assert ENGINE_SPECS[model].engine_type in note
+
+
+def _registry_aircraft(model: str):
+    """The first generated aircraft of model, which carries a manual tail."""
+    fleet = generate_fleet(GeneratorConfig(n_aircraft=len(MANUAL_FLEET_TAILS)))
+    return next(a for a in fleet if a.model == model)
+
+
+def _resolve(label: str) -> str | None:
+    """The component type a tree label names, by its full text or its words before ' ('."""
+    for candidate in (label, label.split(" (")[0]):
+        if (component_type := COMPONENT_ALIASES.get(candidate.lower())) is not None:
+            return component_type
+    return None
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_component_tree_matches_the_generated_aircraft(model: str) -> None:
+    tree = manuals.RENDERERS["component-tree"](model, ENGINE_SPECS[model], {})
+    aircraft = _registry_aircraft(model)
+
+    groups: list[tuple[str, list[str]]] = []
+    for line in tree.splitlines():
+        if (header := re.match(r"^[├└]── (.+)$", line)) is not None:
+            groups.append((header[1], []))
+        elif (leaf := re.match(r"^[│ ]   [├└]── (.+)$", line)) is not None:
+            groups[-1][1].append(leaf[1])
+
+    engine = ENGINE_SPECS[model].engine_type
+    assert [header for header, _ in groups] == [
+        f"ENGINE SYSTEM #1 ({engine} Left)",
+        f"ENGINE SYSTEM #2 ({engine} Right)",
+        "AVIONICS SYSTEM",
+        "HYDRAULICS SYSTEM",
+    ]
+    assert [[_resolve(label) for label in leaves] for _, leaves in groups] == [
+        [c.type for c in system.components] for system in aircraft.systems
+    ]
+    assert tree.startswith(f"```\nAIRCRAFT ({model})\n")
+    assert tree.endswith("\n```")
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_component_id_example_names_a_generated_component(model: str) -> None:
+    block = manuals.RENDERERS["component-ids"](model, ENGINE_SPECS[model], {})
+    aircraft = _registry_aircraft(model)
+
+    example = re.search(r"Example: (\S+)", block)[1]
+    component = next(c for s in aircraft.systems for c in s.components if c.component_id == example)
+    assert f"└── Component: {component.name}" in block
+    assert "└─────── System: Engine #1" in block
+    assert f"└─────────────── Aircraft: {aircraft.aircraft_id} ({aircraft.tail_number})" in block
+    codes = re.findall(r"^- (S\d\d): (.+)$", block, re.MULTILINE)
+    assert [code for code, _ in codes] == [s.system_id[-3:] for s in aircraft.systems]
+    assert [name for _, name in codes][2:] == ["Avionics", "Hydraulics"]

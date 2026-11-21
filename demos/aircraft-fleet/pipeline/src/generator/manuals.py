@@ -12,12 +12,15 @@ every other line. The loader strips the markers before chunking.
 
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from .specs import ENGINE_SPECS, SYSTEM_SENSORS, EngineSpec, sensors_for
+from .config import GeneratorConfig
+from .fleet import AircraftNode, SystemNode, generate_fleet
+from .specs import ENGINE_SPECS, MANUAL_FLEET_TAILS, SYSTEM_SENSORS, EngineSpec, sensors_for
 
 MANUALS_DIR = Path(__file__).resolve().parent.parent.parent / "manuals"
 
@@ -111,10 +114,86 @@ def _egt_trend_note(model: str, engine: EngineSpec, stats: Stats) -> str:
     )
 
 
+# The tree spells out a part name that is an abbreviation, and adds the
+# abbreviation to one that is not.
+_TREE_LABELS: dict[str, str] = {
+    "FMS": "Flight Management System (FMS)",
+    "ADC": "Air Data Computer (ADC)",
+    "ADIRU": "Air Data and Inertial Reference Unit (ADIRU)",
+    "NAV": "Navigation Receiver (NAV)",
+    "MMR": "Multi-Mode Receiver (MMR)",
+    "Electrohydraulic Servo Actuators": "Electrohydraulic Servo Actuators (EHSA)",
+}
+_ENGINE_SIDES = {1: "Left", 2: "Right"}
+# The component number each manual's §2.3 example points at.
+_EXAMPLE_COMPONENT: dict[str, int] = {"A321neo": 1}
+
+
+@functools.cache
+def _registry_aircraft(model: str) -> AircraftNode:
+    """The first generated aircraft of model. It carries the model's first manual tail."""
+    fleet = generate_fleet(GeneratorConfig(n_aircraft=len(MANUAL_FLEET_TAILS)))
+    return next(a for a in fleet if a.model == model)
+
+
+def _system_header(system: SystemNode, engine: EngineSpec) -> str:
+    if system.engine_index is None:
+        return f"{system.type.upper()} SYSTEM"
+    side = _ENGINE_SIDES[system.engine_index]
+    return f"ENGINE SYSTEM #{system.engine_index} ({engine.engine_type} {side})"
+
+
+def _component_tree(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§2.1: the systems and components of every aircraft of model, in id order."""
+    aircraft = _registry_aircraft(model)
+    lines = ["```", f"AIRCRAFT ({model})", "│"]
+    for number, system in enumerate(aircraft.systems, start=1):
+        last_system = number == len(aircraft.systems)
+        lines.append(f"{'└' if last_system else '├'}── {_system_header(system, engine)}")
+        stem = " " if last_system else "│"
+        for index, component in enumerate(system.components, start=1):
+            branch = "└" if index == len(system.components) else "├"
+            label = _TREE_LABELS.get(component.name, component.name)
+            lines.append(f"{stem}   {branch}── {label}")
+        if not last_system:
+            lines.append("│")
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def _system_code(system: SystemNode) -> str:
+    if system.engine_index is None:
+        return system.name
+    return f"Engine #{system.engine_index} ({_ENGINE_SIDES[system.engine_index]})"
+
+
+def _component_ids(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§2.3: an example component id from a manual-tail aircraft, and the system codes."""
+    aircraft = _registry_aircraft(model)
+    first_engine = aircraft.systems[0]
+    component = first_engine.components[_EXAMPLE_COMPONENT.get(model, 3) - 1]
+    lines = [
+        "```",
+        "[Aircraft ID]-[System]-[Component]",
+        "",
+        f"Example: {component.component_id}",
+        f"         │       │    └── Component: {component.name}",
+        f"         │       └─────── System: {_system_code(first_engine).split(' (')[0]}",
+        f"         └─────────────── Aircraft: {aircraft.aircraft_id} ({aircraft.tail_number})",
+        "```",
+        "",
+        "**System Codes:**",
+        *(f"- {s.system_id.rsplit('-', 1)[1]}: {_system_code(s)}" for s in aircraft.systems),
+    ]
+    return "\n".join(lines)
+
+
 # Block id -> renderer. Each takes (model, engine spec, fleet stats).
 RENDERERS: dict[str, Renderer] = {
     "sensor-table": _sensor_table,
     "egt-trend-note": _egt_trend_note,
+    "component-tree": _component_tree,
+    "component-ids": _component_ids,
 }
 
 # Blocks every manual must have, once each.

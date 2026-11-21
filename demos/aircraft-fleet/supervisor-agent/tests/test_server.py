@@ -113,6 +113,37 @@ def test_memory_manager_is_closed_when_the_client_disconnects(supervisor, manage
     assert manager.closed == 1
 
 
+def test_the_stream_finishes_before_the_manager_closes_on_a_disconnect(supervisor, manager):
+    """Strands flushes memory in the stream's finally, through a hook.
+
+    On a disconnect the stream must be closed in place, so that flush ends
+    before the manager closes. A dropped stream is closed later by the event
+    loop, after or during the close.
+    """
+    order: list[str] = []
+
+    async def stream_with_flush(prompt):
+        try:
+            for i in range(1000):
+                yield {"data": f"t{i}"}
+                await asyncio.sleep(0)
+        finally:
+            order.append("flushed")
+
+    supervisor.stream_async = stream_with_flush
+    manager.close = lambda: order.append("closed")
+
+    async def disconnect_mid_answer():
+        stream = server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1"))
+        for _ in range(3):
+            await anext(stream)
+        await stream.aclose()
+        await asyncio.sleep(0.1)
+
+    asyncio.run(disconnect_mid_answer())
+    assert order == ["flushed", "closed"]
+
+
 def test_memory_manager_is_closed_when_the_request_is_cancelled(supervisor, manager):
     async def slow_stream(prompt):
         yield {"data": "partial"}

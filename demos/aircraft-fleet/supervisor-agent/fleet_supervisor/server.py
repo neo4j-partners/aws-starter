@@ -24,6 +24,7 @@ Cloud deployment:
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import threading
@@ -331,9 +332,13 @@ async def invoke(payload: Any, context):
         build = asyncio.create_task(asyncio.to_thread(_build_agent, runtime, session_id, user_id))
         supervisor, _ = await asyncio.shield(build)
         mapper = EventMapper()
-        async for event in supervisor.stream_async(prompt):
-            for client_event in mapper.map(event):
-                yield client_event
+        # Strands flushes memory through a hook in the stream's finally. On a
+        # disconnect, aclosing runs that finally here, before the manager
+        # closes. A dropped stream would be closed later by the event loop.
+        async with contextlib.aclosing(supervisor.stream_async(prompt)) as stream:
+            async for event in stream:
+                for client_event in mapper.map(event):
+                    yield client_event
         logger.info("Session %s handled by %s", session_id, mapper.specialists or "supervisor only")
         yield {"type": "complete"}
     except Exception:

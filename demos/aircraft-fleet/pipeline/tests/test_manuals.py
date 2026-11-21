@@ -884,3 +884,18 @@ def test_chapters_1_and_3_share_the_numbering_of_every_manual(model: str) -> Non
 
     assert re.search(r"^### 1\.2 Fleet Configuration$", text, re.M)
     assert re.search(r"^### 3\.2 Component Descriptions$", text, re.M)
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_no_manual_uses_piston_mixture_terms(model: str) -> None:
+    # A turbofan has no mixture control, so "lean mixture" is piston wording.
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+
+    assert not re.findall(r".*\bmixture\b.*", text, re.IGNORECASE)
+
+
+def test_the_e190_manual_names_its_engine_one_way() -> None:
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES["E190"]).read_text(encoding="utf-8")
+    prose = _PART_NUMBER_FIELD.sub("", text)
+
+    assert set(re.findall(r"\bCF34-[\w-]+", prose)) == {ENGINE_SPECS["E190"].engine_type}

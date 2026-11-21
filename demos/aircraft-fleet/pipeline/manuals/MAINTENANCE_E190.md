@@ -171,7 +171,7 @@ Each CF34-10E engine carries four monitoring sensors. The Avionics and Hydraulic
 **Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the CF34-10E, the trend baseline is 641°C, with Advisory at 661°C, Caution at 671°C, and Warning at 681°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
 <!-- END GENERATED: egt-trend-note -->
 
-Instantaneous takeoff EGT for the CF34-10E7 must stay within the Operating Limits table in section 3.2.3, High-Pressure Turbine.
+Instantaneous takeoff EGT for the CF34-10E must stay within the Operating Limits table in section 3.2.3, High-Pressure Turbine.
 
 **FADEC Integration:** The CF34-10E features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation.
 
@@ -591,7 +591,7 @@ The Full Authority Digital Engine Control (FADEC) provides:
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
 - N1 and N2 rollback
-- EGT rise from a lean mixture
+- EGT rise from a degraded fuel nozzle spray pattern
 - Fuel filter bypass or low fuel pressure EICAS message
 - Possible flameout
 

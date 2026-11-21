@@ -618,7 +618,7 @@ The ceramic matrix composite HPT shrouds require specific inspection criteria:
 #### Symptoms
 - Fuel flow fluctuation or sudden drop
 - N1/N2 rollback
-- EGT rise (lean mixture)
+- EGT rise from a degraded fuel nozzle spray pattern
 - Possible flameout
 
 #### Diagnostic Procedure

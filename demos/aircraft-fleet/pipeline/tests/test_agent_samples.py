@@ -1,21 +1,35 @@
-"""agent_samples: Cypher extraction and read-only execution of generated Cypher."""
+"""agent_samples: schema description, Cypher extraction, and read-only execution."""
 
 from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from types import SimpleNamespace
+from typing import Any
 from urllib.parse import urlparse
 
 import pytest
-from neo4j import Driver, GraphDatabase
+from neo4j import READ_ACCESS, Driver, GraphDatabase, NotificationDisabledClassification
 
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
-from generator.specs import AIRPORTS, MODEL_DISTRIBUTION, OPERATORS
+from generator.specs import (
+    AIRPORTS,
+    COMPONENT_TYPES_BY_SYSTEM,
+    DELAY_CAUSES,
+    EVENT_SEVERITIES,
+    MODEL_DISTRIBUTION,
+    OPERATORS,
+    SENSOR_TYPES,
+)
+from populate_aircraft_db import agent_samples
 from populate_aircraft_db.agent_samples import (
-    GRAPH_SCHEMA,
+    SAMPLE_QUESTIONS,
     _extract_cypher,
     _run_text2cypher,
+    graph_schema,
+    run_agent_samples,
+    system_prompt,
 )
 
 TEST_URI = os.environ.get("NEO4J_TEST_URI", "")
@@ -40,9 +54,54 @@ def test_extract_cypher_does_not_start_at_a_write_clause() -> None:
     assert _extract_cypher(raw) == raw
 
 
+class SchemaDriver:
+    """Answer the two schema queries with fixed rows and any other query with none."""
+
+    def __init__(
+        self,
+        property_rows: list[tuple[list[str], str]] = (),
+        relationship_rows: list[tuple[list[str], str, list[str]]] = (),
+    ) -> None:
+        self.property_rows = [
+            {"nodeLabels": labels, "propertyName": name} for labels, name in property_rows
+        ]
+        self.relationship_rows = [
+            {"from_labels": a, "type": rel, "to_labels": b} for a, rel, b in relationship_rows
+        ]
+        self.session_configs: list[dict[str, Any]] = []
+
+    def session(self, **config: Any) -> _SchemaSession:
+        self.session_configs.append(config)
+        return _SchemaSession(self)
+
+    def execute_query(self, cypher: str, /, **params: Any) -> tuple[list[dict], None, None]:
+        return [], None, None
+
+
+class _SchemaSession:
+    def __init__(self, driver: SchemaDriver) -> None:
+        self.driver = driver
+
+    def __enter__(self) -> _SchemaSession:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def run(self, cypher: str) -> SimpleNamespace:
+        if cypher.startswith("CALL db.schema.nodeTypeProperties()"):
+            rows = self.driver.property_rows
+        elif cypher.startswith("MATCH (a)-[r]->(b)"):
+            rows = self.driver.relationship_rows
+        else:
+            raise AssertionError(f"unexpected schema query: {cypher}")
+        return SimpleNamespace(data=lambda: rows)
+
+
 def _prompt_line(label: str) -> list[str]:
     """Return the comma-separated items on the prompt line that starts with label."""
-    return GRAPH_SCHEMA.split(f"\n{label}: ")[1].split(".\n")[0].split(", ")
+    schema = graph_schema(SchemaDriver(), "db")
+    return schema.split(f"\n{label}: ")[1].split(".\n")[0].split(", ")
 
 
 def test_prompt_names_every_model_operator_and_airport() -> None:
@@ -56,6 +115,116 @@ def test_prompt_sample_tails_are_in_the_smallest_full_fleet() -> None:
     entries = _prompt_line("Sample tail numbers")
     samples = {tuple(entry.rstrip(")").split(" (")) for entry in entries}
     assert samples == fleet
+
+
+def test_schema_lists_labels_and_relationships_without_internal_labels() -> None:
+    driver = SchemaDriver(
+        property_rows=[
+            (["Chunk", "__KGBuilder__"], "text"),
+            (["Chunk", "__KGBuilder__"], "chunkId"),
+            (["__KGBuilder__", "Chunk"], "index"),
+            (["__Entity__"], "hidden"),
+            (["Sensor", "Calibrated"], "sensor_id"),
+            (["Aircraft"], "tail_number"),
+            (["Aircraft"], "aircraft_id"),
+        ],
+        relationship_rows=[
+            (["Chunk", "__KGBuilder__"], "NEXT_CHUNK", ["__KGBuilder__", "Chunk"]),
+            (["__KGBuilder__", "Chunk"], "NEXT_CHUNK", ["Chunk", "__KGBuilder__"]),
+            (["Fault", "__Entity__", "__KGBuilder__"], "FROM_CHUNK", ["Chunk", "__KGBuilder__"]),
+            (["__Entity__"], "HIDDEN", ["Chunk"]),
+            (["Chunk"], "HIDDEN", ["__Entity__"]),
+            (["Aircraft"], "HAS_SYSTEM", ["System"]),
+        ],
+    )
+
+    schema = graph_schema(driver, "db")
+
+    assert schema.startswith(
+        "Node labels and properties:\n"
+        "- Aircraft {aircraft_id, tail_number}\n"
+        "- Calibrated:Sensor {sensor_id}\n"
+        '- Chunk {chunkId, index, text}  (chunkId: "{documentId}:{index}")\n'
+        "\n"
+        "Relationships:\n"
+        "- (Aircraft)-[:HAS_SYSTEM]->(System)\n"
+        "- (Chunk)-[:NEXT_CHUNK]->(Chunk)\n"
+        "- (Fault)-[:FROM_CHUNK]->(Chunk)\n"
+        "\n"
+        "Aircraft models: "
+    )
+
+
+@pytest.mark.parametrize(
+    ("label", "prop", "values"),
+    [
+        ("System", "type", list(COMPONENT_TYPES_BY_SYSTEM)),
+        ("Sensor", "type", [sensor_type for sensor_type, _, _ in SENSOR_TYPES]),
+        ("Delay", "cause", DELAY_CAUSES),
+        ("MaintenanceEvent", "severity", EVENT_SEVERITIES),
+    ],
+)
+def test_schema_value_hints_come_from_the_generator_specs(
+    label: str, prop: str, values: list[str]
+) -> None:
+    schema = graph_schema(SchemaDriver(property_rows=[([label], prop)]), "db")
+
+    assert f"- {label} {{{prop}}}  ({prop}: {', '.join(values)})\n" in schema
+
+
+def test_schema_is_read_in_a_read_session_without_generic_notifications() -> None:
+    driver = SchemaDriver()
+
+    graph_schema(driver, "db")
+
+    assert driver.session_configs == [
+        {
+            "database": "db",
+            "default_access_mode": READ_ACCESS,
+            "notifications_disabled_classifications": [NotificationDisabledClassification.GENERIC],
+        }
+    ]
+
+
+def test_run_agent_samples_sends_the_schema_prompt_with_every_cypher_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = {
+        "property_rows": [(["Aircraft"], "tail_number")],
+        "relationship_rows": [(["Aircraft"], "HAS_SYSTEM", ["System"])],
+    }
+    chats: list[tuple[str, str]] = []
+
+    def chat(system: str, user: str) -> str:
+        chats.append((system, user))
+        return "MATCH (n) RETURN n"
+
+    monkeypatch.setattr(
+        agent_samples, "_create_llm_client", lambda *args, **kwargs: (chat, lambda text: [0.1])
+    )
+    driver = SchemaDriver(**rows)
+
+    run_agent_samples(
+        driver,
+        "db",
+        provider="test",
+        llm_model="model",
+        embedding_model="embedder",
+        embedding_dimensions=1,
+    )
+
+    prompt = system_prompt(graph_schema(SchemaDriver(**rows), "db"))
+    cypher_questions = [sq.question for sq in SAMPLE_QUESTIONS if sq.tool == "text2cypher"]
+    assert [user for system, user in chats if system == prompt] == cypher_questions
+    assert [config["database"] for config in driver.session_configs] == ["db"]
+
+
+def test_system_prompt_puts_the_schema_after_the_rules() -> None:
+    prompt = system_prompt("SCHEMA")
+
+    assert prompt.startswith("You are an expert Neo4j Cypher query generator")
+    assert "\nRules:\n- Return ONLY the Cypher query text." in prompt
+    assert prompt.endswith("\nGraph schema:\nSCHEMA")
 
 
 @pytest.fixture
@@ -75,10 +244,35 @@ def test_generated_write_is_rejected(driver: Driver, capsys: pytest.CaptureFixtu
     driver.execute_query(cleanup, database_=database)
     try:
         _run_text2cypher(
-            driver, database, lambda _system, _user: f"CREATE (:{LABEL})", "Add a node"
+            driver,
+            database,
+            lambda _system, _user: f"CREATE (:{LABEL})",
+            "prompt",
+            "Add a node",
         )
         records, _, _ = driver.execute_query(count, database_=database)
         assert records[0]["n"] == 0
         assert "[ERROR] Cypher execution failed" in capsys.readouterr().out
+    finally:
+        driver.execute_query(cleanup, database_=database)
+
+
+def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
+    database = os.environ.get("NEO4J_TEST_DATABASE", "neo4j")
+    cleanup = "MATCH (n) WHERE n:PytestSchemaFrom OR n:PytestSchemaTo DETACH DELETE n"
+    driver.execute_query(cleanup, database_=database)
+    try:
+        driver.execute_query(
+            "CREATE (:PytestSchemaFrom:__PytestInternal__ {pytest_from: 1})"
+            "-[:PYTEST_SCHEMA_LINK]->(:PytestSchemaTo {pytest_to: 2})",
+            database_=database,
+        )
+
+        lines = graph_schema(driver, database).splitlines()
+
+        assert "- PytestSchemaFrom {pytest_from}" in lines
+        assert "- PytestSchemaTo {pytest_to}" in lines
+        assert "- (PytestSchemaFrom)-[:PYTEST_SCHEMA_LINK]->(PytestSchemaTo)" in lines
+        assert not any("__PytestInternal__" in line for line in lines)
     finally:
         driver.execute_query(cleanup, database_=database)

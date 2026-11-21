@@ -6,10 +6,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from neo4j import Driver, RoutingControl
+from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification, RoutingControl
 from neo4j.exceptions import Neo4jError
 
-from generator.specs import AIRPORTS, MANUAL_FLEET_TAILS, MODEL_DISTRIBUTION, OPERATORS
+from generator.specs import (
+    AIRPORTS,
+    COMPONENT_TYPES_BY_SYSTEM,
+    DELAY_CAUSES,
+    EVENT_SEVERITIES,
+    MANUAL_FLEET_TAILS,
+    MODEL_DISTRIBUTION,
+    OPERATORS,
+    SENSOR_TYPES,
+)
 
 from .display import WIDTH, header, records_table, show_cypher
 from .samples import report_query_error
@@ -29,61 +38,72 @@ Operators: {", ".join(op.name for op in OPERATORS)}.
 Airport IATA codes: {", ".join(airport.iata for airport in AIRPORTS)}.
 """
 
-GRAPH_SCHEMA = (
-    """\
-Node labels and properties:
-- Aircraft {aircraft_id, tail_number, icao24, model, manufacturer, operator}
-- System {system_id, aircraft_id, type, name}  (type: Engine, Avionics, Hydraulics)
-- Component {component_id, system_id, type, name}
-- Sensor {sensor_id, system_id, type, name, unit}  (type: EGT, Vibration, N1Speed, FuelFlow)
-- Reading {reading_id, sensor_id, timestamp, value}
-- Airport {airport_id, name, city, country, iata, icao, lat, lon}
-- Flight {flight_id, flight_number, aircraft_id, operator, origin, destination, scheduled_departure, scheduled_arrival}
-- Delay {delay_id, cause, minutes}  (cause: Weather, Maintenance, Carrier, NAS)
-- MaintenanceEvent {event_id, component_id, system_id, aircraft_id, fault, severity, reported_at, corrective_action}  (severity: MINOR, MAJOR, CRITICAL)
-- Removal {removal_id, tracking_number, component_id, aircraft_id, removal_date, reason, work_order_number, technician_id, part_number, serial_number, hours_since_install, flight_hours_at_removal, flight_cycles_at_removal, replacement_required, shop_visit_required, warranty_status, removal_priority, cost_estimate, installation_date}  (hours_since_install and flight_hours_at_removal are flight hours)
-- Document {documentId, aircraftType, title, type}
-- Chunk {chunkId, text, index, embedding}  (chunkId: "{documentId}:{index}")
-- AircraftModel {name, manufacturer}
-- SystemReference {name, systemType, aircraftType}
-- ComponentReference {name, componentType, partNumber, aircraftType}
-- Fault {name, faultCode, severity, aircraftType}
-- MaintenanceProcedure {name, procedureType, interval, aircraftType}
-- OperatingLimit {name, parameterName, unit, regime, minValue, maxValue, aircraftType}
+# Value hints and notes the schema procedures cannot show, by label.
+_LABEL_NOTES: dict[str, str] = {
+    "System": f"type: {', '.join(COMPONENT_TYPES_BY_SYSTEM)}",
+    "Sensor": f"type: {', '.join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)}",
+    "Delay": f"cause: {', '.join(DELAY_CAUSES)}",
+    "MaintenanceEvent": f"severity: {', '.join(EVENT_SEVERITIES)}",
+    "Removal": "hours_since_install and flight_hours_at_removal are flight hours",
+    "Chunk": 'chunkId: "{documentId}:{index}"',
+}
 
-Relationships:
-- (Aircraft)-[:HAS_SYSTEM]->(System)
-- (System)-[:HAS_COMPONENT]->(Component)
-- (System)-[:HAS_SENSOR]->(Sensor)
-- (Sensor)-[:HAS_READING]->(Reading)
-- (Component)-[:HAS_EVENT]->(MaintenanceEvent)
-- (MaintenanceEvent)-[:AFFECTS_SYSTEM]->(System)
-- (MaintenanceEvent)-[:AFFECTS_AIRCRAFT]->(Aircraft)
-- (Aircraft)-[:OPERATES_FLIGHT]->(Flight)
-- (Flight)-[:DEPARTS_FROM]->(Airport)
-- (Flight)-[:ARRIVES_AT]->(Airport)
-- (Flight)-[:HAS_DELAY]->(Delay)
-- (Aircraft)-[:HAS_REMOVAL]->(Removal)
-- (Removal)-[:REMOVED_COMPONENT]->(Component)
-- (Document)-[:APPLIES_TO]->(Aircraft)
-- (Chunk)-[:FROM_DOCUMENT]->(Document)
-- (Chunk)-[:NEXT_CHUNK]->(Chunk)
-- (AircraftModel)-[:DESCRIBES_MODEL]->(Aircraft)
-- (SystemReference)-[:DESCRIBES_SYSTEM]->(System)
-- (ComponentReference)-[:DESCRIBES_COMPONENT]->(Component)
-- (AircraftModel)-[:HAS_SYSTEM]->(SystemReference)
-- (SystemReference)-[:HAS_COMPONENT]->(ComponentReference)
-- (ComponentReference)-[:HAS_FAULT]->(Fault)
-- (Fault)-[:CORRECTED_BY]->(MaintenanceProcedure)
-- (OperatingLimit)-[:FROM_CHUNK]->(Chunk)
-- (Sensor)-[:HAS_LIMIT]->(OperatingLimit)
+_NODE_PROPERTIES_Q = """\
+CALL db.schema.nodeTypeProperties() YIELD nodeLabels, propertyName
+RETURN nodeLabels, propertyName"""
 
-"""
-    + _GRAPH_FACTS
-)
+_RELATIONSHIPS_Q = """\
+MATCH (a)-[r]->(b)
+RETURN DISTINCT labels(a) AS from_labels, type(r) AS type, labels(b) AS to_labels"""
 
-SYSTEM_PROMPT = (
-    """\
+
+def _domain_label(labels: list[str]) -> str | None:
+    """Join a node's labels, leaving out internal ones such as __KGBuilder__."""
+    domain = sorted(label for label in labels if not label.startswith("__"))
+    return ":".join(domain) or None
+
+
+def graph_schema(driver: Driver, database: str) -> str:
+    """Describe the graph's labels, properties, and relationships for the LLM.
+
+    Labels and properties come from db.schema.nodeTypeProperties and the
+    relationship patterns from the data, so the description matches the
+    database. Value hints come from the generator specs.
+    """
+    # db.schema.nodeTypeProperties warns that its propertyTypes field will
+    # change. The query does not use that field, so the warning is noise.
+    with driver.session(
+        database=database,
+        default_access_mode=READ_ACCESS,
+        notifications_disabled_classifications=[NotificationDisabledClassification.GENERIC],
+    ) as session:
+        property_rows = session.run(_NODE_PROPERTIES_Q).data()
+        relationship_rows = session.run(_RELATIONSHIPS_Q).data()
+
+    properties: dict[str, set[str]] = {}
+    for row in property_rows:
+        if label := _domain_label(row["nodeLabels"]):
+            properties.setdefault(label, set()).add(row["propertyName"])
+
+    relationships = set()
+    for row in relationship_rows:
+        from_label = _domain_label(row["from_labels"])
+        to_label = _domain_label(row["to_labels"])
+        if from_label and to_label:
+            relationships.add((from_label, row["type"], to_label))
+
+    lines = ["Node labels and properties:"]
+    for label in sorted(properties):
+        line = f"- {label} {{{', '.join(sorted(properties[label]))}}}"
+        if note := _LABEL_NOTES.get(label):
+            line += f"  ({note})"
+        lines.append(line)
+    lines += ["", "Relationships:"]
+    lines += [f"- ({a})-[:{rel}]->({b})" for a, rel, b in sorted(relationships)]
+    return "\n".join(lines) + "\n\n" + _GRAPH_FACTS
+
+
+_SYSTEM_PROMPT_RULES = """\
 You are an expert Neo4j Cypher query generator for an aircraft digital twin \
 knowledge graph. Given a natural language question, generate a single Cypher \
 query that answers it.
@@ -102,8 +122,12 @@ Rules:
 
 Graph schema:
 """
-    + GRAPH_SCHEMA
-)
+
+
+def system_prompt(schema: str) -> str:
+    """Return the text2cypher system prompt for a graph schema description."""
+    return _SYSTEM_PROMPT_RULES + schema
+
 
 VECTOR_SEARCH_PROMPT = """\
 You are a query rewriter. Given a natural language question about aircraft \
@@ -348,14 +372,15 @@ def _run_text2cypher(
     driver: Driver,
     database: str,
     chat_fn,
+    prompt: str,
     question: str,
 ) -> None:
-    """Send a question to the LLM, generate Cypher, and execute it."""
+    """Send a question with the system prompt to the LLM, then run the Cypher it returns."""
     print(f'  Question: "{question}"\n')
 
     cypher = ""
     for attempt in range(_MAX_RETRIES):
-        raw = chat_fn(SYSTEM_PROMPT, question).strip()
+        raw = chat_fn(prompt, question).strip()
         cypher = _extract_cypher(raw)
         if cypher:
             break
@@ -464,6 +489,8 @@ def run_agent_samples(
         embedding_dimensions=embedding_dimensions,
     )
 
+    prompt = system_prompt(graph_schema(driver, database))
+
     questions = SAMPLE_QUESTIONS
     if sample_size > 0:
         questions = questions[:sample_size]
@@ -481,7 +508,7 @@ def run_agent_samples(
             header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
 
         if sq.tool == "text2cypher":
-            _run_text2cypher(driver, database, chat_fn, sq.question)
+            _run_text2cypher(driver, database, chat_fn, prompt, sq.question)
         elif sq.tool == "similarity_search":
             _run_similarity_search(driver, database, chat_fn, embed_fn, sq.question)
 

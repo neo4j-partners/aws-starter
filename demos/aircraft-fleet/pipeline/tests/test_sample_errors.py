@@ -116,7 +116,10 @@ def test_existing_index_shows_the_error_without_the_setup_hint(capsys) -> None:
     [
         *SEARCHES,
         pytest.param(
-            lambda d: _run_text2cypher(d, "db", _chat, "q"), None, 0, id="agent-text2cypher"
+            lambda d: _run_text2cypher(d, "db", _chat, "prompt", "q"),
+            None,
+            0,
+            id="agent-text2cypher",
         ),
     ],
 )
@@ -129,7 +132,7 @@ def test_generated_cypher_error_is_reported_without_an_index_lookup(capsys) -> N
     error = ClientError()
     driver = FailingDriver(error)
 
-    _run_text2cypher(driver, "db", lambda system, user: "MATCH (n) RETURN n", "question")
+    _run_text2cypher(driver, "db", lambda system, user: "MATCH (n) RETURN n", "prompt", "question")
 
     out = capsys.readouterr().out
     assert f"[ERROR] Cypher execution failed: {error.code}: {error.message}" in out

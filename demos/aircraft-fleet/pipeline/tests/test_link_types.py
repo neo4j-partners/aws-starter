@@ -24,14 +24,17 @@ MODEL = "PYTEST-LINK"
 
 pytestmark = pytest.mark.skipif(not TEST_URI, reason="NEO4J_TEST_URI is not set")
 
-# One aircraft with an Engine (Turbine, Control Unit) and Hydraulics (Pump).
+# One aircraft with an Engine (HP Turbine, Main Fuel Pump), Avionics (Air
+# Data Unit), and Hydraulics (Hydraulic Pump).
 _SETUP = """
 CREATE (a:Aircraft {aircraft_id: $model + '-A', model: $model})
 CREATE (a)-[:HAS_SYSTEM]->(e:System {system_id: $model + '-E', type: 'Engine'})
+CREATE (a)-[:HAS_SYSTEM]->(v:System {system_id: $model + '-V', type: 'Avionics'})
 CREATE (a)-[:HAS_SYSTEM]->(h:System {system_id: $model + '-H', type: 'Hydraulics'})
-CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E1', type: 'Turbine', name: 'Turbine'})
-CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E2', type: 'Control Unit', name: 'Control Unit'})
-CREATE (h)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-H1', type: 'Pump', name: 'Pump'})
+CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E1', type: 'HP Turbine', name: 'High-Pressure Turbine'})
+CREATE (e)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-E2', type: 'Main Fuel Pump', name: 'Main Fuel Pump'})
+CREATE (v)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-V1', type: 'Air Data Unit', name: 'ADIRU'})
+CREATE (h)-[:HAS_COMPONENT]->(:Component {component_id: $model + '-H1', type: 'Hydraulic Pump', name: 'Engine-Driven Pump'})
 WITH 1 AS _
 UNWIND $systems AS sr
 CREATE (n:SystemReference {name: sr.name + ' - ' + $model, aircraftType: $model})
@@ -48,13 +51,18 @@ _SYSTEMS = [
     {"name": "Hydraulics", "type": None},
 ]
 _COMPONENTS = [
-    {"name": "High-Pressure Turbine", "type": "turbine"},
-    {"name": "FADEC", "type": "Control Unit"},
-    {"name": "Engine-Driven Pump", "type": "PUMP"},
-    {"name": "Fuel Pump", "type": "Fuel Pump"},
-    {"name": "Turbine", "type": None},
+    {"name": "High-Pressure Turbine", "type": "hp turbine"},
+    {"name": "Engine Fuel Pump", "type": "Main Fuel Pump"},
+    {"name": "Engine-Driven Pump", "type": "HYDRAULIC PUMP"},
+    # A manual name is an alias of its type.
+    {"name": "Air Data Inertial Reference Unit", "type": "ADIRU"},
+    {"name": "Turbine Stage", "type": "High-Pressure Turbine"},
+    # No type, and types outside the vocabulary, link to nothing.
+    {"name": "Fuel Filter", "type": "Fuel Filter"},
+    {"name": "Fuel Nozzle", "type": "Nozzle"},
+    {"name": "HP Turbine", "type": None},
     # The type decides the link, not the name.
-    {"name": "Control Unit", "type": "Turbine"},
+    {"name": "Main Fuel Pump", "type": "HP Turbine"},
 ]
 
 
@@ -113,11 +121,13 @@ def test_references_link_on_exact_type(driver: Driver, database: str) -> None:
         database_=database,
     )
     assert [(r["ref"], r["target"]) for r in records] == [
-        (f"Control Unit - {MODEL}", f"{MODEL}-E1"),
+        (f"Air Data Inertial Reference Unit - {MODEL}", f"{MODEL}-V1"),
         (f"Engine - {MODEL}", f"{MODEL}-E"),
+        (f"Engine Fuel Pump - {MODEL}", f"{MODEL}-E2"),
         (f"Engine-Driven Pump - {MODEL}", f"{MODEL}-H1"),
-        (f"FADEC - {MODEL}", f"{MODEL}-E2"),
         (f"High-Pressure Turbine - {MODEL}", f"{MODEL}-E1"),
+        (f"Main Fuel Pump - {MODEL}", f"{MODEL}-E1"),
+        (f"Turbine Stage - {MODEL}", f"{MODEL}-E1"),
     ]
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 
@@ -44,7 +44,7 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         fuel_noise_std=0.025,
     ),
     "A320-200": EngineSpec(
-        engine_type="CFM56-5B",
+        engine_type="V2500-A1",
         egt_baseline=645.0,
         egt_noise_std=3.0,
         egt_degradation_range=(0.001, 0.011),
@@ -809,8 +809,100 @@ CORRECTIVE_ACTIONS: dict[str, str] = {
     "Electrical fault": "Replaced faulty wiring harness and connector block; re-ran BITE check",
 }
 
-COMPONENT_TYPES_BY_SYSTEM: dict[str, list[str]] = {
-    "Engine": ["Turbine", "Compressor", "Combustor", "Nozzle", "Control Unit"],
-    "Avionics": ["Flight Computer", "Navigation Unit", "Communication Unit"],
-    "Hydraulics": ["Pump", "Filter", "Reservoir", "Actuator"],
+
+@dataclass(frozen=True)
+class ComponentSpec:
+    """One component type, with the part name each manual uses for it.
+
+    type is the canonical name: the Component type in the graph, and the
+    value the extraction prompt and the cross-link join use.
+    """
+
+    type: str
+    # The part name on every model, unless names gives one for the model.
+    # Empty means the type.
+    name: str = ""
+    names: dict[str, str] = field(default_factory=dict)
+    # The models that have this component. None means every model.
+    models: frozenset[str] | None = None
+
+    def name_for(self, model: str) -> str:
+        """Return the manual's part name for this component on model."""
+        return self.names.get(model, self.name or self.type)
+
+    def fits(self, model: str) -> bool:
+        """Return True if model has this component."""
+        return self.models is None or model in self.models
+
+    def aliases(self) -> list[str]:
+        """Return the type and every manual name, in order, without repeats."""
+        candidates = [self.type, self.name or self.type, *self.names.values()]
+        return list(dict.fromkeys(candidates))
+
+
+_BOEING_AIRBUS = ("B737-800", "A320-200", "A321neo")
+_A220_E190 = ("A220-300", "E190")
+
+# Components by system type, in id order: C01 is first. C01 to C05 keep one
+# order on every model, so a component id names the same type on each.
+# Names come from each manual's component sections.
+COMPONENTS_BY_SYSTEM: dict[str, tuple[ComponentSpec, ...]] = {
+    "Engine": (
+        ComponentSpec("Fan Module", names={"A321neo": "Fan Module (Carbon Fiber Composite)"}),
+        ComponentSpec("HP Compressor", name="Compressor Stage (High-Pressure)"),
+        ComponentSpec("HP Turbine", name="High-Pressure Turbine"),
+        ComponentSpec("Main Fuel Pump"),
+        ComponentSpec("Thrust Bearing", name="Thrust Bearing Assembly"),
+        # The PW1500G is a geared turbofan.
+        ComponentSpec("Reduction Gearbox", models=frozenset({"A220-300"})),
+    ),
+    "Avionics": (
+        ComponentSpec("Flight Management System", name="FMS"),
+        ComponentSpec(
+            "Air Data Unit",
+            names=dict.fromkeys(_BOEING_AIRBUS, "ADC") | dict.fromkeys(_A220_E190, "ADIRU"),
+        ),
+        ComponentSpec(
+            "Navigation Receiver",
+            names=dict.fromkeys(_BOEING_AIRBUS, "NAV") | dict.fromkeys(_A220_E190, "MMR"),
+        ),
+    ),
+    "Hydraulics": (
+        ComponentSpec(
+            "Hydraulic Pump", name="Main Hydraulic Pump", names={"E190": "Engine-Driven Pump"}
+        ),
+        ComponentSpec("Hydraulic Reservoir"),
+        ComponentSpec(
+            "Flight Control Actuator",
+            name="Flap Actuator Assembly",
+            names={"A220-300": "Electrohydraulic Servo Actuators"},
+        ),
+    ),
 }
+
+COMPONENT_TYPES_BY_SYSTEM: dict[str, list[str]] = {
+    system: [spec.type for spec in specs] for system, specs in COMPONENTS_BY_SYSTEM.items()
+}
+
+
+def component_aliases(components_by_system: dict[str, tuple[ComponentSpec, ...]]) -> dict[str, str]:
+    """Return lowercase alias -> canonical component type.
+
+    Each type and each of its manual names is an alias. Raises ValueError if
+    an alias, ignoring case, names two types.
+    """
+    aliases: dict[str, str] = {}
+    for specs in components_by_system.values():
+        for spec in specs:
+            for alias in spec.aliases():
+                key = alias.lower()
+                if aliases.get(key, spec.type) != spec.type:
+                    raise ValueError(
+                        f"alias {key!r} names both {aliases[key]!r} and {spec.type!r}; "
+                        "an alias must name one component type"
+                    )
+                aliases[key] = spec.type
+    return aliases
+
+
+COMPONENT_ALIASES = component_aliases(COMPONENTS_BY_SYSTEM)

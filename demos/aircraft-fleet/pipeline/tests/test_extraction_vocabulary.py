@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from generator.specs import COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
+from generator.specs import COMPONENT_ALIASES, COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
 from populate_aircraft_db.pipeline import EXTRACTION_PROMPT
 from populate_aircraft_db.schema import (
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
@@ -35,8 +35,17 @@ def _system_lists(text: str) -> dict[str, list[str]]:
 
 def test_prompt_lists_every_component_type_by_system() -> None:
     rule = _rule(7)
-    listed = rule.split("listed for the part's system: ")[1].split(". Use the type")[0]
+    listed = rule.split("listed for the part's system: ")[1].split(". Use these types")[0]
     assert _system_lists(listed) == COMPONENT_TYPES_BY_SYSTEM
+
+
+def _missing_aliases(text: str) -> set[str]:
+    return {alias for alias in COMPONENT_ALIASES if alias not in text.lower()}
+
+
+def test_prompt_names_every_component_alias() -> None:
+    assert not _missing_aliases(_rule(7))
+    assert "Air Data Unit for ADC or ADIRU" in _rule(7)
 
 
 def test_prompt_lists_every_system_type() -> None:
@@ -60,6 +69,7 @@ def test_schema_descriptions_list_the_same_types() -> None:
     component = _property_description("ComponentReference", "componentType")
     listed = component.split("(")[1].split(")")[0]
     assert _system_lists(listed) == COMPONENT_TYPES_BY_SYSTEM
+    assert not _missing_aliases(component)
     system = _property_description("SystemReference", "systemType")
     assert system.split("exactly one of: ")[1].split(".")[0].split(", ") == list(
         COMPONENT_TYPES_BY_SYSTEM

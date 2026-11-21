@@ -11,7 +11,8 @@ from itertools import count, zip_longest
 
 from .config import GeneratorConfig
 from .specs import (
-    COMPONENT_TYPES_BY_SYSTEM,
+    COMPONENTS_BY_SYSTEM,
+    ENGINE_SPECS,
     ENTRY_INTO_SERVICE_RANGES,
     MANUAL_FLEET_TAILS,
     MANUAL_TAIL_ENTRY_INTO_SERVICE,
@@ -149,16 +150,8 @@ class AircraftNode:
     systems: list[SystemNode] = field(default_factory=list)
 
 
-_ENGINE_NAMES: dict[str, list[str]] = {
-    "B737-800": ["CFM56-7B #1", "CFM56-7B #2"],
-    "A320-200": ["CFM56-5B #1", "CFM56-5B #2"],
-    "A321neo": ["LEAP-1A #1", "LEAP-1A #2"],
-    "E190": ["CF34-10E #1", "CF34-10E #2"],
-    "A220-300": ["PW1500G #1", "PW1500G #2"],
-}
-
-
 def _build_system(
+    model: str,
     aircraft_id: str,
     system_index: int,
     system_type: str,
@@ -175,13 +168,14 @@ def _build_system(
     )
 
     # Components
-    for comp_index, comp_type in enumerate(COMPONENT_TYPES_BY_SYSTEM[system_type], start=1):
+    specs = [spec for spec in COMPONENTS_BY_SYSTEM[system_type] if spec.fits(model)]
+    for comp_index, spec in enumerate(specs, start=1):
         system.components.append(
             ComponentNode(
                 component_id=f"{system_id}-C{comp_index:02d}",
                 system_id=system_id,
-                type=comp_type,
-                name=comp_type,
+                type=spec.type,
+                name=spec.name_for(model),
             )
         )
 
@@ -210,7 +204,7 @@ def _build_aircraft(
     utilization: tuple[float, float],
 ) -> AircraftNode:
     aircraft_id = f"AC{1001 + index}"
-    engine_names = _ENGINE_NAMES[model]
+    engine_type = ENGINE_SPECS[model].engine_type
 
     aircraft = AircraftNode(
         aircraft_id=aircraft_id,
@@ -226,15 +220,17 @@ def _build_aircraft(
     )
 
     # Two engines
-    for i, ename in enumerate(engine_names, start=1):
-        aircraft.systems.append(_build_system(aircraft_id, i, "Engine", ename, engine_index=i))
+    for i in (1, 2):
+        aircraft.systems.append(
+            _build_system(model, aircraft_id, i, "Engine", f"{engine_type} #{i}", engine_index=i)
+        )
 
     # Avionics and Hydraulics (no sensors)
     aircraft.systems.append(
-        _build_system(aircraft_id, 3, "Avionics", "Avionics Suite", engine_index=None)
+        _build_system(model, aircraft_id, 3, "Avionics", "Avionics", engine_index=None)
     )
     aircraft.systems.append(
-        _build_system(aircraft_id, 4, "Hydraulics", "Hydraulics System", engine_index=None)
+        _build_system(model, aircraft_id, 4, "Hydraulics", "Hydraulics", engine_index=None)
     )
 
     return aircraft

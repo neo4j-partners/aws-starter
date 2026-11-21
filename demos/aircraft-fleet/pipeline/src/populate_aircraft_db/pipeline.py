@@ -15,6 +15,8 @@ from neo4j_graphrag.embeddings.openai import OpenAIEmbeddings
 
 from .loader import detach_delete_nodes
 from .schema import (
+    COMPONENT_ALIASES_TEXT,
+    COMPONENT_TYPE_BY_ALIAS,
     COMPONENT_TYPES_TEXT,
     SENSOR_PARAMETER_NAMES,
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
@@ -173,7 +175,7 @@ according to the schema below.
 Return result as JSON using this format:
 {{"nodes": [
   {{"id": "0", "label": "AircraftModel", "properties": {{"name": "A320-200"}}}},
-  {{"id": "1", "label": "ComponentReference", "properties": {{"name": "High-Pressure Turbine - A320-200", "componentType": "Turbine", "aircraftType": "A320-200"}}}},
+  {{"id": "1", "label": "ComponentReference", "properties": {{"name": "High-Pressure Turbine - A320-200", "componentType": "HP Turbine", "aircraftType": "A320-200"}}}},
   {{"id": "2", "label": "OperatingLimit", "properties": {{"name": "EGT - A320-200", "parameterName": "EGT", "aircraftType": "A320-200", "unit": "°C", "maxValue": "695"}}}}
 ],
 "relationships": [
@@ -229,9 +231,11 @@ OperatingLimit.
 7. FLEET TYPES: Set SystemReference `systemType` to exactly one of \
 {SYSTEM_TYPES_TEXT}, and omit it for any other system. Set ComponentReference \
 `componentType` to exactly one of the types listed for the part's system: \
-{COMPONENT_TYPES_TEXT}. Use the type the part is or belongs to, for example \
-Turbine for a high-pressure turbine stage. Omit `componentType` when no listed \
-type fits, such as a fuel pump or a gearbox. Never invent other values.
+{COMPONENT_TYPES_TEXT}. Use these types for the manuals' own part names: \
+{COMPONENT_ALIASES_TEXT}. Use the type the part is or belongs to, for example \
+HP Turbine for a high-pressure turbine stage and Main Fuel Pump for an engine \
+fuel pump. Omit `componentType` when no listed type fits, such as a fuel \
+filter or a fuel nozzle. Never invent other values.
 
 """
     + """\
@@ -615,21 +619,23 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     logger.info("  [OK] %d SystemReference -[:DESCRIBES_SYSTEM]-> System", records[0]["count"])
 
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
-    # (same aircraft model, componentType equals the Component type, ignoring
-    # case, within the System type that has that component type in specs)
+    # (same aircraft model; componentType, ignoring case, is a component type
+    # or one of its manual names, and the Component has that type, within the
+    # System type that has that component type in specs)
     records, _, _ = driver.execute_query(
         """
         MATCH (cr:ComponentReference)
         WHERE cr.aircraftType IS NOT NULL AND cr.componentType IS NOT NULL
-        WITH cr, $system_types[toLower(cr.componentType)] AS systemType
-        WHERE systemType IS NOT NULL
+        WITH cr, $component_type_by_alias[toLower(cr.componentType)] AS ctype
+        WHERE ctype IS NOT NULL
+        WITH cr, ctype, $system_types[toLower(ctype)] AS systemType
         MATCH (:Aircraft {model: cr.aircraftType})
             -[:HAS_SYSTEM]->(:System {type: systemType})
-            -[:HAS_COMPONENT]->(c:Component)
-        WHERE toLower(c.type) = toLower(cr.componentType)
+            -[:HAS_COMPONENT]->(c:Component {type: ctype})
         MERGE (cr)-[:DESCRIBES_COMPONENT]->(c)
         RETURN count(*) AS count
     """,
+        component_type_by_alias=COMPONENT_TYPE_BY_ALIAS,
         system_types=SYSTEM_TYPE_BY_COMPONENT_TYPE,
         database_=database,
     )

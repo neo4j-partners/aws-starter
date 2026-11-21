@@ -6,7 +6,12 @@ import logging
 
 from neo4j import Driver
 
-from generator.specs import COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
+from generator.specs import (
+    COMPONENT_ALIASES,
+    COMPONENT_TYPES_BY_SYSTEM,
+    COMPONENTS_BY_SYSTEM,
+    SENSOR_TYPES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +52,23 @@ def system_type_by_component_type(components_by_system: dict[str, list[str]]) ->
 
 SYSTEM_TYPE_BY_COMPONENT_TYPE = system_type_by_component_type(COMPONENT_TYPES_BY_SYSTEM)
 
-# "Engine: Turbine, Compressor, ...; Avionics: ...; Hydraulics: ..."
+# The join maps an extracted componentType through this, so a manual's part
+# name, such as ADIRU, links like its type.
+COMPONENT_TYPE_BY_ALIAS: dict[str, str] = COMPONENT_ALIASES
+
+# "Engine: Fan Module, HP Compressor, ...; Avionics: ...; Hydraulics: ..."
 COMPONENT_TYPES_TEXT = "; ".join(
     f"{system}: {', '.join(components)}" for system, components in COMPONENT_TYPES_BY_SYSTEM.items()
 )
 SYSTEM_TYPES_TEXT = ", ".join(SYSTEM_TYPES)
+
+# "HP Turbine for High-Pressure Turbine; Air Data Unit for ADC or ADIRU; ..."
+COMPONENT_ALIASES_TEXT = "; ".join(
+    f"{spec.type} for {' or '.join(spec.aliases()[1:])}"
+    for specs in COMPONENTS_BY_SYSTEM.values()
+    for spec in specs
+    if len(spec.aliases()) > 1
+)
 
 # The fleet sensor types, which the Sensor HAS_LIMIT join matches to
 # OperatingLimit parameterName.
@@ -290,6 +307,8 @@ def build_extraction_schema():
                     description=(
                         "Fleet component type, exactly one of the types listed "
                         f"for the part's system ({COMPONENT_TYPES_TEXT}). "
+                        f"Use these types for the manuals' own part names: "
+                        f"{COMPONENT_ALIASES_TEXT}. "
                         "Omit it when no listed type fits."
                     ),
                 ),

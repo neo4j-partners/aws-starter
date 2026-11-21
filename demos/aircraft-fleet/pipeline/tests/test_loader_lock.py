@@ -11,14 +11,17 @@ import fcntl
 import logging
 import os
 from collections.abc import Iterator
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
 
 from generator import main as generator_main
-from generator.stamp import LOCK_NAME
+from generator.stamp import LOCK_NAME, GenerateRunningError
 from populate_aircraft_db import loader
+from populate_aircraft_db import main as loader_main
 
 
 class _Driver:
@@ -58,7 +61,7 @@ def test_a_load_fails_at_once_while_a_generate_runs(tmp_path: Path) -> None:
     driver = _Driver()
     with (tmp_path / LOCK_NAME).open("a") as held:
         fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        with pytest.raises(RuntimeError, match=f"^a generate is running in {tmp_path}$"):
+        with pytest.raises(GenerateRunningError, match=f"^a generate is running in {tmp_path}$"):
             loader.load_operational_graph(driver, "db", tmp_path)
 
     assert driver.queries == []
@@ -180,3 +183,46 @@ def test_only_a_read_only_directory_lets_a_load_skip_the_lock(
         with pytest.raises(OSError) as raised:
             loader.load_operational_graph(_Driver(), "db", tmp_path)
         assert raised.value.errno == code
+
+
+def _fake_cli(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> None:
+    """Point the loader CLI at data_dir with a driver and schema steps that run nothing."""
+    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=data_dir)
+    monkeypatch.setattr(loader_main, "Settings", lambda: settings)
+    monkeypatch.setattr(loader_main, "_resolve_llm_credentials", lambda s: object())
+    monkeypatch.setattr(loader_main, "_connect", lambda s: nullcontext(_Driver()))
+    for name in ("create_constraints", "create_indexes", "create_fulltext_indexes"):
+        monkeypatch.setattr(loader_main, name, lambda driver, database: None)
+
+
+@pytest.mark.parametrize("command", ["setup", "load-operational"])
+def test_the_load_commands_exit_1_with_the_message_while_a_generate_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    _fake_cli(monkeypatch, tmp_path)
+
+    with (tmp_path / LOCK_NAME).open("a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        result = CliRunner().invoke(loader_main.app, [command])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
+    assert result.output.splitlines()[-1] == f"[FAIL] a generate is running in {tmp_path}"
+
+
+@pytest.mark.parametrize("command", ["setup", "load-operational"])
+def test_the_load_commands_keep_the_traceback_for_other_runtime_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    _fake_cli(monkeypatch, tmp_path)
+
+    def fail(*args: object) -> None:
+        raise RuntimeError("load failed")
+
+    monkeypatch.setattr(loader_main, "load_operational_graph", fail)
+
+    result = CliRunner().invoke(loader_main.app, [command])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, RuntimeError)
+    assert str(result.exception) == "load failed"

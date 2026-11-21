@@ -14,7 +14,7 @@ import typer
 from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 
-from generator.stamp import stale_reason
+from generator.stamp import GenerateRunningError, stale_reason
 
 from .config import Settings
 from .loader import clear_database, dataset_mismatch, load_operational_graph, verify
@@ -304,6 +304,19 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
     validate_enrichment(driver, settings.neo4j_database)
 
 
+def _load_csvs(driver: Driver, settings: Settings) -> None:
+    """Load the operational CSVs, or exit 1 with the message if a generate runs.
+
+    Only the held lock becomes a message. Any other error keeps its
+    traceback.
+    """
+    try:
+        load_operational_graph(driver, settings.neo4j_database, settings.data_dir)
+    except GenerateRunningError as exc:
+        print(f"[FAIL] {exc}")
+        raise typer.Exit(code=1) from exc
+
+
 # ---------------------------------------------------------------------------
 # CLI commands
 # ---------------------------------------------------------------------------
@@ -329,7 +342,7 @@ def setup_cmd() -> None:
         create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_operational_graph(driver, settings.neo4j_database, settings.data_dir)
+        _load_csvs(driver, settings)
         print()
 
         try:
@@ -436,7 +449,7 @@ def load_operational_cmd() -> None:
         create_fulltext_indexes(driver, settings.neo4j_database)
         print()
 
-        load_operational_graph(driver, settings.neo4j_database, settings.data_dir)
+        _load_csvs(driver, settings)
         print()
 
         print("Linking existing enrichment to operational graph...")

@@ -17,7 +17,13 @@ from typing import Any, TextIO
 from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
 
-from generator.stamp import LOCK_NAME, STAMP_NAME, read_stamp, stamp_differences
+from generator.stamp import (
+    LOCK_NAME,
+    STAMP_NAME,
+    GenerateRunningError,
+    read_stamp,
+    stamp_differences,
+)
 
 from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
 
@@ -431,7 +437,7 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
     so a load that fails partway leaves none.
 
     Raises:
-        RuntimeError: If a generate is running in data_dir.
+        GenerateRunningError: If a generate is running in data_dir.
     """
     with _shared_lock(data_dir):
         _load_operational_graph(driver, database, data_dir)
@@ -448,7 +454,7 @@ def _shared_lock(data_dir: Path) -> Iterator[None]:
     without the lock. A generate cannot publish into that directory either.
 
     Raises:
-        RuntimeError: If a generate holds the lock.
+        GenerateRunningError: If a generate holds the lock.
     """
     path = data_dir / LOCK_NAME
     if (handle := _open_lock_file(path)) is None:
@@ -459,7 +465,7 @@ def _shared_lock(data_dir: Path) -> Iterator[None]:
         try:
             fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise RuntimeError(f"a generate is running in {data_dir}") from exc
+            raise GenerateRunningError(f"a generate is running in {data_dir}") from exc
         yield
 
 

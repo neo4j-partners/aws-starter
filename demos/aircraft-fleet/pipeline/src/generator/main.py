@@ -27,7 +27,15 @@ from .operations import generate_operations
 from .removals import _check_start_date, generate_removals
 from .sensors import generate_system_readings
 from .specs import EVENT_SEVERITIES
-from .stamp import LOCK_NAME, STAMP_NAME, clear_stamp, regenerate_reason, stamp_for, write_stamp
+from .stamp import (
+    LOCK_NAME,
+    STAMP_NAME,
+    GenerateRunningError,
+    clear_stamp,
+    regenerate_reason,
+    stamp_for,
+    write_stamp,
+)
 from .writers import CSV_COLUMNS, write_csv
 
 app = typer.Typer(
@@ -36,10 +44,6 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
-
-
-class GenerateRunningError(RuntimeError):
-    """Another generate, or a load, holds the output's lock."""
 
 
 # Every file a run writes into the output directory, besides the stamp. A run

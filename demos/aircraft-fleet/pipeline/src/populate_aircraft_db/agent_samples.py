@@ -256,9 +256,8 @@ def _create_llm_client(
     """Return an LLM callable and an embed callable based on the provider."""
 
     if provider == "bedrock":
-        import json
-
         import boto3
+        from neo4j_graphrag.embeddings.bedrock import BedrockEmbeddings
 
         client = boto3.client("bedrock-runtime", **({"region_name": region} if region else {}))
 
@@ -277,20 +276,12 @@ def _create_llm_client(
             content = resp["output"]["message"]["content"]
             return next((block["text"] for block in content if "text" in block), "")
 
-        def embed(text: str) -> list[float]:
-            resp = client.invoke_model(
-                modelId=embedding_model,
-                accept="application/json",
-                contentType="application/json",
-                body=json.dumps(
-                    {
-                        "inputText": text,
-                        "dimensions": embedding_dimensions,
-                        "normalize": True,
-                    }
-                ),
-            )
-            return list(json.loads(resp["body"].read())["embedding"])
+        # The same embedder the pipeline uses for the chunk embeddings.
+        embed = BedrockEmbeddings(
+            model_id=embedding_model,
+            dimensions=embedding_dimensions,
+            region_name=region,
+        ).embed_query
 
     elif provider == "openai":
         from openai import OpenAI

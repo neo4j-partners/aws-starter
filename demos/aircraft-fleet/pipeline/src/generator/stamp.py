@@ -23,10 +23,24 @@ _GENERATOR_DIR = Path(__file__).resolve().parent
 _LIBRARIES = ("faker", "numpy")
 
 
+def _is_source(path: Path) -> bool:
+    """Return whether a .py path under the generator is source code.
+
+    Editor and tool files are left out: any path part that starts with "."
+    covers an Emacs .#lock link and .ipynb_checkpoints, and __pycache__ is
+    left out too. So is anything that is not a regular file, such as a
+    directory or a dangling link, since it has no bytes to hash.
+    """
+    parts = path.relative_to(_GENERATOR_DIR).parts
+    if any(part.startswith(".") or part == "__pycache__" for part in parts):
+        return False
+    return path.is_file()
+
+
 def generator_hash() -> str:
-    """Return a SHA-256 over the path and bytes of every .py file in the generator."""
+    """Return a SHA-256 over the path and bytes of every .py source file in the generator."""
     digest = hashlib.sha256()
-    for path in sorted(_GENERATOR_DIR.rglob("*.py")):
+    for path in sorted(filter(_is_source, _GENERATOR_DIR.rglob("*.py"))):
         data = path.read_bytes()
         name = path.relative_to(_GENERATOR_DIR).as_posix()
         digest.update(f"{name}\0{len(data)}\0".encode())

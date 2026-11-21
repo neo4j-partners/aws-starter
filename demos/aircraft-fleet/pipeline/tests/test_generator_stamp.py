@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Callable
 from contextlib import nullcontext
 from importlib.metadata import version
 from pathlib import Path
@@ -181,6 +182,45 @@ def test_generator_hash_covers_every_module(
     (source / "sub" / "b.py").write_text("B = 2\n")
 
     assert stamp.generator_hash() != before
+
+
+def _add_link(path: Path, target: str) -> None:
+    path.symlink_to(target)
+
+
+def _add_file(path: Path, text: str = "EDITOR = 1\n") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+@pytest.mark.parametrize(
+    "add",
+    [
+        # Emacs writes a lock as a symlink to a name that does not exist.
+        pytest.param(lambda src: _add_link(src / ".#a.py", "user@host.123:1"), id="emacs-lock"),
+        pytest.param(
+            lambda src: _add_file(src / ".ipynb_checkpoints" / "a-checkpoint.py"),
+            id="ipynb-checkpoint",
+        ),
+        pytest.param(lambda src: _add_file(src / "sub" / "__pycache__" / "b.py"), id="pycache"),
+        pytest.param(lambda src: _add_file(src / ".scratch.py"), id="dotfile"),
+        pytest.param(lambda src: (src / "pkg.py").mkdir(), id="directory"),
+        pytest.param(lambda src: _add_link(src / "gone.py", "missing.py"), id="dangling-link"),
+    ],
+)
+def test_generator_hash_ignores_editor_and_cache_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, add: Callable[[Path], None]
+) -> None:
+    source = tmp_path / "generator"
+    (source / "sub").mkdir(parents=True)
+    (source / "a.py").write_text("A = 1\n")
+    (source / "sub" / "b.py").write_text("B = 1\n")
+    monkeypatch.setattr(stamp, "_GENERATOR_DIR", source)
+    before = stamp.generator_hash()
+
+    add(source)
+
+    assert stamp.generator_hash() == before
 
 
 @pytest.mark.parametrize(

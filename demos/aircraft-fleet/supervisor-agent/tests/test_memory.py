@@ -29,6 +29,7 @@ def _clean(monkeypatch: pytest.MonkeyPatch):
     for name in MEM_VARS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(memory, "_settings", None)
+    monkeypatch.setattr(memory, "_settings_build", None)
     secrets._read_secret.cache_clear()
 
 

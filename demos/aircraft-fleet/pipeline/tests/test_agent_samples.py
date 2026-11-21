@@ -22,12 +22,10 @@ from neo4j import (
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
 from generator.specs import (
-    AIRPORTS,
     COMPONENT_TYPES_BY_SYSTEM,
     DELAY_CAUSES,
     EVENT_SEVERITIES,
     MODEL_DISTRIBUTION,
-    OPERATORS,
     SENSOR_TYPES,
 )
 from populate_aircraft_db import agent_samples
@@ -63,19 +61,29 @@ def test_extract_cypher_does_not_start_at_a_write_clause() -> None:
 
 
 class SchemaDriver:
-    """Answer the two schema queries with fixed rows and any other query with none."""
+    """Answer the schema and fact queries with fixed rows and any other query with none."""
 
     def __init__(
         self,
         property_rows: list[tuple[list[str], str]] = (),
         relationship_rows: list[tuple[list[str], str, list[str]]] = (),
+        tail_rows: list[tuple[str, str]] = (),
+        operators: list[str] = (),
+        airports: list[str] = (),
     ) -> None:
-        self.property_rows = [
-            {"nodeLabels": labels, "propertyName": name} for labels, name in property_rows
-        ]
-        self.relationship_rows = [
-            {"from_labels": a, "type": rel, "to_labels": b} for a, rel, b in relationship_rows
-        ]
+        self.rows = {
+            agent_samples._NODE_PROPERTIES_Q: [
+                {"nodeLabels": labels, "propertyName": name} for labels, name in property_rows
+            ],
+            agent_samples._RELATIONSHIPS_Q: [
+                {"from_labels": a, "type": rel, "to_labels": b} for a, rel, b in relationship_rows
+            ],
+            agent_samples._SAMPLE_TAILS_Q: [
+                {"model": model, "tail": tail} for model, tail in tail_rows
+            ],
+            agent_samples._OPERATORS_Q: [{"operator": name} for name in operators],
+            agent_samples._AIRPORTS_Q: [{"iata": code} for code in airports],
+        }
         self.session_configs: list[dict[str, Any]] = []
 
     def session(self, **config: Any) -> _SchemaSession:
@@ -97,32 +105,39 @@ class _SchemaSession:
         return None
 
     def run(self, cypher: str) -> SimpleNamespace:
-        if cypher.startswith("CALL db.schema.nodeTypeProperties()"):
-            rows = self.driver.property_rows
-        elif cypher.startswith("MATCH (a)-[r]->(b)"):
-            rows = self.driver.relationship_rows
-        else:
+        if cypher not in self.driver.rows:
             raise AssertionError(f"unexpected schema query: {cypher}")
+        rows = self.driver.rows[cypher]
         return SimpleNamespace(data=lambda: rows)
 
 
-def _prompt_line(label: str) -> list[str]:
+def _prompt_line(schema: str, label: str) -> list[str]:
     """Return the comma-separated items on the prompt line that starts with label."""
-    schema = graph_schema(SchemaDriver(), "db")
     return schema.split(f"\n{label}: ")[1].split(".\n")[0].split(", ")
 
 
-def test_prompt_names_every_model_operator_and_airport() -> None:
-    assert _prompt_line("Aircraft models") == [model for model, _ in MODEL_DISTRIBUTION]
-    assert _prompt_line("Operators") == [operator.name for operator in OPERATORS]
-    assert _prompt_line("Airport IATA codes") == [airport.iata for airport in AIRPORTS]
+def test_prompt_takes_tails_operators_and_airports_from_the_database() -> None:
+    driver = SchemaDriver(
+        tail_rows=[("B737-800", "N1TEST"), ("E190", "N2TEST")],
+        operators=["TestAir"],
+        airports=["ZZA", "ZZB"],
+    )
+
+    schema = graph_schema(driver, "db")
+
+    assert _prompt_line(schema, "Aircraft models") == [model for model, _ in MODEL_DISTRIBUTION]
+    assert _prompt_line(schema, "Sample tail numbers") == ["N1TEST (B737-800)", "N2TEST (E190)"]
+    assert _prompt_line(schema, "Operators") == ["TestAir"]
+    assert _prompt_line(schema, "Airport IATA codes") == ["ZZA", "ZZB"]
 
 
-def test_prompt_sample_tails_are_in_the_smallest_full_fleet() -> None:
-    fleet = {(ac.tail_number, ac.model) for ac in generate_fleet(GeneratorConfig(n_aircraft=5))}
-    entries = _prompt_line("Sample tail numbers")
-    samples = {tuple(entry.rstrip(")").split(" (")) for entry in entries}
-    assert samples == fleet
+def test_prompt_leaves_out_facts_the_database_does_not_have() -> None:
+    schema = graph_schema(SchemaDriver(), "db")
+
+    assert "\nAircraft models: " in schema
+    assert "Sample tail numbers" not in schema
+    assert "Operators" not in schema
+    assert "Airport IATA codes" not in schema
 
 
 def _fleet_tails(n_aircraft: int) -> dict[str, str]:
@@ -326,7 +341,12 @@ def test_generated_write_is_rejected(driver: Driver, capsys: pytest.CaptureFixtu
 
 def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
     database = os.environ.get("NEO4J_TEST_DATABASE", "neo4j")
-    cleanup = "MATCH (n) WHERE n:PytestSchemaFrom OR n:PytestSchemaTo DETACH DELETE n"
+    cleanup = """
+    MATCH (n)
+    WHERE n:PytestSchemaFrom OR n:PytestSchemaTo
+       OR (n:Aircraft AND n.model = 'PYTEST-MODEL') OR (n:Airport AND n.iata = 'ZZQ')
+    DETACH DELETE n
+    """
     driver.execute_query(cleanup, database_=database)
     try:
         driver.execute_query(
@@ -334,12 +354,29 @@ def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
             "-[:PYTEST_SCHEMA_LINK]->(:PytestSchemaTo {pytest_to: 2})",
             database_=database,
         )
+        # The lowest aircraft_id of a model gives its sample tail.
+        driver.execute_query(
+            """
+            CREATE (:Aircraft {aircraft_id: 'PYTEST-AC2', tail_number: 'N2PYT',
+                               model: 'PYTEST-MODEL', operator: 'PytestAir'})
+            CREATE (:Aircraft {aircraft_id: 'PYTEST-AC1', tail_number: 'N1PYT',
+                               model: 'PYTEST-MODEL', operator: 'PytestAir'})
+            CREATE (:Airport {iata: 'ZZQ'})
+            """,
+            database_=database,
+        )
 
-        lines = graph_schema(driver, database).splitlines()
+        schema = graph_schema(driver, database)
+        lines = schema.splitlines()
 
         assert "- PytestSchemaFrom {pytest_from}" in lines
         assert "- PytestSchemaTo {pytest_to}" in lines
         assert "- (PytestSchemaFrom)-[:PYTEST_SCHEMA_LINK]->(PytestSchemaTo)" in lines
         assert not any("__PytestInternal__" in line for line in lines)
+        tails = _prompt_line(schema, "Sample tail numbers")
+        assert "N1PYT (PYTEST-MODEL)" in tails
+        assert "N2PYT (PYTEST-MODEL)" not in tails
+        assert "PytestAir" in _prompt_line(schema, "Operators")
+        assert "ZZQ" in _prompt_line(schema, "Airport IATA codes")
     finally:
         driver.execute_query(cleanup, database_=database)

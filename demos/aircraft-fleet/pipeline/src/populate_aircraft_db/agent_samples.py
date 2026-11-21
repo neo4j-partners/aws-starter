@@ -10,13 +10,11 @@ from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification, Query
 from neo4j.exceptions import Neo4jError
 
 from generator.specs import (
-    AIRPORTS,
     COMPONENT_TYPES_BY_SYSTEM,
     DELAY_CAUSES,
     EVENT_SEVERITIES,
     MANUAL_FLEET_TAILS,
     MODEL_DISTRIBUTION,
-    OPERATORS,
     SENSOR_TYPES,
 )
 
@@ -27,21 +25,14 @@ from .samples import report_query_error
 # Graph schema description fed to the LLM for Cypher generation
 # ---------------------------------------------------------------------------
 
-# Facts about the generated data, from the generator specs so they match it.
-# The first manual tail of each model is in every fleet of five or more
-# aircraft, because the registry tails come first in round-robin order.
+# Tails for the sample questions. The first manual tail of each model is in
+# every fleet of five or more aircraft, because the registry tails come
+# first in round-robin order.
 _FIRST_TAIL: dict[str, str] = {model: tails[0] for model, tails in MANUAL_FLEET_TAILS.items()}
-_SAMPLE_TAILS = ", ".join(f"{tail} ({model})" for model, tail in _FIRST_TAIL.items())
 # The shared-faults question needs two tails of one model, because manual
 # Fault nodes are per aircraft model. The second B737 tail is the sixth
 # registry aircraft, so these are in every fleet of six or more.
 _SHARED_FAULT_TAILS: list[str] = MANUAL_FLEET_TAILS["B737-800"][:2]
-_GRAPH_FACTS = f"""\
-Aircraft models: {", ".join(model for model, _ in MODEL_DISTRIBUTION)}.
-Sample tail numbers: {_SAMPLE_TAILS}.
-Operators: {", ".join(op.name for op in OPERATORS)}.
-Airport IATA codes: {", ".join(airport.iata for airport in AIRPORTS)}.
-"""
 
 # Value hints and notes the schema procedures cannot show, by label.
 _LABEL_NOTES: dict[str, str] = {
@@ -61,6 +52,28 @@ _RELATIONSHIPS_Q = """\
 MATCH (a)-[r]->(b)
 RETURN DISTINCT labels(a) AS from_labels, type(r) AS type, labels(b) AS to_labels"""
 
+# The tail of each model's lowest aircraft_id, which is its first registry
+# tail in a generated fleet.
+_SAMPLE_TAILS_Q = """\
+MATCH (a:Aircraft)
+WHERE a.model IS NOT NULL AND a.tail_number IS NOT NULL
+WITH a ORDER BY a.aircraft_id
+WITH a.model AS model, collect(a)[0] AS first
+RETURN model, first.tail_number AS tail
+ORDER BY first.aircraft_id"""
+
+_OPERATORS_Q = """\
+MATCH (a:Aircraft)
+WHERE a.operator IS NOT NULL
+RETURN DISTINCT a.operator AS operator
+ORDER BY operator"""
+
+_AIRPORTS_Q = """\
+MATCH (ap:Airport)
+WHERE ap.iata IS NOT NULL
+RETURN DISTINCT ap.iata AS iata
+ORDER BY iata"""
+
 
 def _domain_label(labels: list[str]) -> str | None:
     """Join a node's labels, leaving out internal ones such as __KGBuilder__."""
@@ -73,7 +86,8 @@ def graph_schema(driver: Driver, database: str) -> str:
 
     Labels and properties come from db.schema.nodeTypeProperties and the
     relationship patterns from the data, so the description matches the
-    database. Value hints come from the generator specs.
+    database. The sample tails, operators, and airport codes come from the
+    data too. Value hints and the model list come from the generator specs.
     """
     # db.schema.nodeTypeProperties warns that its propertyTypes field will
     # change. The query does not use that field, so the warning is noise.
@@ -84,6 +98,9 @@ def graph_schema(driver: Driver, database: str) -> str:
     ) as session:
         property_rows = session.run(_NODE_PROPERTIES_Q).data()
         relationship_rows = session.run(_RELATIONSHIPS_Q).data()
+        tail_rows = session.run(_SAMPLE_TAILS_Q).data()
+        operator_rows = session.run(_OPERATORS_Q).data()
+        airport_rows = session.run(_AIRPORTS_Q).data()
 
     properties: dict[str, set[str]] = {}
     for row in property_rows:
@@ -105,7 +122,17 @@ def graph_schema(driver: Driver, database: str) -> str:
         lines.append(line)
     lines += ["", "Relationships:"]
     lines += [f"- ({a})-[:{rel}]->({b})" for a, rel, b in sorted(relationships)]
-    return "\n".join(lines) + "\n\n" + _GRAPH_FACTS
+
+    # A fact the database has no values for is left out.
+    facts = {
+        "Aircraft models": [model for model, _ in MODEL_DISTRIBUTION],
+        "Sample tail numbers": [f"{row['tail']} ({row['model']})" for row in tail_rows],
+        "Operators": [row["operator"] for row in operator_rows],
+        "Airport IATA codes": [row["iata"] for row in airport_rows],
+    }
+    lines.append("")
+    lines += [f"{name}: {', '.join(values)}." for name, values in facts.items() if values]
+    return "\n".join(lines) + "\n"
 
 
 _SYSTEM_PROMPT_RULES = """\

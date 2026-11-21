@@ -6,6 +6,7 @@ These paths never reach Neo4j or Bedrock. Retrieval calls are monkeypatched.
 from __future__ import annotations
 
 import asyncio
+import threading
 
 import neo4j
 import pytest
@@ -365,3 +366,88 @@ def test_close_failure_is_logged_not_sent(monkeypatch, caplog) -> None:
     assert events[-1] == {"type": "complete"}
     assert made[0].closed == 1
     assert "Could not close the memory session s-1" in caplog.text
+
+
+def test_failed_build_closes_the_memory_once(monkeypatch) -> None:
+    made, _ = _agent_path(monkeypatch)
+
+    def broken_agent(**kwargs: object) -> _FakeAgent:
+        raise RuntimeError("restore failed")
+
+    monkeypatch.setattr(server, "Agent", broken_agent)
+    events = _run({"prompt": "hi"}, session_id="s-1")
+    assert events == [{"type": "error", "error": server.GENERIC_ERROR}]
+    assert made[0].closed == 1
+
+
+def _blocked_build(monkeypatch) -> tuple[list[_FakeMemory], threading.Event, threading.Event]:
+    """Make the Agent constructor block until ``release`` is set."""
+    made, _ = _agent_path(monkeypatch)
+    building, release = threading.Event(), threading.Event()
+
+    def slow_agent(**kwargs: object) -> _FakeAgent:
+        building.set()
+        assert release.wait(5)
+        # The close must not have run while the constructor used the manager.
+        assert made[0].closed == 0
+        return _FakeAgent(**kwargs)
+
+    monkeypatch.setattr(server, "Agent", slow_agent)
+    return made, building, release
+
+
+async def _produce(stream) -> None:
+    """Iterate a handler stream the way the AgentCore worker loop does.
+
+    ``BedrockAgentCoreApp._async_gen_to_sync_gen`` runs this loop in a task.
+    On a client disconnect it calls ``task.cancel()`` once, then the
+    producer's finally awaits ``aclose()``.
+    """
+    try:
+        async for _ in stream:
+            pass
+    finally:
+        await stream.aclose()
+
+
+def test_disconnect_during_the_build_closes_after_the_build(monkeypatch) -> None:
+    made, building, release = _blocked_build(monkeypatch)
+
+    async def disconnect_mid_build() -> None:
+        stream = server.invoke({"prompt": "hi"}, RequestContext(session_id="s-1"))
+        task = asyncio.create_task(_produce(stream))
+        assert await asyncio.to_thread(building.wait, 5)
+        task.cancel()
+        # The request waits for the build before it closes the manager.
+        await asyncio.sleep(0.05)
+        assert not task.done()
+        assert made[0].closed == 0
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(disconnect_mid_build())
+    assert made[0].closed == 1
+    assert not server._closing
+
+
+def test_second_cancel_does_not_stop_the_close(monkeypatch) -> None:
+    made, building, release = _blocked_build(monkeypatch)
+
+    async def cancel_twice() -> None:
+        stream = server.invoke({"prompt": "hi"}, RequestContext(session_id="s-1"))
+        task = asyncio.create_task(_produce(stream))
+        assert await asyncio.to_thread(building.wait, 5)
+        task.cancel()
+        await asyncio.sleep(0.05)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # The request is gone, but its close task still waits for the build.
+        [closing] = server._closing
+        assert made[0].closed == 0
+        release.set()
+        await closing
+
+    asyncio.run(cancel_twice())
+    assert made[0].closed == 1

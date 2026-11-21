@@ -268,18 +268,16 @@ async def invoke(
         schema = await asyncio.to_thread(get_graph_schema)
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(schema=schema)
 
-        # One memory manager per request, closed on every path below.
-        memory = session_manager(session_id, req.user_id)
+        # One memory manager per request, closed on every path below. The
+        # build blocks, so it runs in a worker thread.
+        build = asyncio.create_task(
+            asyncio.to_thread(_build_agent, session_id, req.user_id, system_prompt)
+        )
         try:
-            # The manager connects and restores the session history while
-            # the Agent is built. Both block, so keep them off the loop.
-            agent = await asyncio.to_thread(
-                Agent,
-                model=model,
-                tools=[graph_query_tool, vector_search_tool],
-                system_prompt=system_prompt,
-                session_manager=memory,
-            )
+            # A client disconnect cancels this await, but the thread keeps
+            # building. The shield keeps the build task running, so the
+            # finally below can wait for it before closing the manager.
+            agent, _ = await asyncio.shield(build)
 
             # Strands repeats ``current_tool_use`` on every input delta while
             # a tool call is being assembled; dedupe by toolUseId so each call
@@ -296,7 +294,7 @@ async def invoke(
                         last_tool_id = tool_id
                         yield {"type": "tool", "name": name}
         finally:
-            await _close_memory(memory)
+            await _close_after_build(build)
 
         yield {"type": "complete"}
         logger.info("Request completed successfully")
@@ -332,14 +330,71 @@ async def invoke(
         yield {"type": "error", "error": GENERIC_ERROR}
 
 
-async def _close_memory(memory: Neo4jSessionManager) -> None:
-    """Flush and close a request's memory manager off the event loop.
+def _build_agent(
+    session_id: str, user_id: str, system_prompt: str
+) -> tuple[Agent, Neo4jSessionManager]:
+    """Build one request's memory manager and Agent. Runs in a worker thread.
+
+    The manager connects and restores the session history while the Agent is
+    built. If the build fails, the manager is closed here before the error is
+    raised. The caller closes only a manager whose Agent was built.
+    """
+    memory = session_manager(session_id, user_id)
+    try:
+        agent = Agent(
+            model=model,
+            tools=[graph_query_tool, vector_search_tool],
+            system_prompt=system_prompt,
+            session_manager=memory,
+        )
+    except Exception:
+        _close_memory(memory)
+        raise
+    return agent, memory
+
+
+# Close tasks still running. The event loop keeps only weak references to
+# tasks, so this set keeps each one alive until it ends.
+_closing: set[asyncio.Task[None]] = set()
+
+
+async def _close_after_build(
+    build: asyncio.Task[tuple[Agent, Neo4jSessionManager]],
+) -> None:
+    """Close a request's memory manager once its build has ended.
+
+    A client disconnect cancels the request while the build thread may still
+    be running. Closing then would race the constructor, which would reconnect
+    the closed manager and leak its driver and loop thread. So this waits for
+    the build first. The close runs in its own task behind a shield, so a
+    second cancel cannot stop it halfway.
+    """
+    closing = asyncio.create_task(_await_build_then_close(build))
+    _closing.add(closing)
+    closing.add_done_callback(_closing.discard)
+    await asyncio.shield(closing)
+
+
+async def _await_build_then_close(
+    build: asyncio.Task[tuple[Agent, Neo4jSessionManager]],
+) -> None:
+    try:
+        _, memory = await build
+    except Exception:
+        # A failed build already closed its manager in _build_agent. The
+        # request path reports the error.
+        return
+    await asyncio.to_thread(_close_memory, memory)
+
+
+def _close_memory(memory: Neo4jSessionManager) -> None:
+    """Flush and close a request's memory manager. Blocks.
 
     A failure is logged, not raised. It runs after the answer has streamed or
     while another error is already propagating, and must not replace either.
     """
     try:
-        await asyncio.to_thread(memory.close)
+        memory.close()
     except Exception:
         logger.exception("Could not close the memory session %s", memory.session_id)
 

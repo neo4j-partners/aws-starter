@@ -32,7 +32,7 @@ from generator.specs import (
 SEED = 42
 # The manuals' historic MINOR/MAJOR/CRITICAL shares, in percent. The test
 # checks them, within 8 points, on the default run only. Other seeds spread
-# wider; over 16 seeds at 30x90 the mean is about 50/32/18.
+# wider; over 16 seeds at 30x90 the mean is about 50/34/16.
 TARGET_MIX = {"MINOR": 52, "MAJOR": 31, "CRITICAL": 17}
 SEVERITY_BY_LEVEL = {1: "MINOR", 2: "MAJOR", 3: "CRITICAL"}
 
@@ -255,7 +255,7 @@ def test_route_side_must_match_the_sensor_direction(direction: Direction, side: 
             unit="u",
             baseline=baseline,
             noise_std=0.1,
-            drift_per_day=(0.0, 0.1),
+            drift_fraction=(0.0, 0.1),
             direction=direction,
             bands=bands,
             faults=(FaultRoute("Leak", side, ("Hydraulic Pump",), 1.0),),
@@ -292,7 +292,7 @@ def test_a_side_whose_route_weights_sum_to_zero_raises_value_error() -> None:
             unit="u",
             baseline=10.0,
             noise_std=0.1,
-            drift_per_day=(0.0, 0.1),
+            drift_fraction=(0.0, 0.1),
             direction=Direction.DEVIATION,
             bands=Bands(1.0, 2.0, 3.0),
             faults=routes,

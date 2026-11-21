@@ -155,7 +155,7 @@ def test_out_of_order_bands_are_rejected(
             unit="u",
             baseline=baseline,
             noise_std=0.1,
-            drift_per_day=(0.0, 0.1),
+            drift_fraction=(0.0, 0.1),
             direction=direction,
             bands=bands,
         )
@@ -170,7 +170,7 @@ def test_drift_range_must_be_ordered_and_not_negative() -> None:
                 unit="u",
                 baseline=10.0,
                 noise_std=0.1,
-                drift_per_day=drift,
+                drift_fraction=drift,
                 direction=Direction.HIGH,
                 bands=Bands(11.0, 12.0, 13.0),
             )
@@ -207,7 +207,9 @@ def test_readings_start_on_the_normal_side_of_advisory(short_run: Path) -> None:
     for sensor in _rows(short_run / "nodes_sensors.csv"):
         system = systems[sensor["system_id"]]
         spec = _sensor(system["type"], model[system["aircraft_id"]], sensor["type"])
-        median = statistics.median(values[sensor[":ID(Sensor)"]])
+        # Drift spreads over the whole window, however short, so only the
+        # first hours sit near baseline.
+        median = statistics.median(values[sensor[":ID(Sensor)"]][:6])
         match spec.direction:
             case Direction.HIGH:
                 assert median < spec.bands.advisory, sensor

@@ -54,9 +54,11 @@ class SensorSpec:
     unit: str
     baseline: float
     noise_std: float
-    # Drift toward the bad side, in units per day, before the operator's
-    # degradation multiplier. Each sensor draws one rate from this range.
-    drift_per_day: tuple[float, float]
+    # Drift toward the bad side by the end of the window, as a share of the
+    # baseline-to-warning gap, before the operator's degradation multiplier.
+    # Each sensor draws one share from this range. The drift spreads evenly
+    # over the window, so a longer window drifts more slowly, not further.
+    drift_fraction: tuple[float, float]
     direction: Direction
     bands: Bands
     faults: tuple[FaultRoute, ...] = ()
@@ -64,9 +66,9 @@ class SensorSpec:
     minimum: float | None = None
 
     def __post_init__(self) -> None:
-        low, high = self.drift_per_day
+        low, high = self.drift_fraction
         if not 0 <= low <= high:
-            raise ValueError(f"sensor {self.type!r}: drift range {self.drift_per_day} is invalid")
+            raise ValueError(f"sensor {self.type!r}: drift range {self.drift_fraction} is invalid")
         b = self.bands
         match self.direction:
             case Direction.HIGH:
@@ -130,10 +132,10 @@ class EngineSpec:
 def _engine_sensors(
     egt: tuple[float, float, float, float],
     egt_noise_std: float,
-    egt_drift_per_day: tuple[float, float],
+    egt_drift: tuple[float, float],
     vib: tuple[float, float, float, float],
     vib_noise_std: float,
-    vib_drift_per_day: tuple[float, float],
+    vib_drift: tuple[float, float],
     n1_cruise: float,
     fuel_cruise: float,
 ) -> tuple[SensorSpec, ...]:
@@ -150,7 +152,7 @@ def _engine_sensors(
             "°C",
             baseline=egt[0],
             noise_std=egt_noise_std,
-            drift_per_day=egt_drift_per_day,
+            drift_fraction=egt_drift,
             direction=Direction.HIGH,
             bands=Bands(*egt[1:]),
             faults=(FaultRoute("Overheat", Direction.HIGH, ("HP Turbine",), 1.0),),
@@ -161,7 +163,7 @@ def _engine_sensors(
             "ips",
             baseline=vib[0],
             noise_std=vib_noise_std,
-            drift_per_day=vib_drift_per_day,
+            drift_fraction=vib_drift,
             direction=Direction.HIGH,
             bands=Bands(*vib[1:]),
             faults=(
@@ -177,7 +179,7 @@ def _engine_sensors(
             "%",
             baseline=n1_cruise,
             noise_std=0.5,
-            drift_per_day=(0.0, 0.0),
+            drift_fraction=(0.0, 0.0),
             direction=Direction.DEVIATION,
             bands=Bands(2.0, 4.0, 6.0),
             # The N1 pickup sits at the fan.
@@ -192,7 +194,7 @@ def _engine_sensors(
             "kg/s",
             baseline=fuel_cruise,
             noise_std=round(0.02 * fuel_cruise, 4),
-            drift_per_day=(0.0, 0.0),
+            drift_fraction=(0.0, 0.0),
             direction=Direction.DEVIATION,
             bands=Bands(*(fuel_cruise * share for share in (0.08, 0.15, 0.25))),
             faults=(
@@ -205,18 +207,19 @@ def _engine_sensors(
 
 
 # Engine bands come from each manual's own limits. The current EGT warning
-# value is the caution value. Vibration noise and drift scale with the gap
-# from baseline to caution.
+# value is the caution value. Vibration noise scales with the gap from
+# baseline to caution. EGT and vibration drift tops are 0.66 of the warning
+# gap, so the most degraded operator (1.5x) ends the window at warning.
 ENGINE_SPECS: dict[str, EngineSpec] = {
     "B737-800": EngineSpec(
         engine_type="CFM56-7B",
         sensors=_engine_sensors(
             egt=(658.0, 678.0, 688.0, 698.0),
             egt_noise_std=3.5,
-            egt_drift_per_day=(0.048, 0.336),
+            egt_drift=(0.095, 0.66),
             vib=(0.8, 2.0, 3.5, 4.5),
             vib_noise_std=0.135,
-            vib_drift_per_day=(0.013, 0.058),
+            vib_drift=(0.149, 0.66),
             n1_cruise=88.0,
             fuel_cruise=0.36,
         ),
@@ -226,10 +229,10 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         sensors=_engine_sensors(
             egt=(560.0, 580.0, 590.0, 600.0),
             egt_noise_std=3.0,
-            egt_drift_per_day=(0.024, 0.264),
+            egt_drift=(0.061, 0.66),
             vib=(0.8, 2.0, 3.5, 5.0),
             vib_noise_std=0.12,
-            vib_drift_per_day=(0.011, 0.054),
+            vib_drift=(0.136, 0.66),
             n1_cruise=87.0,
             fuel_cruise=0.34,
         ),
@@ -239,10 +242,10 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         sensors=_engine_sensors(
             egt=(634.0, 654.0, 664.0, 674.0),
             egt_noise_std=2.8,
-            egt_drift_per_day=(0.024, 0.240),
+            egt_drift=(0.067, 0.66),
             vib=(0.7, 2.0, 3.0, 4.0),
             vib_noise_std=0.095,
-            vib_drift_per_day=(0.0065, 0.039),
+            vib_drift=(0.111, 0.66),
             n1_cruise=86.0,
             fuel_cruise=0.38,
         ),
@@ -252,10 +255,10 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         sensors=_engine_sensors(
             egt=(641.0, 661.0, 671.0, 681.0),
             egt_noise_std=3.2,
-            egt_drift_per_day=(0.048, 0.312),
+            egt_drift=(0.103, 0.66),
             vib=(0.8, 2.0, 3.0, 4.0),
             vib_noise_std=0.10,
-            vib_drift_per_day=(0.008, 0.042),
+            vib_drift=(0.127, 0.66),
             n1_cruise=87.0,
             fuel_cruise=0.27,
         ),
@@ -265,10 +268,10 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
         sensors=_engine_sensors(
             egt=(625.0, 645.0, 655.0, 665.0),
             egt_noise_std=2.5,
-            egt_drift_per_day=(0.024, 0.216),
+            egt_drift=(0.074, 0.66),
             vib=(0.6, 1.5, 2.5, 3.5),
             vib_noise_std=0.08,
-            vib_drift_per_day=(0.0065, 0.033),
+            vib_drift=(0.131, 0.66),
             n1_cruise=85.0,
             fuel_cruise=0.28,
         ),
@@ -282,7 +285,7 @@ _HYDRAULICS_SENSORS: tuple[SensorSpec, ...] = (
         "psi",
         baseline=3000.0,
         noise_std=20.0,
-        drift_per_day=(0.0, 1.0),
+        drift_fraction=(0.0, 0.15),
         direction=Direction.LOW,
         bands=Bands(2800.0, 2600.0, 2400.0),
         faults=(
@@ -296,7 +299,7 @@ _HYDRAULICS_SENSORS: tuple[SensorSpec, ...] = (
         "%",
         baseline=90.0,
         noise_std=0.5,
-        drift_per_day=(0.0, 0.12),
+        drift_fraction=(0.0, 0.27),
         direction=Direction.LOW,
         bands=Bands(70.0, 60.0, 50.0),
         faults=(
@@ -314,7 +317,7 @@ _AVIONICS_SENSORS: tuple[SensorSpec, ...] = (
         "V DC",
         baseline=28.0,
         noise_std=0.15,
-        drift_per_day=(0.0, 0.004),
+        drift_fraction=(0.0, 0.09),
         direction=Direction.LOW,
         bands=Bands(26.0, 25.0, 24.0),
         faults=(
@@ -332,7 +335,7 @@ _AVIONICS_SENSORS: tuple[SensorSpec, ...] = (
         "kt",
         baseline=0.5,
         noise_std=0.15,
-        drift_per_day=(0.0, 0.008),
+        drift_fraction=(0.0, 0.096),
         direction=Direction.HIGH,
         bands=Bands(3.0, 5.0, 8.0),
         faults=(FaultRoute("Sensor drift", Direction.HIGH, ("Air Data Unit",), 1.0),),

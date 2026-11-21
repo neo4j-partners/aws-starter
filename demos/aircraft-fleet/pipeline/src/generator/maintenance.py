@@ -27,7 +27,7 @@ from .specs import CORRECTIVE_ACTIONS, Direction, FaultRoute, SensorSpec, sensor
 # Probability that entering the advisory, caution, or warning band raises an event.
 # Tuned once, with the spike rates in sensors.py, so the default run lands near
 # the manuals' historic 52/31/17 MINOR/MAJOR/CRITICAL mix.
-_EVENT_PROB: dict[int, float] = {1: 0.012, 2: 0.024, 3: 0.036}
+_EVENT_PROB: dict[int, float] = {1: 0.012, 2: 0.030, 3: 0.05}
 SEVERITY_BY_LEVEL: dict[int, str] = {1: "MINOR", 2: "MAJOR", 3: "CRITICAL"}
 
 # Minimum hours between events of one fault on one system, unless the new

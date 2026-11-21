@@ -1,10 +1,11 @@
 """
 Sensor time-series generation with per-sensor degradation drift.
 
-Each sensor draws a drift rate from its spec's range, scaled by the operator's
-maintenance quality factor. The drift moves the value toward the bad side of
-the sensor's bands over the generation window. Readings that cross the bands
-then trigger correlated maintenance events in maintenance.py.
+Each sensor draws a drift share from its spec's range, scaled by the
+operator's maintenance quality factor. The drift moves the value toward the
+bad side of the sensor's bands, reaching that share of the warning gap at the
+end of the window. Readings that cross the bands then trigger correlated
+maintenance events in maintenance.py.
 """
 
 from __future__ import annotations
@@ -18,14 +19,16 @@ from .fleet import AircraftNode, SystemNode
 from .specs import Direction, SensorSpec, sensors_for
 
 # Fraction of hours that spike past advisory on one sensor, at a degradation
-# multiplier of 1.0. Avionics and Hydraulics drift never reaches advisory in
-# 90 days, so their events come from spikes. Tuned once with the event
+# multiplier of 1.0. Avionics and Hydraulics drift never reaches advisory, so
+# their events come from spikes. Tuned once with the event
 # probabilities in maintenance.py so the default run is mostly Engine events.
 _SPIKE_RATE: dict[str, float] = {"Engine": 0.009, "Avionics": 0.013, "Hydraulics": 0.013}
 
-# Mean overshoot past advisory, in band widths. One width carries a spike from
-# advisory to caution, and two carry it to warning.
-_OVERSHOOT_SCALE = 0.85
+# Overshoot past advisory, in band widths: an exponential with this scale,
+# cut off at _MAX_OVERSHOOT. One width carries a spike from advisory to
+# caution, two carry it to warning, and three to one band width past warning.
+_OVERSHOOT_SCALE = 0.95
+_MAX_OVERSHOOT = 3.0
 
 
 def _spike_rate(system_type: str, degradation_multiplier: float) -> float:
@@ -37,11 +40,21 @@ def _timestamps(start: datetime, n_hours: int) -> list[str]:
     return [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%S") for h in range(n_hours)]
 
 
+def _overshoot_widths(n: int, rng: np.random.Generator) -> np.ndarray:
+    """Draw n overshoots from the exponential cut off at _MAX_OVERSHOOT.
+
+    Inverse CDF of the truncated distribution, so each spike takes one
+    uniform draw.
+    """
+    kept = 1 - np.exp(-_MAX_OVERSHOOT / _OVERSHOOT_SCALE)
+    return -_OVERSHOOT_SCALE * np.log1p(-rng.uniform(size=n) * kept)
+
+
 def _overshoot(offsets: tuple[float, float, float], widths: np.ndarray) -> np.ndarray:
     """Map overshoots in band widths to distances from baseline toward the bad side.
 
     0 to 1 width lands in the advisory band, 1 to 2 in the caution band, and 2
-    or more at or past warning, where the last band's width continues.
+    to 3 at or past warning, where the last band's width continues.
     """
     advisory, caution, warning = offsets
     return np.where(
@@ -67,7 +80,7 @@ def _add_spikes(
     if n_spikes == 0:
         return values
     spike_idx = rng.choice(n, size=n_spikes, replace=False)
-    distance = _overshoot(spec.offsets(), rng.exponential(_OVERSHOOT_SCALE, n_spikes))
+    distance = _overshoot(spec.offsets(), _overshoot_widths(n_spikes, rng))
     match spec.direction:
         case Direction.HIGH:
             sides = np.ones(n_spikes)
@@ -99,9 +112,9 @@ def _series(
     rng: np.random.Generator,
 ) -> np.ndarray:
     """Return one sensor's hourly values: baseline, drift, noise, and spikes."""
-    drift_per_day = float(rng.uniform(*spec.drift_per_day)) * degradation_multiplier
-    slope = _drift_sign(spec.direction, rng) * drift_per_day / 24
-    values = spec.baseline + slope * np.arange(n_hours, dtype=float)
+    share = float(rng.uniform(*spec.drift_fraction)) * degradation_multiplier
+    end_drift = _drift_sign(spec.direction, rng) * share * spec.offsets()[2]
+    values = spec.baseline + end_drift * np.linspace(0.0, 1.0, n_hours)
     values = values + rng.normal(0, spec.noise_std, n_hours)
     values = _add_spikes(values, spec, spike_rate, rng)
     if spec.minimum is not None:

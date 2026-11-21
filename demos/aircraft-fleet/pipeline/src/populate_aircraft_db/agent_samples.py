@@ -8,13 +8,27 @@ from typing import Any, Literal
 
 from neo4j import Driver, RoutingControl
 
+from generator.specs import AIRPORTS, MANUAL_FLEET_TAILS, MODEL_DISTRIBUTION, OPERATORS
+
 _W = 70
 
 # ---------------------------------------------------------------------------
 # Graph schema description fed to the LLM for Cypher generation
 # ---------------------------------------------------------------------------
 
-GRAPH_SCHEMA = """\
+# Facts about the generated data, from the generator specs so they match it.
+# The first manual tail of each model is in every fleet of five or more
+# aircraft, because the registry tails come first in round-robin order.
+_SAMPLE_TAILS = ", ".join(f"{tails[0]} ({model})" for model, tails in MANUAL_FLEET_TAILS.items())
+_GRAPH_FACTS = f"""\
+Aircraft models: {", ".join(model for model, _ in MODEL_DISTRIBUTION)}.
+Sample tail numbers: {_SAMPLE_TAILS}.
+Operators: {", ".join(op.name for op in OPERATORS)}.
+Airport IATA codes: {", ".join(airport.iata for airport in AIRPORTS)}.
+"""
+
+GRAPH_SCHEMA = (
+    """\
 Node labels and properties:
 - Aircraft {aircraft_id, tail_number, icao24, model, manufacturer, operator}
 - System {system_id, aircraft_id, type, name}  (type: Engine, Avionics, Hydraulics)
@@ -62,10 +76,9 @@ Relationships:
 - (OperatingLimit)-[:FROM_CHUNK]->(Chunk)
 - (Sensor)-[:HAS_LIMIT]->(OperatingLimit)
 
-Sample tail numbers: N95040A (B737-800), N30268B (A320-200), N54980C (A321neo).
-Operators: ExampleAir, SkyWays, RegionalCo, NorthernJet.
-Airport IATA codes: JFK, LAX, ORD, ATL, DFW, DEN, SFO, SEA, MIA, BOS, MSP, DTW.
 """
+    + _GRAPH_FACTS
+)
 
 SYSTEM_PROMPT = (
     """\

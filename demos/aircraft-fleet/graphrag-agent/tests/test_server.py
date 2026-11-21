@@ -176,6 +176,17 @@ def test_user_id_control_characters_are_escaped(monkeypatch, caplog) -> None:
     assert "\x1b" not in line
 
 
+def test_backslashes_are_escaped_so_a_literal_escape_is_distinct(monkeypatch, caplog) -> None:
+    _stop_before_the_agent(monkeypatch)
+    with caplog.at_level("INFO", logger="fleet_graphrag.server"):
+        _run({"prompt": "hi", "user_id": "a\nb"}, session_id="s-1")
+        _run({"prompt": "hi", "user_id": "a\\nb"}, session_id="s-1")
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("Request ")]
+    # A real newline and the two characters backslash and n must log differently.
+    assert "user=a\\nb " in lines[0]
+    assert "user=a\\\\nb " in lines[1]
+
+
 def test_invalid_payload_names_fields_without_values(caplog) -> None:
     events = _run({"mode": "drop_database", "top_k": "lots", "inputText": 42})
     assert events == [

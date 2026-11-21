@@ -153,9 +153,15 @@ class RequestPayload(BaseModel):
 
 
 def _printable(text: str) -> str:
-    """Escape control characters, so a client value cannot forge log lines."""
+    """Escape control characters, so a client value cannot forge log lines.
+
+    Backslashes are escaped too, so a literal ``\\n`` in the value cannot
+    pass for an escaped newline.
+    """
     return "".join(
-        char if char.isprintable() else char.encode("unicode_escape").decode("ascii")
+        char
+        if char.isprintable() and char != "\\"
+        else char.encode("unicode_escape").decode("ascii")
         for char in text
     )
 

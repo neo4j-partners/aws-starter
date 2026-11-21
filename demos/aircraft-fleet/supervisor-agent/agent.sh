@@ -283,7 +283,10 @@ STOP_SIGNAL=""
 # and HUP first, so a second Ctrl+C, a kill, or a closed terminal cannot
 # stop the restore halfway. A failed restore exits 1. Otherwise, if one of
 # those signals stopped the run, the script dies by that same signal, so a
-# calling shell loop sees a signal death and stops too.
+# calling shell loop sees a signal death and stops too. A failed restore
+# exits 1 even after a signal. A signal death says only that the run was
+# stopped, and a caller would take the checkout as clean. Exit 1 goes with
+# the error that names the file left to fix.
 on_exit() {
     local failed=0
     trap '' INT TERM HUP

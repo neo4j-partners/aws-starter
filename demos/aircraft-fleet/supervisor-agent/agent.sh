@@ -302,7 +302,9 @@ ENV_STRIP_TMP="$ENV_LOCAL.strip.$$"
 # from agentcore/.env.local. Every other line is kept. The secret line is
 # matched in each form the CLI reads: optional leading space, an optional
 # export, the exact variable name, then optional space before the =. The
-# comment must match the whole line.
+# comment must match the whole line. A failure before a deploy is tried
+# again by the restore, so only restore_project, the last try, says to
+# delete the line by hand.
 strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
@@ -328,7 +330,7 @@ strip_gateway_secret() {
         if [ -L "$ENV_LOCAL" ]; then
             echo -e "${RED}$ENV_LOCAL is a symbolic link, so it was not replaced.${NC}" >&2
         fi
-        echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2
+        echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL.${NC}" >&2
         return 1
     fi
 }
@@ -367,7 +369,10 @@ restore_project() {
             failed=1
         fi
     fi
-    strip_gateway_secret || failed=1
+    if ! strip_gateway_secret; then
+        echo -e "${RED}Delete the $GATEWAY_SECRET_VAR line from $ENV_LOCAL by hand.${NC}" >&2
+        failed=1
+    fi
     return "$failed"
 }
 

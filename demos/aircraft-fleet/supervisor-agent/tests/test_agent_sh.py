@@ -486,6 +486,11 @@ def test_a_link_made_after_the_start_check_is_not_replaced(project: Path) -> Non
 
     assert result.returncode == 1
     assert "agentcore/.env.local is a symbolic link" in result.stderr
+    # The restore was the last try, so the line is left to delete by hand.
+    assert (
+        "Delete the AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET line "
+        "from agentcore/.env.local by hand." in result.stderr
+    )
     assert env_local.is_symlink()
     assert target.read_text() == "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n"
     assert not list(env_local.parent.glob(".env.local.*"))
@@ -551,6 +556,8 @@ def test_a_file_made_at_the_copy_name_after_the_remove_is_refused(project: Path)
 
     assert result.returncode == 1
     assert "cannot overwrite existing file" in result.stderr
+    # The restore removed the line, so nothing is left to do by hand.
+    assert "by hand" not in result.stderr
     assert not any(
         call.startswith(("agentcore add", "agentcore deploy")) for call in calls(project)
     )

@@ -9,12 +9,32 @@ import asyncio
 import contextlib
 import threading
 import time
+import types
+import uuid
+from collections.abc import Iterator
 
 import neo4j
 import pytest
 from bedrock_agentcore.runtime import RequestContext
+from bedrock_agentcore.runtime.models import PingStatus
+from neo4j_agent_memory.integrations.base import AsyncBridge
+from neo4j_agent_memory.integrations.strands import SharedMemory
 
 from fleet_graphrag import server
+from fleet_graphrag.agent import memory
+
+# Stands in for the shared memory object on the agent path.
+_SHARED = object()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_shared() -> Iterator[None]:
+    """Each test starts and ends with no shared memory and no open in flight."""
+    memory._shared = None
+    memory._opening = None
+    yield
+    memory._shared = None
+    memory._opening = None
 
 
 def _run(payload: dict | None, session_id: str | None = None) -> list[dict]:
@@ -306,7 +326,10 @@ def test_main_builds_memory_settings_before_serving(monkeypatch) -> None:
 
 
 class _FakeMemory:
-    def __init__(self, session_id: str, user_id: str, *, close_error: bool = False) -> None:
+    def __init__(
+        self, shared: object, session_id: str, user_id: str, *, close_error: bool = False
+    ) -> None:
+        self.shared = shared
         self.session_id = session_id
         self.user_id = user_id
         self.closed = 0
@@ -337,9 +360,13 @@ def _agent_path(monkeypatch, *, fail: bool = False, close_error: bool = False):
     made: list[_FakeMemory] = []
     agents: list[_FakeAgent] = []
 
-    def fake_manager(session_id: str, user_id: str) -> _FakeMemory:
-        made.append(_FakeMemory(session_id, user_id, close_error=close_error))
+    def fake_manager(shared: object, session_id: str, user_id: str) -> _FakeMemory:
+        made.append(_FakeMemory(shared, session_id, user_id, close_error=close_error))
         return made[-1]
+
+    async def fake_shared_memory(background_hook: object) -> object:
+        assert background_hook is server._track_background
+        return _SHARED
 
     def fake_agent(**kwargs: object) -> _FakeAgent:
         agents.append(_FakeAgent(**kwargs))
@@ -348,6 +375,7 @@ def _agent_path(monkeypatch, *, fail: bool = False, close_error: bool = False):
 
     monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
     monkeypatch.setattr(server, "session_manager", fake_manager)
+    monkeypatch.setattr(server, "shared_memory", fake_shared_memory)
     monkeypatch.setattr(server, "Agent", fake_agent)
     return made, agents
 
@@ -356,10 +384,11 @@ def test_agent_gets_a_per_request_memory_that_is_closed(monkeypatch) -> None:
     made, agents = _agent_path(monkeypatch)
     events = _run({"prompt": "hi", "user_id": "pilot-7"}, session_id="s-1")
     assert events[-1] == {"type": "complete"}
-    [memory] = made
-    assert (memory.session_id, memory.user_id) == ("s-1", "pilot-7")
-    assert agents[0].kwargs["session_manager"] is memory
-    assert memory.closed == 1
+    [manager] = made
+    assert manager.shared is _SHARED
+    assert (manager.session_id, manager.user_id) == ("s-1", "pilot-7")
+    assert agents[0].kwargs["session_manager"] is manager
+    assert manager.closed == 1
 
 
 def test_each_request_builds_its_own_memory(monkeypatch) -> None:
@@ -410,8 +439,8 @@ def test_disconnect_closes_the_agent_stream_before_the_memory(monkeypatch) -> No
             finally:
                 order.append("stream finally")
 
-    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
-    monkeypatch.setattr(server, "session_manager", lambda s, u: Memory(s, u))
+    _agent_path(monkeypatch)
+    monkeypatch.setattr(server, "session_manager", lambda shared, s, u: Memory(shared, s, u))
     monkeypatch.setattr(server, "Agent", lambda **kwargs: Agent(**kwargs))
 
     async def disconnect_mid_answer() -> None:
@@ -590,3 +619,130 @@ def test_second_cancel_does_not_stop_the_close(monkeypatch) -> None:
 
     asyncio.run(cancel_twice())
     assert made[0].closed == 1
+
+
+class _FailingOpen:
+    """Stands in for ``SharedMemory``. Every open fails as an unreachable server."""
+
+    opens = 0
+
+    @classmethod
+    def open(cls, settings: object, *, background_hook: object) -> None:
+        cls.opens += 1
+        raise neo4j.exceptions.ServiceUnavailable("memory is down")
+
+
+def test_data_modes_work_when_the_memory_open_fails(monkeypatch) -> None:
+    monkeypatch.setenv("MEM_NEO4J_URI", "neo4j://memory.invalid")
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "local-only")
+    memory.memory_settings.cache_clear()
+    monkeypatch.setattr(memory, "SharedMemory", _FailingOpen)
+    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
+    monkeypatch.setattr(server, "graph_query", lambda q: f"rows for {q}")
+    try:
+        [agent_event] = _run({"prompt": "hi"}, session_id="s-1")
+        assert agent_event["type"] == "error"
+        assert "Could not reach the Neo4j database" in agent_event["error"]
+        assert _run({"mode": "schema"}) == [
+            {"type": "chunk", "data": "SCHEMA"},
+            {"type": "complete"},
+        ]
+        assert _run({"mode": "graph_query", "query": "count"})[0] == {
+            "type": "chunk",
+            "data": "rows for count",
+        }
+        assert _FailingOpen.opens == 1
+    finally:
+        memory.memory_settings.cache_clear()
+
+
+class _ClosableShared:
+    def __init__(self) -> None:
+        self.closes = 0
+
+    async def aclose(self) -> None:
+        self.closes += 1
+
+
+def _serve(during: object = None) -> None:
+    """Run the app's lifespan, as uvicorn does, with ``during`` as the body."""
+
+    async def serve() -> None:
+        async with server.app.router.lifespan_context(server.app):
+            if callable(during):
+                during()
+
+    asyncio.run(serve())
+
+
+def test_shutdown_closes_the_shared_memory() -> None:
+    shared = _ClosableShared()
+
+    def open_memory() -> None:
+        memory._shared = shared
+
+    _serve(open_memory)
+    assert shared.closes == 1
+    assert memory._shared is None
+
+
+def test_shutdown_without_an_open_memory_does_nothing() -> None:
+    _serve()
+    assert memory._shared is None
+
+
+def test_shutdown_closes_the_memory_after_an_error() -> None:
+    shared = _ClosableShared()
+
+    async def fail_while_serving() -> None:
+        async with server.app.router.lifespan_context(server.app):
+            memory._shared = shared
+            raise RuntimeError("server crashed")
+
+    with pytest.raises(RuntimeError, match="server crashed"):
+        asyncio.run(fail_while_serving())
+    assert shared.closes == 1
+
+
+def test_background_task_shows_busy_until_done() -> None:
+    assert server.app.get_current_ping_status() is PingStatus.HEALTHY
+    done = server._track_background("extract:s-1")
+    assert server.app.get_current_ping_status() is PingStatus.HEALTHY_BUSY
+    done()
+    assert server.app.get_current_ping_status() is PingStatus.HEALTHY
+
+
+def test_failed_extraction_still_completes_the_async_task() -> None:
+    """A real manager on a real SharedMemory, with a client whose extraction fails."""
+    started, release = threading.Event(), threading.Event()
+
+    class ShortTerm:
+        async def add_message(self, key: str, role: str, text: str, **kwargs: object) -> object:
+            return types.SimpleNamespace(id=uuid.UUID(str(kwargs["message_id"])), content=text)
+
+        async def extract_entities_from_message(self, stored: object, **kwargs: object) -> None:
+            started.set()
+            await asyncio.to_thread(release.wait, 5)
+            raise RuntimeError("extractor down")
+
+    class Client:
+        is_nams = False
+        is_connected = True
+        short_term = ShortTerm()
+
+        async def close(self) -> None:
+            pass
+
+    shared = SharedMemory(Client(), AsyncBridge(timeout=5), 5.0, server._track_background)
+    try:
+        manager = memory.session_manager(shared, "s-1", "pilot-7")
+        manager.append_message({"role": "user", "content": [{"text": "hi"}]}, agent=None)
+        # The close writes the message and leaves its extraction running.
+        manager.close()
+        assert started.wait(5)
+        assert server.app.get_current_ping_status() is PingStatus.HEALTHY_BUSY
+        release.set()
+    finally:
+        release.set()
+        shared.close(timeout=5)
+    assert server.app.get_current_ping_status() is PingStatus.HEALTHY

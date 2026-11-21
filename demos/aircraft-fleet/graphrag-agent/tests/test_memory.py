@@ -1,15 +1,19 @@
-"""Tests for the memory settings and the per-request session manager.
+"""Tests for the memory settings, the shared memory, and the session manager.
 
-Nothing here connects to Neo4j or Bedrock. A manager connects only when an
-agent that owns it is built.
+Nothing here connects to Neo4j or Bedrock. ``SharedMemory.open`` is replaced
+with a fake, and the real ``SharedMemory`` is built on a stub client.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import asyncio
+import threading
+from collections.abc import Callable, Iterator
 
 import pytest
 from neo4j_agent_memory import ExtractorType
+from neo4j_agent_memory.integrations.base import AsyncBridge
+from neo4j_agent_memory.integrations.strands import SharedMemory
 from neo4j_agent_memory.llm.adapters.bedrock import (
     BedrockEmbeddingProvider,
     BedrockProvider,
@@ -24,6 +28,16 @@ def _fresh_settings() -> Iterator[None]:
     memory.memory_settings.cache_clear()
     yield
     memory.memory_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_shared() -> Iterator[None]:
+    """Each test starts and ends with no shared memory and no open in flight."""
+    memory._shared = None
+    memory._opening = None
+    yield
+    memory._shared = None
+    memory._opening = None
 
 
 @pytest.fixture
@@ -104,14 +118,165 @@ def test_secret_arn_wins_over_the_local_password(
     assert read == ["MEM_NEO4J_PASSWORD_SECRET_ARN"]
 
 
-@pytest.mark.usefixtures("mem_env")
+def _hook(name: str) -> Callable[[], None]:
+    return lambda: None
+
+
+class _StubClient:
+    """A memory client that reports itself connected and does no I/O."""
+
+    is_nams = False
+    is_connected = True
+
+    async def close(self) -> None:
+        pass
+
+
 def test_session_manager_options() -> None:
-    manager = memory.session_manager("s-1", "pilot-7")
+    shared = SharedMemory(_StubClient(), AsyncBridge(), 30.0, _hook)
     try:
+        manager = memory.session_manager(shared, "s-1", "pilot-7")
         assert manager.session_id == "s-1"
         assert manager._user_id == "pilot-7"
         assert manager._retrieval_config.min_score == 0.75
         assert manager._extract_entities is True
+        assert manager._defer_extraction is True
         assert manager._record_tool_calls is False
-    finally:
+        # Built on the shared client and loop, which the manager does not own.
+        assert manager._client is shared.client
+        assert manager._bridge is shared._bridge
+        assert manager._owns_bridge is False
+        assert manager._background_hook is _hook
         manager.close()
+    finally:
+        shared.close()
+
+
+class _FakeShared:
+    """Stands in for ``SharedMemory``. ``open`` blocks until ``release`` is set."""
+
+    opened: list[_FakeShared]
+    release: threading.Event
+    fail: list[Exception]
+
+    def __init__(self, settings: object, background_hook: object) -> None:
+        self.settings = settings
+        self.background_hook = background_hook
+        self.closes = 0
+
+    @classmethod
+    def open(cls, settings: object, *, background_hook: object) -> _FakeShared:
+        assert cls.release.wait(5)
+        if cls.fail:
+            raise cls.fail.pop(0)
+        cls.opened.append(cls(settings, background_hook))
+        return cls.opened[-1]
+
+    async def aclose(self) -> None:
+        self.closes += 1
+
+
+@pytest.fixture
+def fake_shared(monkeypatch: pytest.MonkeyPatch, mem_env: None) -> type[_FakeShared]:
+    class Fake(_FakeShared):
+        opened = []
+        release = threading.Event()
+        fail = []
+
+    Fake.release.set()
+    monkeypatch.setattr(memory, "SharedMemory", Fake)
+    return Fake
+
+
+def test_open_gets_the_settings_and_the_hook(fake_shared: type[_FakeShared]) -> None:
+    shared = asyncio.run(memory.shared_memory(_hook))
+    assert fake_shared.opened == [shared]
+    assert shared.settings is memory.memory_settings()
+    assert shared.background_hook is _hook
+
+
+def test_later_calls_reuse_the_open_memory(fake_shared: type[_FakeShared]) -> None:
+    async def twice() -> tuple[object, object]:
+        return await memory.shared_memory(_hook), await memory.shared_memory(_hook)
+
+    first, second = asyncio.run(twice())
+    assert first is second
+    assert len(fake_shared.opened) == 1
+
+
+def test_concurrent_first_callers_open_once(fake_shared: type[_FakeShared]) -> None:
+    fake_shared.release.clear()
+
+    async def many() -> list[object]:
+        calls = asyncio.gather(*(memory.shared_memory(_hook) for _ in range(5)))
+        await asyncio.sleep(0.05)
+        fake_shared.release.set()
+        return await calls
+
+    results = asyncio.run(many())
+    assert len(fake_shared.opened) == 1
+    assert all(r is fake_shared.opened[0] for r in results)
+
+
+def test_failed_open_is_not_cached(fake_shared: type[_FakeShared]) -> None:
+    fake_shared.fail.append(RuntimeError("memory is down"))
+
+    async def fail_then_open() -> object:
+        with pytest.raises(RuntimeError, match="memory is down"):
+            await memory.shared_memory(_hook)
+        return await memory.shared_memory(_hook)
+
+    shared = asyncio.run(fail_then_open())
+    assert fake_shared.opened == [shared]
+
+
+def test_cancelled_first_caller_keeps_the_open(fake_shared: type[_FakeShared]) -> None:
+    """A disconnect during the open must not lose the client it opens."""
+    fake_shared.release.clear()
+
+    async def cancel_then_call() -> object:
+        first = asyncio.create_task(memory.shared_memory(_hook))
+        await asyncio.sleep(0.05)
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        fake_shared.release.set()
+        return await memory.shared_memory(_hook)
+
+    shared = asyncio.run(cancel_then_call())
+    assert fake_shared.opened == [shared]
+
+
+def test_close_without_an_open_does_nothing(fake_shared: type[_FakeShared]) -> None:
+    asyncio.run(memory.close_memory())
+    assert fake_shared.opened == []
+
+
+def test_close_waits_for_an_open_in_flight(fake_shared: type[_FakeShared]) -> None:
+    fake_shared.release.clear()
+
+    async def close_during_open() -> None:
+        opening = asyncio.create_task(memory.shared_memory(_hook))
+        await asyncio.sleep(0.05)
+        closing = asyncio.create_task(memory.close_memory())
+        await asyncio.sleep(0.05)
+        assert not closing.done()
+        fake_shared.release.set()
+        await opening
+        await closing
+
+    asyncio.run(close_during_open())
+    [shared] = fake_shared.opened
+    assert shared.closes == 1
+    assert memory._shared is None
+
+
+def test_second_close_does_nothing(fake_shared: type[_FakeShared]) -> None:
+    async def open_then_close_twice() -> None:
+        await memory.shared_memory(_hook)
+        await memory.close_memory()
+        await memory.close_memory()
+
+    asyncio.run(open_then_close_twice())
+    [shared] = fake_shared.opened
+    assert shared.closes == 1

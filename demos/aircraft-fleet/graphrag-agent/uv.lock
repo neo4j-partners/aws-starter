@@ -39,7 +39,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "neo4j", specifier = ">=6.3.1" },
-    { name = "neo4j-agent-memory", extras = ["strands"], path = "/Users/ryanknight/projects/neo4j-labs/agent-memory/dist/neo4j_agent_memory-0.8.0+fleet.2-py3-none-any.whl" },
+    { name = "neo4j-agent-memory", extras = ["strands"], path = "/Users/ryanknight/projects/neo4j-labs/agent-memory/dist/neo4j_agent_memory-0.8.0+fleet.4-py3-none-any.whl" },
     { name = "neo4j-graphrag", extras = ["bedrock"], specifier = ">=1.24" },
     { name = "pydantic", specifier = ">=2" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
@@ -757,8 +757,8 @@ wheels = [
 
 [[package]]
 name = "neo4j-agent-memory"
-version = "0.8.0+fleet.2"
-source = { path = "/Users/ryanknight/projects/neo4j-labs/agent-memory/dist/neo4j_agent_memory-0.8.0+fleet.2-py3-none-any.whl" }
+version = "0.8.0+fleet.4"
+source = { path = "/Users/ryanknight/projects/neo4j-labs/agent-memory/dist/neo4j_agent_memory-0.8.0+fleet.4-py3-none-any.whl" }
 dependencies = [
     { name = "neo4j" },
     { name = "pydantic" },
@@ -766,7 +766,7 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { filename = "neo4j_agent_memory-0.8.0+fleet.2-py3-none-any.whl", hash = "sha256:cd1112f49defebaa484198f9698414ebce31d81e6bea99224843554b8e78c342" },
+    { filename = "neo4j_agent_memory-0.8.0+fleet.4-py3-none-any.whl", hash = "sha256:bc417c160f71b2cd3da2de71426107ae2e68a360d51f1c616a9378e8d602aba6" },
 ]
 
 [package.optional-dependencies]
@@ -848,7 +848,7 @@ requires-dist = [
     { name = "spacy", marker = "extra == 'extraction'", specifier = ">=3.7.0" },
     { name = "spacy", marker = "extra == 'full'", specifier = ">=3.7.0" },
     { name = "spacy", marker = "extra == 'spacy'", specifier = ">=3.7.0" },
-    { name = "strands-agents", marker = "extra == 'strands'", specifier = ">=1.52,<2" },
+    { name = "strands-agents", marker = "extra == 'strands'", specifier = ">=1.55,<2" },
     { name = "typing-extensions", specifier = ">=4.4" },
 ]
 provides-extras = ["all", "anthropic", "aws", "bedrock", "cli", "crewai", "extraction", "full", "fuzzy", "gliner", "gliner2", "google", "google-adk", "instructor", "langchain", "langchain-agents", "litellm", "llamaindex", "mcp", "microsoft-agent", "nams", "observability", "openai", "openai-agents", "opentelemetry", "opik", "pydantic-ai", "sentence-transformers", "spacy", "strands", "vertex-ai"]

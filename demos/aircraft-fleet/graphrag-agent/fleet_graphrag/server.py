@@ -23,10 +23,11 @@ Cloud deployment (AgentCore CLI, see agentcore/agentcore.json):
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from enum import StrEnum
 from pathlib import Path
 
@@ -43,7 +44,10 @@ load_dotenv(ENV_FILE)
 
 import neo4j  # noqa: E402
 from bedrock_agentcore.runtime import BedrockAgentCoreApp, RequestContext  # noqa: E402
-from neo4j_agent_memory.integrations.strands import Neo4jSessionManager  # noqa: E402
+from neo4j_agent_memory.integrations.strands import (  # noqa: E402
+    Neo4jSessionManager,
+    SharedMemory,
+)
 from pydantic import (  # noqa: E402
     BaseModel,
     ConfigDict,
@@ -61,7 +65,12 @@ from fleet_graphrag.agent import (  # noqa: E402
     settings,
     vector_search,
 )
-from fleet_graphrag.agent.memory import memory_settings, session_manager  # noqa: E402
+from fleet_graphrag.agent.memory import (  # noqa: E402
+    close_memory,
+    memory_settings,
+    session_manager,
+    shared_memory,
+)
 from fleet_graphrag.agent.model import build_bedrock_model  # noqa: E402
 from fleet_graphrag.agent.neo4j_errors import (  # noqa: E402
     UNREACHABLE,
@@ -87,7 +96,35 @@ logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-app = BedrockAgentCoreApp()
+
+@contextlib.asynccontextmanager
+async def _lifespan(_: BedrockAgentCoreApp) -> AsyncIterator[None]:
+    """Close the shared memory at shutdown, if a request opened it.
+
+    The close waits for the entity extractions still running in the
+    background. Both ``fleet-server`` and the Runtime's ``main.py`` serve
+    through this app, so both run it.
+    """
+    try:
+        yield
+    finally:
+        await close_memory()
+
+
+app = BedrockAgentCoreApp(lifespan=_lifespan)
+
+
+def _track_background(name: str) -> Callable[[], None]:
+    """Report a background memory task to the Runtime until it ends.
+
+    The shared memory calls this on its own thread as each task starts, and
+    calls the returned callback once when the task ends. While a task is
+    tracked, ``/ping`` reports HealthyBusy, so the Runtime does not stop the
+    session in the middle of an extraction.
+    """
+    task_id = app.add_async_task(name)
+    return lambda: app.complete_async_task(task_id)
+
 
 GENERIC_ERROR = (
     "Error processing your request. Please try rephrasing your question or check the server logs."
@@ -283,10 +320,15 @@ async def invoke(
         schema = await asyncio.to_thread(get_graph_schema)
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(schema=schema)
 
+        # The first request opens the shared memory. A failed open raises
+        # here and the next request tries again. The data modes above never
+        # need it, so they keep working while the memory is down.
+        shared = await shared_memory(_track_background)
+
         # One memory manager per request, closed on every path below. The
         # build blocks, so it runs in a worker thread.
         build = asyncio.create_task(
-            asyncio.to_thread(_build_agent, session_id, req.user_id, system_prompt)
+            asyncio.to_thread(_build_agent, shared, session_id, req.user_id, system_prompt)
         )
         try:
             # A client disconnect cancels this await, but the thread keeps
@@ -383,15 +425,15 @@ async def invoke(
 
 
 def _build_agent(
-    session_id: str, user_id: str, system_prompt: str
+    shared: SharedMemory, session_id: str, user_id: str, system_prompt: str
 ) -> tuple[Agent, Neo4jSessionManager]:
     """Build one request's memory manager and Agent. Runs in a worker thread.
 
-    The manager connects and restores the session history while the Agent is
-    built. If the build fails, the manager is closed here before the error is
-    raised. The caller closes only a manager whose Agent was built.
+    The manager restores the session history while the Agent is built. If the
+    build fails, the manager is closed here before the error is raised. The
+    caller closes only a manager whose Agent was built.
     """
-    memory = session_manager(session_id, user_id)
+    memory = session_manager(shared, session_id, user_id)
     try:
         agent = Agent(
             model=model,
@@ -416,10 +458,10 @@ async def _close_after_build(
     """Close a request's memory manager once its build has ended.
 
     A client disconnect cancels the request while the build thread may still
-    be running. Closing then would race the constructor, which would reconnect
-    the closed manager and leak its driver and loop thread. So this waits for
-    the build first. The close runs in its own task behind a shield, so a
-    second cancel cannot stop it halfway.
+    be running. Closing then would race the constructor, which would fail to
+    restore the session on the closed manager. So this waits for the build
+    first. The close runs in its own task behind a shield, so a second cancel
+    cannot stop it halfway.
     """
     closing = asyncio.create_task(_await_build_then_close(build))
     _closing.add(closing)

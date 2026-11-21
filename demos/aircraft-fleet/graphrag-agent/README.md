@@ -43,7 +43,7 @@ flowchart TD
     client -- "POST /invocations (SSE stream)" --> agent
     agent <--> bedrock
     agent -- "graph_query: Text2Cypher<br/>vector_search: hybrid search" --> fleet
-    agent -- "Neo4jSessionManager, one per request" --> memory
+    agent -- "SharedMemory, one client per process<br/>Neo4jSessionManager, one per request" --> memory
 ```
 
 - **Neo4j:** The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`. It opens one driver per process.
@@ -186,13 +186,14 @@ connection differs:
 
 The agent remembers earlier turns of a session and what it learned about a user.
 It uses [Neo4j Agent Memory](https://github.com/neo4j-labs/agent-memory)
-through its Strands `Neo4jSessionManager`.
+through its Strands `SharedMemory` and `Neo4jSessionManager`.
 
 - **Separate database:** Memory needs its own Neo4j database or instance. Point `MEM_NEO4J_*` at it, not at the fleet graph. Text2Cypher reads the live schema, so memory labels in the fleet graph would reach its prompt. Locally, a second database in the same Neo4j Enterprise server works, such as one made with `CREATE DATABASE memory`.
 - **Session and user:** The session ID comes from the AgentCore session header. The `user_id` field in the payload scopes long-term memory. A missing or empty `user_id` becomes `anonymous`, so all anonymous callers share one profile.
 - **What it stores:** Each session keeps its messages. The agent extracts entities from them and retrieves related entities and preferences on later turns. Matches below a vector score of 0.75 are left out. Tool calls are not recorded. A restored turn shows only its text, so the system prompt tells the agent that a missing tool call does not mean no tool ran.
-- **One manager per request:** Neo4j Agent Memory 0.8.0 cannot share one client across session managers. Each request builds its own manager, connects, restores the session history, and closes the manager when the answer ends. It also closes when the request fails. A failed build closes its own manager before the error is reported. If the client disconnects while the agent is still being built, the close waits for the build to end, so the build cannot reopen a closed manager.
-- **Cost per request:** The first request against an empty memory database takes about 2 seconds longer, measured on a local Neo4j. It opens the memory driver and creates the memory schema and indexes. When the database already has them, the first request after startup adds about 0.1 to 0.3 seconds. Later requests add about 0.05 to 0.1 seconds. A remote instance adds a few network round trips to each.
+- **Background extraction:** Entity extraction runs in the background after the turn is written, so the answer does not wait for it. While an extraction runs, `/ping` reports `HealthyBusy`, so the Runtime keeps the session alive until it ends. A failed extraction is logged, and the message stays stored without entities.
+- **One client per process:** The agent opens one memory client per process, through `SharedMemory`, on the first request that needs memory. The `schema`, `graph_query`, and `vector_search` modes never open it, so they keep working while the memory database is down. A failed open is not kept, so the next request tries again. Each request builds its own session manager on the shared client, restores the session history, and closes the manager when the answer ends. It also closes when the request fails. A failed build closes its own manager before the error is reported. If the client disconnects while the agent is still being built, the close waits for the build to end. At shutdown, the server waits up to 30 seconds for extractions still running, then closes the shared client.
+- **Cost per request:** These numbers were measured on a local Neo4j. The first request against an empty memory database takes about 1.8 seconds longer. It opens the memory client and creates the memory schema and indexes. When the database already has them, the open adds about 0.1 to 0.2 seconds to the first request. After that, building a request's session manager and restoring its history takes a few milliseconds, and about 25 to 50 milliseconds once the history grows. Writing the turn when the answer ends takes about 0.7 to 1.1 seconds, mostly the Titan embedding of each message. The first write after startup takes about 3 seconds. The `complete` event is sent after the write. Entity extraction is not in these numbers, because it runs in the background. A remote instance adds a few network round trips to each step.
 - **Extraction model:** Entity extraction runs on `global.anthropic.claude-sonnet-5-5` with Titan v2 embeddings at 1024 dimensions. Sonnet 5.5 rejects a temperature and a forced tool choice. The extractor is built with `send_temperature=False` and `tool_choice="auto"`, two options that the fleet fork of Neo4j Agent Memory adds. The agent itself still uses `MODEL_ID`.
 
 ## Layout

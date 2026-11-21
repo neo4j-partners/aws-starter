@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any
@@ -115,6 +116,34 @@ def test_prompt_sample_tails_are_in_the_smallest_full_fleet() -> None:
     entries = _prompt_line("Sample tail numbers")
     samples = {tuple(entry.rstrip(")").split(" (")) for entry in entries}
     assert samples == fleet
+
+
+def _fleet_tails(n_aircraft: int) -> dict[str, str]:
+    """Return tail number -> model for a generated fleet of n_aircraft."""
+    return {
+        ac.tail_number: ac.model for ac in generate_fleet(GeneratorConfig(n_aircraft=n_aircraft))
+    }
+
+
+def _question_tails(question: str) -> list[str]:
+    return re.findall(r"\bN\d{4,5}[A-Z]?\b", question)
+
+
+def test_sample_question_tails_are_in_the_smallest_fleet_that_holds_them() -> None:
+    tails = {tail for sample in SAMPLE_QUESTIONS for tail in _question_tails(sample.question)}
+    assert tails
+    assert tails <= _fleet_tails(6).keys()
+    assert not tails <= _fleet_tails(5).keys()
+
+
+def test_shared_faults_question_pairs_two_tails_of_one_model() -> None:
+    # Manual Fault nodes are per aircraft model, so tails of two models
+    # never share one.
+    (question,) = [sq.question for sq in SAMPLE_QUESTIONS if sq.category == "Shared Faults"]
+    first, second = _question_tails(question)
+    models = _fleet_tails(6)
+    assert first != second
+    assert models[first] == models[second]
 
 
 def test_schema_lists_labels_and_relationships_without_internal_labels() -> None:

@@ -30,7 +30,12 @@ from .samples import report_query_error
 # Facts about the generated data, from the generator specs so they match it.
 # The first manual tail of each model is in every fleet of five or more
 # aircraft, because the registry tails come first in round-robin order.
-_SAMPLE_TAILS = ", ".join(f"{tails[0]} ({model})" for model, tails in MANUAL_FLEET_TAILS.items())
+_FIRST_TAIL: dict[str, str] = {model: tails[0] for model, tails in MANUAL_FLEET_TAILS.items()}
+_SAMPLE_TAILS = ", ".join(f"{tail} ({model})" for model, tail in _FIRST_TAIL.items())
+# The shared-faults question needs two tails of one model, because manual
+# Fault nodes are per aircraft model. The second B737 tail is the sixth
+# registry aircraft, so these are in every fleet of six or more.
+_SHARED_FAULT_TAILS: list[str] = MANUAL_FLEET_TAILS["B737-800"][:2]
 _GRAPH_FACTS = f"""\
 Aircraft models: {", ".join(model for model, _ in MODEL_DISTRIBUTION)}.
 Sample tail numbers: {_SAMPLE_TAILS}.
@@ -150,27 +155,27 @@ class SampleQuestion:
 SAMPLE_QUESTIONS: list[SampleQuestion] = [
     # -- Cypher Template style (answered via text2cypher) --
     SampleQuestion(
-        "Tell me about aircraft N95040A",
+        f"Tell me about aircraft {_FIRST_TAIL['B737-800']}",
         "Aircraft Overview",
         "text2cypher",
     ),
     SampleQuestion(
-        "What are the sensor operating limits for N30268B?",
+        f"What are the sensor operating limits for {_FIRST_TAIL['A320-200']}?",
         "Sensor Operating Limits",
         "text2cypher",
     ),
     SampleQuestion(
-        "Show the maintenance summary for N54980C",
+        f"Show the maintenance summary for {_FIRST_TAIL['A321neo']}",
         "Maintenance Summary",
         "text2cypher",
     ),
     SampleQuestion(
-        "What faults do aircraft N95040A and N26760M share?",
+        "What faults do aircraft {} and {} share?".format(*_SHARED_FAULT_TAILS),
         "Shared Faults",
         "text2cypher",
     ),
     SampleQuestion(
-        "What maintenance manual applies to N30268B?",
+        f"What maintenance manual applies to {_FIRST_TAIL['A320-200']}?",
         "Manual Lookup",
         "text2cypher",
     ),

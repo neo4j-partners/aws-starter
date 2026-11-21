@@ -20,6 +20,9 @@ from typing import Any
 from .config import GeneratorConfig
 
 STAMP_NAME = ".stamp.json"
+# A generate holds an exclusive lock on this file in its output directory,
+# and a load holds a shared one, so a load never reads a run mid-publish.
+LOCK_NAME = ".generate.lock"
 _GENERATOR_DIR = Path(__file__).resolve().parent
 # Libraries whose data or random streams shape the CSVs.
 _LIBRARIES = ("faker", "numpy")

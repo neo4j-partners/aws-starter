@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import csv
+import fcntl
 import json
 import logging
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from itertools import batched
 from pathlib import Path
@@ -14,7 +16,7 @@ from typing import Any
 from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
 
-from generator.stamp import STAMP_NAME, read_stamp, stamp_differences
+from generator.stamp import LOCK_NAME, STAMP_NAME, read_stamp, stamp_differences
 
 from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
 
@@ -426,7 +428,34 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
     The generator stamp is recorded last on a Dataset node, so verify can
     tell which generated run the graph holds. The old node is removed first,
     so a load that fails partway leaves none.
+
+    Raises:
+        RuntimeError: If a generate is running in data_dir.
     """
+    with _shared_lock(data_dir):
+        _load_operational_graph(driver, database, data_dir)
+
+
+@contextmanager
+def _shared_lock(data_dir: Path) -> Iterator[None]:
+    """Hold data_dir's generate lock shared, or fail at once if a generate holds it.
+
+    A generate publishes its CSVs one at a time under the exclusive lock, so
+    a load without this lock could read a mix of old and new files.
+
+    Raises:
+        RuntimeError: If a generate holds the lock.
+    """
+    with (data_dir / LOCK_NAME).open("a") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError(f"a generate is running in {data_dir}") from exc
+        yield
+
+
+def _load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
+    """Do the load for load_operational_graph, with the lock already held."""
     stamp = read_stamp(data_dir)
     driver.execute_query("MATCH (d:Dataset) DETACH DELETE d", database_=database)
     skipped = load_nodes(driver, database, data_dir)

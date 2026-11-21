@@ -25,7 +25,7 @@ from .operations import generate_operations
 from .removals import _check_start_date, generate_removals
 from .sensors import generate_system_readings
 from .specs import EVENT_SEVERITIES
-from .stamp import STAMP_NAME, clear_stamp, regenerate_reason, stamp_for, write_stamp
+from .stamp import LOCK_NAME, STAMP_NAME, clear_stamp, regenerate_reason, stamp_for, write_stamp
 from .writers import CSV_COLUMNS, write_csv
 
 app = typer.Typer(
@@ -40,9 +40,6 @@ console = Console()
 OUTPUT_FILES = frozenset(CSV_COLUMNS) | {"nodes_readings.csv"}
 # Name prefix of the temp directory a run writes into before it publishes.
 _WORK_PREFIX = ".generating-"
-# A run holds an exclusive lock on this file in the output directory, so two
-# runs never write or sweep the same output at once.
-_LOCK_NAME = ".generate.lock"
 
 
 def _fleet_rows(
@@ -175,13 +172,15 @@ def generate(
 def _exclusive_lock(output: Path) -> Iterator[None]:
     """Hold the output's generate lock, or fail at once if another run holds it.
 
+    A load holds the same lock shared, so this also fails while a load runs.
+
     The kernel releases the lock when the process exits, even on SIGKILL, so
     a temp dir found while holding it was left by a run that has ended.
 
     Raises:
         RuntimeError: If another generate holds the lock.
     """
-    with (output / _LOCK_NAME).open("a") as handle:
+    with (output / LOCK_NAME).open("a") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:

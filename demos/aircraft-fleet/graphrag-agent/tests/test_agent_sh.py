@@ -20,6 +20,7 @@ import pytest
 
 AGENT_ROOT = Path(__file__).resolve().parents[1]
 STACK = "AgentCore-AircraftFleet-default"
+ACCOUNT = "111122223333"
 
 # Every status call prints a banner on stderr, as the real CLI can when an
 # update is available. It must not break the JSON on stdout.
@@ -50,6 +51,11 @@ esac
 
 STUB_AWS = r"""#!/bin/bash
 echo "aws $*" >> "$STUB_LOG"
+if [ "$1 $2" = "sts get-caller-identity" ]; then
+    if [ -n "$STUB_STS_ERROR" ]; then echo "$STUB_STS_ERROR" >&2; exit 254; fi
+    echo "${STUB_CALLER_ACCOUNT:-111122223333}"
+    exit 0
+fi
 if [ "$1 $2" != "cloudformation describe-stacks" ]; then exit 99; fi
 if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
 if [ -n "$STUB_AWS_WARNING" ]; then echo "$STUB_AWS_WARNING" >&2; fi
@@ -91,6 +97,9 @@ def project(tmp_path: Path) -> Path:
     (root / "agentcore").mkdir(parents=True)
     shutil.copy2(AGENT_ROOT / "agent.sh", root / "agent.sh")
     shutil.copy2(AGENT_ROOT / "agentcore" / "agentcore.json", root / "agentcore" / "agentcore.json")
+    # The first deploy writes this file. Git ignores it, so the test writes its own.
+    targets = [{"name": "default", "account": ACCOUNT, "region": "us-east-1"}]
+    (root / "agentcore" / "aws-targets.json").write_text(json.dumps(targets))
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     stubs = {"agentcore": STUB_AGENTCORE, "aws": STUB_AWS, "uv": STUB_UV, "mktemp": STUB_MKTEMP}
@@ -234,6 +243,39 @@ def test_uv_stderr_is_not_read_as_the_region(project: Path) -> None:
         for c in calls(project)
     )
     assert leftover_temp_files(project) == []
+
+
+def test_credentials_for_another_account_fail_before_the_stack_check(project: Path) -> None:
+    result = run_destroy(project, STUB_CALLER_ACCOUNT="999988887777")
+
+    assert result.returncode == 1
+    assert f"account 999988887777, but target 'default' is in account {ACCOUNT}" in result.stdout
+    assert "Cleanup complete" not in result.stdout
+    assert not any(c.startswith("aws cloudformation") for c in calls(project))
+
+
+def test_a_failed_identity_check_fails(project: Path) -> None:
+    result = run_destroy(project, STUB_STS_ERROR="An error occurred (ExpiredToken)")
+
+    assert result.returncode == 1
+    assert "Could not check the active AWS account with STS." in result.stdout
+    assert "ExpiredToken" in result.stderr
+    assert "Cleanup complete" not in result.stdout
+
+
+@pytest.mark.parametrize("targets", [None, "[]", "not json"])
+def test_an_unknown_target_account_fails(project: Path, targets: str | None) -> None:
+    path = project / "agentcore" / "aws-targets.json"
+    if targets is None:
+        path.unlink()
+    else:
+        path.write_text(targets)
+
+    result = run_destroy(project)
+
+    assert result.returncode == 1
+    assert "Could not read the account for target 'default'" in result.stdout
+    assert "Cleanup complete" not in result.stdout
 
 
 def test_missing_aws_cli_fails(project: Path) -> None:

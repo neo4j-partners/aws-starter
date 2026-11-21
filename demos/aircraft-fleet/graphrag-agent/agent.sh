@@ -81,6 +81,8 @@ print_usage() {
 RUNTIME_NAME="graphrag_agent"
 TARGET="default"
 PROJECT_SPEC="agentcore/agentcore.json"
+# The first deploy records each target's account and region here. Git ignores it.
+TARGETS_FILE="agentcore/aws-targets.json"
 
 ensure_deps() {
     if [ ! -d ".venv" ]; then
@@ -164,14 +166,42 @@ print(f"AgentCore-{name}-{sys.argv[2]}".replace("_", "-"))
 ' "$PROJECT_SPEC" "$TARGET"
 }
 
-# Print the stack status, "absent" when the stack does not exist, or fail.
-# stderr goes to its own file, so a CLI warning cannot be read as the status.
-stack_status() {
-    local stack="$1" region="$2" output err_file err
+require_aws() {
     if ! command -v aws >/dev/null 2>&1; then
         echo "The aws CLI is not installed." >&2
         return 1
     fi
+}
+
+# Print the account that $TARGET deploys to, or fail.
+target_account() {
+    uv run --quiet python -c '
+import json
+import sys
+from pathlib import Path
+
+try:
+    targets = json.loads(Path(sys.argv[1]).read_text())
+    accounts = [t["account"] for t in targets if t.get("name") == sys.argv[2]]
+except (OSError, ValueError, TypeError, AttributeError, KeyError) as error:
+    sys.exit(f"{sys.argv[1]}: {error}")
+if len(accounts) != 1:
+    sys.exit(f"{sys.argv[1]} has {len(accounts)} entries for this target.")
+print(accounts[0])
+' "$TARGETS_FILE" "$TARGET"
+}
+
+# Print the account of the active AWS credentials, or fail.
+caller_account() {
+    require_aws || return 1
+    aws sts get-caller-identity --query Account --output text --region "$1"
+}
+
+# Print the stack status, "absent" when the stack does not exist, or fail.
+# stderr goes to its own file, so a CLI warning cannot be read as the status.
+stack_status() {
+    local stack="$1" region="$2" output err_file err
+    require_aws || return 1
     err_file=$(mktemp)
     if output=$(aws cloudformation describe-stacks --stack-name "$stack" --region "$region" \
             --query 'Stacks[0].StackStatus' --output text 2>"$err_file"); then
@@ -192,6 +222,7 @@ stack_status() {
 
 report_remaining() {
     local status parsed region remaining status_err parse_err stack cfn_status
+    local account caller
     # stderr goes to its own file, so a CLI banner or warning cannot break
     # the JSON. It is printed only when the call fails.
     status_err=$(mktemp)
@@ -246,6 +277,21 @@ walk(resources)
     # so ask CloudFormation directly.
     if ! stack=$(stack_name); then
         echo -e "${RED}Could not read the project name from $PROJECT_SPEC.${NC}"
+        exit 1
+    fi
+    # The stack check uses the active credentials. If they belong to another
+    # account, the stack reads as absent there, so confirm the account first.
+    if ! account=$(target_account); then
+        echo -e "${RED}Could not read the account for target '$TARGET' from $TARGETS_FILE.${NC}"
+        exit 1
+    fi
+    if ! caller=$(caller_account "$region"); then
+        echo -e "${RED}Could not check the active AWS account with STS.${NC}"
+        exit 1
+    fi
+    if [ "$caller" != "$account" ]; then
+        echo -e "${RED}The active AWS credentials belong to account $caller, but target '$TARGET' is in account $account.${NC}"
+        echo "Use credentials for account $account, for example with AWS_PROFILE, and run destroy again."
         exit 1
     fi
     if ! cfn_status=$(stack_status "$stack" "$region"); then

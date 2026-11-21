@@ -100,28 +100,43 @@ def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
     """Return the (start label, type, end label) triples the count store allows.
 
     Triples with an internal label, such as __KGBuilder__, are left out.
+    So are triples with a backslash in any name. Inside backticks Cypher
+    decodes an escape such as \\u0060 to a backtick, so doubling backticks
+    cannot keep such a name inside its quotes.
     """
     names = {node.element_id: node["name"] for node in visualization["nodes"]}
     candidates = set()
     for rel in visualization["relationships"]:
-        start = names[rel.start_node.element_id]
-        end = names[rel.end_node.element_id]
-        if not start.startswith("__") and not end.startswith("__"):
-            candidates.add((start, rel.type, end))
+        triple = (names[rel.start_node.element_id], rel.type, names[rel.end_node.element_id])
+        if triple[0].startswith("__") or triple[2].startswith("__"):
+            continue
+        if any("\\" in name for name in triple):
+            continue
+        candidates.add(triple)
     return sorted(candidates)
 
 
-def _pattern_check_query(candidates: list[tuple[str, str, str]]) -> str:
-    """Return a query that yields the index of each candidate the data has.
+# Branches per pattern check query. Candidates grow with start labels times
+# end labels, so the check runs in chunks to bound each query's size.
+_CHECK_CHUNK = 150
+
+
+def _pattern_check_queries(candidates: list[tuple[str, str, str]]) -> list[str]:
+    """Return queries that yield the index of each candidate the data has.
 
     Each branch stops at the first matching relationship. Fixed labels let
-    the planner start from a label scan.
+    the planner start from a label scan. Neo4j 5.26 plans dynamic labels
+    as a scan of every relationship, so the names are quoted into the text.
     """
-    return "\nUNION ALL\n".join(
+    branches = [
         f"MATCH (:{_quote_identifier(start)})-[:{_quote_identifier(rel_type)}]->"
         f"(:{_quote_identifier(end)}) RETURN {index} AS candidate LIMIT 1"
         for index, (start, rel_type, end) in enumerate(candidates)
-    )
+    ]
+    return [
+        "\nUNION ALL\n".join(branches[first : first + _CHECK_CHUNK])
+        for first in range(0, len(branches), _CHECK_CHUNK)
+    ]
 
 
 def graph_schema(driver: Driver, database: str) -> str:
@@ -152,11 +167,11 @@ def graph_schema(driver: Driver, database: str) -> str:
         notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
     ) as session:
         candidates = _candidate_patterns(session.run(_SCHEMA_VISUALIZATION_Q).single(strict=True))
-        found = (
-            [row["candidate"] for row in session.run(_pattern_check_query(candidates)).data()]
-            if candidates
-            else []
-        )
+        found = [
+            row["candidate"]
+            for query in _pattern_check_queries(candidates)
+            for row in session.run(query).data()
+        ]
         model_rows = session.run(_MODELS_Q).data()
         tail_rows = session.run(_SAMPLE_TAILS_Q).data()
         operator_rows = session.run(_OPERATORS_Q).data()
@@ -173,7 +188,8 @@ def graph_schema(driver: Driver, database: str) -> str:
     if not properties:
         print(f"  [WARN] No node labels in database {database!r}; run 'setup' first.\n")
 
-    relationships = [candidates[index] for index in found]
+    # Only an index the queries hold names a candidate.
+    relationships = [candidates[index] for index in found if 0 <= index < len(candidates)]
 
     lines = ["Node labels and properties:"]
     for label in sorted(properties):

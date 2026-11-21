@@ -74,8 +74,11 @@ class SchemaDriver:
         operators: list[str] = (),
         airports: list[str] = (),
         schema_error: Exception | None = None,
+        extra_candidates: list[int] = (),
     ) -> None:
         self.schema_error = schema_error
+        # Indexes every pattern check returns on top of the real matches.
+        self.extra_candidates = list(extra_candidates)
         self.rows = {
             agent_samples._NODE_PROPERTIES_Q: [
                 {"nodeLabels": labels, "propertyName": name} for labels, name in property_rows
@@ -122,6 +125,7 @@ class _SchemaSession:
         if cypher.startswith("MATCH (:"):
             self.driver.check_queries.append(cypher)
             rows = _check_rows(cypher, self.driver.relationship_rows)
+            rows += [{"candidate": index} for index in self.driver.extra_candidates]
             return SimpleNamespace(data=lambda: rows)
         if cypher not in self.driver.rows:
             raise AssertionError(f"unexpected schema query: {cypher}")
@@ -345,6 +349,54 @@ def test_schema_quotes_names_in_the_pattern_check() -> None:
     (check,) = driver.check_queries
     assert check == "MATCH (:`Odd``Label`)-[:`ODD``TYPE`]->(:`Plain`) RETURN 0 AS candidate LIMIT 1"
     assert "- (Odd`Label)-[:ODD`TYPE]->(Plain)" in lines
+
+
+def test_schema_keeps_a_backslash_name_out_of_the_pattern_check() -> None:
+    # Inside backticks, Cypher decodes ` to a backtick, so doubling
+    # backticks cannot keep such a name inside its quotes.
+    evil = "Evil\\u0060)-[]->() RETURN 99 AS candidate //"
+    driver = SchemaDriver(
+        relationship_rows=[
+            ([evil], "HAS_SYSTEM", ["System"]),
+            (["Aircraft"], "HAS_SYSTEM", ["System"]),
+            (["Aircraft"], "ODD\\TYPE", ["System"]),
+        ]
+    )
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert driver.check_queries
+    assert not any("\\" in query for query in driver.check_queries)
+    assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+
+
+@pytest.mark.parametrize("index", [-1, 1, 99])
+def test_schema_ignores_a_candidate_index_out_of_range(index: int) -> None:
+    driver = SchemaDriver(
+        relationship_rows=[(["Aircraft"], "HAS_SYSTEM", ["System"])],
+        extra_candidates=[index],
+    )
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+
+
+def test_schema_checks_patterns_in_queries_of_bounded_size() -> None:
+    # 20 start labels and 20 end labels of one type give 400 candidates.
+    starts = [f"S{n:02d}" for n in range(20)]
+    ends = [f"E{n:02d}" for n in range(20)]
+    driver = SchemaDriver(
+        relationship_rows=[([s], "LINKS", [e]) for s, e in zip(starts, ends, strict=True)]
+    )
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    branch_counts = [query.count("UNION ALL") + 1 for query in driver.check_queries]
+    assert branch_counts == [150, 150, 100]
+    assert lines[lines.index("Relationships:") + 1 :] == [
+        f"- ({s})-[:LINKS]->({e})" for s, e in zip(starts, ends, strict=True)
+    ]
 
 
 def test_schema_skips_the_pattern_check_without_relationships() -> None:

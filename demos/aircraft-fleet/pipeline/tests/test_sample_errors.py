@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from neo4j import Query
-from neo4j.exceptions import ClientError, Forbidden
+from neo4j.exceptions import ClientError, Forbidden, ServiceUnavailable, SessionExpired
 
 from populate_aircraft_db.agent_samples import _run_similarity_search, _run_text2cypher
 from populate_aircraft_db.samples import (
@@ -110,12 +110,21 @@ def test_missing_index_shows_the_error_and_the_setup_hint(
     assert driver.index_lookups == [index]
 
 
+# A user without SHOW INDEXES rights, or a connection that drops.
+@pytest.mark.parametrize(
+    "index_error",
+    [
+        pytest.param(Forbidden(), id="forbidden"),
+        pytest.param(ServiceUnavailable("connection lost"), id="service-unavailable"),
+        pytest.param(SessionExpired("session expired"), id="session-expired"),
+    ],
+)
 @pytest.mark.parametrize(("run", "index", "ok_queries"), SEARCHES)
 def test_failed_index_lookup_shows_only_the_original_error(
-    capsys, run, index: str, ok_queries: int
+    capsys, run, index: str, ok_queries: int, index_error: Exception
 ) -> None:
     error = ClientError()
-    driver = FailingDriver(error, ok_queries=ok_queries, index_error=Forbidden())
+    driver = FailingDriver(error, ok_queries=ok_queries, index_error=index_error)
 
     run(driver)
 

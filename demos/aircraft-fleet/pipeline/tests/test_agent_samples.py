@@ -469,8 +469,15 @@ def test_schema_sessions_disable_only_the_expected_notifications() -> None:
     ]
     property_queries, other_queries = driver.session_queries
     assert property_queries == [agent_samples._NODE_PROPERTIES_Q]
-    assert agent_samples._SCHEMA_VISUALIZATION_Q in other_queries
-    assert len(other_queries) == 6
+    (check,) = driver.check_queries
+    assert other_queries == [
+        agent_samples._SCHEMA_VISUALIZATION_Q,
+        check,
+        agent_samples._MODELS_Q,
+        agent_samples._SAMPLE_TAILS_Q,
+        agent_samples._OPERATORS_Q,
+        agent_samples._AIRPORTS_Q,
+    ]
 
 
 def test_run_agent_samples_sends_the_schema_prompt_with_every_cypher_question(

@@ -384,9 +384,11 @@ def test_schema_value_hints_come_from_the_generator_specs(
     assert f"- {label} {{{prop}}}  ({prop}: {', '.join(values)})\n" in schema
 
 
-def test_only_the_property_query_runs_without_generic_notifications() -> None:
+def test_schema_sessions_disable_only_the_expected_notifications() -> None:
     # db.schema.nodeTypeProperties raises a GENERIC notice about its
-    # propertyTypes field. Other GENERIC notices still reach the log.
+    # propertyTypes field. Other GENERIC notices still reach the log. On a
+    # partial database the fact queries name a label or property key that
+    # does not exist yet, which raises an UNRECOGNIZED notice.
     driver = SchemaDriver(relationship_rows=[(["Aircraft"], "HAS_SYSTEM", ["System"])])
 
     graph_schema(driver, "db")
@@ -397,7 +399,12 @@ def test_only_the_property_query_runs_without_generic_notifications() -> None:
             **read,
             "notifications_disabled_classifications": [NotificationDisabledClassification.GENERIC],
         },
-        read,
+        {
+            **read,
+            "notifications_disabled_classifications": [
+                NotificationDisabledClassification.UNRECOGNIZED
+            ],
+        },
     ]
     property_queries, other_queries = driver.session_queries
     assert property_queries == [agent_samples._NODE_PROPERTIES_Q]

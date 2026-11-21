@@ -3,6 +3,7 @@ configured LLM, generating Cypher or vector searches, and executing them."""
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 
@@ -96,23 +97,46 @@ def _domain_label(labels: list[str]) -> str | None:
     return ":".join(domain) or None
 
 
+def _printable(name: str) -> str:
+    """Escape each character the terminal would not print, such as NUL or a newline."""
+    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in name)
+
+
+def _warn_skipped(triples: set[tuple[str, str, str]], reason: str) -> None:
+    if triples:
+        shown = ", ".join(
+            f"({_printable(start)})-[:{_printable(rel_type)}]->({_printable(end)})"
+            for start, rel_type, end in sorted(triples)
+        )
+        print(f"  [WARN] skipped {len(triples)} relationship pattern(s) with {reason}: {shown}")
+
+
 def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
     """Return the (start label, type, end label) triples the count store allows.
 
     Triples with an internal label, such as __KGBuilder__, are left out.
     So are triples with a backslash in any name. Inside backticks Cypher
     decodes an escape such as \\u0060 to a backtick, so doubling backticks
-    cannot keep such a name inside its quotes.
+    cannot keep such a name inside its quotes. Triples with a control
+    character, such as NUL or a newline, are left out too. Each skipped
+    triple is reported, since the schema then omits a real relationship.
     """
     names = {node.element_id: node["name"] for node in visualization["nodes"]}
     candidates = set()
+    with_backslash = set()
+    with_control = set()
     for rel in visualization["relationships"]:
         triple = (names[rel.start_node.element_id], rel.type, names[rel.end_node.element_id])
         if triple[0].startswith("__") or triple[2].startswith("__"):
             continue
         if any("\\" in name for name in triple):
-            continue
-        candidates.add(triple)
+            with_backslash.add(triple)
+        elif any(unicodedata.category(c) == "Cc" for name in triple for c in name):
+            with_control.add(triple)
+        else:
+            candidates.add(triple)
+    _warn_skipped(with_backslash, "a backslash")
+    _warn_skipped(with_control, "a control character")
     return sorted(candidates)
 
 

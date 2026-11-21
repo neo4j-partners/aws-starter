@@ -357,7 +357,9 @@ def test_schema_quotes_names_in_the_pattern_check() -> None:
     assert "- (Odd`Label)-[:ODD`TYPE]->(Plain)" in lines
 
 
-def test_schema_keeps_a_backslash_name_out_of_the_pattern_check() -> None:
+def test_schema_keeps_a_backslash_name_out_of_the_pattern_check(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     # Inside backticks, Cypher decodes ` to a backtick, so doubling
     # backticks cannot keep such a name inside its quotes.
     evil = "Evil\\u0060)-[]->() RETURN 99 AS candidate //"
@@ -374,6 +376,35 @@ def test_schema_keeps_a_backslash_name_out_of_the_pattern_check() -> None:
     assert driver.check_queries
     assert not any("\\" in query for query in driver.check_queries)
     assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+    assert (
+        "  [WARN] skipped 2 relationship pattern(s) with a backslash: "
+        "(Aircraft)-[:ODD\\TYPE]->(System), "
+        "(Evil\\u0060)-[]->() RETURN 99 AS candidate //)-[:HAS_SYSTEM]->(System)\n"
+    ) in capsys.readouterr().out
+
+
+def test_schema_keeps_a_control_character_name_out_of_the_pattern_check(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    driver = SchemaDriver(
+        relationship_rows=[
+            (["Nul\x00Label"], "HAS_SYSTEM", ["System"]),
+            (["Aircraft"], "HAS_SYSTEM", ["System"]),
+            (["Aircraft"], "LINE\nBREAK", ["System"]),
+        ]
+    )
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert driver.check_queries == [
+        "MATCH (:`Aircraft`)-[:`HAS_SYSTEM`]->(:`System`) RETURN 0 AS candidate LIMIT 1"
+    ]
+    assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+    # The names are escaped, so a control character never reaches the terminal.
+    assert (
+        "  [WARN] skipped 2 relationship pattern(s) with a control character: "
+        "(Aircraft)-[:LINE\\nBREAK]->(System), (Nul\\x00Label)-[:HAS_SYSTEM]->(System)\n"
+    ) in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("index", [-1, 1, 99])

@@ -1,8 +1,10 @@
-"""Tests for ``agent.sh destroy`` with stub ``agentcore``, ``aws``, ``uv``, and ``mktemp``.
+"""Tests for ``agent.sh destroy`` and ``deploy`` with stub ``agentcore``, ``aws``, ``uv``,
+``npm``, and ``mktemp``.
 
 Each test copies agent.sh and the tracked agentcore.json into a temporary
-folder. PATH holds only the stub folder, /usr/bin, and /bin, so no real
-agentcore or aws CLI can run and nothing reaches AWS. The stubs log every call
+folder. PATH holds only the stub folder, which also links the SYSTEM_TOOLS
+the script runs, so no real agentcore, aws, or npm can run and nothing
+reaches AWS. The stubs log every call
 to calls.log and act on STUB_* environment variables. Each run gets its own
 process group, so STUB_INTERRUPT can send SIGINT to it, as Ctrl+C does.
 """
@@ -81,6 +83,25 @@ shift 3
 exec "$STUB_PYTHON" "$@"
 """
 
+# The system tools that agent.sh and the stubs run. Each test's PATH holds
+# only these links and the stubs, so a real agentcore, aws, uv, or npm
+# installed in /usr/bin cannot be found in place of a stub, or in place of
+# a stub a test removes.
+SYSTEM_TOOLS = (
+    "bash",
+    "cat",
+    "cp",
+    "dirname",
+    "find",
+    "grep",
+    "head",
+    "mkdir",
+    "readlink",
+    "rm",
+    "sleep",
+    "tail",
+)
+
 # npm logs its arguments and working folder. `npm ci` writes
 # node_modules/.package-lock.json, as a complete real install does, unless
 # STUB_NPM_EXIT makes it fail.
@@ -134,15 +155,25 @@ def project(tmp_path: Path) -> Path:
         stub = bin_dir / name
         stub.write_text(body)
         stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
+    for name in SYSTEM_TOOLS:
+        tool = shutil.which(name, path="/usr/bin:/bin")
+        assert tool is not None, f"{name} is not in /usr/bin or /bin"
+        (bin_dir / name).symlink_to(tool)
     (tmp_path / "tmp").mkdir()
     return root
+
+
+def assert_tools_found(result: subprocess.CompletedProcess[str]) -> None:
+    # A tool missing from SYSTEM_TOOLS can fail inside a branch that a test
+    # does not check, so look for the shell's error on every run.
+    assert "command not found" not in result.stderr, result.stderr
 
 
 def run_destroy(
     project: Path, *args: str, stdin: str = "", **stub_env: str
 ) -> subprocess.CompletedProcess[str]:
     env = {
-        "PATH": f"{project.parent / 'bin'}:/usr/bin:/bin",
+        "PATH": str(project.parent / "bin"),
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
         "STUB_PYTHON": sys.executable,
@@ -150,7 +181,7 @@ def run_destroy(
         "STUB_STATUS_JSON": _status(),
         **stub_env,
     }
-    return subprocess.run(
+    result = subprocess.run(
         ["bash", str(project / "agent.sh"), "destroy", *(args or ("--yes",))],
         input=stdin,
         capture_output=True,
@@ -160,6 +191,8 @@ def run_destroy(
         check=False,
         start_new_session=True,
     )
+    assert_tools_found(result)
+    return result
 
 
 def calls(project: Path) -> list[str]:
@@ -428,14 +461,14 @@ def run_deploy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[st
     (project.parent / ".env").write_text("NEO4J_URI=bolt://localhost:27687\n")
     (project / ".venv").mkdir(exist_ok=True)
     env = {
-        "PATH": f"{project.parent / 'bin'}:/usr/bin:/bin",
+        "PATH": str(project.parent / "bin"),
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
         "STUB_PYTHON": sys.executable,
         "STUB_TMP": str(project.parent / "tmp"),
         **stub_env,
     }
-    return subprocess.run(
+    result = subprocess.run(
         ["bash", str(project / "agent.sh"), "deploy"],
         capture_output=True,
         text=True,
@@ -443,6 +476,8 @@ def run_deploy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[st
         timeout=60,
         check=False,
     )
+    assert_tools_found(result)
+    return result
 
 
 def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
@@ -487,6 +522,7 @@ def test_a_failed_cdk_install_stops_before_deploy(project: Path) -> None:
 def test_deploy_without_npm_names_the_install_step(project: Path) -> None:
     remove_cdk_install(project)
     (project.parent / "bin" / "npm").unlink()
+    assert shutil.which("npm", path=str(project.parent / "bin")) is None
 
     result = run_deploy(project)
 

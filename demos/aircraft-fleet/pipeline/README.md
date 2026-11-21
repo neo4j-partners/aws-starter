@@ -45,6 +45,12 @@ the generator code, and the Python, Faker, and NumPy versions. The same seed can
 give different CSVs under another version of any of them. `generated/` is stale
 when its stamp does not match the `GEN_*` values, the current code, or the installed
 versions, and `load` and `load-operational` regenerate it then.
+`generate` writes each run into a `generated/.generating-*` temp directory first.
+A run that fails or is stopped before it finishes leaves the previous CSVs and
+stamp in place. When the run finishes, it removes the old stamp, moves each CSV
+into `generated/`, and writes the new stamp last. A run stopped during that move
+leaves a mix of old and new CSVs with no stamp, so the next `load` regenerates.
+The next run also removes any temp directory that a killed run left behind.
 The load copies the stamp onto a single `Dataset` node in the graph. `verify` makes
 two checks. It compares the stamp with the current code and versions, and it compares the
 graph's `Dataset` node with the stamp. A graph with no `Dataset` node was loaded

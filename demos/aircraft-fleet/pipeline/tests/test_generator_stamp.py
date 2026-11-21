@@ -134,19 +134,6 @@ def test_stale_reason_names_a_changed_library(
     )
 
 
-def test_failed_generate_leaves_no_stamp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _generate(tmp_path)
-
-    def fail(*args: object) -> None:
-        raise RuntimeError("generator bug")
-
-    monkeypatch.setattr(generator_main, "generate_removals", fail)
-    with pytest.raises(RuntimeError, match="generator bug"):
-        _generate(tmp_path, seed=7)
-
-    assert stamp.read_stamp(tmp_path) is None
-
-
 @pytest.mark.parametrize(
     "content",
     [

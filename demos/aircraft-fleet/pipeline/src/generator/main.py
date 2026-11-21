@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import random
+import shutil
+import tempfile
 import time
 from pathlib import Path
 from typing import Annotated
@@ -19,8 +22,8 @@ from .operations import generate_operations
 from .removals import _check_start_date, generate_removals
 from .sensors import generate_system_readings
 from .specs import EVENT_SEVERITIES
-from .stamp import clear_stamp, read_stamp, stamp_for, write_stamp
-from .writers import write_csv
+from .stamp import STAMP_NAME, clear_stamp, read_stamp, stamp_for, write_stamp
+from .writers import CSV_COLUMNS, write_csv
 
 app = typer.Typer(
     name="generate-data",
@@ -28,6 +31,12 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+# Every file a run writes into the output directory, besides the stamp. A run
+# removes the ones it did not write, so stale files cannot pass as current.
+OUTPUT_FILES = frozenset(CSV_COLUMNS) | {"nodes_readings.csv"}
+# Name prefix of the temp directory a run writes into before it publishes.
+_WORK_PREFIX = ".generating-"
 
 
 def _fleet_rows(
@@ -135,11 +144,68 @@ def generate(
     _check_start_date(config)
     output.mkdir(parents=True, exist_ok=True)
     stamp = stamp_for(config)
+    _remove_orphaned_work_dirs(output)
     if if_stale and read_stamp(output) == stamp:
         console.print(f"{output.resolve()} is current for this config and code. Skipping.")
         return
-    # An interrupted run must not leave the previous run's stamp behind.
+    # Write the run into a temp directory, so a failure leaves the
+    # previous output and its stamp as they were.
+    work = Path(tempfile.mkdtemp(dir=output, prefix=_WORK_PREFIX))
+    try:
+        elapsed, summary = _write_dataset(config, work, stamp)
+        _publish(work, output)
+    finally:
+        shutil.rmtree(work)
+    _print_summary(config, *summary, elapsed)
+
+
+def _remove_orphaned_work_dirs(output: Path) -> None:
+    """Remove temp directories that a killed run left in output.
+
+    A SIGKILL skips generate's cleanup. Only real directories whose name
+    starts with the temp prefix are removed, never a symlink or a file.
+    """
+    for path in output.iterdir():
+        if path.name.startswith(_WORK_PREFIX) and path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+
+
+def _publish(work: Path, output: Path) -> None:
+    """Move a finished run from work into output, with the stamp last.
+
+    The old stamp is cleared first, so an output caught mid-move has no
+    stamp and reads as stale. Known outputs that this run did not write are
+    removed, so they cannot pass as current. Files outside OUTPUT_FILES are
+    never touched.
+
+    Raises:
+        ValueError: If work holds a file outside OUTPUT_FILES.
+    """
+    written = {p.name for p in work.iterdir()} - {STAMP_NAME}
+    if unknown := sorted(written - OUTPUT_FILES):
+        raise ValueError(f"{', '.join(unknown)} must be added to OUTPUT_FILES")
     clear_stamp(output)
+    for name in sorted(OUTPUT_FILES - written):
+        (output / name).unlink(missing_ok=True)
+    for name in sorted(written):
+        os.replace(work / name, output / name)
+    os.replace(work / STAMP_NAME, output / STAMP_NAME)
+
+
+def _write_dataset(
+    config: GeneratorConfig, work: Path, stamp: dict
+) -> tuple[float, tuple[list[AircraftNode], int, list[dict], list[dict], list[dict]]]:
+    """Write every CSV and the stamp into work.
+
+    Returns:
+        The elapsed seconds, and the values _print_summary reports.
+    """
+    aircraft, airports, days, seed = (
+        config.n_aircraft,
+        config.n_airports,
+        config.n_days,
+        config.seed,
+    )
 
     rng = random.Random(seed)
     rng_np = np.random.default_rng(seed)
@@ -149,7 +215,7 @@ def generate(
     console.print(
         f"  Aircraft: {aircraft}  |  Airports: {airports}  |  Days: {days}  |  Seed: {seed}"
     )
-    console.print(f"  Output:   {output.resolve()}\n")
+    console.print(f"  Output:   {config.output_dir.resolve()}\n")
 
     # ── 1. Fleet topology ───────────────────────────────────────────────────
     console.print("[cyan]Generating fleet topology…[/cyan]")
@@ -164,13 +230,13 @@ def generate(
         rels_sys_sens,
     ) = _fleet_rows(fleet)
 
-    write_csv(aircraft_rows, output / "nodes_aircraft.csv")
-    write_csv(system_rows, output / "nodes_systems.csv")
-    write_csv(component_rows, output / "nodes_components.csv")
-    write_csv(sensor_rows, output / "nodes_sensors.csv")
-    write_csv(rels_ac_sys, output / "rels_aircraft_system.csv")
-    write_csv(rels_sys_comp, output / "rels_system_component.csv")
-    write_csv(rels_sys_sens, output / "rels_system_sensor.csv")
+    write_csv(aircraft_rows, work / "nodes_aircraft.csv")
+    write_csv(system_rows, work / "nodes_systems.csv")
+    write_csv(component_rows, work / "nodes_components.csv")
+    write_csv(sensor_rows, work / "nodes_sensors.csv")
+    write_csv(rels_ac_sys, work / "rels_aircraft_system.csv")
+    write_csv(rels_sys_comp, work / "rels_system_component.csv")
+    write_csv(rels_sys_sens, work / "rels_system_sensor.csv")
     console.print(
         f"  [green]✓[/green] {len(aircraft_rows)} aircraft  "
         f"{len(system_rows)} systems  "
@@ -187,7 +253,7 @@ def generate(
     total_readings = 0
 
     # Write readings incrementally per aircraft to keep memory bounded
-    readings_path = output / "nodes_readings.csv"
+    readings_path = work / "nodes_readings.csv"
     with readings_path.open("w", newline="", encoding="utf-8") as rf:
         import csv as _csv
 
@@ -243,10 +309,10 @@ def generate(
             }
         )
 
-    write_csv(maintenance_rows, output / "nodes_maintenance.csv")
-    write_csv(rels_comp_event, output / "rels_component_event.csv")
-    write_csv(rels_event_system, output / "rels_event_system.csv")
-    write_csv(rels_event_aircraft, output / "rels_event_aircraft.csv")
+    write_csv(maintenance_rows, work / "nodes_maintenance.csv")
+    write_csv(rels_comp_event, work / "rels_component_event.csv")
+    write_csv(rels_event_system, work / "rels_event_system.csv")
+    write_csv(rels_event_aircraft, work / "rels_event_aircraft.csv")
 
     # ── 3. Flight operations ────────────────────────────────────────────────
     console.print("[cyan]Generating flights, airports, and delays…[/cyan]")
@@ -260,13 +326,13 @@ def generate(
         rels_delay,
     ) = generate_operations(fleet, config, rng)
 
-    write_csv(airport_rows, output / "nodes_airports.csv")
-    write_csv(flight_rows, output / "nodes_flights.csv")
-    write_csv(delay_rows, output / "nodes_delays.csv")
-    write_csv(rels_ac_flight, output / "rels_aircraft_flight.csv")
-    write_csv(rels_dep, output / "rels_flight_departure.csv")
-    write_csv(rels_arr, output / "rels_flight_arrival.csv")
-    write_csv(rels_delay, output / "rels_flight_delay.csv")
+    write_csv(airport_rows, work / "nodes_airports.csv")
+    write_csv(flight_rows, work / "nodes_flights.csv")
+    write_csv(delay_rows, work / "nodes_delays.csv")
+    write_csv(rels_ac_flight, work / "rels_aircraft_flight.csv")
+    write_csv(rels_dep, work / "rels_flight_departure.csv")
+    write_csv(rels_arr, work / "rels_flight_arrival.csv")
+    write_csv(rels_delay, work / "rels_flight_delay.csv")
     console.print(
         f"  [green]✓[/green] {len(airport_rows)} airports  "
         f"{len(flight_rows):,} flights  "
@@ -278,18 +344,15 @@ def generate(
     removal_rows, rels_ac_removal, rels_comp_removal = generate_removals(
         fleet, maintenance_rows, config, rng
     )
-    write_csv(removal_rows, output / "nodes_removals.csv")
-    write_csv(rels_ac_removal, output / "rels_aircraft_removal.csv")
-    write_csv(rels_comp_removal, output / "rels_component_removal.csv")
+    write_csv(removal_rows, work / "nodes_removals.csv")
+    write_csv(rels_ac_removal, work / "rels_aircraft_removal.csv")
+    write_csv(rels_comp_removal, work / "rels_component_removal.csv")
     console.print(f"  [green]✓[/green] {len(removal_rows)} removals")
 
-    write_stamp(output, stamp)
+    write_stamp(work, stamp)
 
-    # ── Summary ─────────────────────────────────────────────────────────────
-    elapsed = time.time() - t0
-    _print_summary(
-        config, fleet, total_readings, maintenance_rows, flight_rows, delay_rows, elapsed
-    )
+    summary = (fleet, total_readings, maintenance_rows, flight_rows, delay_rows)
+    return time.time() - t0, summary
 
 
 def _print_summary(

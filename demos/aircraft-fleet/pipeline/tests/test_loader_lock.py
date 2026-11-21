@@ -86,5 +86,5 @@ def test_a_generate_fails_at_once_while_a_load_runs(
     loader.load_operational_graph(_Driver(), "db", tmp_path)
 
     assert [(r.exit_code, r.output) for r in results] == [
-        (1, f"another generate is running in {tmp_path}\n")
+        (1, f"another generate or a load is running in {tmp_path}\n")
     ]

@@ -198,7 +198,9 @@ def _exclusive_lock(output: Path) -> Iterator[None]:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise GenerateRunningError(f"another generate is running in {output}") from exc
+            raise GenerateRunningError(
+                f"another generate or a load is running in {output}"
+            ) from exc
         yield
 
 

@@ -199,7 +199,7 @@ def test_generate_fails_fast_while_another_generate_runs(tmp_path: Path) -> None
     # The CLI prints the message and exits 1, with no traceback.
     assert result.exit_code == 1
     assert isinstance(result.exception, SystemExit)
-    assert result.output == f"another generate is running in {output}\n"
+    assert result.output == f"another generate or a load is running in {output}\n"
     assert (live / "nodes_aircraft.csv").read_text() == "partial\n"
     assert stamp.read_stamp(output) is None
 

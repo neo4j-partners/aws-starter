@@ -70,16 +70,18 @@ ORDER BY model"""
 # The tail of each model's lowest aircraft_id number, which is its first
 # registry tail in a generated fleet. An aircraft_id is "AC" and a number.
 # As text AC10000 sorts before AC1001, so the query sorts by the number.
-# The text breaks ties, such as AC100 and AC0100, so the result is stable.
+# The text breaks ties, such as AC100 and AC0100. The tail number and the
+# model break any left, such as aircraft with no aircraft_id, so the result
+# is stable.
 # toIntegerOrNull gives null for a number too large for an integer, and
 # nulls sort last, so one odd id cannot fail the whole read.
 _SAMPLE_TAILS_Q = """\
 MATCH (a:Aircraft)
 WHERE a.model IS NOT NULL AND a.tail_number IS NOT NULL
-WITH a ORDER BY toIntegerOrNull(substring(a.aircraft_id, 2)), a.aircraft_id
+WITH a ORDER BY toIntegerOrNull(substring(a.aircraft_id, 2)), a.aircraft_id, a.tail_number
 WITH a.model AS model, collect(a)[0] AS first
 RETURN model, first.tail_number AS tail
-ORDER BY toIntegerOrNull(substring(first.aircraft_id, 2)), first.aircraft_id"""
+ORDER BY toIntegerOrNull(substring(first.aircraft_id, 2)), first.aircraft_id, model"""
 
 _OPERATORS_Q = """\
 MATCH (a:Aircraft)

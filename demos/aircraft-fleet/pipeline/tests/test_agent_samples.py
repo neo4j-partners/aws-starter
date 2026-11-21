@@ -831,6 +831,17 @@ def test_graph_schema_reads_the_live_database(
             """,
             database_=database,
         )
+        # Without an aircraft_id, the tail number picks a model's first
+        # aircraft, and the model name orders the models. They are created in
+        # the wrong order for both.
+        driver.execute_query(
+            """
+            CREATE (:Aircraft {tail_number: 'N9PYT', model: 'PYTEST-NULL-B'})
+            CREATE (:Aircraft {tail_number: 'N8PYT', model: 'PYTEST-NULL-A'})
+            CREATE (:Aircraft {tail_number: 'N7PYT', model: 'PYTEST-NULL-A'})
+            """,
+            database_=database,
+        )
 
         with caplog.at_level(logging.INFO, logger="neo4j.notifications"):
             schema = graph_schema(driver, database)
@@ -850,6 +861,8 @@ def test_graph_schema_reads_the_live_database(
             "N3PYT (PYTEST-TIE)",
             "N1PYT (PYTEST-MODEL)",
             "N6PYT (PYTEST-HUGE)",
+            "N7PYT (PYTEST-NULL-A)",
+            "N9PYT (PYTEST-NULL-B)",
         ]
         assert "PytestAir" in _prompt_line(schema, "Operators")
         assert "ZZQ" in _prompt_line(schema, "Airport IATA codes")

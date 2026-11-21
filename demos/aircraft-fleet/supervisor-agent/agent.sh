@@ -137,9 +137,12 @@ ensure_project() {
 # git ignores that folder, so a fresh clone has none. Install it from the
 # tracked package-lock.json before deploy or destroy. npm writes
 # node_modules/.package-lock.json only after a complete install, so a
-# partial install from a failed npm ci is installed again.
+# partial install from a failed npm ci is installed again. A package-lock.json
+# newer than that file, as after a pull that changes it, is installed again
+# too, so deploy does not run on the old CDK libraries.
 ensure_cdk_deps() {
-    if [ -f "$CDK_DIR/node_modules/.package-lock.json" ]; then
+    if [ -f "$CDK_DIR/node_modules/.package-lock.json" ] \
+        && ! [ "$CDK_DIR/package-lock.json" -nt "$CDK_DIR/node_modules/.package-lock.json" ]; then
         return
     fi
     if ! command -v npm >/dev/null 2>&1; then
@@ -147,7 +150,7 @@ ensure_cdk_deps() {
         echo "Install Node.js, then run: (cd $CDK_DIR && npm ci)"
         exit 1
     fi
-    echo -e "${YELLOW}Installing the CDK dependencies (first deploy)...${NC}"
+    echo -e "${YELLOW}Installing the CDK dependencies...${NC}"
     if ! (cd "$CDK_DIR" && npm ci); then
         echo -e "${RED}ERROR: npm ci failed in $CDK_DIR${NC}"
         echo "Fix the error above, then run: (cd $CDK_DIR && npm ci)"

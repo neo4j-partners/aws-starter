@@ -187,7 +187,7 @@ The server streams JSON events over SSE:
 The project lives in `agentcore/`. It was created with the AgentCore CLI, and
 its runtime `codeLocation` is this folder.
 
-The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` and `./agent.sh destroy` run `npm ci` there when the install is missing or incomplete, and `./agent.sh configure` always runs it. To install them once by hand, run:
+The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` and `./agent.sh destroy` run `npm ci` there when the install is missing or incomplete, or older than `package-lock.json`, as after a pull that changes it. `./agent.sh configure` always runs it. To install them once by hand, run:
 
 ```bash
 (cd agentcore/cdk && npm ci)

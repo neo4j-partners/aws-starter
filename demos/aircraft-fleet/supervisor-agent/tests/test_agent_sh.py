@@ -11,6 +11,7 @@ import re
 import shutil
 import stat
 import subprocess
+import time
 from pathlib import Path
 from signal import SIGHUP, SIGINT, SIGTERM
 
@@ -201,10 +202,15 @@ def project(tmp_path: Path) -> Path:
         stub = bin_dir / name
         stub.write_text(body)
         stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
-    # The CDK dependencies are installed unless a test removes them.
+    # The CDK dependencies are installed unless a test removes them. The
+    # tracked lockfile is older than the install, as after a clean install.
+    lock = root / "agentcore" / "cdk" / "package-lock.json"
+    lock.write_text("{}")
     install = root / "agentcore" / "cdk" / "node_modules"
     install.mkdir()
     (install / ".package-lock.json").write_text("{}")
+    past = time.time() - 60
+    os.utime(lock, (past, past))
     return root
 
 
@@ -677,6 +683,30 @@ def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> 
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert not any(call.startswith("npm") for call in calls(project))
+
+
+# A pull that changes package-lock.json leaves it newer than the install,
+# which then has the old CDK libraries.
+# destroy reads the stack status as a stack that is still deployed, so only
+# deploy gets one.
+@pytest.mark.parametrize(
+    ("args", "stub_env"),
+    [(("deploy",), {"STUB_STACK_STATUS": DISCOVERY_URL}), (("destroy", "--yes"), {})],
+)
+def test_a_package_lock_newer_than_the_install_is_installed_again(
+    project: Path, args: tuple[str, ...], stub_env: dict[str, str]
+) -> None:
+    ready_to_deploy(project)
+    cdk = project / "agentcore" / "cdk"
+    newer = (cdk / "node_modules" / ".package-lock.json").stat().st_mtime + 10
+    os.utime(cdk / "package-lock.json", (newer, newer))
+
+    result = run_agent(project, *args, **stub_env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    logged = calls(project)
+    first_agentcore = next(i for i, call in enumerate(logged) if call.startswith("agentcore"))
+    assert logged.index("npm ci in agentcore/cdk") < first_agentcore
 
 
 # A failed npm ci can leave node_modules without the lockfile that npm

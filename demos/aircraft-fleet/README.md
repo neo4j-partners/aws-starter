@@ -7,7 +7,7 @@ it with AI agents on Amazon Bedrock.
 
 - **Pipeline:** The [`demos/aircraft-fleet/pipeline/`](./pipeline/) project builds the Aircraft Digital Twin graph. It loads synthetic fleet data, then chunks the maintenance manuals, embeds them with Bedrock Titan, and extracts entities with Bedrock Claude.
 - **GraphRAG agent:** The [`demos/aircraft-fleet/graphrag-agent/`](./graphrag-agent/) project is a Strands agent that answers questions over the graph. It connects to Neo4j directly with a driver. It uses Text2Cypher for exact questions and vector search for manual text.
-- **Supervisor agent:** The [`demos/aircraft-fleet/supervisor-agent/`](./supervisor-agent/) project is a LangGraph supervisor. It sends each question to a Maintenance worker or an Operations worker. The workers query the graph through the Neo4j MCP server and AgentCore Gateway.
+- **Supervisor agent:** The [`demos/aircraft-fleet/supervisor-agent/`](./supervisor-agent/) project is a Strands supervisor agent. It has two specialist agents, Maintenance and Operations. It calls each one as a tool. The supervisor model picks one or both specialists for each question. It then writes the final answer from their results. The specialists query the graph through the Neo4j MCP server and AgentCore Gateway.
 - **Shared graph:** The pipeline creates the schema and vector index that the agents expect. Point all three projects at the same Neo4j database and they work with no code changes.
 
 ## Quick start
@@ -15,7 +15,7 @@ it with AI agents on Amazon Bedrock.
 Run these commands from `demos/aircraft-fleet/`:
 
 ```bash
-cp .env.sample .env          # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+cp .env.sample .env          # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, MEM_NEO4J_URI, MEM_NEO4J_PASSWORD
 
 cd pipeline
 uv sync
@@ -31,19 +31,20 @@ uv run fleet-cli "How many aircraft are in the database?"   # terminal 2
 
 - **Neo4j:** You need a Neo4j database that you can reach. Neo4j Aura works well.
 - **AWS:** You need AWS credentials with Bedrock model access. Enable an LLM and the Titan embedding model.
-- **Tools:** You need the [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.11 or later.
+- **Tools:** You need the [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.12 or later.
 
 ## Configure
 
-The pipeline and the GraphRAG agent both read one `.env` file in
-`demos/aircraft-fleet/`. Create it once:
+The pipeline, the GraphRAG agent, and the supervisor agent all read one `.env`
+file in `demos/aircraft-fleet/`. Create it once:
 
 ```bash
-cp .env.sample .env          # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+cp .env.sample .env          # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, MEM_NEO4J_URI, MEM_NEO4J_PASSWORD
 ```
 
-The supervisor agent does not read this file. It reads MCP credentials
-instead. See Step 4.
+- **Agent servers:** Both agent servers load this file at startup. Set `FLEET_ENV_FILE` to load a different file. A value already set in the environment wins.
+- **Supervisor graph access:** The supervisor agent reaches the fleet graph through MCP credentials, not the `NEO4J_*` settings. See Step 4.
+- **Memory settings:** Both agents keep memory in a separate Neo4j database, not the fleet graph. Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in `.env`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. An agent server stops at startup if the URI or the password is missing.
 
 ## Step 1: Build the graph
 
@@ -86,7 +87,6 @@ for the client commands, tracing, and troubleshooting.
 Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 
 ```bash
-./agent.sh configure
 ./agent.sh deploy
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
@@ -108,13 +108,13 @@ cp .env.sample .env.fleet    # set the same NEO4J_URI, NEO4J_USERNAME, NEO4J_PAS
 ```
 
 `sync-credentials.sh` copies `.mcp-credentials.fleet.json` to
-`demos/aircraft-fleet/supervisor-agent/.mcp-credentials.json`.
+`demos/aircraft-fleet/.mcp-credentials.json`.
 
 Then run these commands from `demos/aircraft-fleet/supervisor-agent/`:
 
 ```bash
 uv sync
-./agent.sh start             # serves http://localhost:8080
+./agent.sh start             # serves http://localhost:7071
 ./agent.sh test-maintenance
 ./agent.sh test-operations
 ```

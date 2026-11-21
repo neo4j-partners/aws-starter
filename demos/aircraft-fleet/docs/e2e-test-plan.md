@@ -40,7 +40,7 @@ All paths below are relative to `demos/aircraft-fleet/`.
 
 Tick each box only after the step's result is recorded below.
 
-- [x] **0.** Prerequisites verified (uv, Python 3.11+, AWS creds, Bedrock
+- [x] **0.** Prerequisites verified (uv, Python 3.12+, AWS creds, Bedrock
       model access, reachable Neo4j)
 - [x] **1.** Shared `.env` created and filled in
 - [x] **2.** Pipeline deps synced (`cd pipeline && uv sync`)
@@ -51,12 +51,12 @@ Tick each box only after the step's result is recorded below.
 - [x] **7.** Local agent server started (`uv run fleet-server`)
 - [x] **8.** Local single query answered (`uv run fleet-cli "..."`)
 - [x] **9.** Local full showcase passed (`uv run fleet-demo`)
-- [x] **10.** Agent configured for AWS (`./agent.sh configure`)
-- [x] **11.** Agent deployed (`./agent.sh deploy`)
-- [x] **12.** Deployment reached READY (`./agent.sh status`)
-- [x] **13.** Cloud single query answered (`./agent.sh invoke-cloud "..."`)
-- [x] **14.** Cloud full showcase passed (`uv run fleet-demo --remote`)
-- [x] **15.** Cloud resources destroyed (`./agent.sh destroy`)
+- [ ] **10.** AgentCore CLI installed and deploy settings set in `.env`
+- [ ] **11.** Agent deployed (`./agent.sh deploy`)
+- [ ] **12.** Deployment reached READY (`./agent.sh status`)
+- [ ] **13.** Cloud single query answered (`./agent.sh invoke-cloud "..."`)
+- [ ] **14.** Cloud full showcase passed (`uv run fleet-demo --remote`)
+- [ ] **15.** Cloud resources destroyed (`./agent.sh destroy`)
 - [x] **16.** Run Summary written
 - [ ] **17.** MCP server deployed with `--env fleet` against the same Neo4j
 - [ ] **18.** Supervisor credentials synced
@@ -73,7 +73,7 @@ Tick each box only after the step's result is recorded below.
 
 Confirm before starting:
 
-- `uv --version` and Python 3.11+ available.
+- `uv --version` and Python 3.12+ available.
 - AWS credentials configured (`aws sts get-caller-identity` succeeds). If
   using SSO: `aws sso login --sso-session <your-sso-session>`.
 - Bedrock model access enabled in the target region for the extraction LLM
@@ -91,17 +91,17 @@ are enabled there. Record the region used.
 **Result:** PASS (2026-05-18)
 - `uv 0.11.12` (Homebrew, aarch64-apple-darwin); system Python 3.14.4 (uv
   manages project venvs at 3.10+).
-- AWS identity: account `159878781974`, role
-  `AWSReservedSSO_AdministratorAccess` as `ryan.knight@neo4j.com`. No SSO
+- AWS identity: account `<ACCOUNT_ID>`, role
+  `<SSO_ROLE>` as `<EMAIL>`. No SSO
   re-login needed (`aws sts get-caller-identity` succeeded).
-- Region: `us-east-1` (from shared `.env`: `AWS_REGION=us-east-1`,
-  `BEDROCK_REGION=us-east-1`). Bedrock `list-foundation-models` in us-east-1
+- Region: `us-east-1` (from shared `.env`:
+  `AWS_REGION=us-east-1`). Bedrock `list-foundation-models` in us-east-1
   shows `amazon.titan-embed-text-v2:0`,
   `anthropic.claude-sonnet-4-5-20250929-v1:0`, and
   `anthropic.claude-sonnet-4-6` available.
-- Neo4j target: Aura `neo4j+s://e8e7cca9.databases.neo4j.io`, db `neo4j`.
+- Neo4j target: Aura `neo4j+s://<AURA_ID>.databases.neo4j.io`, db `neo4j`.
   `verify_connectivity()` OK; current node count = 360,758 (instance
-  already holds data from a prior run — pipeline `setup.sh` will reload).
+  already holds data from a prior run, and pipeline `setup.sh` will reload).
 
 ---
 
@@ -119,10 +119,10 @@ cp .env.sample .env
 # EMBED_DIMENSIONS to match on both sides.
 ```
 
-**Result:** PASS — `.env` already present at the demo root.
+**Result:** PASS. The `.env` was already present at the demo root.
 Set: `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE=neo4j`,
 `LOAD_FULL_DATASET=false` (fast/sampled run), `LLM_PROVIDER=bedrock`,
-`AWS_REGION=us-east-1`, `BEDROCK_REGION=us-east-1`. Embedder left at default
+`AWS_REGION=us-east-1`. Embedder left at default
 `amazon.titan-embed-text-v2:0` @ 1024 dims on both sides (no overrides set).
 
 ---
@@ -134,7 +134,7 @@ cd pipeline
 uv sync
 ```
 
-**Result:** PASS — `cd pipeline && uv sync` resolved and installed the
+**Result:** PASS. `cd pipeline && uv sync` resolved and installed the
 environment cleanly (no resolution conflicts).
 
 ---
@@ -154,7 +154,7 @@ If credentials or model access fail mid-run, record the failing stage. To
 isolate stages: `./setup.sh generate`, `./setup.sh load-operational` (no LLM,
 no key), `./setup.sh load`, `./setup.sh verify`.
 
-**Result:** IN PROGRESS — first `./setup.sh` attempt aborted partway.
+**Result:** IN PROGRESS. The first `./setup.sh` attempt aborted partway.
 - Stage 1 (generate): PASS. 20 aircraft, 80 systems, 340 components, 160
   sensors, 345,600 sensor readings, 110 maintenance events, 40 airports,
   8,116 flights, 3,124 delays, 25 component removals (seed 42, full=false).
@@ -165,20 +165,20 @@ no key), `./setup.sh load`, `./setup.sh verify`.
   instance reset) before re-running the load.
 - Re-run: operator cleared the DB directly (verified node count = 0).
   Restarted via `./setup.sh load` (skips CSV regen; Stage 1 already passed).
-- Stage 2 (clean): PASS, instant — `[OK] Database cleared (0 nodes
+- Stage 2 (clean): PASS, instant. `[OK] Database cleared (0 nodes
   deleted)` on the now-empty instance.
-- Stage 3a (schema): PASS — 11 uniqueness constraints, 5 range indexes,
+- Stage 3a (schema): PASS. 11 uniqueness constraints, 5 range indexes,
   4 fulltext indexes (`maintenance_search`, `delay_search`,
   `component_search`, `document_search`) created.
-- Stage 3b (node load): PASS — 20 Aircraft, 80 System, 340 Component,
+- Stage 3b (node load): PASS. 20 Aircraft, 80 System, 340 Component,
   160 Sensor, 345,600 Reading, 40 Airport, 8,116 Flight, 3,124 Delay,
   110 MaintenanceEvent, 25 Removal.
-- Stage 3c (relationships): PASS — HAS_SYSTEM 80, HAS_COMPONENT 340,
+- Stage 3c (relationships): PASS. HAS_SYSTEM 80, HAS_COMPONENT 340,
   HAS_SENSOR 160, HAS_EVENT 110, HAS_READING 345,600, OPERATES_FLIGHT
   8,116, DEPARTS_FROM 8,116, ARRIVES_AT 8,116, HAS_DELAY 3,124,
   AFFECTS_SYSTEM 110, AFFECTS_AIRCRAFT 110, HAS_REMOVAL 25,
   REMOVED_COMPONENT 25.
-- Stage 3d (GraphRAG enrichment): PASS — 5 manuals processed
+- Stage 3d (GraphRAG enrichment): PASS. 5 manuals processed
   (AMM-A320/A321neo/B737/E190/A220-2024-001) via Bedrock (Titan
   embeddings + Claude extraction). Created 6 extraction constraints,
   vector index `maintenanceChunkEmbeddings` and fulltext
@@ -186,7 +186,7 @@ no key), `./setup.sh load`, `./setup.sh verify`.
   20 AircraftModel→Aircraft, 965 SystemReference→System, 148
   ComponentReference→Component, 1,440 Sensor→OperatingLimit. 290 Chunk
   nodes, all with embeddings.
-- Stage 3e (verify --strict, run by `load`): PASS — `[OK] Verification
+- Stage 3e (verify --strict, run by `load`): PASS. `[OK] Verification
   passed.` Vector search smoke test returned 1 result, best score 1.0000.
   Data-quality checks all zero (no orphan readings/flights/components/
   sensors/documents).
@@ -206,7 +206,7 @@ a clean read-only pass:
 
 Expect a pass report and exit code 0.
 
-**Result:** PASS — standalone `./setup.sh verify` exit code 0,
+**Result:** PASS. Standalone `./setup.sh verify` exit code 0,
 `[OK] Verification passed.`
 - Embeddings: 290 chunks, 0 missing, dimensions found `[1024]`, 0
   wrong-dimension.
@@ -230,7 +230,7 @@ Simulates an agent issuing Cypher and vector searches against the loaded
 graph. Confirms the dual graph and the `maintenanceChunkEmbeddings` index are
 queryable.
 
-**Result:** PASS (with one minor cosmetic note) — `./setup.sh samples`
+**Result:** PASS (with one minor cosmetic note). `./setup.sh samples`
 exit code 0, "All samples complete."
 - All sections returned real data: Fleet Overview (20 aircraft with
   model/manufacturer/system+component counts), system→component
@@ -243,7 +243,7 @@ exit code 0, "All samples complete."
 - **Minor note (since FIXED):** the hybrid demo's *fulltext* sub-query
   printed "(fulltext index not available — run 'setup' first)" even
   though `verify` confirms `maintenanceChunkText` FULLTEXT ONLINE. Root
-  cause was NOT a param mismatch — the fulltext keyword string was built
+  cause was NOT a param mismatch. The fulltext keyword string was built
   from raw chunk text starting with `[DOCUMENT CONTEXT]`; the `[` is a
   Lucene range operator, so `db.index.fulltext.queryNodes` threw a
   `ParseException` that the broad `except` masked with the misleading
@@ -262,7 +262,7 @@ cd ../graphrag-agent
 uv sync
 ```
 
-**Result:** PASS — `cd agent && uv sync` resolved and installed cleanly
+**Result:** PASS. `cd graphrag-agent && uv sync` resolved and installed cleanly
 (no conflicts).
 
 ---
@@ -281,14 +281,14 @@ uv run opentelemetry-instrument fleet-server
 If port 7070 is held: `lsof -ti :7070 | xargs kill`, then restart.
 
 **Result:** PASS (resolved). Originally blocked; operator started the
-server manually in-session. Now listening on port 7070 (pid 40141),
+server manually in-session. Now listening on port 7070 (pid <PID>),
 health endpoint returns `{"status":"Healthy"}`. History:
 - Port 7070 was held by an unrelated long-running fleet-agent server
-  (PID 16869, 2h34m elapsed) from an older `fleet-agent/` folder
+  (PID <PID>, 2h34m elapsed) from an older `fleet-agent/` folder
   (a different project). Operator approved "kill it and start ours";
   `lsof -ti :7070 | xargs kill` ran and port 7070 was freed.
 - Starting `uv run fleet-server` was then denied by the Claude Code
-  auto-mode permission classifier (stale rationale — it did not register
+  auto-mode permission classifier (stale rationale: it did not register
   the operator's approval). Server not started; Steps 8–9 not yet run.
 - Resolution options surfaced to operator: (a) run `uv run fleet-server`
   manually in-session, (b) add a Bash permission rule and retry, or
@@ -307,8 +307,8 @@ uv run fleet-cli "How many aircraft are in the database?"
 Expect a numeric answer consistent with the loaded dataset (default ~20
 aircraft).
 
-**Result:** PASS — operator started `uv run fleet-server` manually
-(in-session); confirmed listening on 7070 (pid 40141), `/ping` returned
+**Result:** PASS. The operator started `uv run fleet-server` manually
+(in-session); confirmed listening on 7070 (pid <PID>), `/ping` returned
 `{"status":"Healthy"}`. `uv run fleet-cli "How many aircraft are in the
 database?"` → routed to `graph_query_tool` → **"There are 20 aircraft in
 the database."** Matches the loaded dataset (20 aircraft, full=false).
@@ -326,18 +326,18 @@ Walks four sections: live schema, `graph_query` (Text2Cypher),
 `vector_search` (semantic over manual chunks), and the full ReAct agent.
 Section 4 calls Claude for several turns and takes a few minutes.
 
-**Result:** PASS — `uv run fleet-demo` exit code 0, all 4 sections.
-- **Section 1 (live schema):** PASS — agent loaded the live Neo4j schema
+**Result:** PASS. `uv run fleet-demo` exit code 0, all 4 sections.
+- **Section 1 (live schema):** PASS: agent loaded the live Neo4j schema
   (node labels / rels / properties) at startup.
-- **Section 2 (graph_query / Text2Cypher):** PASS — count = 20 aircraft;
+- **Section 2 (graph_query / Text2Cypher):** PASS: count = 20 aircraft;
   grouped aggregation matched generation (Airbus A220-300 ×2, A320-200
   ×5, A321neo ×4, Boeing B737-800 ×7, Embraer E190 ×2); relationship
   traversal returned CRITICAL maintenance events with tail numbers and
   faults.
-- **Section 3 (vector_search):** PASS — semantic query "procedure for
+- **Section 3 (vector_search):** PASS: semantic query "procedure for
   detecting a hydraulic system leak" returned real manual text (E190
   Maintenance Manual §6.4.1 Leak Detection), not noise.
-- **Section 4 (full ReAct agent):** PASS — agent self-selected tools
+- **Section 4 (full ReAct agent):** PASS: agent self-selected tools
   correctly: `graph_query_tool` for the operator/delays structured
   question (RegionalCo, 1,054 delays), `vector_search_tool` for the
   hydraulic reservoir low-level manual question (detailed procedure),
@@ -347,71 +347,52 @@ Section 4 calls Claude for several turns and takes a few minutes.
 
 ---
 
-## Step 10: Configure for AWS deployment
+## Step 10: Set up the AgentCore CLI deploy
+
+Deployment uses the AgentCore CLI. Install it once:
 
 ```bash
-# from demos/aircraft-fleet/graphrag-agent
-./agent.sh configure
+npm install -g @aws/agentcore
 ```
 
-Writes `.bedrock_agentcore.yaml`, pins entrypoint `runtime_app.py`. Required
-even if the yaml already exists.
+The project lives in `graphrag-agent/agentcore/`. Set the deploy settings in
+the shared `.env`:
 
-**Result:** PASS (with a documented deviation). No TTY in the automation
-shell, so `./agent.sh configure` (which runs `agentcore configure`
-interactively) crashed with `OSError: [Errno 22]` attaching to stdin.
-Ran the equivalent non-interactively instead:
-`uv run agentcore configure -e runtime_app.py -n fleet_agent -ni
--r us-east-1 -dt direct_code_deploy -rt PYTHON_3_13` (exit 0).
-- Agent name: `fleet_agent`; entrypoint pinned `runtime_app.py`.
-- Deployment: `direct_code_deploy`, runtime python3.13 (managed, no
-  Docker), Network mode PUBLIC.
-- Region: `us-east-1`; Account: `159878781974`.
-- Execution role: auto-create; S3 bucket: auto-create; Authorization:
-  IAM (default); Memory: STM_ONLY (30-day retention).
-- Config written to `agent/.bedrock_agentcore.yaml` (none existed
-  before). `fleet_agent` set as default agent.
+- **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE`.
+- **Memory connection:** Set `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, and `MEM_NEO4J_DATABASE`.
+- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the complete ARNs of the Secrets Manager secrets that hold the passwords.
+
+Record the AgentCore CLI version and the two secret names. Do not record the ARNs.
+
+**Result:** Not run.
 
 ---
 
 ## Step 11: Deploy to AgentCore Runtime
 
 ```bash
+# from demos/aircraft-fleet/graphrag-agent
 ./agent.sh deploy
 ```
 
-Provisions the runtime (managed python3.13 arm64, no Docker build) and
-injects the Neo4j connection from the shared `.env` as Runtime env vars.
-Takes several minutes.
+The deploy builds a code zip and deploys the CDK stack. It builds no Docker
+image. The first deploy creates the `default` target in
+`agentcore/aws-targets.json`. Record how long the deploy takes.
 
-**Result:** PASS — operator ran `./agent.sh deploy` in-session (the
-auto-mode classifier repeatedly denied the automation from running it
-even after explicit approval). Direct-code-deploy launch created an
-STM-only memory resource `fleet_agent_mem-y5xGNR8xYm` (memory CREATING
-phase ~1.5 min, normal vs the 30–180s AWS quote) then provisioned the
-runtime. No Docker build.
-- Agent ARN:
-  `arn:aws:bedrock-agentcore:us-east-1:159878781974:runtime/fleet_agent-fTBR27H3u3`
-- Region us-east-1, Account 159878781974, Network PUBLIC.
-- Created 2026-05-19 01:42:39 UTC, last updated 01:43:01 UTC.
-- Neo4j connection injected as Runtime env vars (NEO4J_URI/USERNAME/
-  PASSWORD/DATABASE) via `deploy_env_args`.
+**Result:** Not run.
 
 ---
 
-## Step 12: Wait for READY
+## Step 12: Check the deployment
 
 ```bash
 ./agent.sh status
 ```
 
-Wait for `Endpoint: DEFAULT READY`.
+Expect the Runtime ARN and a deployed state. Record the state that `status`
+reports.
 
-**Result:** PASS — `./agent.sh status` (exit 0): `Ready - Agent deployed
-and endpoint available`, `Endpoint: DEFAULT (READY)`. Time to READY ~22s
-between Created (01:42:39 UTC) and Last Updated (01:43:01 UTC) after the
-memory resource went ACTIVE. CloudWatch log group
-`/aws/bedrock-agentcore/runtimes/fleet_agent-fTBR27H3u3-DEFAULT`.
+**Result:** Not run.
 
 ---
 
@@ -423,11 +404,7 @@ memory resource went ACTIVE. CloudWatch log group
 
 Expect the same answer as the local run in Step 8.
 
-**Result:** PASS — `./agent.sh invoke-cloud "How many aircraft are in
-the database?"` (exit 0). Deployed agent streamed: tool
-`graph_query_tool` → **"There are 20 aircraft in the database."**
-Identical to local Step 8. Session
-`53e598a3-087b-4134-9949-154b315027aa`, ARN `fleet_agent-fTBR27H3u3`.
+**Result:** Not run.
 
 ---
 
@@ -437,7 +414,8 @@ Identical to local Step 8. Session
 uv run fleet-demo --remote
 ```
 
-Same four sections as Step 9, against the deployed runtime over boto3.
+This runs the same five sections as Step 9 against the deployed runtime over
+boto3.
 
 Optional extra checks:
 
@@ -446,23 +424,9 @@ uv run fleet-invoke "What does the manual say about hydraulic leak detection?"
 uv run fleet-invoke load-test 5     # replay queries.txt every 5s; Ctrl+C to stop
 ```
 
-**Result:** PASS — `uv run fleet-demo --remote` exit code 0, all 4
-sections against the deployed runtime over boto3.
-- **Section 1 (schema):** PASS — live schema loaded remotely.
-- **Section 2 (graph_query):** PASS — count 20; manufacturer/model
-  breakdown identical to local (A220-300 ×2, A320-200 ×5, A321neo ×4,
-  B737-800 ×7, E190 ×2); CRITICAL events with tail numbers + faults.
-- **Section 3 (vector_search):** PASS — hydraulic-leak query returned
-  real manual text (E190 Manual §6.4.1 Leak Detection, fault code
-  HYD-LEAK-001, leak-location table), not noise.
-- **Section 4 (ReAct agent):** PASS — `graph_query_tool` for operator
-  delays (RegionalCo, 1,054), `vector_search_tool` for hydraulic
-  reservoir low-level guidance, both tools chained for the
-  engine-vibration "needs both" question (40 events + per-type manual
-  procedure).
-- **Local vs cloud answers consistent:** yes — identical figures and
-  manual content vs Step 9.
-- Optional `fleet-invoke` / load-test extras: not run.
+Record whether the local and cloud answers match.
+
+**Result:** Not run.
 
 ---
 
@@ -472,28 +436,16 @@ sections against the deployed runtime over boto3.
 ./agent.sh destroy
 ```
 
-Removes the runtime. Decide separately whether to clean the Neo4j graph
-(`cd ../pipeline && ./setup.sh clean`); record the decision.
+The command asks for confirmation. Pass `--yes` to skip the question. It
+checks that the active AWS credentials belong to the target's account. When it
+finishes, it asks CloudFormation whether the stack
+`AgentCore-AircraftFleet-default` still exists. Record that answer.
 
-**Result:** PASS — `./agent.sh destroy` is interactive (y/N prompt) and
-failed on no TTY; ran `uv run agentcore destroy --force` instead
-(exit 0, same non-interactive deviation as Step 10).
-- "Successfully destroyed resources for agent 'fleet_agent'. Resources
-  removed: 7, Warnings: 0, Errors: 0."
-- Destroyed: AgentCore runtime `fleet_agent-fTBR27H3u3`; S3 artifacts
-  `deployment.zip` + `source.zip`; memory
-  `fleet_agent_mem-y5xGNR8xYm`; IAM execution role
-  `AmazonBedrockAgentCoreSDKRuntime-us-east-1-7d250c5f60`; agent config
-  + `.bedrock_agentcore.yaml` removed.
-- **Neo4j cleanup decision:** LEFT INTACT. The Aura graph
-  (`e8e7cca9`) is the operator's own instance and is useful for
-  re-runs / local agent use; not destroying data resources without an
-  explicit ask. To wipe it later:
-  `cd ../pipeline && ./setup.sh clean` (slow on Aura — prefer a single
-  `MATCH (n) DETACH DELETE n` / instance reset, as in Step 3).
-- Note: the local `fleet-server` (pid 40141, started in-session) is
-  still running on port 7070; stop with
-  `lsof -ti :7070 | xargs kill` when done.
+Decide separately whether to clean the Neo4j graph, and record the decision.
+On Aura, a single `MATCH (n) DETACH DELETE n` or an instance reset is faster
+than `./setup.sh clean`.
+
+**Result:** Not run.
 
 ---
 
@@ -518,8 +470,8 @@ cp .env.sample .env.fleet   # skip if present. Set the same NEO4J_* values
 ../scripts/sync-credentials.sh
 ```
 
-The script copies `.mcp-credentials.fleet.json` to
-`supervisor-agent/.mcp-credentials.json`.
+The script copies `.mcp-credentials.fleet.json` to `.mcp-credentials.json`
+in `demos/aircraft-fleet/`.
 
 **Result:** Not run.
 
@@ -528,7 +480,7 @@ The script copies `.mcp-credentials.fleet.json` to
 ```bash
 cd ../demos/aircraft-fleet/supervisor-agent
 uv sync
-./agent.sh start                   # serves http://localhost:8080
+./agent.sh start                   # serves http://localhost:7071
 ```
 
 **Result:** Not run.
@@ -569,12 +521,15 @@ cd ../../../neo4j-mcp-server
 
 Fill this in at the end (or when stopping early).
 
+This summary records the 2026-05-18 run. Steps 10 to 15 now use the
+AgentCore CLI flow and need a fresh run.
+
 - **Date / operator:** 2026-05-18 (UTC deploy timestamps 2026-05-19),
-  operator ryan@grandcloud.com, executed via Claude Code.
+  operator <EMAIL>, executed via Claude Code.
 - **Region(s) used:** `us-east-1` (Bedrock + AgentCore + Titan).
-- **Dataset size (LOAD_FULL_DATASET):** `false` — sampled: 20 aircraft,
+- **Dataset size (LOAD_FULL_DATASET):** `false`. Sampled: 20 aircraft,
   90 days, 40 airports, seed 42 (345,600 readings).
-- **Neo4j target:** Aura `neo4j+s://e8e7cca9.databases.neo4j.io`,
+- **Neo4j target:** Aura `neo4j+s://<AURA_ID>.databases.neo4j.io`,
   database `neo4j`.
 - **Overall status:** PASS for Steps 0–16. Steps 17–22 (the supervisor
   path) were added after this run and have not been run.
@@ -584,7 +539,7 @@ Fill this in at the end (or when stopping early).
   None of Steps 0–16 were skipped. Two steps
   needed a non-interactive workaround (no TTY in the automation shell):
   Step 10 `agentcore configure -ni` and Step 15 `agentcore destroy
-  --force` instead of the interactive `./agent.sh` wrappers — same
+  --force` instead of the interactive `./agent.sh` wrappers, with the same
   outcome. Step 3 first attempt aborted (clean too slow on the pre-
   existing ~360k-node Aura instance); operator cleared the DB directly
   and the `./setup.sh load` re-run passed.
@@ -598,15 +553,15 @@ Fill this in at the end (or when stopping early).
   3. Claude Code auto-mode classifier repeatedly denied the cloud
      `./agent.sh deploy` (and the local `fleet-server` start) despite
      operator approval; operator ran those two commands in-session.
-- **Embedder alignment confirmed (pipeline vs agent):** yes — default
+- **Embedder alignment confirmed (pipeline vs agent):** yes: default
   `amazon.titan-embed-text-v2:0` @ 1024 dims on both sides; verify
   reported 290 chunks, dimensions `[1024]`, 0 wrong-dimension; remote +
   local vector_search both returned real manual text.
-- **Local vs cloud answers consistent:** yes — single query "20
+- **Local vs cloud answers consistent:** yes: single query "20
   aircraft" identical; full showcase Sections 2–4 produced identical
   figures and manual content local (Step 9) vs remote (Step 14).
 - **Follow-up actions / issues to file:**
-  1. ✅ FIXED — Samples hybrid demo fulltext sub-query failed (Lucene
+  1. ✅ FIXED. Samples hybrid demo fulltext sub-query failed (Lucene
      `ParseException` on `[DOCUMENT CONTEXT]` in the derived keyword
      string; broad `except` masked it as "index not available").
      `samples.py` `_HYBRID_FT_Q` reduce now strips Lucene special
@@ -615,11 +570,11 @@ Fill this in at the end (or when stopping early).
   2. Consider documenting that `clean` is slow against a non-empty
      Aura instance and recommending a one-shot delete / instance reset
      in the test plan / README. (Still open.)
-  3. ✅ FIXED — `./agent.sh configure` and `destroy` now forward extra
+  3. ✅ FIXED. `./agent.sh configure` and `destroy` now forward extra
      args to the underlying `agentcore` command (`"${@:2}"`), so
      `./agent.sh configure -ni ...` and `./agent.sh destroy --force`
      work non-interactively. Noted in `graphrag-agent/README.md`.
-- **Cloud resources confirmed destroyed:** yes — 7 resources removed,
+- **Cloud resources confirmed destroyed:** yes: 7 resources removed,
   0 errors (runtime, 2 S3 artifacts, memory, IAM role, config + yaml).
   Neo4j Aura data intentionally left intact (operator's instance).
-  Local `fleet-server` (pid 40141) still running on port 7070.
+  Local `fleet-server` (pid <PID>) still running on port 7070.

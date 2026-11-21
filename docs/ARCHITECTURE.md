@@ -379,8 +379,8 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph GraphRAGAgent["GraphRAG Agent (runtime_app.py)"]
-        LLM[Claude Sonnet 4.5<br/>via Bedrock]
+    subgraph GraphRAGAgent["GraphRAG Agent (fleet_graphrag/server.py)"]
+        LLM[Claude Sonnet 5.5<br/>via Bedrock]
         AGENT[Strands Agent<br/>schema in system prompt]
         GQ[graph_query_tool<br/>Text2Cypher]
         VS[vector_search_tool<br/>semantic search]
@@ -408,7 +408,7 @@ The agent reads the graph schema once at startup and puts it in the system promp
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| LLM | Claude Sonnet 4.5 (Bedrock) | Reasoning and response generation |
+| LLM | Claude Sonnet 5.5 on Bedrock, global inference profile | Reasoning and response generation |
 | Agent Framework | Strands `Agent` | Tool calling and streamed answers |
 | Retrieval | `neo4j-graphrag` retrievers | Text2Cypher and vector search |
 | Database Access | Neo4j Python driver | Direct connection, no MCP or Gateway |
@@ -424,11 +424,11 @@ uv run fleet-cli "How many aircraft are in the database?"
 ./agent.sh deploy         # Deploy to AgentCore Runtime
 ```
 
-The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` from the shared `.env` at the `aircraft-fleet` root. See [graphrag-agent/README.md](../demos/aircraft-fleet/graphrag-agent/README.md) for the full command list.
+The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` from the shared `.env` at the `aircraft-fleet` root. It also needs `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` for memory. See [graphrag-agent/README.md](../demos/aircraft-fleet/graphrag-agent/README.md) for the full command list.
 
 ### Supervisor Agent (Multi-Agent)
 
-A supervisor agent that routes queries to specialized domain experts using LangGraph StateGraph.
+A Strands supervisor agent in `supervisor-agent/` answers questions over the aircraft graph with two specialist agents. The supervisor calls each specialist as a tool. The specialists reach Neo4j through the AgentCore Gateway and the Neo4j MCP server.
 
 ```mermaid
 flowchart TB
@@ -436,13 +436,15 @@ flowchart TB
         USER[User Query]
     end
 
-    subgraph Supervisor["Supervisor Agent"]
-        ROUTER[Router Node<br/>Query Classification]
+    subgraph Supervisor["Supervisor Agent (fleet_supervisor/server.py)"]
+        SUP[Supervisor Strands Agent<br/>picks specialist tools]
 
-        subgraph Workers["Specialist Workers"]
-            MAINT[Maintenance Agent<br/>Faults, Components, Sensors]
-            OPS[Operations Agent<br/>Flights, Delays, Routes]
+        subgraph Workers["Specialist Tools"]
+            MAINT[maintenance_specialist<br/>Faults, Components, Sensors]
+            OPS[operations_specialist<br/>Flights, Delays, Routes]
         end
+
+        GWTOOLS[Gateway tools<br/>get_neo4j_schema, read_neo4j_cypher]
     end
 
     subgraph MCP["MCP Server"]
@@ -454,73 +456,35 @@ flowchart TB
         NEO4J[(Neo4j Database)]
     end
 
-    USER --> ROUTER
-    ROUTER -->|maintenance keywords| MAINT
-    ROUTER -->|operations keywords| OPS
-    MAINT --> GATEWAY
-    OPS --> GATEWAY
+    USER --> SUP
+    SUP -->|tool call| MAINT
+    SUP -->|tool call| OPS
+    MAINT --> GWTOOLS
+    OPS --> GWTOOLS
+    GWTOOLS -->|MCP with bearer token| GATEWAY
     GATEWAY --> MCPSERVER
     MCPSERVER --> NEO4J
 
-    style ROUTER fill:#fff3e0
+    style SUP fill:#fff3e0
     style MAINT fill:#e8f5e9
     style OPS fill:#e3f2fd
 ```
 
-**StateGraph Architecture:**
+**Routing:**
 
-```mermaid
-stateDiagram-v2
-    [*] --> Router: User Query
-    Router --> Maintenance: maintenance keywords
-    Router --> Operations: operations keywords
-    Maintenance --> [*]: Response
-    Operations --> [*]: Response
+- **Specialists as tools:** The supervisor has two tools, `maintenance_specialist` and `operations_specialist`. Each tool wraps a specialist Strands agent with `Agent.as_tool`.
+- **Routing by description:** The supervisor model picks a tool from the tool descriptions. No separate classifier runs. The Maintenance description covers maintenance events, faults, components, systems, sensors, and severity. The Operations description covers flights, delays, routes, airports, operators, and schedules. It also covers general questions such as the graph schema or simple counts.
+- **One or both specialists:** The supervisor can call both specialists in one turn. Strands runs those tool calls concurrently. The supervisor passes each specialist a self-contained question. It then writes the final answer from the results.
+- **A fresh agent per call:** `SpecialistTool` builds a new specialist agent for every call. A Strands agent serves one call at a time. A fresh agent per call keeps parallel calls apart.
+- **Model-safe errors:** If a specialist fails, the supervisor model gets a generic error message. The details go to the server log.
 
-    note right of Router
-        Classifies query using LLM:
-        - maintenance, fault, component → Maintenance
-        - flight, delay, route → Operations
-    end note
+**Gateway access:**
 
-    note right of Maintenance
-        Domain expertise:
-        - Aircraft health monitoring
-        - Component reliability
-        - Fault analysis
-        - Sensor data interpretation
-    end note
-
-    note right of Operations
-        Domain expertise:
-        - Flight scheduling
-        - Delay analysis
-        - Route management
-        - Airline performance
-    end note
-```
-
-**Agent State Flow:**
-
-```mermaid
-flowchart LR
-    subgraph State["SupervisorState"]
-        MSG[messages: list]
-        NEXT[next_agent: str]
-    end
-
-    subgraph Nodes["Graph Nodes"]
-        R[router]
-        M[maintenance]
-        O[operations]
-    end
-
-    START((START)) --> R
-    R -->|next_agent=maintenance| M
-    R -->|next_agent=operations| O
-    M --> END((END))
-    O --> END
-```
+- **One MCP client:** The server starts one Strands `MCPClient` against the Gateway URL on the first request. It filters the Gateway tool list down to `get_neo4j_schema` and `read_neo4j_cypher`. Both specialists share these two tools.
+- **Local auth:** A local run uses the OAuth2 client credentials grant. It posts the client ID and secret from the credentials file to the Cognito `token_url`.
+- **Cloud auth:** On AgentCore Runtime, the client gets an M2M token from AgentCore Identity. The runtime holds no client secret.
+- **Token refresh:** The client sends the token as a bearer header. It fetches a new token before the old one expires. A 401 response triggers one refresh and one retry.
+- **Reconnects:** The Gateway can end the MCP session, for example when it restarts. A tool call that finds the session ended rebuilds the client and retries once.
 
 **Domain Specialists:**
 
@@ -533,18 +497,19 @@ flowchart LR
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Supervisor | LangGraph `StateGraph` | Multi-agent coordination |
-| Router | Claude LLM + Classification Prompt | Query routing |
-| Workers | LangGraph `create_react_agent` | Domain-specific ReAct agents |
-| State | `TypedDict` with `add_messages` | Conversation history |
-| Memory | `MemorySaver` | Session persistence |
+| Supervisor | Strands `Agent` | Picks specialists and writes the answer |
+| Routing | Specialist tool descriptions | The supervisor model chooses a tool for each question |
+| Specialists | Strands `Agent` wrapped with `Agent.as_tool` | Domain agents, built fresh for each call |
+| Graph Tools | Strands `MCPClient` to the AgentCore Gateway | `get_neo4j_schema` and `read_neo4j_cypher` |
+| Memory | `Neo4jSessionManager` from `neo4j_agent_memory` | Session history for the supervisor |
+| Server | `BedrockAgentCoreApp` | Streams answers as server-sent events |
 
 **Usage:**
 
 ```bash
 cd demos/aircraft-fleet/supervisor-agent
 uv sync                       # Install dependencies
-./agent.sh start              # Run locally (port 8080)
+./agent.sh start              # Run locally (port 7071)
 ./agent.sh test-maintenance   # Test routing to Maintenance Agent
 ./agent.sh test-operations    # Test routing to Operations Agent
 ./agent.sh deploy             # Deploy to AgentCore Runtime
@@ -560,7 +525,6 @@ Complete flow from user query to Neo4j response:
 sequenceDiagram
     participant User
     participant Agent as Supervisor Agent
-    participant Router
     participant Worker as Specialist Agent
     participant LLM as Claude Sonnet
     participant Gateway as AgentCore Gateway
@@ -570,34 +534,34 @@ sequenceDiagram
 
     User->>Agent: "What are the most common faults?"
 
-    Note over Agent,Router: Step 1: Query Routing
-    Agent->>Router: Classify query
-    Router->>LLM: ROUTER_PROMPT + query
-    LLM-->>Router: "maintenance"
-    Router-->>Agent: next_agent = maintenance
+    Note over Agent,LLM: Step 1: Routing
+    Agent->>LLM: SUPERVISOR_SYSTEM_PROMPT + query + specialist tool specs
+    LLM-->>Agent: Tool use: maintenance_specialist(question)
 
     Note over Agent,Worker: Step 2: Specialist Processing
-    Agent->>Worker: Forward to Maintenance Agent
-    Worker->>LLM: MAINTENANCE_PROMPT + query
+    Agent->>Worker: Build a new Maintenance Agent for this call
+    Worker->>LLM: MAINTENANCE_SYSTEM_PROMPT + question
 
-    Note over Worker,Neo4j: Step 3: Tool Execution (ReAct Loop)
-    loop ReAct: Thought → Action → Observation
-        LLM-->>Worker: Thought: Need to query faults
-        Worker->>Gateway: MCP call_tool(read_neo4j_cypher, query)
+    Note over Worker,Neo4j: Step 3: Tool Execution (Strands agent loop)
+    loop Until the model returns an answer
+        LLM-->>Worker: Tool use: read_neo4j_cypher(query)
+        Worker->>Gateway: MCP call_tool with bearer token
         Gateway->>Runtime: Forward with OAuth
         Runtime->>MCP: Execute tool
         MCP->>Neo4j: MATCH (m:MaintenanceEvent)...
         Neo4j-->>MCP: Results
         MCP-->>Runtime: Tool response
         Runtime-->>Gateway: Response
-        Gateway-->>Worker: Observation: [fault data]
-        Worker->>LLM: Observation + continue
+        Gateway-->>Worker: Tool result: [fault data]
+        Worker->>LLM: Tool result
     end
 
     Note over Worker,User: Step 4: Response
-    LLM-->>Worker: Final answer
-    Worker-->>Agent: Response message
-    Agent-->>User: "The most common faults are..."
+    LLM-->>Worker: Specialist answer
+    Worker-->>Agent: Tool result
+    Agent->>LLM: Specialist answer
+    LLM-->>Agent: Final answer
+    Agent-->>User: Streams "The most common faults are..."
 ```
 
 ---
@@ -612,8 +576,8 @@ sequenceDiagram
 | **Runtime** | Bedrock AgentCore | MicroVM container hosting |
 | **Gateway** | Bedrock AgentCore | Tool aggregation, auth |
 | **Auth** | Amazon Cognito | OAuth2 M2M tokens |
-| **Agents** | LangGraph, LangChain | Multi-agent orchestration |
-| **LLM** | Claude Sonnet 4 (Bedrock) | Reasoning, tool selection |
+| **Agents** | Strands Agents, LangGraph, LangChain | Tool calling and multi-agent orchestration |
+| **LLM** | Claude Sonnet 5.5, Claude Haiku 4.5 and Claude Sonnet 4.6 on Bedrock | Reasoning and tool selection. Sonnet 4.6 runs entity extraction in the pipeline and in agent memory. |
 | **Observability** | CloudWatch, X-Ray | Logs, traces, metrics |
 
 ---

@@ -100,23 +100,34 @@ esac
 # call of cmd, the same as a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead.
 # STUB_RECORD_STRIP_MODE records the strip copy's mode and size in bytes
 # while it holds the lines: awk's after awk writes them to its standard
-# output, which is the copy, and mv's before mv moves the copy.
+# output, which is the copy, and mv's before mv moves the copy. mv also
+# records the copy's name and agent.sh's PID.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
 real=/bin/"$name"
 [ -x "$real" ] || real=/usr/bin/"$name"
+# Print agent.sh's PID, even from inside one of its subshells.
+agent_pid() {
+    local owner=$PPID parent
+    while parent=$(ps -o ppid= -p "$owner" | tr -d ' ') \
+        && ps -o command= -p "$parent" | grep -qF /agent.sh; do
+        owner=$parent
+    done
+    echo "$owner"
+}
 # stat's flags differ between macOS and Linux, so Python reads the mode. It
 # reads its own standard output when no file is named.
 record_strip() {
     python3 -c 'import os, stat, sys
 st = os.stat(sys.argv[3]) if len(sys.argv) > 3 else os.fstat(1)
+named = [os.path.basename(sys.argv[3]), sys.argv[4]] if len(sys.argv) > 3 else []
 with open(sys.argv[1], "a") as log:
-    print(sys.argv[2], format(stat.S_IMODE(st.st_mode), "o"), st.st_size, file=log)' \
+    print(sys.argv[2], format(stat.S_IMODE(st.st_mode), "o"), st.st_size, *named, file=log)' \
         "${STUB_LOG%/*}/strip-modes" "$@"
 }
 if [ -n "${STUB_RECORD_STRIP_MODE:-}" ] && [ "$name" = mv ]; then
     case "${@: -2:1}" in
-        *.env.local.strip.*) record_strip mv "${@: -2:1}" ;;
+        *.env.local.strip.*) record_strip mv "${@: -2:1}" "$(agent_pid)" ;;
     esac
 fi
 "$real" "$@"
@@ -128,13 +139,7 @@ counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
 if [ "${STUB_INTERRUPT_AFTER:-}" = "$name:$count" ]; then
-    # Signal agent.sh itself, even from inside one of its subshells.
-    owner=$PPID
-    while parent=$(ps -o ppid= -p "$owner" | tr -d ' ') \
-        && ps -o command= -p "$parent" | grep -qF /agent.sh; do
-        owner=$parent
-    done
-    kill -s "${STUB_INTERRUPT_SIGNAL:-INT}" "$owner"
+    kill -s "${STUB_INTERRUPT_SIGNAL:-INT}" "$(agent_pid)"
 fi
 exit "$status"
 """
@@ -591,7 +596,8 @@ def test_on_exit_leaves_a_strip_copy_name_that_is_not_this_runs(
 
 # mktemp creates the copy with mode 0600, under umask 077 as well. The copy
 # holds the lines only after awk writes them and until mv moves it, and it
-# is 0600 at both points.
+# is 0600 at both points. Its name is the PID prefix plus mktemp's six
+# random characters, so a fixed name that a umask alone made 0600 fails.
 def test_the_copy_is_0600_while_it_holds_data_under_a_wide_umask(project: Path) -> None:
     env_local = project / "agentcore" / ".env.local"
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
@@ -600,7 +606,11 @@ def test_the_copy_is_0600_while_it_holds_data_under_a_wide_umask(project: Path) 
     result = run_destroy(project, umask=0o022, STUB_RECORD_STRIP_MODE="1")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (project.parent / "strip-modes").read_text() == "awk 600 4\nmv 600 4\n"
+    awk_line, mv_line = (project.parent / "strip-modes").read_text().splitlines()
+    assert awk_line == "awk 600 4"
+    tool, mode, size, copy, pid = mv_line.split()
+    assert (tool, mode, size) == ("mv", "600", "4")
+    assert re.fullmatch(rf"\.env\.local\.strip\.{pid}\.\w{{6}}", copy)
     assert env_local.read_text() == "A=1\n"
     assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
 

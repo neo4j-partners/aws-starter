@@ -618,24 +618,71 @@ def test_the_fault_code_tables_are_the_canonical_list(model: str) -> None:
             assert (row[4] != b737[row[0]][4]) is overridden, row
 
 
-# A code-shaped token: a fault code system prefix, a segment, and three digits.
-# A part number such as AVN-FMS-737-100 continues with "-<digits>", so a token
-# that does is not a code.
-_PREFIXES = "|".join(sorted({c.code.split("-")[0] for c in FAULT_CODES}))
-_CODE_TOKEN = re.compile(rf"\b(?:{_PREFIXES})-[A-Z]{{2,5}}-\d{{3}}\b(?!-\d)")
-# Task card numbers. They share the code shape but are not fault codes.
-_TASK_CARDS = {"ENG-TC-001", "ENG-TC-002", "HYD-TC-001", "HYD-TOOL-100"}
+# A code-shaped token, loose enough to catch a variant of a code: any prefix,
+# any case, a "-", "_", or en dash between segments, two to four digits, and an
+# optional letter or "-<digits>" tail.
+_CODE_TOKEN = re.compile(
+    r"\b[A-Z]{2,5}[-_\u2013][A-Z]{2,6}[-_\u2013]\d{2,4}[A-Za-z]?(?:-\d+)?\b", re.IGNORECASE
+)
+# A task card shares the code shape. Its id is valid in the manual that
+# defines it, so fault sections can refer to it.
+_TASK_CARD = re.compile(r"^#### Task Card: (\S+)", re.MULTILINE)
+# A part number shares it too. It is valid only in a part number field.
+_PART_NUMBER_FIELD = re.compile(r"\(P/N: [^)\n]*\)|^\*\*Part Number:\*\* .*$", re.MULTILINE)
 
 
 def _unknown_codes(text: str) -> list[str]:
-    canonical = {c.code for c in FAULT_CODES} | _TASK_CARDS
-    return [t for t in _CODE_TOKEN.findall(text) if t not in canonical]
+    """Code-shaped tokens that are not a fault code, task card, or part number."""
+    valid = {c.code for c in FAULT_CODES} | set(_TASK_CARD.findall(text))
+    fields = [m.span() for m in _PART_NUMBER_FIELD.finditer(text)]
+    return [
+        m.group()
+        for m in _CODE_TOKEN.finditer(text)
+        if m.group() not in valid
+        and not any(start <= m.start() and m.end() <= end for start, end in fields)
+    ]
 
 
 def test_the_code_check_flags_a_mistyped_code_but_not_a_part_number() -> None:
-    text = "Record ENG-OHV-006, not ENG-OVH-006. Order AVN-FMS-737-100 and HYD-PUMP-2901."
+    text = (
+        "Record ENG-OHV-006, not ENG-OVH-006. Order the computer (P/N: AVN-FMS-737-100).\n"
+        "**Part Number:** HYD-PUMP-2901\n"
+    )
 
     assert _unknown_codes(text) == ["ENG-OHV-006"]
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "ENG-OVH-06",
+        "ENG-OVHEAT-006",
+        "ENG-OVH-006a",
+        "ENG-OVH-006-1",
+        "ELEC-OVH-006",
+        "GBX-CHP-001",
+        "APU-OVH-001",
+        "eng-ovh-006",
+        "ENG\u2013OVH\u2013006",
+        "ENG_OVH_006",
+        "AVN-SDR-01",
+    ],
+)
+def test_the_code_check_flags_a_variant_of_a_code(token: str) -> None:
+    assert _unknown_codes(f"Record {token} in the log.") == [token]
+
+
+def test_a_part_number_counts_only_in_a_part_number_field() -> None:
+    assert _unknown_codes("Use the hand pump (P/N: HYD-TOOL-100).") == []
+    assert _unknown_codes("Use HYD-TOOL-100 to bleed the system.") == ["HYD-TOOL-100"]
+
+
+def test_a_task_card_counts_only_in_the_manual_that_defines_it() -> None:
+    reference = "See task card ENG-TC-009 for the inspection.\n"
+    card = "#### Task Card: ENG-TC-009 - Borescope Inspection\n"
+
+    assert _unknown_codes(card + reference) == []
+    assert _unknown_codes(reference) == ["ENG-TC-009"]
 
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))

@@ -327,7 +327,7 @@ def test_a_rejected_password_is_read_again_once(supervisor, password_retry, monk
 
 
 def test_a_password_rejected_twice_fails_without_a_third_try(
-    supervisor, password_retry, monkeypatch
+    supervisor, password_retry, monkeypatch, caplog
 ):
     managers, forgotten = password_retry
 
@@ -339,6 +339,10 @@ def test_a_password_rejected_twice_fails_without_a_third_try(
     assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
     assert forgotten == [True]
     assert [m.closed for m in managers] == [1, 1]
+    # The second failure is raised on its own, not chained to the first.
+    [failed] = [r for r in caplog.records if r.getMessage() == "Request failed"]
+    assert failed.exc_info is not None
+    assert failed.exc_info[1].__context__ is None
 
 
 def test_other_build_errors_keep_the_cached_password(supervisor, password_retry, monkeypatch):

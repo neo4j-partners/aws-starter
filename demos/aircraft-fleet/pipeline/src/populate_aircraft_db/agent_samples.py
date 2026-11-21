@@ -18,7 +18,7 @@ from generator.specs import (
 )
 
 from .display import WIDTH, header, records_table, show_cypher
-from .samples import report_query_error
+from .query_errors import report_query_error
 
 # ---------------------------------------------------------------------------
 # Graph schema description fed to the LLM for Cypher generation

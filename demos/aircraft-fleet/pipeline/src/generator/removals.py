@@ -50,6 +50,24 @@ def _check_start_date(config: GeneratorConfig) -> None:
         )
 
 
+def _most_hours_since_install(
+    removal_date: datetime,
+    last_removal: datetime | None,
+    flight_hours_at_removal: int,
+    utilization: float,
+) -> int:
+    """Most flight hours a part can have since install when it comes off on removal_date.
+
+    They stay below the airframe total, and below the hours flown since the
+    part's last removal, when its replacement went in.
+    """
+    most = flight_hours_at_removal - 1
+    if last_removal is not None:
+        days_since = (removal_date - last_removal).total_seconds() / 86400
+        most = min(most, int(days_since * utilization))
+    return most
+
+
 def _part_number(rng: random.Random) -> str:
     prefix = rng.choice(["P", "PN", "PT", "PNR"])
     return f"{prefix}{rng.randint(10000, 99999)}-{rng.randint(1, 999):03d}"
@@ -102,25 +120,45 @@ def generate_removals(
         utilization = aircraft.hours_per_day
         in_service = datetime.combine(aircraft.entry_into_service, datetime.min.time())
 
-        # Each component is removed at most once in the window, so its install
-        # and removal dates never overlap another removal of the same part.
-        removed = rng.sample(all_components, min(n_removals, len(all_components)))
+        removal_dates = sorted(
+            config.start_date
+            + timedelta(days=rng.randint(0, config.n_days - 1), hours=rng.randint(6, 18))
+            for _ in range(n_removals)
+        )
+        # Removals run in date order. A component can come off again once its
+        # replacement, installed at the last removal or later, has flown the
+        # install minimum. One part's install-to-removal intervals never overlap.
+        last_removed: dict[str, datetime] = {}
 
-        for component in removed:
-            removal_counter += 1
-            removal_id = f"RE{removal_counter:06d}"
-
-            removal_date = config.start_date + timedelta(
-                days=rng.randint(0, config.n_days - 1),
-                hours=rng.randint(6, 18),
-            )
+        for removal_date in removal_dates:
             # Airframe hours are the days in service at the aircraft's rate.
             days_in_service = (removal_date - in_service).total_seconds() / 86400
             flight_hours_at_removal = int(days_in_service * utilization)
-            # Flight hours since install stay below the airframe total. The
-            # install date follows from them at the same rate, so it falls
-            # after entry into service, and the hours and the date agree.
-            hours_since_install = rng.randint(_MIN_HOURS_SINCE_INSTALL, flight_hours_at_removal - 1)
+            # The install date follows from the hours since install at the
+            # same rate, so it falls after entry into service and after the
+            # part's last removal, and the hours and the date agree.
+            most_hours = {
+                c.component_id: _most_hours_since_install(
+                    removal_date,
+                    last_removed.get(c.component_id),
+                    flight_hours_at_removal,
+                    utilization,
+                )
+                for c in all_components
+            }
+            eligible = [
+                c for c in all_components if most_hours[c.component_id] >= _MIN_HOURS_SINCE_INSTALL
+            ]
+            if not eligible:
+                continue
+            component = rng.choice(eligible)
+            last_removed[component.component_id] = removal_date
+
+            removal_counter += 1
+            removal_id = f"RE{removal_counter:06d}"
+            hours_since_install = rng.randint(
+                _MIN_HOURS_SINCE_INSTALL, most_hours[component.component_id]
+            )
             install_date = removal_date - timedelta(days=hours_since_install / utilization)
 
             priority = rng.choices(_PRIORITIES, weights=_PRIORITY_WEIGHTS)[0]

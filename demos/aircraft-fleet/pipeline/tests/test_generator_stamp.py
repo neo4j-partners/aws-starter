@@ -102,6 +102,28 @@ def test_failed_generate_leaves_no_stamp(tmp_path: Path, monkeypatch: pytest.Mon
     assert stamp.read_stamp(tmp_path) is None
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param(b"[]", id="list"),
+        pytest.param(b'"x"', id="string"),
+        pytest.param(b"\xff\xfe not utf-8", id="not-utf-8"),
+        pytest.param(None, id="directory"),
+    ],
+)
+def test_read_stamp_returns_none_for_an_unusable_stamp(
+    tmp_path: Path, content: bytes | None
+) -> None:
+    path = tmp_path / stamp.STAMP_NAME
+    if content is None:
+        path.mkdir()
+    else:
+        path.write_bytes(content)
+
+    assert stamp.read_stamp(tmp_path) is None
+    assert "has no .stamp.json" in stamp.stale_reason(tmp_path)
+
+
 def test_generator_hash_covers_every_module(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

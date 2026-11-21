@@ -44,14 +44,17 @@ def stamp_for(config: GeneratorConfig) -> dict[str, Any]:
 
 
 def read_stamp(directory: Path) -> dict[str, Any] | None:
-    """Return the directory's stamp, or None if it is missing or not valid JSON."""
+    """Return the directory's stamp, or None if it is missing or unusable.
+
+    A stamp that cannot be read, is not UTF-8 JSON, or is not a JSON object
+    proves nothing, so it counts as missing. OSError covers a missing file
+    and a directory in its place. ValueError covers bad UTF-8 and bad JSON.
+    """
     try:
-        return json.loads((directory / STAMP_NAME).read_text(encoding="utf-8"))
-    except FileNotFoundError:
+        stamp = json.loads((directory / STAMP_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return None
-    except json.JSONDecodeError:
-        # A truncated or hand-edited stamp proves nothing, so treat it as missing.
-        return None
+    return stamp if isinstance(stamp, dict) else None
 
 
 def write_stamp(directory: Path, stamp: dict[str, Any]) -> None:

@@ -9,7 +9,8 @@ This is a working log, not just a reference. As you run the test:
    output, pass or fail, and anything you had to change. Do not wait until
    the end to write it all up.
 2. **Capture real evidence.** Paste the relevant command output, counts,
-   ARNs, and error text. A bare "worked" is not a result.
+   and error text. A bare "worked" is not a result. Leave out account IDs,
+   ARNs, and passwords.
 3. **Write the final summary.** When you finish (or stop early), complete the
    "Run Summary" section at the bottom: overall status, what passed, what
    failed, root causes, and follow-ups.
@@ -322,9 +323,10 @@ Step 7 (server) thereby also satisfied.
 uv run fleet-demo
 ```
 
-Walks four sections: live schema, `graph_query` (Text2Cypher),
-`vector_search` (semantic over manual chunks), and the full ReAct agent.
-Section 4 calls Claude for several turns and takes a few minutes.
+Walks five sections: live schema, `graph_query` (Text2Cypher),
+`vector_search` (semantic over manual chunks), the full ReAct agent, and
+memory. The agent and memory sections call Claude for several turns and take
+a few minutes. The 2026-05-18 result below predates the memory section.
 
 **Result:** PASS. `uv run fleet-demo` exit code 0, all 4 sections.
 - **Section 1 (live schema):** PASS: agent loaded the live Neo4j schema
@@ -353,6 +355,13 @@ Deployment uses the AgentCore CLI. Install it once:
 
 ```bash
 npm install -g @aws/agentcore
+```
+
+The CDK dependencies are git-ignored. Install them once in a fresh clone, or
+the deploy stops with "CDK dependencies are missing":
+
+```bash
+(cd graphrag-agent/agentcore/cdk && npm install)
 ```
 
 The project lives in `graphrag-agent/agentcore/`. Set the deploy settings in
@@ -570,10 +579,9 @@ AgentCore CLI flow and need a fresh run.
   2. Consider documenting that `clean` is slow against a non-empty
      Aura instance and recommending a one-shot delete / instance reset
      in the test plan / README. (Still open.)
-  3. ✅ FIXED. `./agent.sh configure` and `destroy` now forward extra
-     args to the underlying `agentcore` command (`"${@:2}"`), so
-     `./agent.sh configure -ni ...` and `./agent.sh destroy --force`
-     work non-interactively. Noted in `graphrag-agent/README.md`.
+  3. Superseded. The AgentCore CLI rewrite removed `./agent.sh configure`.
+     `./agent.sh destroy --yes` now runs without a prompt. See Steps 10
+     to 15.
 - **Cloud resources confirmed destroyed:** yes: 7 resources removed,
   0 errors (runtime, 2 S3 artifacts, memory, IAM role, config + yaml).
   Neo4j Aura data intentionally left intact (operator's instance).

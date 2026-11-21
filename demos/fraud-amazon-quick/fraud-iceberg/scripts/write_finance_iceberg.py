@@ -10,8 +10,10 @@
 """Create an S3 bucket and load the bundled finance CSVs as Iceberg tables.
 
 Run with an AWS profile or role that can create the S3 bucket, manage its
-objects, and create Glue databases and tables:
+objects, and create Glue databases and tables. Name the IAM role that may
+write objects with --writer-role-arn or DATA_AGENT_WRITER_ROLE_ARN:
 
+    export DATA_AGENT_WRITER_ROLE_ARN=arn:aws:iam::123456789012:role/writer
     uv run scripts/write_finance_iceberg.py
     uv run scripts/write_finance_iceberg.py my-unique-bucket-name
 

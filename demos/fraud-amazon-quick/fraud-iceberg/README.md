@@ -22,6 +22,7 @@ own dependencies, so `uv run` needs no `uv sync`.
 uv run scripts/write_finance_iceberg.py --dry-run
 
 # Load into a normal S3 bucket with Glue
+export DATA_AGENT_WRITER_ROLE_ARN=arn:aws:iam::123456789012:role/your-writer-role
 uv run scripts/write_finance_iceberg.py my-company-data-agent-neo4j
 
 # Or load into Amazon S3 Tables
@@ -145,9 +146,12 @@ uv run fraud-graph-analyze
 ## Load into a normal S3 bucket with Glue
 
 Sign in with your usual AWS profile, environment credentials, or IAM role.
-Then run from `demos/fraud-amazon-quick/fraud-iceberg/`:
+Then run from `demos/fraud-amazon-quick/fraud-iceberg/`. Set the IAM role
+that may write objects first. See `--writer-role-arn` below.
 
 ```bash
+export DATA_AGENT_WRITER_ROLE_ARN=arn:aws:iam::123456789012:role/your-writer-role
+
 # Creates and loads s3://data-agent-neo4j-euw1 by default.
 uv run scripts/write_finance_iceberg.py
 
@@ -194,6 +198,7 @@ tables. The tables use Zstandard-compressed Parquet.
 - **`--writer-role-arn`:** This flag sets the IAM role that may write objects. You can also set `DATA_AGENT_WRITER_ROLE_ARN`. A load needs one of the two. A dry run needs neither.
 
 ```bash
+# The loads assume DATA_AGENT_WRITER_ROLE_ARN is set.
 uv run scripts/write_finance_iceberg.py my-company-data-agent-neo4j --replace
 uv run scripts/write_finance_iceberg.py --dry-run
 uv run scripts/write_finance_iceberg.py --force-delete

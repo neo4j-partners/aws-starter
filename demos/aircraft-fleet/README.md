@@ -91,8 +91,12 @@ Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
 
-`./agent.sh deploy` reads the Neo4j connection from `.env`. It passes the
-values to the runtime as environment variables.
+The deploy uses the AgentCore CLI and reads its settings from `.env`. It
+passes the connection settings to the runtime, but never the passwords. The
+runtime reads each password from a Secrets Manager secret named by
+`NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN`. See
+[Deploy](graphrag-agent/README.md#deploy) in the graphrag-agent README for
+the one-time setup.
 
 ## Step 4: Run the supervisor agent over the MCP Gateway (optional)
 

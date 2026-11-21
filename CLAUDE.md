@@ -83,8 +83,8 @@ uv run fleet-server              # Terminal 1 (port 7070)
 uv run fleet-cli "How many aircraft are in the database?"   # Terminal 2
 uv run fleet-demo
 
-# Step 3: deploy to AgentCore Runtime (optional)
-./agent.sh configure
+# Step 3: deploy to AgentCore Runtime (optional, needs the AgentCore CLI
+# and the *_SECRET_ARN settings in .env; see graphrag-agent/README.md)
 ./agent.sh deploy
 ./agent.sh invoke-cloud "query"
 

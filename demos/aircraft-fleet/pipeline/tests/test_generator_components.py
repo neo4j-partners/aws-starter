@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,8 @@ from generator.specs import (
     ComponentSpec,
     component_aliases,
 )
+
+MANUALS_DIR = Path(__file__).resolve().parent.parent / "manuals"
 
 ENGINE_TYPES = ["Fan Module", "HP Compressor", "HP Turbine", "Main Fuel Pump", "Thrust Bearing"]
 
@@ -91,6 +94,63 @@ def test_types_by_system_follow_the_component_specs() -> None:
 )
 def test_an_alias_resolves_to_its_type(alias: str, component_type: str) -> None:
     assert COMPONENT_ALIASES[alias] == component_type
+
+
+# Names the manuals use that the extraction prompt does not list. The model
+# can still return them, so the join must link them.
+@pytest.mark.parametrize(
+    ("alias", "component_type"),
+    [
+        ("air data computer", "Air Data Unit"),
+        ("air data and inertial reference unit", "Air Data Unit"),
+        ("air data / inertial reference unit", "Air Data Unit"),
+        ("air data inertial reference unit", "Air Data Unit"),
+        ("multi-mode receiver", "Navigation Receiver"),
+        ("flight management computer", "Flight Management System"),
+        ("fmc", "Flight Management System"),
+        ("edp", "Hydraulic Pump"),
+        ("ehsa", "Flight Control Actuator"),
+        ("electrohydraulic servo actuator", "Flight Control Actuator"),
+        ("flap actuator", "Flight Control Actuator"),
+    ],
+)
+def test_a_link_only_alias_resolves_to_its_type(alias: str, component_type: str) -> None:
+    assert COMPONENT_ALIASES[alias] == component_type
+
+
+def _component_headings(text: str) -> list[str]:
+    """Return the part headings under each "Component Descriptions" section."""
+    sections = re.findall(
+        r"^### [\d.]+ Component Descriptions\n(.*?)(?=^### |\Z)", text, re.MULTILINE | re.DOTALL
+    )
+    return [h for s in sections for h in re.findall(r"^#### [\d.]+ (.+)$", s, re.MULTILINE)]
+
+
+def test_every_component_heading_in_the_manuals_resolves_to_a_type() -> None:
+    # "Air Data and Inertial Reference Unit (ADIRU)" needs both the name and
+    # the abbreviation. A note such as "(Engine-Driven)" is not a name.
+    unresolved = []
+    for manual in sorted(MANUALS_DIR.glob("MAINTENANCE_*.md")):
+        headings = _component_headings(manual.read_text(encoding="utf-8"))
+        assert headings, manual.name
+        for heading in headings:
+            name, _, note = heading.partition(" (")
+            note = note.removesuffix(")")
+            names = [heading if heading.lower() in COMPONENT_ALIASES else name]
+            if re.fullmatch(r"[A-Z]{2,}", note):
+                names.append(note)
+            unresolved += [(manual.name, n) for n in names if n.lower() not in COMPONENT_ALIASES]
+    assert unresolved == []
+
+
+def test_a_link_only_alias_of_two_types_raises_value_error() -> None:
+    specs = {
+        "Engine": (ComponentSpec("HP Turbine", link_aliases=("Turbine",)),),
+        "Hydraulics": (ComponentSpec("Turbine Pump", names={"E190": "turbine"}),),
+    }
+    message = "alias 'turbine' names both 'HP Turbine' and 'Turbine Pump'"
+    with pytest.raises(ValueError, match=f"^{re.escape(message)}"):
+        component_aliases(specs)
 
 
 def test_every_type_is_its_own_alias() -> None:

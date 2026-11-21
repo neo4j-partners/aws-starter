@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from generator.specs import COMPONENT_ALIASES, COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
+from generator.specs import COMPONENT_TYPES_BY_SYSTEM, COMPONENTS_BY_SYSTEM, SENSOR_TYPES
 from populate_aircraft_db.pipeline import EXTRACTION_PROMPT
 from populate_aircraft_db.schema import (
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
@@ -39,8 +39,18 @@ def test_prompt_lists_every_component_type_by_system() -> None:
     assert _system_lists(listed) == COMPONENT_TYPES_BY_SYSTEM
 
 
+# The aliases the prompt lists. Link-only aliases are left out to keep the
+# prompt short; the join accepts them anyway.
+PROMPT_ALIASES = {
+    alias.lower()
+    for specs in COMPONENTS_BY_SYSTEM.values()
+    for spec in specs
+    for alias in spec.aliases()
+}
+
+
 def _missing_aliases(text: str) -> set[str]:
-    return {alias for alias in COMPONENT_ALIASES if alias not in text.lower()}
+    return {alias for alias in PROMPT_ALIASES if alias not in text.lower()}
 
 
 def test_prompt_names_every_component_alias() -> None:

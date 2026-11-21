@@ -18,7 +18,8 @@ dependencies = [
     "strands-agents>=1.65",
     # Held below 2.x until bedrock-agentcore[strands-agents] allows mcp 2.
     "mcp>=1.28,<2",
-    "neo4j-agent-memory[strands]==0.8.0",
+    # The fleet fork of 0.8.0. [tool.uv.sources] says where the wheel is.
+    "neo4j-agent-memory[strands]==0.8.0+fleet.2",
 ]
 
 [dependency-groups]
@@ -37,6 +38,12 @@ fleet-server = "fleet_graphrag.server:main"
 fleet-cli = "fleet_graphrag.client.cli:main"
 fleet-demo = "fleet_graphrag.client.demo:main"
 fleet-invoke = "fleet_graphrag.client.invoke:main"
+
+# TEMPORARY: a local path that exists only on the build machine. It is
+# replaced by the published release-asset URL before the merge. CodeZip
+# cannot install from this path, so do not deploy with it.
+[tool.uv.sources]
+neo4j-agent-memory = { path = "/Users/ryanknight/projects/neo4j-labs/agent-memory/dist/neo4j_agent_memory-0.8.0+fleet.2-py3-none-any.whl" }
 
 [build-system]
 requires = ["hatchling"]

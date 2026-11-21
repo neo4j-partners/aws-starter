@@ -84,6 +84,15 @@ def test_supervisor_has_both_specialist_tools():
     assert sorted(supervisor.tool_names) == sorted([MAINTENANCE_TOOL, OPERATIONS_TOOL])
 
 
+# Memory stores no tool calls, so restored turns hold only text. The
+# supervisor must not read a missing specialist call as no call.
+def test_supervisor_prompt_says_restored_turns_hold_no_tool_calls():
+    prompt = build_supervisor(build_model(), [read_neo4j_cypher]).system_prompt
+    assert "Earlier turns restored from memory contain only user and assistant text" in prompt
+    assert "does not mean no specialist ran" in prompt
+    assert "call the specialist again rather than comment on it" in prompt
+
+
 def test_every_specialist_tool_has_a_display_name():
     assert set(SPECIALIST_NAMES) == {MAINTENANCE_TOOL, OPERATIONS_TOOL}
 

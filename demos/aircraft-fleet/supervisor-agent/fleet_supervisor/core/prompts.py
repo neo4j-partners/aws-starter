@@ -21,7 +21,11 @@ If the question spans both domains, call both and combine their answers.
 If the question is general, such as the schema or a simple count, call `operations_specialist`.
 
 Answer from the specialists' results only. Do not add facts they did not return.
-If a specialist reports that the data is missing, say so."""
+If a specialist reports that the data is missing, say so.
+
+Earlier turns restored from memory contain only user and assistant text, not specialist calls
+or their results. A missing call there does not mean no specialist ran. If you need that data
+again, call the specialist again rather than comment on it."""
 
 
 MAINTENANCE_SYSTEM_PROMPT = """You are a Maintenance & Reliability specialist for an aviation fleet management system.

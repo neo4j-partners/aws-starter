@@ -53,6 +53,10 @@ STUB_AWS = r"""#!/bin/bash
 echo "aws $*" >> "$STUB_LOG"
 if [ "$1 $2" = "sts get-caller-identity" ]; then
     if [ -n "$STUB_STS_ERROR" ]; then echo "$STUB_STS_ERROR" >&2; exit 254; fi
+    if [ -n "$STUB_CALLER_ACCOUNT_AFTER_DEPLOY" ] && grep -q "^agentcore deploy" "$STUB_LOG"; then
+        echo "$STUB_CALLER_ACCOUNT_AFTER_DEPLOY"
+        exit 0
+    fi
     echo "${STUB_CALLER_ACCOUNT:-111122223333}"
     exit 0
 fi
@@ -198,7 +202,7 @@ def test_unreadable_status_output_fails(project: Path, status_json: str) -> None
     assert result.returncode == 1
     assert "Could not read the agentcore status output" in result.stdout
     assert "Cleanup complete" not in result.stdout
-    assert not any(c.startswith("aws ") for c in calls(project))
+    assert not any(c.startswith("aws cloudformation") for c in calls(project))
 
 
 def test_failed_status_call_fails_and_removes_its_temp_file(project: Path) -> None:
@@ -246,12 +250,34 @@ def test_uv_stderr_is_not_read_as_the_region(project: Path) -> None:
 
 
 def test_credentials_for_another_account_fail_before_the_stack_check(project: Path) -> None:
-    result = run_destroy(project, STUB_CALLER_ACCOUNT="999988887777")
+    # The credentials change between the first check and the report.
+    result = run_destroy(project, STUB_CALLER_ACCOUNT_AFTER_DEPLOY="999988887777")
 
     assert result.returncode == 1
+    assert "agentcore deploy --target default --yes" in calls(project)
     assert f"account 999988887777, but target 'default' is in account {ACCOUNT}" in result.stdout
     assert "Cleanup complete" not in result.stdout
     assert not any(c.startswith("aws cloudformation") for c in calls(project))
+
+
+@pytest.mark.parametrize("args", [("--yes",), ("",)])
+def test_credentials_for_another_account_fail_before_any_agentcore_call(
+    project: Path, args: tuple[str, ...]
+) -> None:
+    targets = [{"name": "default", "account": ACCOUNT, "region": "eu-west-1"}]
+    (project / "agentcore" / "aws-targets.json").write_text(json.dumps(targets))
+
+    result = run_destroy(project, *args, stdin="y\n", STUB_CALLER_ACCOUNT="999988887777")
+
+    assert result.returncode == 1
+    assert f"account 999988887777, but target 'default' is in account {ACCOUNT}" in result.stdout
+    assert "Continue?" not in result.stdout
+    logged = calls(project)
+    assert not any(c.startswith("agentcore ") for c in logged)
+    # Before deploy, the region comes from aws-targets.json.
+    assert logged == [
+        "aws sts get-caller-identity --query Account --output text --region eu-west-1"
+    ]
 
 
 def test_a_failed_identity_check_fails(project: Path) -> None:
@@ -306,7 +332,7 @@ def test_destroy_without_yes_cancels_unless_confirmed(project: Path, answer: str
 
     assert result.returncode == 1
     assert "Cancelled. Nothing was changed." in result.stdout
-    assert calls(project) == []
+    assert not any(c.startswith("agentcore ") for c in calls(project))
 
 
 def test_destroy_runs_when_confirmed(project: Path) -> None:

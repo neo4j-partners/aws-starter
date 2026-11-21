@@ -173,8 +173,8 @@ require_aws() {
     fi
 }
 
-# Print the account that $TARGET deploys to, or fail.
-target_account() {
+# Print the account and the region that $TARGET deploys to, or fail.
+target_entry() {
     uv run --quiet python -c '
 import json
 import sys
@@ -182,12 +182,12 @@ from pathlib import Path
 
 try:
     targets = json.loads(Path(sys.argv[1]).read_text())
-    accounts = [t["account"] for t in targets if t.get("name") == sys.argv[2]]
+    entries = [(t["account"], t["region"]) for t in targets if t.get("name") == sys.argv[2]]
 except (OSError, ValueError, TypeError, AttributeError, KeyError) as error:
     sys.exit(f"{sys.argv[1]}: {error}")
-if len(accounts) != 1:
-    sys.exit(f"{sys.argv[1]} has {len(accounts)} entries for this target.")
-print(accounts[0])
+if len(entries) != 1:
+    sys.exit(f"{sys.argv[1]} has {len(entries)} entries for this target.")
+print(*entries[0])
 ' "$TARGETS_FILE" "$TARGET"
 }
 
@@ -195,6 +195,27 @@ print(accounts[0])
 caller_account() {
     require_aws || return 1
     aws sts get-caller-identity --query Account --output text --region "$1"
+}
+
+# Exit unless the active AWS credentials belong to the account of $TARGET.
+# Credentials for another account would deploy there and read the stack as
+# absent. $1 is the region for the STS call, by default the target's region.
+require_target_account() {
+    local entry account target_region caller
+    if ! entry=$(target_entry); then
+        echo -e "${RED}Could not read the account for target '$TARGET' from $TARGETS_FILE.${NC}"
+        exit 1
+    fi
+    read -r account target_region <<<"$entry"
+    if ! caller=$(caller_account "${1:-$target_region}"); then
+        echo -e "${RED}Could not check the active AWS account with STS.${NC}"
+        exit 1
+    fi
+    if [ "$caller" != "$account" ]; then
+        echo -e "${RED}The active AWS credentials belong to account $caller, but target '$TARGET' is in account $account.${NC}"
+        echo "Use credentials for account $account, for example with AWS_PROFILE, and run destroy again."
+        exit 1
+    fi
 }
 
 # Print the stack status, "absent" when the stack does not exist, or fail.
@@ -222,7 +243,6 @@ stack_status() {
 
 report_remaining() {
     local status parsed region remaining status_err parse_err stack cfn_status
-    local account caller
     # stderr goes to its own file, so a CLI banner or warning cannot break
     # the JSON. It is printed only when the call fails.
     status_err=$(mktemp)
@@ -279,21 +299,10 @@ walk(resources)
         echo -e "${RED}Could not read the project name from $PROJECT_SPEC.${NC}"
         exit 1
     fi
-    # The stack check uses the active credentials. If they belong to another
-    # account, the stack reads as absent there, so confirm the account first.
-    if ! account=$(target_account); then
-        echo -e "${RED}Could not read the account for target '$TARGET' from $TARGETS_FILE.${NC}"
-        exit 1
-    fi
-    if ! caller=$(caller_account "$region"); then
-        echo -e "${RED}Could not check the active AWS account with STS.${NC}"
-        exit 1
-    fi
-    if [ "$caller" != "$account" ]; then
-        echo -e "${RED}The active AWS credentials belong to account $caller, but target '$TARGET' is in account $account.${NC}"
-        echo "Use credentials for account $account, for example with AWS_PROFILE, and run destroy again."
-        exit 1
-    fi
+    # The stack check uses the active credentials. destroy checked the
+    # account before deploy, but the credentials can change since then
+    # (an expiring session, a profile switch), so check again.
+    require_target_account "$region"
     if ! cfn_status=$(stack_status "$stack" "$region"); then
         echo -e "${RED}Could not check stack $stack in $region with CloudFormation.${NC}"
         exit 1
@@ -414,6 +423,9 @@ case "${1:-help}" in
 
     destroy)
         ensure_cli
+        # Check the account before anything changes, so credentials for
+        # another account cannot deploy the empty project there.
+        require_target_account
         if [ "${2:-}" != "--yes" ]; then
             confirm_destroy
         fi

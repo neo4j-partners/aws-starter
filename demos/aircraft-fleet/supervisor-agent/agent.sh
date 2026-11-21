@@ -322,6 +322,16 @@ strip_gateway_secret() {
     fi
 }
 
+# Exit if .env.local is a symbolic link. mv would replace the link with a
+# regular file and leave the secret in the link's target, so deploy and
+# destroy check this before anything changes.
+refuse_linked_env_local() {
+    if [ -L "$ENV_LOCAL" ]; then
+        echo -e "${RED}$ENV_LOCAL is a symbolic link. Replace it with a regular file and run again.${NC}"
+        exit 1
+    fi
+}
+
 # The name is fixed, so removing a copy that is already gone is harmless.
 remove_strip_copy() {
     rm -f "$ENV_STRIP_TMP"
@@ -629,6 +639,7 @@ case "${1:-help}" in
 
     deploy)
         ensure_project
+        refuse_linked_env_local
         ensure_no_secrets_in_zip
         load_deploy_env
         begin_spec_restore
@@ -687,6 +698,7 @@ case "${1:-help}" in
 
     destroy)
         ensure_project
+        refuse_linked_env_local
         # Check the account before anything changes, so credentials for
         # another account cannot deploy the empty project there.
         require_target_account

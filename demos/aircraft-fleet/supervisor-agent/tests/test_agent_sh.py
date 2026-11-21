@@ -400,6 +400,32 @@ def test_destroy_narrows_a_wider_file_mode_to_0600(project: Path) -> None:
     assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
 
 
+# mv would replace the link with a regular file and leave the secret in the
+# link's target, so a linked .env.local stops the run before anything changes.
+@pytest.mark.parametrize(
+    ("args", "stdin"), [(("destroy", "--yes"), ""), (("destroy",), "y\n"), (("deploy",), "")]
+)
+def test_a_linked_env_local_is_refused_before_any_change(
+    project: Path, args: tuple[str, ...], stdin: str
+) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+    target = project.parent / "shared.env"
+    target.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local = project / "agentcore" / ".env.local"
+    env_local.symlink_to(target)
+
+    result = run_agent(project, *args, stdin=stdin)
+
+    assert result.returncode == 1
+    assert "agentcore/.env.local is a symbolic link" in result.stdout
+    assert "Continue?" not in result.stdout
+    assert env_local.is_symlink()
+    assert target.read_text() == "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n"
+    assert spec.read_bytes() == tracked
+    assert not any("deploy" in call or "remove" in call or "add" in call for call in calls(project))
+
+
 def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:
     env_local = project / "agentcore" / ".env.local"
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")

@@ -399,10 +399,12 @@ def test_schema_keeps_a_backslash_name_out_of_the_pattern_check(
     assert driver.check_queries
     assert not any("\\" in query for query in driver.check_queries)
     assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+    # A literal backslash is shown doubled, so the text ` cannot pass
+    # for an escaped character.
     assert (
         "  [WARN] skipped 2 relationship pattern(s) with a backslash: "
-        "(Aircraft)-[:ODD\\TYPE]->(System), "
-        "(Evil\\u0060)-[]->() RETURN 99 AS candidate //)-[:HAS_SYSTEM]->(System)\n"
+        "(Aircraft)-[:ODD\\\\TYPE]->(System), "
+        "(Evil\\\\u0060)-[]->() RETURN 99 AS candidate //)-[:HAS_SYSTEM]->(System)\n"
     ) in capsys.readouterr().out
 
 

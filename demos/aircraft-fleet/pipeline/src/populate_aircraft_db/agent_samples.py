@@ -103,8 +103,12 @@ def _domain_label(labels: list[str]) -> str | None:
 
 
 def _printable(name: str) -> str:
-    """Escape each character the terminal would not print, such as NUL or a newline."""
-    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in name)
+    """Escape each character the terminal would not print, such as NUL or a newline.
+
+    A literal backslash is doubled too, so a name with the text \x00 cannot
+    print like one with a real NUL.
+    """
+    return "".join(c if c.isprintable() and c != "\\" else repr(c)[1:-1] for c in name)
 
 
 def _warn_skipped(triples: set[tuple[str, str, str]], reason: str) -> None:

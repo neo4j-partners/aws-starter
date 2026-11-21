@@ -141,8 +141,8 @@ def stale_reason(directory: Path) -> str | None:
     if stamp.get("generator_hash") != generator_hash():
         return f"the generator code changed since {directory} was generated"
     recorded = stamp.get("runtime")
-    if not isinstance(recorded, dict):
-        recorded = {}
+    if not isinstance(recorded, dict) or not recorded:
+        return "the stamp records no runtime versions"
     if changed := [k for k, v in runtime_versions().items() if recorded.get(k) != v]:
         return f"the {', '.join(changed)} version changed since {directory} was generated"
     return None

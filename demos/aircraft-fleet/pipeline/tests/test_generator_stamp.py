@@ -104,6 +104,20 @@ def test_the_stamp_records_the_python_faker_and_numpy_versions(tmp_path: Path) -
     }
 
 
+@pytest.mark.parametrize("runtime", [None, "3.12", []], ids=["absent", "string", "list"])
+def test_a_stamp_without_runtime_versions_says_so(tmp_path: Path, runtime: object) -> None:
+    # A stamp from before runtime versions were recorded, or a hand-edited one.
+    _generate(tmp_path)
+    written = stamp.read_stamp(tmp_path)
+    if runtime is None:
+        del written["runtime"]
+    else:
+        written["runtime"] = runtime
+    stamp.write_stamp(tmp_path, written)
+
+    assert stamp.stale_reason(tmp_path) == "the stamp records no runtime versions"
+
+
 def _bump_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
     current = stamp.runtime_versions()
     monkeypatch.setattr(stamp, "runtime_versions", lambda: {**current, "numpy": "0.0.0"})

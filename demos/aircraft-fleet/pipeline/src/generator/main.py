@@ -19,6 +19,7 @@ from .operations import generate_operations
 from .removals import generate_removals
 from .sensors import EngineSeries, generate_engine_readings
 from .specs import EVENT_SEVERITIES
+from .stamp import clear_stamp, read_stamp, stamp_for, write_stamp
 from .writers import write_csv
 
 app = typer.Typer(
@@ -113,6 +114,13 @@ def generate(
     output: Annotated[
         Path, typer.Option("--output", "-o", help="Output directory for CSV files.")
     ] = Path("."),
+    if_stale: Annotated[
+        bool,
+        typer.Option(
+            "--if-stale",
+            help="Skip generation when the output's stamp matches this config and code.",
+        ),
+    ] = False,
 ) -> None:
     """Generate all CSV files for the aircraft digital twin dataset."""
     airports = min(airports, 40)
@@ -125,6 +133,12 @@ def generate(
         seed=seed,
         output_dir=output,
     )
+    stamp = stamp_for(config)
+    if if_stale and read_stamp(output) == stamp:
+        console.print(f"{output.resolve()} is current for this config and code. Skipping.")
+        return
+    # An interrupted run must not leave the previous run's stamp behind.
+    clear_stamp(output)
 
     rng = random.Random(seed)
     rng_np = np.random.default_rng(seed)
@@ -270,6 +284,8 @@ def generate(
     write_csv(rels_ac_removal, output / "rels_aircraft_removal.csv")
     write_csv(rels_comp_removal, output / "rels_component_removal.csv")
     console.print(f"  [green]✓[/green] {len(removal_rows)} removals")
+
+    write_stamp(output, stamp)
 
     # ── Summary ─────────────────────────────────────────────────────────────
     elapsed = time.time() - t0

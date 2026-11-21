@@ -14,6 +14,8 @@ import typer
 from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import ServiceUnavailable
 
+from generator.stamp import stale_reason
+
 from .config import Settings
 from .loader import clear_database, load_operational_graph, verify
 from .schema import (
@@ -354,6 +356,14 @@ def verify_cmd(
 ) -> None:
     """Run comprehensive graph verification (read-only)."""
     settings = Settings()  # type: ignore[call-arg]
+
+    # The graph was loaded from these CSVs, so stale CSVs mean a stale graph.
+    if reason := stale_reason(settings.data_dir):
+        status = "[FAIL]" if strict else "[WARN]"
+        print(f"{status} Generated CSVs are stale: {reason}.")
+        print("  Regenerate and reload: ./setup.sh generate, then ./setup.sh load.")
+        if strict:
+            raise typer.Exit(code=1)
 
     print(f"Connecting to {settings.neo4j_uri}...")
     with _connect(settings) as driver:

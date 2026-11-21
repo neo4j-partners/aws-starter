@@ -10,6 +10,9 @@
 #   ./setup.sh clean           # delete all nodes/relationships
 #   ./setup.sh samples         # run showcase queries against the loaded graph
 #
+# load and load-operational first regenerate generated/ when its stamp does
+# not match the GEN_* values or the generator code.
+#
 # All configuration is via the shared ../.env at the aircraft-fleet root
 # (copy from ../.env.sample).
 
@@ -68,6 +71,7 @@ sync_deps() {
   uv sync ${UV_SYNC_EXTRA}
 }
 
+# Extra arguments, such as --if-stale, go to generate-data generate.
 do_generate() {
   echo "==> Generating dataset (aircraft=$AIRCRAFT days=$DAYS airports=$AIRPORTS seed=$SEED, full=$LOAD_FULL_DATASET)"
   mkdir -p generated
@@ -76,7 +80,8 @@ do_generate() {
     --airports "$AIRPORTS" \
     --days "$DAYS" \
     --seed "$SEED" \
-    --output generated
+    --output generated \
+    "$@"
 }
 
 require_generated() {
@@ -101,14 +106,14 @@ case "$CMD" in
     ;;
   load)
     sync_deps
-    require_generated
+    do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db setup
     uv run populate-aircraft-db verify --strict
     ;;
   load-operational)
     sync_deps
-    require_generated
+    do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db load-operational
     uv run populate-aircraft-db verify --strict

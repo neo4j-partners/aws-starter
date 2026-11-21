@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from neo4j import Driver
+from neo4j import Driver, RoutingControl
 
 _W = 70
 
@@ -376,9 +376,7 @@ def _extract_cypher(raw: str) -> str:
     # If no fencing, find the first line that looks like Cypher
     for i, ln in enumerate(text.splitlines()):
         upper = ln.strip().upper()
-        if upper.startswith(
-            ("MATCH", "OPTIONAL", "WITH", "CALL", "UNWIND", "RETURN", "CREATE", "MERGE")
-        ):
+        if upper.startswith(("MATCH", "OPTIONAL", "WITH", "CALL", "UNWIND", "RETURN")):
             return "\n".join(text.splitlines()[i:]).strip()
     return text
 
@@ -410,8 +408,12 @@ def _run_text2cypher(
 
     _cypher_block(cypher)
 
+    # LLM-generated Cypher runs in a read transaction, so the server rejects
+    # any write it contains.
     try:
-        records, _, _ = driver.execute_query(cypher, database_=database)
+        records, _, _ = driver.execute_query(
+            cypher, database_=database, routing_=RoutingControl.READ
+        )
         rows = [dict(r) for r in records]
         _result_table(rows)
     except Exception as exc:

@@ -177,6 +177,7 @@ require_aws() {
 target_entry() {
     uv run --quiet python -c '
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -187,7 +188,12 @@ except (OSError, ValueError, TypeError, AttributeError, KeyError) as error:
     sys.exit(f"{sys.argv[1]}: {error}")
 if len(entries) != 1:
     sys.exit(f"{sys.argv[1]} has {len(entries)} entries for this target.")
-print(*entries[0])
+account, region = entries[0]
+# An AWS account ID is 12 digits. An empty one would shift the region into
+# the account when the shell reads this line.
+if not isinstance(account, str) or not re.fullmatch(r"[0-9]{12}", account):
+    sys.exit(f"{sys.argv[1]} has no 12-digit account for this target.")
+print(account, region)
 ' "$TARGETS_FILE" "$TARGET"
 }
 

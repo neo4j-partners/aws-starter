@@ -302,7 +302,23 @@ def test_a_failed_identity_check_fails(project: Path) -> None:
     assert "Cleanup complete" not in result.stdout
 
 
-@pytest.mark.parametrize("targets", [None, "[]", "not json"])
+def _targets(account: object) -> str:
+    return json.dumps([{"name": "default", "account": account, "region": "us-east-1"}])
+
+
+@pytest.mark.parametrize(
+    "targets",
+    [
+        None,
+        "[]",
+        "not json",
+        # An account must be a string of 12 digits.
+        _targets(""),
+        _targets("12345"),
+        _targets("1111 2222 3333"),
+        _targets(111122223333),
+    ],
+)
 def test_an_unknown_target_account_fails(project: Path, targets: str | None) -> None:
     path = project / "agentcore" / "aws-targets.json"
     if targets is None:

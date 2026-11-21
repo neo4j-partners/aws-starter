@@ -129,6 +129,7 @@ def generate_removals(
         # replacement, installed at the last removal or later, has flown the
         # install minimum. One part's install-to-removal intervals never overlap.
         last_removed: dict[str, datetime] = {}
+        times_removed: dict[str, int] = {}
 
         for removal_date in removal_dates:
             # Airframe hours are the days in service at the aircraft's rate.
@@ -149,10 +150,21 @@ def generate_removals(
             eligible = [
                 c for c in all_components if most_hours[c.component_id] >= _MIN_HOURS_SINCE_INSTALL
             ]
+            # A skip drops one of this aircraft's removals. Only extreme
+            # critical-event loads cause one, and then a busy aircraft's
+            # removals cluster early in the window. Realistic loads never skip.
             if not eligible:
                 continue
-            component = rng.choice(eligible)
+            # Spread removals: take a component with the fewest removals so
+            # far. The sort keeps the rng's pick the same for a seed.
+            fewest = min(times_removed.get(c.component_id, 0) for c in eligible)
+            least_removed = sorted(
+                (c for c in eligible if times_removed.get(c.component_id, 0) == fewest),
+                key=lambda c: c.component_id,
+            )
+            component = rng.choice(least_removed)
             last_removed[component.component_id] = removal_date
+            times_removed[component.component_id] = fewest + 1
 
             removal_counter += 1
             removal_id = f"RE{removal_counter:06d}"

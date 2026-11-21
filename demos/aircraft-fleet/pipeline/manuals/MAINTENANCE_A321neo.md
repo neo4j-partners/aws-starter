@@ -305,7 +305,9 @@ The two-stage HPT features advanced single-crystal nickel superalloy blades with
 
 The engine-driven fuel pump module integrates the fuel pump, fuel metering unit (FMU), and servo fuel heater into a single line-replaceable unit (LRU) for improved maintainability.
 
-**Flow Rate:** 0.40 - 2.00 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.12 - 2.00 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Fuel System Features:**
 - Variable geometry fuel nozzles

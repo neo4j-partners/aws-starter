@@ -273,7 +273,9 @@ The single-stage HPT drives the high-pressure compressor through a concentric sh
 
 The engine-driven fuel pump is a positive displacement gear pump providing metered fuel flow to the combustion chamber through the fuel metering valve (FMV). The hydromechanical unit (HMU) integrates the fuel pump with the fuel metering valve under FADEC control.
 
-**Flow Rate:** 0.20 - 1.20 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.08 - 1.20 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings

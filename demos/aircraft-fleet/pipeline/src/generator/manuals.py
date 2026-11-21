@@ -330,6 +330,14 @@ def _phase_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     return _table(header, rows)
 
 
+def _fuel_flow_range(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.2.4: the fuel pump's flow range, from ground idle to takeoff."""
+    bounds = [
+        float(value) for cell in engine.phase_limits["FuelFlow (kg/s)"] for value in cell.split("-")
+    ]
+    return f"**Flow Rate:** {min(bounds):.2f} - {max(bounds):.2f} kg/s (ground idle to takeoff)"
+
+
 def _egt_row(label: str, band: EgtBand) -> tuple[str, ...]:
     return (
         label,
@@ -574,6 +582,7 @@ RENDERERS: dict[str, Renderer] = {
     "egt-limits": _egt_limits,
     "normal-parameters": _phase_limits,
     "quick-ref-engine": _phase_limits,
+    "fuel-flow-range": _fuel_flow_range,
     "quick-ref-hydraulics": _hydraulic_limits,
     "fault-codes-engine": functools.partial(_fault_codes, "Engine"),
     "fault-codes-avionics": functools.partial(_fault_codes, "Avionics"),

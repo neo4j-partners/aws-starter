@@ -250,7 +250,9 @@ The two-stage HPT extracts energy to drive the HPC. Turbine blades feature advan
 
 The engine-driven fuel pump provides metered fuel flow to the combustion chamber. The pump incorporates an integral fuel filter and fuel-oil heat exchanger.
 
-**Flow Rate:** 0.85 - 1.95 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.15 - 1.95 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings

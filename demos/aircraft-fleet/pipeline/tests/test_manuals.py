@@ -457,6 +457,36 @@ def test_the_parameter_table_rows_come_from_the_specs(model: str) -> None:
     assert len(PHASES) == 4
 
 
+def test_the_fuel_flow_range_runs_from_ground_idle_to_takeoff() -> None:
+    engine = ENGINE_SPECS["A320-200"]
+
+    assert engine.phase_limits["FuelFlow (kg/s)"][0].startswith("0.15-")
+    assert engine.phase_limits["FuelFlow (kg/s)"][3].endswith("-1.95")
+    assert manuals.RENDERERS["fuel-flow-range"]("A320-200", engine, {}) == (
+        "**Flow Rate:** 0.15 - 1.95 kg/s (ground idle to takeoff)"
+    )
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_fuel_flow_range_holds_every_phase_and_the_cruise_baseline(model: str) -> None:
+    engine = ENGINE_SPECS[model]
+    line = manuals.RENDERERS["fuel-flow-range"](model, engine, {})
+    low, high = map(float, re.findall(r"\d+\.\d+", line))
+    fuel = {s.type: s for s in engine.sensors}["FuelFlow"]
+
+    for cell in engine.phase_limits["FuelFlow (kg/s)"]:
+        cell_low, cell_high = map(float, cell.split("-"))
+        assert low <= cell_low <= cell_high <= high, cell
+    assert low < fuel.baseline < high
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_only_generated_blocks_quote_fuel_flow_numbers(model: str) -> None:
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+
+    assert re.findall(r"^.*\d\s*kg/s.*$", _BLOCK.sub("", text), re.M) == []
+
+
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
 def test_each_cruise_cell_holds_its_spec_baseline(model: str) -> None:
     rows = _phase_table(model)

@@ -88,9 +88,7 @@ DOCUMENTS: list[DocumentMeta] = [
 # its line break. Any other comment goes alone. A comment ends at its first
 # "-->", so the body may not contain one; otherwise a comment followed by text
 # could run on to a later comment that ends a line and take the text between.
-_LINE_COMMENT = re.compile(
-    r"^[ \t]*<!--(?:(?!-->).)*-->[ \t]*(?:\n|\Z)", re.MULTILINE | re.DOTALL
-)
+_LINE_COMMENT = re.compile(r"^[ \t]*<!--(?:(?!-->).)*-->[ \t]*(?:\n|\Z)", re.MULTILINE | re.DOTALL)
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 

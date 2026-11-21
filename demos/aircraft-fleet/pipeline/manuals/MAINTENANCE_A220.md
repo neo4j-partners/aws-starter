@@ -277,7 +277,9 @@ The 2-stage HPT drives the high-pressure compressor through a concentric shaft. 
 
 The engine-driven fuel pump is a positive displacement gear pump providing metered fuel flow to the combustion chamber through the fuel metering valve (FMV). The electronic engine control (EEC) integrates fuel pump management with the fuel metering valve under FADEC control.
 
-**Flow Rate:** 0.22 - 1.35 kg/s (normal operating range)
+<!-- BEGIN GENERATED: fuel-flow-range -->
+**Flow Rate:** 0.09 - 1.35 kg/s (ground idle to takeoff)
+<!-- END GENERATED: fuel-flow-range -->
 
 **Warning Signs of Degradation:**
 - Fluctuating fuel flow readings

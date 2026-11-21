@@ -708,11 +708,28 @@ SENSOR_TYPES: list[tuple[str, str, str]] = [
     ("FuelFlow", "Fuel Flow", "kg/s"),
 ]
 
-# Flight delay causes. operations.py weights them in this order.
-DELAY_CAUSES: list[str] = ["Weather", "Maintenance", "NAS", "Carrier"]
+
+@dataclass(frozen=True)
+class DelayCauseSpec:
+    """A flight delay cause, its share of delays, and its duration range."""
+
+    cause: str
+    weight: float
+    min_minutes: int
+    max_minutes: int
+
+
+# Flight delay causes, each with its weight and duration range in minutes.
+DELAY_CAUSE_SPECS: tuple[DelayCauseSpec, ...] = (
+    DelayCauseSpec("Weather", 0.30, 20, 180),
+    DelayCauseSpec("Maintenance", 0.25, 30, 240),
+    DelayCauseSpec("NAS", 0.25, 15, 90),
+    DelayCauseSpec("Carrier", 0.20, 10, 60),
+)
+DELAY_CAUSES: tuple[str, ...] = tuple(spec.cause for spec in DELAY_CAUSE_SPECS)
 
 # Maintenance event severities, most severe first.
-EVENT_SEVERITIES: list[str] = ["CRITICAL", "MAJOR", "MINOR"]
+EVENT_SEVERITIES: tuple[str, ...] = ("CRITICAL", "MAJOR", "MINOR")
 
 # Which sensor type triggers which fault types (fault, severity)
 SENSOR_FAULT_MAP: dict[str, list[tuple[str, str]]] = {

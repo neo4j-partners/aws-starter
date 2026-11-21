@@ -13,7 +13,7 @@ from datetime import timedelta
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
-from .specs import AIRPORTS, DELAY_CAUSES
+from .specs import AIRPORTS, DELAY_CAUSE_SPECS
 
 # Flights per aircraft per day — drawn uniformly from this range
 _FLIGHTS_PER_DAY_RANGE = (3, 6)
@@ -22,16 +22,7 @@ _FLIGHTS_PER_DAY_RANGE = (3, 6)
 _MIN_BLOCK_HOURS = 1.0
 _MAX_BLOCK_HOURS = 5.5
 
-# Weights for DELAY_CAUSES, in the same order
-_DELAY_WEIGHTS = [0.30, 0.25, 0.25, 0.20]
-
-# Delay duration ranges (minutes) by cause
-_DELAY_MINUTES: dict[str, tuple[int, int]] = {
-    "Weather": (20, 180),
-    "Maintenance": (30, 240),
-    "NAS": (15, 90),
-    "Carrier": (10, 60),
-}
+_DELAY_WEIGHTS = [spec.weight for spec in DELAY_CAUSE_SPECS]
 
 # Hub airports get this weight multiplier in route selection
 _HUB_WEIGHT = 4.0
@@ -124,11 +115,12 @@ def generate_operations(
                 # Delays — probability scaled by operator quality
                 if rng.random() < delay_rate:
                     delay_counter += 1
-                    cause = rng.choices(DELAY_CAUSES, weights=_DELAY_WEIGHTS)[0]
-                    lo, hi = _DELAY_MINUTES[cause]
-                    minutes = rng.randint(lo, hi)
+                    spec = rng.choices(DELAY_CAUSE_SPECS, weights=_DELAY_WEIGHTS)[0]
+                    minutes = rng.randint(spec.min_minutes, spec.max_minutes)
                     delay_id = f"DLY{delay_counter:05d}"
-                    delay_nodes.append({":ID(Delay)": delay_id, "cause": cause, "minutes": minutes})
+                    delay_nodes.append(
+                        {":ID(Delay)": delay_id, "cause": spec.cause, "minutes": minutes}
+                    )
                     rels_delay.append({":START_ID(Flight)": flight_id, ":END_ID(Delay)": delay_id})
 
                 current_airport = destination

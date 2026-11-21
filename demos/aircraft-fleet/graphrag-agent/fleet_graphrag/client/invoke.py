@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deployed-agent harness — single invocation and continuous load test.
+"""Deployed-agent harness: single invocation and continuous load test.
 
 Talks to the agent deployed on AgentCore Runtime over the boto3
 ``bedrock-agentcore`` data plane (via :mod:`client.transport`). The response
@@ -14,7 +14,7 @@ Usage:
 Prerequisites:
     - Agent deployed (./agent.sh deploy)
     - AWS credentials configured
-    - .bedrock_agentcore.yaml present (created by ./agent.sh configure)
+    - The agentcore CLI on PATH. The Runtime ARN comes from `agentcore status`.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import re
 import sys
 import time
 
-from client.transport import AGENT_ROOT, invoke_deployed
+from fleet_graphrag.client.transport import AGENT_ROOT, DeploymentNotFoundError, invoke_deployed
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -104,16 +104,21 @@ def run_load_test(interval: int = 5) -> None:
 
 
 def main() -> None:
+    try:
+        _run()
+    except DeploymentNotFoundError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+
+def _run() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "load-test":
         interval = 5
         if len(sys.argv) > 2:
             try:
                 interval = int(sys.argv[2])
             except ValueError:
-                print(
-                    f"ERROR: Invalid interval '{sys.argv[2]}'. "
-                    f"Must be a number."
-                )
+                print(f"ERROR: Invalid interval '{sys.argv[2]}'. Must be a number.")
                 sys.exit(1)
         run_load_test(interval)
         return

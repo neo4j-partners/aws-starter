@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GraphRAG Agent functionality showcase — console demo.
+"""GraphRAG Agent functionality showcase: console demo.
 
 Walks the agent's full surface area, section by section, in plain English:
 
@@ -7,15 +7,17 @@ Walks the agent's full surface area, section by section, in plain English:
   2. The ``graph_query`` retriever on its own (Text2Cypher).
   3. The ``vector_search`` retriever on its own (semantic search).
   4. The full Strands ReAct agent, choosing tools by itself.
+  5. Conversation memory: a follow-up question that relies on the turn before.
 
 This is a pure client. Every section is served by a running
-``runtime_app.py`` through the matching payload mode — nothing is built
+``fleet_graphrag.server`` through the matching payload mode. Nothing is built
 in-process:
 
   - section 1 -> ``{"mode": "schema"}``
   - section 2 -> ``{"mode": "graph_query", "query": ...}``
   - section 3 -> ``{"mode": "vector_search", "query": ..., "top_k": 2}``
   - section 4 -> ``{"prompt": ...}``  (the full agent)
+  - section 5 -> two ``{"prompt": ..., "user_id": ...}`` calls in one session
 
 The per-section questions below are hand-written narration for the showcase;
 they are intentionally separate from ``queries.txt`` (the load/demo list).
@@ -28,9 +30,15 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import textwrap
 
-from client.transport import Target, invoke
+from fleet_graphrag.client.transport import (
+    DeploymentNotFoundError,
+    Target,
+    invoke,
+    new_session_id,
+)
 
 logging.basicConfig(level=logging.WARNING, format="%(message)s")
 
@@ -73,17 +81,17 @@ def call(payload: dict) -> str:
 
 def section_schema() -> None:
     banner(
-        "SECTION 1 — What the agent knows about the database",
+        "SECTION 1: What the agent knows about the database",
         "Before answering anything, the agent loads the live Neo4j schema "
         "(node types and how they connect) once per process and puts it in "
-        "its system prompt. This is that schema — the map it reasons over.",
+        "its system prompt. This is that schema, the map it reasons over.",
     )
     show("Live graph schema", call({"mode": "schema"}))
 
 
 def section_graph_query() -> None:
     banner(
-        "SECTION 2 — graph_query retriever, used directly (Text2Cypher)",
+        "SECTION 2: graph_query retriever, used directly (Text2Cypher)",
         "This calls the structured retriever with no agent in the loop. "
         "Claude turns each plain question into a READ-ONLY Cypher query from "
         "the schema, runs it, and returns the rows. Best for exact lookups, "
@@ -108,7 +116,7 @@ def section_graph_query() -> None:
 
 def section_vector_search() -> None:
     banner(
-        "SECTION 3 — vector_search retriever, used directly (semantic search)",
+        "SECTION 3: vector_search retriever, used directly (semantic search)",
         "This calls the document retriever with no agent in the loop. The "
         "question is embedded and matched against maintenance-manual text "
         "chunks by meaning, not keywords. Best for 'what does the manual say "
@@ -128,7 +136,7 @@ def section_vector_search() -> None:
 
 def section_agent() -> None:
     banner(
-        "SECTION 4 — The full ReAct agent, choosing tools by itself",
+        "SECTION 4: The full ReAct agent, choosing tools by itself",
         "Now the real agent runs. Given only a question, Claude decides "
         "which tool to call (graph_query for structured facts, "
         "vector_search for manual text), may chain several calls, then "
@@ -136,14 +144,22 @@ def section_agent() -> None:
         "manual-text question, and one that needs both.",
     )
     questions = [
-        ("Structured", "Which operator has the worst on-time performance, "
-         "and how many delays do they have?"),
-        ("Manual text", "What does the maintenance manual recommend for "
-         "hydraulic reservoir low-level warnings?"),
-        ("Needs both", "For maintenance events whose fault is 'Vibration "
-         "exceedance', what corrective actions were taken, and what does "
-         "the manual say the correct engine-vibration troubleshooting "
-         "procedure is?"),
+        (
+            "Structured",
+            "Which operator has the worst on-time performance, and how many delays do they have?",
+        ),
+        (
+            "Manual text",
+            "What does the maintenance manual recommend for "
+            "hydraulic reservoir low-level warnings?",
+        ),
+        (
+            "Needs both",
+            "For maintenance events whose fault is 'Vibration "
+            "exceedance', what corrective actions were taken, and what does "
+            "the manual say the correct engine-vibration troubleshooting "
+            "procedure is?",
+        ),
     ]
     for label, q in questions:
         print(f"User ({label}): {q}")
@@ -156,41 +172,68 @@ def section_agent() -> None:
         print()
 
 
+def section_memory() -> None:
+    banner(
+        "SECTION 5 - Conversation memory across turns",
+        "Both questions below go to the same session. The second one says "
+        "'that fault' without naming it. The agent restores the first turn "
+        "from Neo4j Agent Memory, so it knows the fault means the EGT events "
+        "from the first answer.",
+    )
+    session_id = new_session_id()
+    turns = [
+        "Which aircraft had the most EGT events?",
+        "What does the manual say about that fault?",
+    ]
+    for turn, q in enumerate(turns, start=1):
+        print(f"User (turn {turn}): {q}")
+        print("--- Agent answer ---")
+        result = invoke(
+            {"prompt": q, "user_id": "fleet-demo"},
+            target=TARGET,
+            stream=True,
+            session_id=session_id,
+        )
+        if result.get("status") != "success":
+            print(f"[error] {result.get('errors', ['Unknown error'])}")
+        print()
+
+
 def main() -> None:
     global TARGET
-    parser = argparse.ArgumentParser(
-        description="GraphRAG Agent functionality showcase."
-    )
+    parser = argparse.ArgumentParser(description="GraphRAG Agent functionality showcase.")
     parser.add_argument(
         "--remote",
         action="store_true",
-        help=(
-            "Drive the deployed AgentCore runtime instead of the local "
-            "server on port 7070."
-        ),
+        help=("Drive the deployed AgentCore runtime instead of the local server on port 7070."),
     )
     TARGET = "deployed" if parser.parse_args().remote else "local"
 
     mode_line = (
         "DEPLOYED: AgentCore runtime"
         if TARGET == "deployed"
-        else "LOCAL: runtime_app.py on port 7070"
+        else "LOCAL: fleet-server on port 7070"
     )
     print()
     print("#" * WIDTH)
-    print("#" + "AIRCRAFT FLEET GRAPHRAG AGENT — FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
+    print("#" + "AIRCRAFT FLEET GRAPHRAG AGENT: FUNCTIONALITY SHOWCASE".center(WIDTH - 2) + "#")
     print("#" + mode_line.center(WIDTH - 2) + "#")
     print("#" * WIDTH)
 
-    section_schema()
-    section_graph_query()
-    section_vector_search()
-    section_agent()
+    try:
+        section_schema()
+        section_graph_query()
+        section_vector_search()
+        section_agent()
+        section_memory()
+    except DeploymentNotFoundError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
     banner(
         "DONE",
         "You have seen the schema the agent reasons over, each GraphRAG "
-        "retriever on its own, and the full agent choosing tools "
-        "end to end.",
+        "retriever on its own, the full agent choosing tools "
+        "end to end, and a follow-up that uses conversation memory.",
     )
 
 

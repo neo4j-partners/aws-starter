@@ -1,46 +1,66 @@
 [project]
 name = "aircraft-fleet-graphrag-agent"
 version = "0.1.0"
-description = "Aircraft Fleet GraphRAG Agent — Strands, direct-to-Neo4j GraphRAG over an agent/ core"
-requires-python = ">=3.10"
+description = "Aircraft Fleet GraphRAG Agent: Strands, direct-to-Neo4j GraphRAG"
+requires-python = ">=3.12"
 dependencies = [
-    # Shared core — direct-to-Neo4j GraphRAG (no MCP, no Gateway)
-    "bedrock-agentcore",
-    "bedrock-agentcore-starter-toolkit",
-    "neo4j-graphrag[bedrock]>=1.16.0",
-    "neo4j>=5.17.0",
-    "boto3>=1.42.0",
+    # Shared core: direct-to-Neo4j GraphRAG, with no MCP and no Gateway
+    "bedrock-agentcore>=1.26",
+    "neo4j-graphrag[bedrock]>=1.24",
+    "neo4j>=6.3.1",
+    "boto3>=1.43.127",
+    "httpx>=0.28",
     "pydantic>=2",
     "python-dotenv>=1.0.0",
-    "pyyaml>=6.0",
     # Observability - ADOT for automatic tracing to CloudWatch
-    "aws-opentelemetry-distro>=0.10.0",
+    "aws-opentelemetry-distro>=0.23",
     # Strands agent framework
-    "strands-agents",
+    "strands-agents>=1.65",
+    # Held below 2.x until bedrock-agentcore[strands-agents] allows mcp 2.
+    "mcp>=1.28,<2",
+    # The fleet fork of 0.8.0. [tool.uv.sources] says where the wheel is.
+    "neo4j-agent-memory[strands]==0.8.0+fleet.7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.14",
 ]
 
 # Console entry points. The server runs in the foreground of its own
-# terminal (Ctrl+C to stop) — it is never backgrounded by a script. The
+# terminal (Ctrl+C to stop). It is never backgrounded by a script. The
 # clients are thin wire callers. `fleet-server` defaults to port 7070 for
-# local dev (AGENT_PORT still overrides); the cloud container uses
-# runtime_app's __main__ (fixed 8080).
+# local dev (AGENT_PORT still overrides). AgentCore Runtime runs the root
+# main.py, which serves 8080.
 [project.scripts]
-fleet-server = "runtime_app:main"
-fleet-cli = "client.cli:main"
-fleet-demo = "client.demo:main"
-fleet-invoke = "client.invoke:main"
+fleet-server = "fleet_graphrag.server:main"
+fleet-cli = "fleet_graphrag.client.cli:main"
+fleet-demo = "fleet_graphrag.client.demo:main"
+fleet-invoke = "fleet_graphrag.client.invoke:main"
+
+[tool.uv.sources]
+neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.7/neo4j_agent_memory-0.8.0%2Bfleet.7-py3-none-any.whl" }
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Package the `agent` core plus `client` and the top-level `runtime_app`
-# module into the venv so the console scripts resolve `runtime_app:main`
-# and `client.*:main`, and runtime_app can `from agent import ...` without
-# any sys.path manipulation. Deployment uses direct_code_deploy (it zips
-# the source tree), so packaging client here only affects the local venv.
+# One package. The editable install puts it on the venv path for the console
+# scripts and the tests. AgentCore runs main.py as a file, and CodeZip
+# installs the dependencies but not the project. fleet_graphrag imports there
+# because its folder sits next to main.py.
 [tool.hatch.build.targets.wheel]
-packages = ["agent", "client"]
+packages = ["fleet_graphrag"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"runtime_app.py" = "runtime_app.py"
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

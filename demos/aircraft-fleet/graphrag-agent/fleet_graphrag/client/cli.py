@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Aircraft Fleet GraphRAG Agent — terminal client.
+"""Aircraft Fleet GraphRAG Agent: terminal client.
 
 A thin client. It does not build an agent: it sends a prompt to a running
-``runtime_app.py`` and streams the answer back. ``--remote`` switches the
+``fleet_graphrag.server`` and streams the answer back. ``--remote`` switches the
 target from the local server to the deployed AgentCore runtime; nothing else
 changes.
 
@@ -20,8 +20,8 @@ from __future__ import annotations
 import argparse
 import sys
 
-from client.invoke import load_queries
-from client.transport import Target, invoke
+from fleet_graphrag.client.invoke import load_queries
+from fleet_graphrag.client.transport import Target, invoke
 
 # Number of queries.txt entries to run when no question is given.
 DEMO_COUNT = 5
@@ -29,7 +29,7 @@ DEMO_COUNT = 5
 
 def ask(question: str, target: Target) -> None:
     print("=" * 70)
-    print(f"Aircraft Fleet GraphRAG Agent (Strands) — {target}")
+    print(f"Aircraft Fleet GraphRAG Agent (Strands): {target}")
     print("=" * 70)
     print(f"Question: {question}")
     print("-" * 70)

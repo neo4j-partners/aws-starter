@@ -8,9 +8,10 @@ fleet graph and the maintenance manuals stored in Neo4j.
 - **Two kinds of questions:** Some fleet questions need exact graph answers, such as "How many aircraft are overdue for inspection?" Others need manual text, such as "What does the manual say about hydraulic leak detection?" This agent handles both.
 - **Direct Neo4j driver:** The agent opens one Neo4j driver per process and connects straight to Aura. It uses no MCP server and no AgentCore Gateway.
 - **`graph_query` tool:** This tool uses the `neo4j-graphrag` Text2Cypher retriever. Claude writes read-only Cypher from the live schema for exact and aggregate questions.
-- **`vector_search` tool:** This tool uses a `neo4j-graphrag` `VectorRetriever` over the `maintenanceChunkEmbeddings` index. It answers topical questions from the manual chunks.
+- **`vector_search` tool:** This tool uses the `neo4j-graphrag` `HybridCypherRetriever`. It combines the `maintenanceChunkEmbeddings` vector index with the `maintenanceChunkText` fulltext index. It answers topical questions from the manual chunks.
 - **Claude on Bedrock:** The agent loop and Text2Cypher both call Claude through Amazon Bedrock. They use credentials from the standard AWS chain.
 - **Titan embeddings:** Bedrock Titan embeds the questions for `vector_search`. The model matches the one the pipeline used to build the graph.
+- **Conversation memory:** Neo4j Agent Memory keeps each session's history and the entities and preferences it learns about each user. It lives in its own Neo4j database, apart from the fleet graph. See [Conversation memory](#conversation-memory).
 - **AgentCore Runtime:** The agent can run on Amazon Bedrock AgentCore Runtime. The deploy command passes the Neo4j connection as runtime environment variables.
 
 ## Quick start
@@ -18,53 +19,44 @@ fleet graph and the maintenance manuals stored in Neo4j.
 Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 
 ```bash
-cp ../.env.sample ../.env    # skip if it already exists; set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+cp ../.env.sample ../.env    # skip if it already exists; set the NEO4J_* and MEM_NEO4J_* values
 uv sync
 
 uv run fleet-server          # terminal 1: serves http://localhost:7070
 uv run fleet-cli "How many aircraft are in the fleet?"   # terminal 2
 uv run fleet-demo            # terminal 2: full showcase
 
-./agent.sh configure         # deploy to AgentCore Runtime
-./agent.sh deploy
+./agent.sh deploy            # deploy to AgentCore Runtime
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
 ```
 
 ## Architecture
 
-```
-  +-------------------------------------------+
-  |  Client                                   |
-  |  agent.sh invoke-cloud / fleet-invoke /    |
-  |  fleet-demo --remote  (boto3)             |
-  +-------------------------------------------+
-                      |
-                      |  POST /invocations  (SSE stream)
-                      v
-  +-------------------------------------------+        +---------------------------+
-  |  AgentCore Runtime                        |        |  Amazon Bedrock           |
-  |  GraphRAG Agent (runtime_app.py)          | -----> |  Claude (LLM, Text2Cypher)|
-  |  Strands ReAct                            | <----- |  Titan (embeddings)       |
-  +-------------------------------------------+        +---------------------------+
-            |                          |
-            |  graph_query             |  vector_search
-            |  Text2Cypher -> Cypher   |  query embedding -> ANN
-            v                          v
-  +-------------------------------------------+
-  |  Neo4j Aura  (one neo4j+s:// driver)      |
-  |  Aircraft Digital Twin graph              |
-  |  + maintenanceChunkEmbeddings index       |
-  +-------------------------------------------+
+```mermaid
+flowchart TD
+    client["Client<br/>agent.sh invoke-cloud, fleet-invoke,<br/>fleet-demo --remote (boto3)"]
+    agent["AgentCore Runtime<br/>GraphRAG agent (fleet_graphrag.server)<br/>Strands ReAct"]
+    bedrock["Amazon Bedrock<br/>Claude: agent loop, Text2Cypher, memory extraction<br/>Titan: embeddings"]
+    fleet[("Neo4j fleet graph<br/>Aircraft Digital Twin<br/>vector and fulltext chunk indexes")]
+    memory[("Neo4j memory database<br/>sessions, messages, entities, preferences")]
+
+    client -- "POST /invocations (SSE stream)" --> agent
+    agent <--> bedrock
+    agent -- "graph_query: Text2Cypher<br/>vector_search: hybrid search" --> fleet
+    agent -- "SharedMemory, one client per process<br/>Neo4jSessionManager, one per request" --> memory
 ```
 
 - **Neo4j:** The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`. It opens one driver per process.
+- **Neo4j password in the cloud:** When `NEO4J_PASSWORD_SECRET_ARN` is set, the agent reads the password from that Secrets Manager secret once at startup and ignores `NEO4J_PASSWORD`. The secret value is a JSON object with a `password` key, such as `{"username": "neo4j", "password": "..."}`. Other keys are ignored.
 - **Bedrock:** The agent uses the standard AWS credential chain for Claude, Text2Cypher, and Titan.
+- **Memory:** The agent reads `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, `MEM_NEO4J_DATABASE`, and `MEM_NEO4J_PASSWORD`. When `MEM_NEO4J_PASSWORD_SECRET_ARN` is set, the memory password comes from that secret in the same JSON form.
 
 ## Prerequisites
 
-1. **Python:** You need Python 3.10 or later and the `uv` package manager.
+1. **Python:** You need Python 3.12 or later and the `uv` package manager.
 2. **AWS:** You need the AWS CLI configured, with Bedrock access to the LLM and the Titan embedding model.
 3. **Neo4j:** You need a Neo4j database built by [`demos/aircraft-fleet/pipeline/`](../pipeline/).
+4. **Memory database:** You need a second Neo4j database or instance for conversation memory. It can be empty. The agent creates its schema on first connect.
 
 ## Build the graph
 
@@ -100,8 +92,9 @@ uv run fleet-server                                 # serves http://localhost:70
 uv run opentelemetry-instrument fleet-server        # the same server, with OTEL tracing
 ```
 
-- **Config:** The server loads the shared `.env` in `demos/aircraft-fleet/`. The `agent` package loads it on import.
-- **Port:** The server runs `runtime_app.py` on port 7070. The deployed runtime uses port 8080. Local runs use 7070 to avoid a clash. Set `AGENT_PORT` to use another port.
+- **Config:** The server loads the shared `.env` in `demos/aircraft-fleet/`. `fleet_graphrag/server.py` loads it before it imports the `agent` package. Values already set in the environment win.
+- **Startup checks:** The server builds the memory settings before it serves. A missing `MEM_NEO4J_URI` or memory password stops startup.
+- **Port:** `fleet-server` runs `fleet_graphrag.server` on port 7070. The deployed runtime uses port 8080. Local runs use 7070 to avoid a clash. Set `AGENT_PORT` to use another port.
 - **Stopping:** The server runs in the foreground. Press Ctrl+C or run `./agent.sh stop` to stop it.
 - **Testing:** `./agent.sh test` sends one question to the server.
 - **Clients:** The clients below talk to the server over HTTP from a second terminal. They hold no Neo4j credentials.
@@ -136,23 +129,39 @@ Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 
 ```bash
 uv sync
-cp ../.env.sample ../.env    # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+cp ../.env.sample ../.env    # set the deploy settings listed under Deploy
 aws sso login --sso-session <your-sso-session>     # only if you use AWS SSO
 ```
 
 ### Deploy
 
+Deployment uses the AgentCore CLI. Install it with
+`npm install -g @aws/agentcore`. The project lives in `agentcore/`, and
+`agentcore/agentcore.json` declares the `graphrag_agent` Runtime.
+
+The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` and `./agent.sh destroy` install them when they are missing or incomplete. They also reinstall when `agentcore/cdk/package-lock.json` is newer than the install, as after a `git pull` that changes it. The install uses `npm ci`, or `npm install` when there is no `package-lock.json`. To run `agentcore deploy` directly, install them once first:
+
 ```bash
-./agent.sh configure         # writes .bedrock_agentcore.yaml with entrypoint runtime_app.py
-./agent.sh deploy            # creates the runtime and passes the Neo4j settings
-./agent.sh status            # wait for "Endpoint: DEFAULT READY"
+(cd agentcore/cdk && npm ci)
 ```
 
-- **Deploy type:** With `direct_code_deploy`, `agentcore deploy` uploads a code package to S3. It runs on a managed Python 3.13 arm64 runtime and sets up IAM and CloudWatch. It builds no Docker image and pushes nothing to ECR.
-- **Neo4j settings:** `./agent.sh deploy` passes the Neo4j connection as runtime environment variables. The container has no `.env` file. The output shows the agent ARN and the dashboard URL.
-- **Optional settings:** `./agent.sh deploy` also passes `MODEL_ID`, `AWS_REGION`, `VECTOR_INDEX_NAME`, `EMBED_MODEL_ID`, and `EMBED_DIMENSIONS` when you set them.
-- **Configure first:** Run `configure` even if `.bedrock_agentcore.yaml` already exists. It sets the entrypoint and records the account, region, and execution role.
-- **Extra arguments:** `configure` and `destroy` pass any extra arguments to the `agentcore` command. This lets you run them without prompts, for example `./agent.sh configure -ni -dt direct_code_deploy -rt PYTHON_3_13` and `./agent.sh destroy --force`.
+`./agent.sh deploy` reads the deploy settings from the shared `../.env`. A value exported in the shell wins. `agentcore/cdk/lib/cdk-stack.ts` copies them into the Runtime environment, and synth stops with a list of any that are missing:
+
+- **Neo4j connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE` for the fleet graph.
+- **Memory connection:** Set `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, and `MEM_NEO4J_DATABASE` for the agent memory database.
+- **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to the complete ARNs of the Secrets Manager secrets that hold the passwords. A complete ARN ends in the six-character suffix that Secrets Manager adds. Each secret holds a JSON object with a `password` key. The deploy never reads or sends the passwords themselves.
+- **Secret access:** The stack grants the Runtime role `secretsmanager:GetSecretValue` on exactly those two ARNs. A secret encrypted with a customer managed KMS key also needs `kms:Decrypt` on that key, which the stack does not grant.
+
+```bash
+./agent.sh deploy            # builds the code zip and deploys the CDK stack
+./agent.sh status            # shows the Runtime ARN and deployment state
+./agent.sh logs --tail       # follows the Runtime logs
+```
+
+- **Deploy type:** The Runtime uses a `CodeZip` build. `agentcore deploy` zips this directory, uploads it, and runs it on a managed Python 3.12 arm64 runtime. It builds no Docker image.
+- **Packaged files:** The zip holds every file here except `agentcore/`, `.venv`, `.git`, `node_modules`, `__pycache__`, and `.pytest_cache`. It includes `.ruff_cache`. `./agent.sh deploy` refuses to run while a `.env*` or `.mcp-credentials*.json` file is present, because the zip would include it. Local runs read the shared `../.env` instead.
+- **Deployment target:** The first deploy creates the `default` target in `agentcore/aws-targets.json` from your current AWS account and region. That file and `agentcore/.cli/` hold account-specific values, so git ignores them.
+- **Fresh clone:** The deployed state lives in those ignored files. A fresh clone, or a different machine, has no record of an earlier deploy, so `./agent.sh status` reports the Runtime as not deployed even when it is running in your account.
 
 ### Call the deployed agent
 
@@ -167,20 +176,37 @@ The deployed agent has the same four `/invocations` modes as the local server.
 A `mode` field picks one. With no `mode`, the full agent runs. Only the
 connection differs:
 
-- **`./agent.sh invoke-cloud "..."`:** This command sends one prompt through the `agentcore invoke` CLI.
-- **`uv run fleet-demo --remote`:** This command runs all four demo sections against the deployed agent.
+- **`./agent.sh invoke-cloud "..."`:** This command sends one prompt through `agentcore invoke`.
+- **`uv run fleet-demo --remote`:** This command runs all five demo sections against the deployed agent.
 - **`uv run fleet-invoke "..."`:** This command sends one prompt and streams the answer as it arrives.
 - **`uv run fleet-invoke load-test [seconds]`:** This command sends a random query from `queries.txt` on an interval. The default interval is 5 seconds.
-- **`./agent.sh destroy`:** This command removes the runtime when you finish.
+- **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. It does not read `../.env`. When it finishes, it lists anything `agentcore status` still reports as deployed. It also asks CloudFormation for the stack `AgentCore-AircraftFleet-default`. The status command reads local state that can be lost, so the CloudFormation answer is the one that counts. Destroy fails while the stack exists in any state other than `DELETE_COMPLETE`. Before it asks or changes anything, it confirms that the active AWS credentials belong to the account recorded for the target in `agentcore/aws-targets.json`. It checks the account again before the CloudFormation check. Credentials for another account would not see the stack.
+
+## Conversation memory
+
+The agent remembers earlier turns of a session and what it learned about a user.
+It uses [Neo4j Agent Memory](https://github.com/neo4j-labs/agent-memory)
+through its Strands `SharedMemory` and `Neo4jSessionManager`.
+
+- **Separate database:** Memory needs its own Neo4j database or instance. Point `MEM_NEO4J_*` at it, not at the fleet graph. Text2Cypher reads the live schema, so memory labels in the fleet graph would reach its prompt. Locally, a second database in the same Neo4j Enterprise server works, such as one made with `CREATE DATABASE memory`.
+- **Session and user:** The session ID comes from the AgentCore session header. The `user_id` field in the payload scopes long-term memory. A missing or empty `user_id` becomes `anonymous`, so all anonymous callers share one profile.
+- **What it stores:** Each session keeps its messages. The agent extracts entities from them and retrieves related entities and preferences on later turns. Matches below a vector score of 0.75 are left out. Tool calls are not recorded. A restored turn shows only its text, so the system prompt tells the agent that a missing tool call does not mean no tool ran.
+- **Background extraction:** Entity extraction runs in the background after the turn is written, so the answer does not wait for it. While an extraction runs, `/ping` reports `HealthyBusy`, so the Runtime keeps the session alive until it ends. A failed extraction is logged, and the message stays stored without entities.
+- **One client per process:** The agent opens one memory client per process, through `SharedMemory`, on the first request that needs memory. The `schema`, `graph_query`, and `vector_search` modes never open it, so they keep working while the memory database is down. A failed open is not kept, so the next request tries again. A rejected memory password is kept, though. The agent reports it on every later request until the process restarts. A retry would send the same password and count toward the server's failed-login lockout. Each request builds its own session manager on the shared client, restores the session history, and closes the manager when the answer ends. It also closes when the request fails. A failed build closes its own manager before the error is reported. If the client disconnects while the agent is still being built, the close waits for the build to end. At shutdown, the server waits up to 30 seconds for extractions still running. Any still running then get 5 seconds to unwind, and closing the shared client can take up to 30 more seconds. So a shutdown can take about 65 seconds in the worst case. If an open is still in flight at shutdown, the server waits for it first. An open that succeeds takes up to 30 seconds, and its client is then closed as above. So that shutdown can take about 95 seconds. An open that fails leaves no client to close, and it ends within about 95 seconds too.
+- **Cost per request:** These numbers were measured on a local Neo4j. The first request against an empty memory database takes about 1.8 seconds longer. It opens the memory client and creates the memory schema and indexes. When the database already has them, the open adds about 0.1 to 0.2 seconds to the first request. After that, building a request's session manager and restoring its history takes a few milliseconds, and about 25 to 50 milliseconds once the history grows. Writing the turn when the answer ends takes about 0.7 to 1.1 seconds, mostly the Titan embedding of each message. The first write after startup takes about 3 seconds. The `complete` event is sent after the write. Entity extraction is not in these numbers, because it runs in the background. A remote instance adds a few network round trips to each step.
+- **Extraction model:** Entity extraction runs on `global.anthropic.claude-sonnet-5-5` with Titan v2 embeddings at 1024 dimensions. Sonnet 5.5 rejects a temperature and a forced tool choice. The extractor is built with `send_temperature=False` and `tool_choice="auto"`, two options that the fleet fork of Neo4j Agent Memory adds. The agent itself still uses `MODEL_ID`.
 
 ## Layout
 
 | Path | Use |
 |------|-----|
-| `agent/` | The core package, installed into the venv. `config.py` holds the model ID, region, embedder, index, and system prompt. `retrieval.py` holds the Neo4j driver and the `graph_query`, `vector_search`, and `get_graph_schema` functions. `tools.py` holds the Strands tool wrappers. |
-| `client/` | The clients behind `fleet-cli`, `fleet-demo`, and `fleet-invoke`. `transport.py` is the only network layer. It covers local HTTP on port 7070 and the deployed agent through boto3. `cli.py` is the terminal client, `demo.py` is the showcase, and `invoke.py` is the deployed single call and load test. |
-| `runtime_app.py` | The AgentCore Runtime entrypoint. `main()` is `fleet-server` on port 7070. The cloud container uses `__main__` on port 8080. It handles the `mode` field. |
-| `agent.sh` | The wrapper for local `start`, `stop`, and `test`, and for `configure`, `deploy`, `status`, `invoke-cloud`, and `destroy` |
+| `main.py` | The AgentCore Runtime entrypoint. It calls `fleet_graphrag.server.main` on port 8080. AgentCore runs a file, not a module, and CodeZip installs the dependencies but not the project. The package imports because its folder sits next to `main.py`. |
+| `fleet_graphrag/` | The one package, installed into the venv in editable mode. It holds `server.py`, `agent/`, and `client/`. |
+| `fleet_graphrag/server.py` | The `BedrockAgentCoreApp` and its entrypoint. It handles the `mode` field. `main()` is the only way to start the server. `fleet-server` calls it on port 7070. |
+| `fleet_graphrag/agent/` | The agent core. `config.py` holds the model ID, region, embedder, index, and system prompt. `retrieval.py` holds the Neo4j driver and the `graph_query`, `vector_search`, and `get_graph_schema` functions. `tools.py` holds the Strands tool wrappers. `memory.py` builds the memory settings and the per-request session manager. `secrets.py` reads the passwords. |
+| `fleet_graphrag/client/` | The clients behind `fleet-cli`, `fleet-demo`, and `fleet-invoke`. `transport.py` is the only network layer. It covers local HTTP on port 7070 and the deployed agent through boto3. `cli.py` is the terminal client, `demo.py` is the showcase, and `invoke.py` is the deployed single call and load test. |
+| `agent.sh` | The wrapper for local `start`, `stop`, and `test`, and for `deploy`, `status`, `invoke-cloud`, `logs`, and `destroy` |
+| `agentcore/` | The AgentCore CLI project. `agentcore.json` declares the Runtime. `cdk/` is the CDK app the CLI deploys. Its `lib/cdk-stack.ts` adds the Neo4j env vars and the secret grant. |
 | `queries.txt` | Sample queries for discovery, fleet, maintenance, and delays |
 
 ## Commands
@@ -195,17 +221,16 @@ terminal. Press Ctrl+C to stop it.
 | `uv run fleet-demo` | Run the showcase against the local server. Add `--remote` to use the deployed agent. |
 | `uv run fleet-invoke "prompt"` | Send one prompt to the deployed agent. `load-test [N]` sends a random query from `queries.txt` every N seconds. |
 
-`./agent.sh` wraps the local server and the deployment. On `deploy`, it passes
-the Neo4j connection to the runtime.
+`./agent.sh` wraps the local server and the AgentCore CLI.
 
 | Command | Description |
 |---------|-------------|
 | `start` / `stop` | Start or stop the local server on port 7070 |
 | `test` | Ask the local server one question |
-| `configure` | Create the AWS deployment config |
-| `deploy` / `destroy` | Deploy to or remove from AgentCore Runtime |
+| `deploy` / `destroy [--yes]` | Deploy to or remove from AgentCore Runtime. `destroy` asks first unless you pass `--yes`. |
 | `status` | Show the deployment status |
 | `invoke-cloud "prompt"` | Call the deployed agent through `agentcore invoke` |
+| `logs [args]` | Search the Runtime logs. Add `--tail` to follow them. |
 
 ## Environment variables
 
@@ -213,18 +238,33 @@ the Neo4j connection to the runtime.
 |----------|---------|
 | `NEO4J_URI` | Required |
 | `NEO4J_USERNAME` | `neo4j` |
-| `NEO4J_PASSWORD` | Required |
+| `NEO4J_PASSWORD` | Local runs only. Required when `NEO4J_PASSWORD_SECRET_ARN` is unset. |
+| `NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. The password comes from this secret. |
 | `NEO4J_DATABASE` | `neo4j` |
-| `MODEL_ID` | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+| `MEM_NEO4J_URI` | Required. The memory database, separate from the fleet graph. |
+| `MEM_NEO4J_USERNAME` | `neo4j` |
+| `MEM_NEO4J_DATABASE` | `neo4j` |
+| `MEM_NEO4J_PASSWORD` | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. The memory password comes from this secret. |
+| `MODEL_ID` | `global.anthropic.claude-sonnet-5-5` |
+| `MAX_TOKENS` | `64000`. The output cap for each agent model call. |
+| `MODEL_EFFORT` | `medium`. One of `low`, `medium`, `high`, `xhigh`, or `max`. |
 | `AWS_REGION` | `us-east-1` |
 | `VECTOR_INDEX_NAME` | `maintenanceChunkEmbeddings` |
+| `FULLTEXT_INDEX_NAME` | `maintenanceChunkText` |
 | `EMBED_MODEL_ID` | `amazon.titan-embed-text-v2:0` |
 | `EMBED_DIMENSIONS` | `1024` |
-| `AGENT_PORT` | `7070` for `fleet-server`, `8080` in the container |
+| `SCHEMA_TTL_S` | `600`. Seconds before the cached graph schema is fetched again. |
+| `TEXT2CYPHER_TIMEOUT_S` | `30`. The server-side timeout for a generated query. |
+| `TEXT2CYPHER_MAX_ROWS` | `200`. The most rows a generated query returns. |
+| `TEXT2CYPHER_MAX_TOKENS` | `2048`. The output cap for the Cypher-writing call. |
+| `AGENT_PORT` | `7070` for `fleet-server`, `8080` on AgentCore Runtime |
 
 ## Observability
 
-The agent uses AWS Distro for OpenTelemetry.
+The agent uses AWS Distro for OpenTelemetry auto-instrumentation. It does not use `StrandsTelemetry`.
+
+ADOT traces the Neo4j driver, the boto3 calls to Bedrock, and incoming requests. Strands writes its agent, model, and tool spans through the global OpenTelemetry tracer, so ADOT exports those spans too. `StrandsTelemetry` would install a second tracer provider that only covers the Strands spans. The AgentCore CLI also turns on OpenTelemetry for each runtime by default through `instrumentation.enableOtel`.
 
 - **Local tracing:** Run `uv run opentelemetry-instrument fleet-server`. This traces the Neo4j driver, the boto3 calls to Bedrock, and incoming requests.
 - **Deployed tracing:** Enable Tracing on the runtime in the CloudWatch console under Bedrock AgentCore. Traces then appear in the Bedrock AgentCore Observability dashboard. Without this step, AgentCore records no traces.
@@ -233,7 +273,10 @@ The agent uses AWS Distro for OpenTelemetry.
 
 | Symptom | Cause and fix |
 |---------|---------------|
-| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env` in `demos/aircraft-fleet/` for local runs. For deployed runs, set them as runtime environment variables. |
+| `MEM_NEO4J_URI is not set` at startup | Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `.env` for local runs. They point at the memory database, not the fleet graph. |
+| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env` in `demos/aircraft-fleet/` for local runs. A deployed Runtime gets `NEO4J_URI` and `NEO4J_PASSWORD_SECRET_ARN` from the deploy. Set them in the shared `.env` and run `./agent.sh deploy` again. |
+| `Missing or invalid deploy settings for runtime "graphrag_agent"` | Synth found a deploy setting that is unset, a Neo4j URI without TLS, or a secret ARN that is not complete. Fix the listed names in the shared `.env`. |
+| `Could not read the secret in NEO4J_PASSWORD_SECRET_ARN` in the Runtime logs | The secret does not exist in that region, or the Runtime role cannot read it. Check the ARN and that the secret is not encrypted with a KMS key the role cannot use. |
 | `vector_search` returns poor results or nothing | The agent's embedder must match the pipeline's embedder. Align `EMBED_MODEL_ID` and `EMBED_DIMENSIONS`, and confirm that the `maintenanceChunkEmbeddings` index exists. |
 | `ServiceUnavailable` or an auth error from Neo4j | The `NEO4J_URI` scheme or the credentials are wrong, or the database is unreachable. |
 | `NoCredentialsError` | AWS credentials are missing. Run `aws configure` or set credentials in the environment. |

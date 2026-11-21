@@ -63,11 +63,14 @@ case "$1 $2" in
 esac
 """
 
-# rm, cp, and mv pass through to /bin. STUB_INTERRUPT_AFTER=cmd:N sends
-# SIGINT to agent.sh right after the Nth call of cmd, the same as a Ctrl+C.
+# rm, cp, mv, and awk pass through to the real command. STUB_INTERRUPT_AFTER
+# =cmd:N sends SIGINT to agent.sh right after the Nth call of cmd, the same as
+# a Ctrl+C.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
-/bin/"$name" "$@"
+real=/bin/"$name"
+[ -x "$real" ] || real=/usr/bin/"$name"
+"$real" "$@"
 status=$?
 counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
@@ -124,6 +127,7 @@ def project(tmp_path: Path) -> Path:
         ("rm", STUB_PASSTHROUGH),
         ("cp", STUB_PASSTHROUGH),
         ("mv", STUB_PASSTHROUGH),
+        ("awk", STUB_PASSTHROUGH),
     ):
         stub = bin_dir / name
         stub.write_text(body)
@@ -401,8 +405,8 @@ def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> N
     env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
     env_local.chmod(0o600)
 
-    # cp 1 backs up the spec, cp 2 restores it, cp 3 starts the strip's copy.
-    result = run_destroy(project, STUB_INTERRUPT_AFTER="cp:3")
+    # The strip's awk has written the copy, and mv has not replaced the file.
+    result = run_destroy(project, STUB_INTERRUPT_AFTER="awk:1")
 
     assert result.returncode == 130, result.stdout + result.stderr
     assert env_local.read_text() == "A=1\n"
@@ -427,12 +431,15 @@ def test_a_failed_configure_leaves_no_temporary_project(project: Path) -> None:
 def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lost: int) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
 
     result = run_destroy(project, STUB_MKTEMP_LOSE=str(lost))
 
     assert result.returncode != 0
     assert (project.parent / "mktemp-calls").read_text() == f"{lost}\n"
     assert spec.read_bytes() == tracked
+    assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
 
 

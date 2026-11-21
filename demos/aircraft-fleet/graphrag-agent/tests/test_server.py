@@ -6,6 +6,7 @@ These paths never reach Neo4j or Bedrock. Retrieval calls are monkeypatched.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 import time
 
@@ -453,6 +454,47 @@ def test_stream_close_failure_on_disconnect_is_logged(monkeypatch, caplog) -> No
         r for r in caplog.records if r.getMessage() == "The agent stream failed while closing"
     ]
     assert record.exc_info is not None
+    assert str(record.exc_info[1]) == "flush failed"
+
+
+def test_cancel_with_a_failing_stream_close_ends_cancelled(monkeypatch, caplog) -> None:
+    """A flush that fails while a cancel unwinds the stream must not end the request."""
+
+    class Agent(_FakeAgent):
+        async def stream_async(self, prompt: str):
+            try:
+                yield {"data": "partial "}
+                # Waits for the model, where a cancel lands.
+                await asyncio.sleep(10)
+            finally:
+                # Stands in for the AfterInvocationEvent flush failing.
+                raise RuntimeError("flush failed")
+
+    made, _ = _agent_path(monkeypatch)
+    monkeypatch.setattr(server, "Agent", lambda **kwargs: Agent(**kwargs))
+    events: list[dict] = []
+
+    async def cancel_mid_answer() -> bool:
+        async def consume() -> None:
+            async for event in server.invoke({"prompt": "hi"}, RequestContext(session_id="s-1")):
+                events.append(event)
+
+        task = asyncio.create_task(consume())
+        while not events:
+            await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+        return task.cancelled()
+
+    assert asyncio.run(cancel_mid_answer())
+    assert events == [{"type": "chunk", "data": "partial "}]
+    assert made[0].closed == 1
+    assert "Error processing request" not in caplog.text
+    [record] = [
+        r for r in caplog.records if r.getMessage() == "The agent stream failed while closing"
+    ]
     assert str(record.exc_info[1]) == "flush failed"
 
 

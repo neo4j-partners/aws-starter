@@ -326,6 +326,16 @@ async def invoke(
                 except Exception:
                     logger.exception("The agent stream failed while closing")
                 raise
+            except Exception as e:
+                # A cancel that lands while the stream awaits the model runs
+                # the stream's cleanup. A flush that fails there replaces the
+                # CancelledError, so restore the cancel. Otherwise the handlers
+                # below would send an error and end the request normally.
+                task = asyncio.current_task()
+                if task is None or not task.cancelling():
+                    raise
+                logger.exception("The agent stream failed while closing")
+                raise asyncio.CancelledError from e
             finally:
                 await events.aclose()
         finally:

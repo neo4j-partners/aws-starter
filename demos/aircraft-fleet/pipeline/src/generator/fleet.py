@@ -229,7 +229,7 @@ def _build_aircraft(
             _build_system(model, aircraft_id, i, "Engine", f"{engine_type} #{i}", engine_index=i)
         )
 
-    # Avionics and Hydraulics (no sensors)
+    # Avionics and Hydraulics
     aircraft.systems.append(
         _build_system(model, aircraft_id, 3, "Avionics", "Avionics", engine_index=None)
     )

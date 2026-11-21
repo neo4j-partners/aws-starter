@@ -43,10 +43,10 @@ if [[ "$LOAD_FULL_DATASET" == "true" ]]; then
 else
   # 30 aircraft covers every tail listed in the maintenance manuals.
   DEFAULT_AIRCRAFT=30
-  # 90 days: sensor wear grows over time, so a longer window gives more
-  # MaintenanceEvents. 30 aircraft x 90 days yields about 240 events and
-  # 520k readings. That is small-tier friendly, and the graphrag-agent
-  # maintenance queries return data.
+  # 90 days gives the graphrag-agent maintenance queries enough data.
+  # 30 aircraft x 90 days yields about 230 MaintenanceEvents and about
+  # 778k readings. That is past Aura Free, so use a paid tier or a local
+  # Neo4j.
   DEFAULT_DAYS=90
 fi
 AIRCRAFT="${GEN_AIRCRAFT:-$DEFAULT_AIRCRAFT}"

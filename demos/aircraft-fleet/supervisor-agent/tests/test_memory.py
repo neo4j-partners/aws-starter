@@ -80,6 +80,15 @@ def test_bedrock_providers_are_explicit(memory_on) -> None:
     assert settings.llm._aws_region == memory.AWS_REGION
 
 
+# Sonnet 5.5 rejects a temperature and a forced toolChoice, so the extractor
+# sends neither.
+def test_the_extractor_runs_on_sonnet_5_5_without_a_temperature(memory_on) -> None:
+    llm = memory.memory_settings().llm
+    assert llm.model == "bedrock/global.anthropic.claude-sonnet-5-5"
+    assert llm._tool_choice == "auto"
+    assert llm._inference_config(0.0, 100) == {"maxTokens": 100}
+
+
 def test_memory_api_key_does_not_switch_backends(
     monkeypatch: pytest.MonkeyPatch, memory_on
 ) -> None:

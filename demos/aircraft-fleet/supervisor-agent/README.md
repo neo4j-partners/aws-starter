@@ -165,6 +165,7 @@ uv run fleet-supervisor-cli "Compare fault counts with delay counts"
 ```
 
 - **Memory settings:** Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `demos/aircraft-fleet/.env`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. They point at the memory database, not the fleet graph. The server stops at startup if the URI or the password is missing.
+- **Memory package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.2, a build of the `neo4j-partners/agent-memory` fork. Its entity extractor runs on Claude Sonnet 5.5. Sonnet 5.5 rejects a temperature and a forced tool choice, so the extractor sends no temperature and lets the model choose the tool. For now `pyproject.toml` pins the wheel by a local path, so `uv sync` works only where that file exists. The pin moves to the published wheel's URL before the merge.
 - **Shared .env:** The server loads `demos/aircraft-fleet/.env` at startup. The path comes from the package, so it works from any working directory. Set `FLEET_ENV_FILE` to use another file. A value already set in the environment wins.
 - **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server`. Set `AGENT_PORT` to change the port.
 - **Runtime entrypoint:** `uv run python main.py` starts the same server on 8080, the port AgentCore Runtime uses.

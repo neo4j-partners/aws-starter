@@ -37,9 +37,8 @@ MEM_NEO4J_URI = "MEM_NEO4J_URI"
 EMBEDDING_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
 EMBEDDING_DIMENSIONS = 1024
 # The model that extracts entities from stored messages. Sonnet 5.5 rejects
-# the forced toolChoice and the temperature that the extractor sends, so
-# extraction stays on Sonnet 4.6.
-EXTRACTION_MODEL = "bedrock/global.anthropic.claude-sonnet-4-6"
+# a temperature and a forced toolChoice, so the extractor sends neither.
+EXTRACTION_MODEL = "bedrock/global.anthropic.claude-sonnet-5-5"
 # Only memories at least this similar to the question are added to it.
 RETRIEVAL_MIN_SCORE = 0.75
 
@@ -168,7 +167,9 @@ def _build_memory_settings() -> MemorySettings:
         embedding=BedrockEmbeddingProvider(
             EMBEDDING_MODEL, aws_region=AWS_REGION, dimensions=EMBEDDING_DIMENSIONS
         ),
-        llm=BedrockProvider(EXTRACTION_MODEL, aws_region=AWS_REGION),
+        llm=BedrockProvider(
+            EXTRACTION_MODEL, aws_region=AWS_REGION, send_temperature=False, tool_choice="auto"
+        ),
         # The default pipeline needs spaCy and GLiNER, which are not installed.
         extraction=ExtractionConfig(extractor_type=ExtractorType.LLM),
     )

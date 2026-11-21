@@ -17,10 +17,12 @@ repair.
 Claude Sonnet 5.5 rejects a forced ``toolChoice`` (``tool`` or ``any``), so
 the tool is offered with ``auto`` and the system prompt instructs the model to
 call it. Under ``auto`` the model can still answer in prose, so a reply with
-no tool call is retried once. A reply that still has no tool call, or one cut
-off at ``max_tokens``, is counted as a miss and returned as content that fails
-``Neo4jGraph`` validation. The extractor's ``OnError`` policy then decides:
-``RAISE`` raises and ``IGNORE`` logs the chunk and yields an empty graph.
+no tool call is retried once. Tool arguments are validated against the
+``response_format`` model the same way the extractor validates them, and
+arguments that fail are also retried once. A reply that still has no valid
+tool call, or one cut off at ``max_tokens``, is counted as a miss and returned
+as content that fails ``Neo4jGraph`` validation. The extractor's ``OnError``
+policy then decides: ``RAISE`` raises and ``IGNORE`` logs the chunk and yields an empty graph.
 Raising here instead would bypass ``OnError``, because the extractor calls the
 LLM outside its validation ``try``.
 
@@ -45,11 +47,11 @@ from neo4j_graphrag.llm.types import LLMResponse
 from neo4j_graphrag.message_history import MessageHistory
 from neo4j_graphrag.tool import Tool
 from neo4j_graphrag.types import LLMMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
-# One call plus one retry when the reply has no emit_graph tool call.
+# One call plus one retry when the reply has no valid emit_graph tool call.
 _MAX_ATTEMPTS = 2
 # Prefix for miss content. It is never valid JSON, so the extractor's
 # Neo4jGraph validation fails and its OnError policy applies.
@@ -93,6 +95,13 @@ class _RawSchemaTool(Tool):
 
     def get_parameters(self, exclude: list[str] | None = None) -> dict[str, Any]:
         return self._json_schema
+
+
+def _first_error(error: ValidationError) -> str:
+    """Return the first validation error as "<location>: <message>"."""
+    first = error.errors()[0]
+    location = ".".join(str(part) for part in first["loc"]) or "<root>"
+    return f"{location}: {first['msg']}"
 
 
 class StructuredBedrockLLM(BedrockLLM):
@@ -216,11 +225,24 @@ class StructuredBedrockLLM(BedrockLLM):
                 ),
                 None,
             )
-            if tool_call is not None:
-                return LLMResponse(content=json.dumps(tool_call.arguments))
+            if tool_call is None:
+                reason = f"no {_TOOL_NAME} tool call"
+            else:
+                content = json.dumps(tool_call.arguments)
+                # model_validate_json is the check the extractor runs on this
+                # content, so a reply that passes here passes there.
+                try:
+                    response_format.model_validate_json(content)
+                except ValidationError as e:
+                    reason = (
+                        f"{_TOOL_NAME} arguments failed {response_format.__name__} "
+                        f"validation ({e.error_count()} errors, first: {_first_error(e)})"
+                    )
+                else:
+                    return LLMResponse(content=content)
             if attempt < _MAX_ATTEMPTS:
-                logger.info("StructuredBedrockLLM: no %s tool call; retrying.", _TOOL_NAME)
-        return self._miss(f"no {_TOOL_NAME} tool call after {_MAX_ATTEMPTS} attempts", response)
+                logger.info("StructuredBedrockLLM: %s; retrying.", reason)
+        return self._miss(f"{reason} after {_MAX_ATTEMPTS} attempts", response)
 
     def _converse(self, converse_kwargs: dict[str, Any]) -> dict[str, Any]:
         """Call Converse and wrap client errors in ``LLMGenerationError``."""

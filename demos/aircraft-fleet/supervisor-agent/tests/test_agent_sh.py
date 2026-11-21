@@ -51,23 +51,27 @@ case "$1 $2" in
 esac
 """
 
-# rm passes through. With STUB_RM_SIGNAL set, the first rm call then sends
-# that signal to agent.sh, the same as a Ctrl+C right after it.
-STUB_RM = r"""#!/bin/bash
-/bin/rm "$@"
+# rm, cp, and mv pass through to /bin. STUB_INTERRUPT_AFTER=cmd:N sends
+# SIGINT to agent.sh right after the Nth call of cmd, the same as a Ctrl+C.
+STUB_PASSTHROUGH = r"""#!/bin/bash
+name="${0##*/}"
+/bin/"$name" "$@"
 status=$?
-marker="${STUB_LOG%/*}/rm-signalled"
-if [ -n "$STUB_RM_SIGNAL" ] && [ ! -e "$marker" ]; then
-    : > "$marker"
-    kill -s "$STUB_RM_SIGNAL" "$PPID"
+counter="${STUB_LOG%/*}/$name-calls"
+count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+echo "$count" > "$counter"
+if [ "${STUB_INTERRUPT_AFTER:-}" = "$name:$count" ]; then
+    kill -s INT "$PPID"
 fi
 exit "$status"
 """
 
-# This macOS mktemp ignores TMPDIR, so the stub passes a template in the
-# test's own folder. That lets a test check that nothing was left behind.
+# This macOS mktemp ignores TMPDIR, so a call without a template gets one
+# in the test's own folder. That lets a test check that nothing was left
+# behind. A call with a template keeps it.
 STUB_MKTEMP = r"""#!/bin/bash
-exec /usr/bin/mktemp "$@" "$STUB_TMP/tmp.XXXXXX"
+if [ "$#" -gt 0 ]; then exec /usr/bin/mktemp "$@"; fi
+exec /usr/bin/mktemp "$STUB_TMP/tmp.XXXXXX"
 """
 
 CLEAN_STATUS = json.dumps(
@@ -94,7 +98,9 @@ def project(tmp_path: Path) -> Path:
         ("agentcore", STUB_AGENTCORE),
         ("aws", STUB_AWS),
         ("mktemp", STUB_MKTEMP),
-        ("rm", STUB_RM),
+        ("rm", STUB_PASSTHROUGH),
+        ("cp", STUB_PASSTHROUGH),
+        ("mv", STUB_PASSTHROUGH),
     ):
         stub = bin_dir / name
         stub.write_text(body)
@@ -229,6 +235,46 @@ def test_destroy_strips_a_left_secret_line_and_keeps_the_file_mode(project: Path
     assert not list(env_local.parent.glob(".env.local.*"))
 
 
+def test_destroy_strips_only_the_exact_secret_variable(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    kept = (
+        "OLD_AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=other\n"
+        "# AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET= is set by deploy\n"
+    )
+    env_local.write_text(kept + "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n")
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_local.read_text() == kept
+
+
+def test_destroy_keeps_a_wider_file_mode(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o644)
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_local.read_text() == "A=1\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o644
+
+
+def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o600)
+
+    # cp 1 backs up the spec, cp 2 restores it, cp 3 starts the strip's copy.
+    result = run_destroy(project, STUB_INTERRUPT_AFTER="cp:3")
+
+    assert result.returncode == 130, result.stdout + result.stderr
+    assert env_local.read_text() == "A=1\n"
+    assert not list(env_local.parent.glob(".env.local.*"))
+    assert not list((project.parent / "tmp").iterdir())
+
+
 def test_a_failed_configure_leaves_no_temporary_project(project: Path) -> None:
     shutil.rmtree(project / "agentcore")
 
@@ -259,7 +305,7 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
 
-    result = run_destroy(project, STUB_RM_SIGNAL="INT")
+    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:1")
 
     assert result.returncode == 130
     assert spec.read_bytes() == tracked

@@ -247,29 +247,47 @@ add_gateway_credential() {
         --client-secret -
 }
 
+# The copy strip_gateway_secret writes before it replaces .env.local. It
+# holds the file's other lines. restore_project, which the EXIT trap runs,
+# removes a copy an interrupt left behind.
+ENV_STRIP_TMP=""
+
 # Remove the client secret line, and the comment the CLI writes above it,
-# from agentcore/.env.local. Every other line is kept.
+# from agentcore/.env.local. Every other line is kept. The secret line must
+# start with the exact variable name, and the comment must match the whole
+# line.
 strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
-    local status=0 kept
-    # mktemp creates the file readable by its owner only.
-    kept=$(mktemp)
-    grep -v -F -e "$comment" -e "$GATEWAY_SECRET_VAR=" "$ENV_LOCAL" > "$kept" || status=$?
-    # grep exits 1 when it prints nothing, which is fine. 2 is an error.
-    # cat writes into the existing file, so its mode and owner stay as they are.
-    if [ "$status" -gt 1 ] || ! cat "$kept" > "$ENV_LOCAL"; then
-        rm -f "$kept"
+    # The copy sits next to the file, so mv replaces the file in one step.
+    # cp -p gives the copy the file's mode before the filtered lines go in.
+    if ! ENV_STRIP_TMP=$(mktemp "$ENV_LOCAL.XXXXXX") \
+        || ! cp -p "$ENV_LOCAL" "$ENV_STRIP_TMP" \
+        || ! awk -v prefix="$GATEWAY_SECRET_VAR=" -v comment="$comment" \
+            'index($0, prefix) != 1 && $0 != comment' "$ENV_LOCAL" > "$ENV_STRIP_TMP" \
+        || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
+        remove_strip_copy
         echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2
         return 1
     fi
-    rm -f "$kept"
+    ENV_STRIP_TMP=""
+}
+
+# Clear the name before removing the file, as restore_project does for the
+# spec backup, so a second run never acts on a stale name.
+remove_strip_copy() {
+    if [ -n "$ENV_STRIP_TMP" ]; then
+        local copy="$ENV_STRIP_TMP"
+        ENV_STRIP_TMP=""
+        rm -f "$copy"
+    fi
 }
 
 # Put back the tracked agentcore.json and remove the secret line. Returns
 # nonzero if either step fails, and says what to do by hand.
 restore_project() {
     local failed=0
+    remove_strip_copy
     if [ -n "${SPEC_BACKUP:-}" ]; then
         if cp "$SPEC_BACKUP" "$PROJECT_SPEC"; then
             # Clear the name before removing the file. A second run, from the

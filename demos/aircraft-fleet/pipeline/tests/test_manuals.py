@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from manual_text import fault_code_lines
 from typer.testing import CliRunner
 
 from generator import main as generator_main
@@ -786,25 +787,6 @@ _SECTION_FAULTS = {
 _SECTION_SYSTEMS = {"4": "Engine", "5": "Avionics", "6": "Hydraulics"}
 
 
-def _fault_code_lines(text: str) -> list[tuple[str, str]]:
-    """Each "**Fault Code:**" line's code, with the heading above it.
-
-    A line that starts like one in any other form raises, so a variant fails
-    a test instead of being skipped.
-    """
-    out = []
-    heading = ""
-    for line in text.splitlines():
-        if re.match(r"^#{3,5} \d", line):
-            heading = line.lstrip("# ")
-        elif re.match(r"^\*\*Fault Codes?:\*\*", line, re.IGNORECASE):
-            match = re.fullmatch(r"\*\*Fault Code:\*\* (\S+)", line)
-            if match is None:
-                raise ValueError(f"not a plain Fault Code line: {line!r}")
-            out.append((match.group(1), heading))
-    return out
-
-
 @pytest.mark.parametrize(
     "line",
     [
@@ -812,16 +794,22 @@ def _fault_code_lines(text: str) -> list[tuple[str, str]]:
         "**Fault Codes:** ENG-OVH-006",
         "**Fault Code:** ENG-OVH-006 ",
         "**Fault Code:**ENG-OVH-006",
+        "**Fault Code**: ENG-OVH-006",
+        "- **Fault Code:** ENG-OVH-006",
+        " **Fault Code:** ENG-OVH-006",
+        "Fault Code: ENG-OVH-006",
+        "**Fault Code :** ENG-OVH-006",
+        "**FAULT_CODE:** ENG-OVH-006",
     ],
 )
 def test_a_fault_code_line_variant_fails_instead_of_vanishing(line: str) -> None:
     with pytest.raises(ValueError, match="not a plain Fault Code line"):
-        _fault_code_lines(f"### 4.1 Overheat\n{line}\n")
+        fault_code_lines(f"### 4.1 Overheat\n{line}\n")
 
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
 def test_each_fault_code_line_is_the_code_of_its_sections_fault(model: str) -> None:
-    lines = _fault_code_lines(_manual(model))
+    lines = fault_code_lines(_manual(model))
     assert len(lines) >= 8
     for code, heading in lines:
         system = _SECTION_SYSTEMS[heading[0]]
@@ -839,7 +827,7 @@ _MANUAL_ONLY_SECTIONS = {"A321neo": {"ENG-ELF-008"}}
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
 def test_section_4_covers_every_engine_fault_once(model: str) -> None:
-    codes = [code for code, heading in _fault_code_lines(_manual(model)) if heading[0] == "4"]
+    codes = [code for code, heading in fault_code_lines(_manual(model)) if heading[0] == "4"]
     generated = {c.code for c in FAULT_CODES if c.system == "Engine" and c.generated}
 
     assert len(codes) == len(set(codes))

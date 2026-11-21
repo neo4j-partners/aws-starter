@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 import pytest
+from manual_text import fault_code_lines
 from typer.testing import CliRunner
 
 from generator import main as generator_main
@@ -242,34 +243,10 @@ def _stats_blocks(text: str) -> list[tuple[str, str]]:
     return out
 
 
-def _fault_code_lines(text: str) -> list[tuple[str, str]]:
-    """Each "**Fault Code:**" line's code, with the heading above it.
-
-    A line that starts like one in any other form raises, so a variant fails
-    a test instead of being skipped.
-    """
-    out = []
-    heading = ""
-    for line in text.splitlines():
-        if re.match(r"^#{3,5} \d", line):
-            heading = line.lstrip("# ")
-        elif re.match(r"^\*\*Fault Codes?:\*\*", line, re.IGNORECASE):
-            match = re.fullmatch(r"\*\*Fault Code:\*\* (\S+)", line)
-            if match is None:
-                raise ValueError(f"not a plain Fault Code line: {line!r}")
-            out.append((match.group(1), heading))
-    return out
-
-
-def test_a_fault_code_line_variant_fails_instead_of_vanishing() -> None:
-    with pytest.raises(ValueError, match="not a plain Fault Code line"):
-        _fault_code_lines("### 4.1 Overheat\n**Fault Codes:** ENG-OVH-006\n")
-
-
 @pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
 def test_each_fault_section_has_the_stats_block_of_its_code(model: str) -> None:
     text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
-    expected = [(manuals.fault_stats_id(_code(c)), h) for c, h in _fault_code_lines(text)]
+    expected = [(manuals.fault_stats_id(_code(c)), h) for c, h in fault_code_lines(text)]
 
     assert len(expected) >= 6
     assert _stats_blocks(text) == expected

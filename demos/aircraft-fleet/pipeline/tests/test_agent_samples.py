@@ -756,7 +756,8 @@ def test_graph_schema_reads_the_live_database(
     cleanup = """
     MATCH (n)
     WHERE n:PytestSchemaFrom OR n:PytestSchemaTo
-       OR (n:Aircraft AND n.model = 'PYTEST-MODEL') OR (n:Airport AND n.iata = 'ZZQ')
+       OR (n:Aircraft AND n.model STARTS WITH 'PYTEST-')
+       OR (n:Airport AND n.iata = 'ZZQ')
     DETACH DELETE n
     """
     driver.execute_query(cleanup, database_=database)
@@ -778,6 +779,17 @@ def test_graph_schema_reads_the_live_database(
             """,
             database_=database,
         )
+        # AC100, AC0100, and AC00100 all have the number 100. The text of the
+        # aircraft_id breaks the tie, both for a model's first aircraft and
+        # for the order of the models.
+        driver.execute_query(
+            """
+            CREATE (:Aircraft {aircraft_id: 'AC100', tail_number: 'N4PYT', model: 'PYTEST-TIE'})
+            CREATE (:Aircraft {aircraft_id: 'AC0100', tail_number: 'N3PYT', model: 'PYTEST-TIE'})
+            CREATE (:Aircraft {aircraft_id: 'AC00100', tail_number: 'N5PYT', model: 'PYTEST-TIE2'})
+            """,
+            database_=database,
+        )
 
         with caplog.at_level(logging.INFO, logger="neo4j.notifications"):
             schema = graph_schema(driver, database)
@@ -792,6 +804,11 @@ def test_graph_schema_reads_the_live_database(
         tails = _prompt_line(schema, "Sample tail numbers")
         assert "N1PYT (PYTEST-MODEL)" in tails
         assert "N2PYT (PYTEST-MODEL)" not in tails
+        assert [tail for tail in tails if "PYT (PYTEST-" in tail] == [
+            "N5PYT (PYTEST-TIE2)",
+            "N3PYT (PYTEST-TIE)",
+            "N1PYT (PYTEST-MODEL)",
+        ]
         assert "PytestAir" in _prompt_line(schema, "Operators")
         assert "ZZQ" in _prompt_line(schema, "Airport IATA codes")
     finally:

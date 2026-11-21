@@ -23,6 +23,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anyio" },
     { name = "pytest" },
     { name = "python-dotenv" },
     { name = "ruff" },
@@ -41,6 +42,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyio", specifier = ">=4.16.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "ruff", specifier = ">=0.8.0" },

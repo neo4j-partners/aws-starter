@@ -135,14 +135,12 @@ def test_memory_manager_is_closed_when_the_request_is_cancelled(supervisor, mana
     assert manager.closed == 1
 
 
-def test_cancel_during_the_build_closes_the_manager_after_the_build(
-    supervisor, manager, monkeypatch
-):
-    """A disconnect cancels the request while the constructor thread runs.
+@pytest.fixture
+def blocked_build(monkeypatch, supervisor, manager):
+    """Block the supervisor constructor until ``release`` is set.
 
-    Starlette cancels through an anyio cancel scope, which cancels every
-    await again. close() must still wait for the constructor, which connects
-    the manager, so the connection it opens is closed.
+    Returns ``(started, release, order)``. ``order`` records "built" when
+    the constructor returns and "closed" when the manager closes.
     """
     started, release = threading.Event(), threading.Event()
     order: list[str] = []
@@ -159,14 +157,26 @@ def test_cancel_during_the_build_closes_the_manager_after_the_build(
 
     monkeypatch.setattr(server, "build_supervisor", blocking_build)
     monkeypatch.setattr(manager, "close", recording_close)
+    return started, release, order
+
+
+async def _drain_invoke() -> None:
+    async for _ in server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")):
+        pass
+
+
+def test_anyio_cancel_during_the_build_closes_the_manager_after_the_build(manager, blocked_build):
+    """Starlette cancels through an anyio cancel scope while the build runs.
+
+    The scope cancels every await again, so the finally block cannot wait
+    in place. The close must still run after the constructor, which
+    connects the manager, so the connection it opens is closed.
+    """
+    started, release, order = blocked_build
 
     async def disconnect_during_build():
-        async def drain():
-            async for _ in server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")):
-                pass
-
         async with anyio.create_task_group() as group:
-            group.start_soon(drain)
+            group.start_soon(_drain_invoke)
             await anyio.to_thread.run_sync(started.wait)
             group.cancel_scope.cancel()
         release.set()
@@ -175,6 +185,29 @@ def test_cancel_during_the_build_closes_the_manager_after_the_build(
                 await anyio.sleep(0.01)
 
     anyio.run(disconnect_during_build)
+    assert order == ["built", "closed"]
+
+
+def test_task_cancel_during_the_build_closes_the_manager_after_the_build(manager, blocked_build):
+    """The AgentCore SDK cancels the handler task once on a disconnect.
+
+    It runs the handler as a plain asyncio task on its worker loop and calls
+    ``task.cancel()`` once. The finally block then waits for the build and
+    closes the manager before the task ends.
+    """
+    started, release, order = blocked_build
+
+    async def disconnect_during_build():
+        task = asyncio.create_task(_drain_invoke())
+        await asyncio.to_thread(started.wait)
+        task.cancel()
+        await asyncio.sleep(0.05)
+        assert order == []
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 5)
+
+    asyncio.run(disconnect_during_build())
     assert order == ["built", "closed"]
 
 

@@ -27,6 +27,8 @@ fleet-supervisor-invoke = "fleet_supervisor.client.invoke:main"
 
 [dependency-groups]
 dev = [
+    # tests/test_server.py cancels a request through an anyio task group.
+    "anyio>=4.16.0",
     "pytest>=8.0",
     # agent.sh parses ../.env with it for the deploy settings.
     "python-dotenv>=1.2.4",

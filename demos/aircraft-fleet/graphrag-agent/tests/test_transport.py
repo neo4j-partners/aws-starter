@@ -147,10 +147,57 @@ def test_error_event_is_collected() -> None:
     assert _result(content, errors) == {"status": "error", "errors": ["boom"]}
 
 
-def test_trailing_event_without_blank_line() -> None:
-    raw = [b'data: {"type": "chunk", "data": "tail"}']
-    content, _ = _consume_sse(raw, stream=False)
-    assert content == ["tail"]
+@pytest.mark.parametrize(
+    "tail",
+    [
+        b'data: {"type": "chunk", "data": "tail"}',
+        b'data: {"type": "chunk", "data": "tail"}\n',
+        b'data: {"type": "complete"}\n',
+    ],
+)
+def test_trailing_block_without_blank_line_is_discarded(tail: bytes, caplog) -> None:
+    raw = [_event({"type": "chunk", "data": "ok"}), tail]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["ok"]
+    assert errors == [transport.TRUNCATED_STREAM]
+    assert "Response stream ended inside an event" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        [b"\xef\xbb\xbf" + _event({"type": "chunk", "data": "a"}), COMPLETE],
+        # The byte order mark split across two chunks.
+        [b"\xef", b"\xbb\xbf" + _event({"type": "chunk", "data": "a"}), COMPLETE],
+    ],
+)
+def test_leading_byte_order_mark_is_dropped(raw: list[bytes]) -> None:
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["a"]
+    assert errors == []
+
+
+def test_sdk_error_event_without_type_is_an_error(caplog) -> None:
+    sdk_error = {
+        "error": "boom",
+        "error_type": "RuntimeError",
+        "message": "An error occurred during streaming",
+    }
+    raw = [_event({"type": "chunk", "data": "partial"}), _event(sdk_error)]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["partial"]
+    assert errors == ["boom"]
+    assert "Response stream" not in caplog.text
+
+
+@pytest.mark.parametrize("value", [None, 42, ["boom"], {"text": "boom"}])
+def test_error_event_without_string_text_is_skipped_with_a_warning(value: object, caplog) -> None:
+    raw = [_event({"type": "chunk", "data": "partial"}), _event({"type": "error", "error": value})]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["partial"]
+    # With the error skipped, the stream has no final event, so it was cut off.
+    assert errors == [transport.TRUNCATED_STREAM]
+    assert "Skipped an error event whose error is" in caplog.text
 
 
 def test_bare_json_without_data_field_is_ignored() -> None:

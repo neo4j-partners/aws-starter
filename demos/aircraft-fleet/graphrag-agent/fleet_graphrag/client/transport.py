@@ -176,10 +176,13 @@ def _handle_sse_event(
 ) -> str | None:
     """Dispatch one SSE event block, printing ``chunk`` text live when streaming.
 
-    The event data is one of the four JSON objects the server sends. An event
-    with no data, or data that is not JSON, is ignored. A JSON value that is not
-    an object, or a chunk whose data is not a string, is skipped with a warning.
-    Returns the event's ``type``, or None when the event was ignored or skipped.
+    The event data is one of the four JSON objects the server sends, or the
+    error object the AgentCore SDK sends when the handler raises mid-stream.
+    That object has ``error`` and ``error_type`` but no ``type``, and counts
+    as an error event. An event with no data, or data that is not JSON, is
+    ignored. A JSON value that is not an object, or a chunk or error event
+    whose text is not a string, is skipped with a warning. Returns the event's
+    ``type``, or None when the event was ignored or skipped.
     """
     text = _event_data(event)
     if text is None:
@@ -192,6 +195,8 @@ def _handle_sse_event(
         logger.warning("Skipped an SSE event whose data is a JSON %s", type(data).__name__)
         return None
     kind = data.get("type")
+    if kind is None and "error" in data:
+        kind = "error"
     if kind == "chunk":
         chunk = data.get("data")
         if not isinstance(chunk, str):
@@ -208,7 +213,11 @@ def _handle_sse_event(
             name = data.get("name", "")
             print(f"\n\n  → {name}\n", end="\n", flush=True)
     elif kind == "error":
-        errors.append(data.get("error", "Unknown error"))
+        message = data.get("error", "Unknown error")
+        if not isinstance(message, str):
+            logger.warning("Skipped an error event whose error is %s", type(message).__name__)
+            return None
+        errors.append(message)
     return kind if isinstance(kind, str) else None
 
 
@@ -220,6 +229,9 @@ def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list
     """Parse ``data: {...}\\n\\n`` events off a byte iterator as they arrive.
 
     Lines may end in ``\\r\\n``, ``\\r``, or ``\\n``, as the SSE format allows.
+    A leading UTF-8 byte order mark is dropped, as the format requires. A
+    final block with no blank line after it is incomplete. It is discarded,
+    and the stream is reported as cut off.
     """
     content_parts: list[str] = []
     errors: list[str] = []
@@ -227,33 +239,40 @@ def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list
     # stream that ends with neither was cut off, even between two events.
     completed = False
     buffer = ""
+
+    def dispatch(text: str) -> str:
+        """Handle each finished event in ``text`` and return the unfinished rest."""
+        nonlocal completed
+        *events, rest = text.split("\n\n")
+        for event in events:
+            kind = _handle_sse_event(event, content_parts, errors, stream)
+            completed = completed or kind == "complete"
+        return rest
+
     # A trailing \r may be the first half of a \r\n split across two chunks,
     # so it waits for the next chunk before it is normalized.
     held_cr = ""
     # A multibyte character can straddle two chunks. The incremental decoder
     # holds the partial bytes until the rest of the character arrives. Invalid
-    # bytes become U+FFFD instead of ending the stream.
-    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    # bytes become U+FFFD instead of ending the stream. The utf-8-sig codec
+    # drops a byte order mark at the start of the stream, even a split one.
+    decoder = codecs.getincrementaldecoder("utf-8-sig")(errors="replace")
     for raw in chunks:
         text = held_cr + decoder.decode(raw)
         held_cr = "\r" if text.endswith("\r") else ""
-        buffer += _normalize_newlines(text.removesuffix(held_cr))
-        while "\n\n" in buffer:
-            event, buffer = buffer.split("\n\n", 1)
-            kind = _handle_sse_event(event, content_parts, errors, stream)
-            completed = completed or kind == "complete"
+        buffer = dispatch(buffer + _normalize_newlines(text.removesuffix(held_cr)))
     # Bytes still pending here are the start of a character the stream never
     # finished, so the response was cut off.
     pending_bytes, _ = decoder.getstate()
-    buffer += _normalize_newlines(held_cr + decoder.decode(b"", final=True))
-    if buffer.strip():
-        kind = _handle_sse_event(buffer, content_parts, errors, stream)
-        completed = completed or kind == "complete"
+    buffer = dispatch(buffer + _normalize_newlines(held_cr + decoder.decode(b"", final=True)))
+    partial_event = bool(buffer.strip())
     if pending_bytes:
         logger.warning("Response stream ended inside a UTF-8 character")
+    elif partial_event:
+        logger.warning("Response stream ended inside an event")
     elif not (completed or errors):
         logger.warning("Response stream ended before the complete event")
-    if pending_bytes or not (completed or errors):
+    if pending_bytes or partial_event or not (completed or errors):
         errors.append(TRUNCATED_STREAM)
     if stream:
         print()  # terminate the streamed line

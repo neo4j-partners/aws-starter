@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from neo4j import (
     READ_ACCESS,
     Driver,
+    ManagedTransaction,
     NotificationDisabledClassification,
     Query,
     Record,
@@ -163,6 +164,25 @@ def _pattern_check_queries(candidates: list[tuple[str, str, str]]) -> list[str]:
     ]
 
 
+def _read_node_properties(tx: ManagedTransaction) -> list[dict[str, Any]]:
+    return tx.run(_NODE_PROPERTIES_Q).data()
+
+
+def _read_visualization(tx: ManagedTransaction) -> Record:
+    return tx.run(_SCHEMA_VISUALIZATION_Q).single(strict=True)
+
+
+def _read_facts(
+    tx: ManagedTransaction, check_queries: list[str]
+) -> tuple[list[int], list[list[dict[str, Any]]]]:
+    """Return the candidate indexes the data has, then the model, tail, operator, and airport rows."""
+    found = [row["candidate"] for query in check_queries for row in tx.run(query).data()]
+    facts = [
+        tx.run(query).data() for query in (_MODELS_Q, _SAMPLE_TAILS_Q, _OPERATORS_Q, _AIRPORTS_Q)
+    ]
+    return found, facts
+
+
 def graph_schema(driver: Driver, database: str) -> str:
     """Describe the graph's labels, properties, and relationships for the LLM.
 
@@ -181,7 +201,7 @@ def graph_schema(driver: Driver, database: str) -> str:
         default_access_mode=READ_ACCESS,
         notifications_disabled_classifications=[NotificationDisabledClassification.GENERIC],
     ) as session:
-        property_rows = session.run(_NODE_PROPERTIES_Q).data()
+        property_rows = session.execute_read(_read_node_properties)
         bookmarks = session.last_bookmarks()
     # On a partial database the fact queries can name a label or property
     # key that does not exist yet. The empty result is expected, so the
@@ -193,16 +213,11 @@ def graph_schema(driver: Driver, database: str) -> str:
         notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
         bookmarks=bookmarks,
     ) as session:
-        candidates = _candidate_patterns(session.run(_SCHEMA_VISUALIZATION_Q).single(strict=True))
-        found = [
-            row["candidate"]
-            for query in _pattern_check_queries(candidates)
-            for row in session.run(query).data()
-        ]
-        model_rows = session.run(_MODELS_Q).data()
-        tail_rows = session.run(_SAMPLE_TAILS_Q).data()
-        operator_rows = session.run(_OPERATORS_Q).data()
-        airport_rows = session.run(_AIRPORTS_Q).data()
+        # _candidate_patterns prints any skipped patterns, so it runs outside
+        # the transaction functions, which the driver may retry.
+        candidates = _candidate_patterns(session.execute_read(_read_visualization))
+        found, facts = session.execute_read(_read_facts, _pattern_check_queries(candidates))
+        model_rows, tail_rows, operator_rows, airport_rows = facts
 
     # A label whose nodes have no properties comes back once with a null
     # propertyName. It is listed with an empty property set.

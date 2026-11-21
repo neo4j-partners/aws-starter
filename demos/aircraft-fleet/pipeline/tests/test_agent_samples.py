@@ -19,7 +19,13 @@ from neo4j import (
     Query,
     RoutingControl,
 )
-from neo4j.exceptions import Forbidden, ServiceUnavailable, SessionExpired
+from neo4j.exceptions import (
+    DriverError,
+    Forbidden,
+    Neo4jError,
+    ServiceUnavailable,
+    SessionExpired,
+)
 
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
@@ -74,9 +80,13 @@ class SchemaDriver:
         operators: list[str] = (),
         airports: list[str] = (),
         schema_error: Exception | None = None,
+        schema_error_times: int | None = None,
         extra_candidates: list[int] = (),
     ) -> None:
         self.schema_error = schema_error
+        # How many queries raise schema_error before the rest succeed. None
+        # means every query raises it.
+        self.schema_error_times = schema_error_times
         # Indexes every pattern check returns on top of the real matches.
         self.extra_candidates = list(extra_candidates)
         self.rows = {
@@ -121,9 +131,22 @@ class _SchemaSession:
     def __exit__(self, *exc: object) -> None:
         return None
 
+    def execute_read(self, work: Any, *args: Any) -> Any:
+        """Run work in a transaction, retrying a retryable error as the driver does."""
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                return work(SimpleNamespace(run=self.run), *args)
+            except (DriverError, Neo4jError) as exc:
+                if not exc.is_retryable() or attempt == attempts - 1:
+                    raise
+        raise AssertionError("unreachable")
+
     def run(self, cypher: str) -> SimpleNamespace:
         self.queries.append(cypher)
-        if self.driver.schema_error is not None:
+        if self.driver.schema_error is not None and self.driver.schema_error_times != 0:
+            if self.driver.schema_error_times is not None:
+                self.driver.schema_error_times -= 1
             raise self.driver.schema_error
         if cypher == agent_samples._SCHEMA_VISUALIZATION_Q:
             record = _visualization(self.driver.relationship_rows)
@@ -618,6 +641,25 @@ def test_schema_read_connection_error_skips_only_the_text2cypher_questions(
     assert out.count("[SKIP] No graph schema") == len(_questions("text2cypher"))
     similarity = [sq.question for sq in _questions("similarity_search")]
     assert [user for _, user in chats] == similarity
+
+
+def test_schema_read_retries_after_a_session_expires() -> None:
+    # A transient error, such as a dropped routing session, is retried
+    # inside a read transaction instead of failing the whole schema read.
+    driver = SchemaDriver(
+        property_rows=[(["Aircraft"], "tail_number")],
+        relationship_rows=[(["Aircraft"], "HAS_SYSTEM", ["System"])],
+        models=["B737-800"],
+        schema_error=SessionExpired("session expired"),
+        schema_error_times=1,
+    )
+
+    schema = graph_schema(driver, "db")
+    lines = schema.splitlines()
+
+    assert "- Aircraft {tail_number}" in lines
+    assert "- (Aircraft)-[:HAS_SYSTEM]->(System)" in lines
+    assert _prompt_line(schema, "Aircraft models") == ["B737-800"]
 
 
 @pytest.mark.parametrize(

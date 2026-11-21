@@ -225,16 +225,29 @@ class _Open:
     error: BaseException | None = None
 
 
-class SharedMemoryOpenError(RuntimeError):
-    """The shared client failed to open.
+class MemoryClientError(RuntimeError):
+    """A failure on a shared client, with the settings that client used.
 
-    ``settings`` are the ones the failed open used, which may belong to
-    another request. The open's error is the cause.
+    The settings may belong to another request. The failure is the cause.
     """
 
-    def __init__(self, settings: MemorySettings) -> None:
-        super().__init__("Opening the shared memory client failed.")
+    def __init__(self, message: str, settings: MemorySettings) -> None:
+        super().__init__(message)
         self.settings = settings
+
+
+class SharedMemoryOpenError(MemoryClientError):
+    """The shared client failed to open."""
+
+    def __init__(self, settings: MemorySettings) -> None:
+        super().__init__("Opening the shared memory client failed.", settings)
+
+
+class MemorySessionError(MemoryClientError):
+    """A session on the shared client failed, after the client opened."""
+
+    def __init__(self, settings: MemorySettings) -> None:
+        super().__init__("A memory session on the shared client failed.", settings)
 
 
 # The client new sessions use, or None until the next open. The open in
@@ -261,6 +274,11 @@ class MemorySession:
         self.manager = manager
         self._shared = shared
         self._released = False
+
+    @property
+    def settings(self) -> MemorySettings:
+        """The settings the session's client opened with."""
+        return self._shared.settings
 
     def close(self) -> None:
         """Close the manager, then release the client, even if the close fails."""

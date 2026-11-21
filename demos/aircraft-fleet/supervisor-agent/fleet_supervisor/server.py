@@ -69,8 +69,9 @@ from fleet_supervisor.core.mcp import (  # noqa: E402
     build_mcp_client,
 )
 from fleet_supervisor.core.memory import (  # noqa: E402
+    MemoryClientError,
     MemorySession,
-    SharedMemoryOpenError,
+    MemorySessionError,
     build_session_manager,
     close_shared_memory,
     forget_memory_settings,
@@ -303,8 +304,8 @@ def _build_agent(
     Neo4j rejects the password, the cached one may predate a secret
     rotation. So this drops it and retires the client that opened with it,
     unless another request already did, and builds once more with the
-    current settings. When the shared client failed to open, the rejected
-    password is the one that open used, which may be another request's.
+    current settings. The rejected password is the one the shared client
+    used, which may be another request's.
     """
     settings = memory_settings()
     try:
@@ -312,7 +313,7 @@ def _build_agent(
     except Exception as error:
         if not password_rejected(error):
             raise
-        if isinstance(error, SharedMemoryOpenError):
+        if isinstance(error, MemoryClientError):
             settings = error.settings
     # Outside the except block, so a second failure does not chain the first.
     logger.warning("Neo4j rejected the memory password; reading it again")
@@ -326,16 +327,20 @@ def _build_agent_once(
     """Build the memory session and the supervisor once.
 
     If the build fails, this closes the session before raising, so the
-    caller only closes a session it gets back.
+    caller only closes a session it gets back. Neo4j can reject the
+    password while the supervisor restores the session. That raises a
+    MemorySessionError with the settings the session's client used.
     """
     session = build_session_manager(session_id, user_id, settings, track_background_task)
     try:
         supervisor = build_supervisor(
             runtime.model, runtime.tools, session.manager if session is not None else None
         )
-    except BaseException:
+    except BaseException as error:
         if session is not None:
             _close_logged(session)
+            if isinstance(error, Exception) and password_rejected(error):
+                raise MemorySessionError(session.settings) from error
         raise
     return supervisor, session
 

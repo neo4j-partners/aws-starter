@@ -61,8 +61,9 @@ def supervisor(monkeypatch):
 
 
 class FakeManager:
-    def __init__(self, close_error: Exception | None = None):
+    def __init__(self, close_error: Exception | None = None, settings=None):
         self.close_error = close_error
+        self.settings = settings
         self.closed = 0
 
     @property
@@ -316,7 +317,7 @@ def password_retry(monkeypatch, supervisor):
     forgotten: list[bool] = []
 
     def new_manager(session_id, user_id, settings, background_hook):
-        managers.append(FakeManager())
+        managers.append(FakeManager(settings=settings))
         return managers[-1]
 
     monkeypatch.setattr(server, "build_session_manager", new_manager)
@@ -352,7 +353,7 @@ def test_concurrent_rejections_of_one_password_read_it_again_once(supervisor, mo
     monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
 
     def new_manager(session_id, user_id, settings, background_hook):
-        manager = FakeManager()
+        manager = FakeManager(settings=settings)
         manager.password = settings.neo4j.password.get_secret_value()
         return manager
 
@@ -384,6 +385,80 @@ def test_concurrent_rejections_of_one_password_read_it_again_once(supervisor, mo
     assert forgotten == [True]
 
 
+class FakeMemoryClient:
+    """A shared memory client whose session managers know its password."""
+
+    def __init__(self, settings) -> None:
+        self.settings = settings
+        self.password = settings.neo4j.password.get_secret_value()
+        self.closes = 0
+
+    def session_manager(self, session_id, **kwargs):
+        return SimpleNamespace(password=self.password, close=lambda: None)
+
+    def close(self, timeout: float = 30.0) -> None:
+        self.closes += 1
+
+
+def test_a_rejected_restore_forgets_the_password_its_client_used(supervisor, monkeypatch):
+    """A request with new settings can still get a client opened with old ones.
+
+    Another request dropped the p1 settings but has not yet retired the p1
+    client. R reads p2, takes the p1 client, and Neo4j rejects the restore.
+    R must forget p1, so the p2 settings stay and R opens a p2 client.
+    """
+    from fleet_supervisor.core import memory
+
+    for name, value in [
+        ("_settings", None),
+        ("_settings_build", None),
+        ("_shared", None),
+        ("_shared_open", None),
+        ("_retired", set()),
+        ("_closers", set()),
+        ("_shutting_down", False),
+    ]:
+        monkeypatch.setattr(memory, name, value)
+    monkeypatch.delenv("MEM_NEO4J_PASSWORD_SECRET_ARN", raising=False)
+    monkeypatch.setenv("MEM_NEO4J_URI", "bolt://127.0.0.1:37687")
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "p1")
+    monkeypatch.setattr(memory, "forget_secrets", lambda: None)
+    for name in ("memory_settings", "forget_memory_settings", "build_session_manager"):
+        monkeypatch.setattr(server, name, getattr(memory, name))
+    clients: list[FakeMemoryClient] = []
+
+    def fake_open(settings, *, background_hook=None):
+        clients.append(FakeMemoryClient(settings))
+        return clients[-1]
+
+    monkeypatch.setattr(memory, "SharedMemory", SimpleNamespace(open=fake_open))
+    p1 = memory.memory_settings()
+    memory.build_session_manager("s0", "u1", p1, None).close()
+    # Another request dropped p1, but has not retired the p1 client yet.
+    with monkeypatch.context() as paused:
+        paused.setattr(memory, "_retire_shared", lambda failed: None)
+        memory.forget_memory_settings(p1)
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD", "p2")
+    p2 = memory.memory_settings()
+
+    def build(model, tools, session_manager=None):
+        if session_manager.password == "p1":
+            raise password_rejected_error()
+        return supervisor
+
+    monkeypatch.setattr(server, "build_supervisor", build)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+
+    assert events[-1] == {"type": "complete"}
+    assert memory.memory_settings() is p2
+    [old, new] = clients
+    assert old.password == "p1" and new.password == "p2"
+    assert memory._shared is not None and memory._shared.memory is new
+    assert new.closes == 0
+    memory.close_shared_memory()
+    assert old.closes == 1
+
+
 def test_a_password_rejected_twice_fails_without_a_third_try(
     supervisor, password_retry, monkeypatch, caplog
 ):
@@ -400,7 +475,14 @@ def test_a_password_rejected_twice_fails_without_a_third_try(
     # The second failure is raised on its own, not chained to the first.
     [failed] = [r for r in caplog.records if r.getMessage() == "Request failed"]
     assert failed.exc_info is not None
-    assert failed.exc_info[1].__context__ is None
+    raised = failed.exc_info[1]
+    assert isinstance(raised, server.MemorySessionError)
+    chain = []
+    error = raised
+    while error is not None:
+        chain.append(error)
+        error = error.__cause__ or error.__context__
+    assert sum(str(e) == "Failed to initialize session 's1'" for e in chain) == 1
 
 
 def test_a_rejected_open_forgets_the_password_the_open_used(supervisor, monkeypatch):

@@ -90,7 +90,9 @@ esac
 
 # rm, cp, mv, and awk pass through to the real command. STUB_INTERRUPT_AFTER
 # =cmd:N sends SIGINT to agent.sh right after the Nth call of cmd, the same as
-# a Ctrl+C.
+# a Ctrl+C. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
+# name right after the Nth rm of that name. STUB_RECORD_STRIP_MODE makes awk
+# record the copy's mode while the copy exists.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
 real=/bin/"$name"
@@ -102,6 +104,23 @@ count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
 if [ "${STUB_INTERRUPT_AFTER:-}" = "$name:$count" ]; then
     kill -s INT "$PPID"
+fi
+if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
+    case "${!#}" in
+        *.env.local.strip.*)
+            counter="${STUB_LOG%/*}/strip-rm-calls"
+            count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+            echo "$count" > "$counter"
+            if [ "$count" = "$STUB_PLANT_AFTER_STRIP_RM" ]; then
+                printf 'PLANTED=1\n' > "${!#}"
+            fi
+            ;;
+    esac
+fi
+if [ "$name" = awk ] && [ -n "${STUB_RECORD_STRIP_MODE:-}" ]; then
+    for copy in agentcore/.env.local.strip.*; do
+        [ -f "$copy" ] && stat -f %Lp "$copy" >> "${STUB_LOG%/*}/strip-modes"
+    done
 fi
 exit "$status"
 """
@@ -161,12 +180,14 @@ def project(tmp_path: Path) -> Path:
     return root
 
 
-def run_destroy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[str]:
-    return run_agent(project, "destroy", "--yes", **stub_env)
+def run_destroy(
+    project: Path, umask: int = -1, **stub_env: str
+) -> subprocess.CompletedProcess[str]:
+    return run_agent(project, "destroy", "--yes", umask=umask, **stub_env)
 
 
 def run_agent(
-    project: Path, *args: str, stdin: str = "", **stub_env: str
+    project: Path, *args: str, stdin: str = "", umask: int = -1, **stub_env: str
 ) -> subprocess.CompletedProcess[str]:
     temp_dir = project.parent / "tmp"
     temp_dir.mkdir(exist_ok=True)
@@ -187,6 +208,7 @@ def run_agent(
         input=stdin,
         timeout=60,
         check=False,
+        umask=umask,
     )
 
 
@@ -509,6 +531,45 @@ def test_anything_left_at_the_copy_name_does_not_stop_the_strip(
     assert env_local.read_text() == "A=1\n"
     assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
     assert not list(env_local.parent.glob(".env.local.*"))
+
+
+# set -C refuses a file that appears at the copy's name between the strip's
+# remove and its create. The deploy stops, and on_exit's restore strips the
+# line with a fresh copy.
+def test_a_file_made_at_the_copy_name_after_the_remove_is_refused(project: Path) -> None:
+    ready_to_deploy(project)
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o600)
+
+    result = run_agent(
+        project,
+        "deploy",
+        STUB_STACK_STATUS="https://cognito-idp.example/.well-known/openid-configuration",
+        STUB_PLANT_AFTER_STRIP_RM="1",
+    )
+
+    assert result.returncode == 1
+    assert "cannot overwrite existing file" in result.stderr
+    assert not any(
+        call.startswith(("agentcore add", "agentcore deploy")) for call in calls(project)
+    )
+    assert env_local.read_text() == "A=1\n"
+    assert not list(env_local.parent.glob(".env.local.*"))
+
+
+# umask 077 creates the copy with mode 0600, so the filtered lines are never
+# readable by others, even before chmod.
+def test_the_copy_is_0600_while_it_exists_under_a_wide_umask(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o600)
+
+    result = run_destroy(project, umask=0o022, STUB_RECORD_STRIP_MODE="1")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (project.parent / "strip-modes").read_text() == "600\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
 
 
 def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:

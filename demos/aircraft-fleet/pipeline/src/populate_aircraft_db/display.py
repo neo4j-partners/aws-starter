@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -19,12 +20,9 @@ def header(title: str, description: str) -> None:
 
 def show_cypher(query: str, label: str = "Cypher") -> None:
     """Print a query under a label, with its common indentation removed."""
-    lines = query.strip().splitlines()
-    indents = [len(ln) - len(ln.lstrip()) for ln in lines if ln.strip()]
-    base = min(indents) if indents else 0
     print(f"  {label}:")
-    for ln in lines:
-        print(f"    {ln[base:]}")
+    for ln in textwrap.dedent(query).strip().splitlines():
+        print(f"    {ln}")
     print()
 
 

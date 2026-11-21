@@ -37,3 +37,21 @@ def test_show_cypher_indents_under_its_label(capsys: pytest.CaptureFixture[str])
     assert capsys.readouterr().out == (
         "  Generated Cypher:\n    MATCH (a)\n      WHERE a.x\n    RETURN a\n\n"
     )
+
+
+def test_show_cypher_removes_the_indent_of_an_indented_multiline_query(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    query = """
+        MATCH (a:Aircraft)
+          WHERE a.model = $model
+        RETURN a.tail_number
+    """
+    show_cypher(query)
+    assert capsys.readouterr().out == (
+        "  Cypher:\n"
+        "    MATCH (a:Aircraft)\n"
+        "      WHERE a.model = $model\n"
+        "    RETURN a.tail_number\n"
+        "\n"
+    )

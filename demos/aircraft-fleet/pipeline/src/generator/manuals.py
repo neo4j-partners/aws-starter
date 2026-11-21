@@ -332,11 +332,14 @@ def _phase_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
 
 
 def _fuel_flow_range(model: str, engine: EngineSpec, stats: Stats) -> str:
-    """§3.2.4: the fuel pump's flow range, from ground idle to takeoff."""
-    bounds = [
-        float(value) for cell in engine.phase_limits["FuelFlow (kg/s)"] for value in cell.split("-")
-    ]
-    return f"**Flow Rate:** {min(bounds):.2f} - {max(bounds):.2f} kg/s (ground idle to takeoff)"
+    """§3.2.4: the fuel pump's flow range, from ground idle to takeoff.
+
+    The low end is the ground idle cell's low, and the high end is the
+    takeoff cell's high, so the range matches its label.
+    """
+    cells = engine.phase_limits["FuelFlow (kg/s)"]
+    low, high = float(cells[0].split("-")[0]), float(cells[-1].split("-")[-1])
+    return f"**Flow Rate:** {low:.2f} - {high:.2f} kg/s (ground idle to takeoff)"
 
 
 def _egt_row(label: str, band: EgtBand) -> tuple[str, ...]:

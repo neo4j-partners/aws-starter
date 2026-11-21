@@ -677,6 +677,27 @@ def test_the_fuel_flow_range_runs_from_ground_idle_to_takeoff() -> None:
     )
 
 
+def test_the_fuel_flow_range_reads_the_ground_idle_low_and_the_takeoff_high() -> None:
+    engine = ENGINE_SPECS["A320-200"]
+    cells = ("0.10-0.20", "0.05-0.30", "0.80-2.40", "1.20-1.50")
+    engine = dataclasses.replace(
+        engine, phase_limits={**engine.phase_limits, "FuelFlow (kg/s)": cells}
+    )
+
+    assert manuals.RENDERERS["fuel-flow-range"]("A320-200", engine, {}) == (
+        "**Flow Rate:** 0.10 - 1.50 kg/s (ground idle to takeoff)"
+    )
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_ground_idle_and_takeoff_are_the_fuel_flow_extremes(model: str) -> None:
+    cells = ENGINE_SPECS[model].phase_limits["FuelFlow (kg/s)"]
+    values = [float(value) for cell in cells for value in cell.split("-")]
+
+    assert float(cells[0].split("-")[0]) == min(values)
+    assert float(cells[-1].split("-")[-1]) == max(values)
+
+
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
 def test_the_fuel_flow_range_holds_every_phase_and_the_cruise_baseline(model: str) -> None:
     engine = ENGINE_SPECS[model]

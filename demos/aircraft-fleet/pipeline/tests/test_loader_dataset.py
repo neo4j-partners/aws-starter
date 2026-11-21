@@ -17,9 +17,11 @@ from urllib.parse import urlparse
 
 import pytest
 from neo4j import Driver, GraphDatabase
+from neo4j.exceptions import ConstraintError
 
 from generator import stamp
 from populate_aircraft_db import loader
+from populate_aircraft_db.schema import create_constraints
 
 TEST_URI = os.environ.get("NEO4J_TEST_URI", "")
 LOCAL_HOSTS = {"localhost", "127.0.0.1"}
@@ -57,7 +59,8 @@ def no_csv_load(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _datasets(driver: Driver, database: str) -> list[dict]:
     records, _, _ = driver.execute_query(
-        "MATCH (d:Dataset) RETURN d.generator_hash AS hash, d.stamp AS stamp", database_=database
+        "MATCH (d:Dataset) RETURN d.id AS id, d.generator_hash AS hash, d.stamp AS stamp",
+        database_=database,
     )
     return [record.data() for record in records]
 
@@ -72,8 +75,17 @@ def test_load_replaces_the_dataset_node_with_the_current_stamp(
     loader.load_operational_graph(driver, database, tmp_path)
 
     (dataset,) = _datasets(driver, database)
+    assert dataset["id"] == "current"
     assert dataset["hash"] == "abc123"
     assert json.loads(dataset["stamp"]) == STAMP
+
+
+def test_the_schema_allows_one_current_dataset_node(driver: Driver, database: str) -> None:
+    create_constraints(driver, database)
+    driver.execute_query("CREATE (:Dataset {id: 'current'})", database_=database)
+
+    with pytest.raises(ConstraintError):
+        driver.execute_query("CREATE (:Dataset {id: 'current'})", database_=database)
 
 
 @pytest.mark.usefixtures("no_csv_load")

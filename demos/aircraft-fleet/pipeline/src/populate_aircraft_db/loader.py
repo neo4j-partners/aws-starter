@@ -445,7 +445,10 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
         )
         return
     driver.execute_query(
-        "CREATE (:Dataset {generator_hash: $hash, stamp: $stamp, loaded_at: datetime()})",
+        """
+        MERGE (d:Dataset {id: 'current'})
+        SET d += {generator_hash: $hash, stamp: $stamp, loaded_at: datetime()}
+        """,
         hash=stamp.get("generator_hash"),
         stamp=json.dumps(stamp, sort_keys=True),
         database_=database,

@@ -88,6 +88,8 @@ CONSTRAINTS: list[tuple[str, str]] = [
     ("Removal", "removal_id"),
     ("Document", "documentId"),
     ("Chunk", "chunkId"),
+    # The load records its generator stamp on one Dataset node, id 'current'.
+    ("Dataset", "id"),
 ]
 
 # (label, property) pairs — property indexes for common lookups.

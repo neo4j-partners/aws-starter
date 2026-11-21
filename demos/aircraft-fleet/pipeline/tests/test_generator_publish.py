@@ -211,6 +211,32 @@ def test_generate_takes_the_lock_again_after_a_run(tmp_path: Path) -> None:
     assert stamp.read_stamp(tmp_path)["config"]["seed"] == 7
 
 
+def test_the_lock_is_held_while_the_run_publishes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A second open file must not get the lock while files are moved.
+    # test_generate_takes_the_lock_again_after_a_run cannot show this.
+    real_publish = generator_main._publish
+    blocked: list[bool] = []
+
+    def publish(work: Path, output: Path) -> None:
+        with (output / stamp.LOCK_NAME).open("a") as other:
+            try:
+                fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                blocked.append(True)
+            else:
+                blocked.append(False)
+        real_publish(work, output)
+
+    monkeypatch.setattr(generator_main, "_publish", publish)
+
+    _generate(tmp_path)
+
+    assert blocked == [True]
+    assert stamp.read_stamp(tmp_path) is not None
+
+
 def test_the_cli_shows_a_traceback_for_other_runtime_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

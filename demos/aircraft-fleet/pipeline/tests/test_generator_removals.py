@@ -22,8 +22,9 @@ from generator.removals import (
 
 
 def test_start_date_too_soon_after_entry_into_service_is_rejected() -> None:
-    # The latest A220-300 enters service on 2023-05-31. A window that opens
-    # a month later leaves fewer airframe hours than the install minimum.
+    # The latest A320-200 and A321neo enter service on 2023-12-31. A window
+    # that opens on 2023-07-01 comes before that, so those aircraft have no
+    # airframe hours at all.
     config = GeneratorConfig(n_aircraft=6, n_days=5, start_date=datetime(2023, 7, 1))
     fleet = generate_fleet(GeneratorConfig(n_aircraft=6))
 

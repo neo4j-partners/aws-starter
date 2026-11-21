@@ -1,0 +1,31 @@
+{
+  "name": "fleetsupervisor",
+  "version": 2,
+  "managedBy": "CDK",
+  "runtimes": [
+    {
+      "name": "supervisor",
+      "description": "Aircraft fleet supervisor with Maintenance and Operations specialists",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": ".",
+      "runtimeVersion": "PYTHON_3_12",
+      "envVars": [
+        {
+          "name": "MODEL_ID",
+          "value": "global.anthropic.claude-sonnet-5-5"
+        }
+      ],
+      "protocol": "HTTP"
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "harnesses": []
+}

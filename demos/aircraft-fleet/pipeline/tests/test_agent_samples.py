@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from collections.abc import Iterator
@@ -88,19 +89,22 @@ class SchemaDriver:
         }
         self.relationship_rows = list(relationship_rows)
         self.session_configs: list[dict[str, Any]] = []
+        self.session_queries: list[list[str]] = []
         self.check_queries: list[str] = []
 
     def session(self, **config: Any) -> _SchemaSession:
         self.session_configs.append(config)
-        return _SchemaSession(self)
+        self.session_queries.append([])
+        return _SchemaSession(self, self.session_queries[-1])
 
     def execute_query(self, cypher: str, /, **params: Any) -> tuple[list[dict], None, None]:
         return [], None, None
 
 
 class _SchemaSession:
-    def __init__(self, driver: SchemaDriver) -> None:
+    def __init__(self, driver: SchemaDriver, queries: list[str]) -> None:
         self.driver = driver
+        self.queries = queries
 
     def __enter__(self) -> _SchemaSession:
         return self
@@ -109,6 +113,7 @@ class _SchemaSession:
         return None
 
     def run(self, cypher: str) -> SimpleNamespace:
+        self.queries.append(cypher)
         if self.driver.schema_error is not None:
             raise self.driver.schema_error
         if cypher == agent_samples._SCHEMA_VISUALIZATION_Q:
@@ -379,18 +384,25 @@ def test_schema_value_hints_come_from_the_generator_specs(
     assert f"- {label} {{{prop}}}  ({prop}: {', '.join(values)})\n" in schema
 
 
-def test_schema_is_read_in_a_read_session_without_generic_notifications() -> None:
-    driver = SchemaDriver()
+def test_only_the_property_query_runs_without_generic_notifications() -> None:
+    # db.schema.nodeTypeProperties raises a GENERIC notice about its
+    # propertyTypes field. Other GENERIC notices still reach the log.
+    driver = SchemaDriver(relationship_rows=[(["Aircraft"], "HAS_SYSTEM", ["System"])])
 
     graph_schema(driver, "db")
 
+    read = {"database": "db", "default_access_mode": READ_ACCESS}
     assert driver.session_configs == [
         {
-            "database": "db",
-            "default_access_mode": READ_ACCESS,
+            **read,
             "notifications_disabled_classifications": [NotificationDisabledClassification.GENERIC],
-        }
+        },
+        read,
     ]
+    property_queries, other_queries = driver.session_queries
+    assert property_queries == [agent_samples._NODE_PROPERTIES_Q]
+    assert agent_samples._SCHEMA_VISUALIZATION_Q in other_queries
+    assert len(other_queries) == 6
 
 
 def test_run_agent_samples_sends_the_schema_prompt_with_every_cypher_question(
@@ -423,7 +435,8 @@ def test_run_agent_samples_sends_the_schema_prompt_with_every_cypher_question(
     prompt = system_prompt(graph_schema(SchemaDriver(**rows), "db"))
     cypher_questions = [sq.question for sq in SAMPLE_QUESTIONS if sq.tool == "text2cypher"]
     assert [user for system, user in chats if system == prompt] == cypher_questions
-    assert [config["database"] for config in driver.session_configs] == ["db"]
+    # One schema read, which opens two sessions.
+    assert [config["database"] for config in driver.session_configs] == ["db", "db"]
 
 
 def _run_samples(
@@ -569,7 +582,9 @@ def test_generated_write_is_rejected(driver: Driver, capsys: pytest.CaptureFixtu
         driver.execute_query(cleanup, database_=database)
 
 
-def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
+def test_graph_schema_reads_the_live_database(
+    driver: Driver, caplog: pytest.LogCaptureFixture
+) -> None:
     database = os.environ.get("NEO4J_TEST_DATABASE", "neo4j")
     cleanup = """
     MATCH (n)
@@ -596,9 +611,11 @@ def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
             database_=database,
         )
 
-        schema = graph_schema(driver, database)
+        with caplog.at_level(logging.INFO, logger="neo4j.notifications"):
+            schema = graph_schema(driver, database)
         lines = schema.splitlines()
 
+        assert [r for r in caplog.records if r.name == "neo4j.notifications"] == []
         assert "- PytestSchemaFrom {pytest_from}" in lines
         assert "- PytestSchemaTo {pytest_to}" in lines
         assert "- (PytestSchemaFrom)-[:PYTEST_SCHEMA_LINK]->(PytestSchemaTo)" in lines

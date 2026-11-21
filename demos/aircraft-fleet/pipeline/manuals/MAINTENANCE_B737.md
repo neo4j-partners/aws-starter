@@ -134,18 +134,28 @@ The B737-800 hydraulic system provides power for flight control surfaces, leadin
 
 ### 2.2 Engine Health Monitoring
 
-Each CFM56-7B engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each CFM56-7B engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
-| VIB | Engine Vibration | ips (inches/sec) | Fan frame, turbine frame |
-| N1Speed | Fan Speed | % RPM | Fan shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
+| Engine | Vibration | Engine Vibration | ips | Fan frame, turbine frame |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~658°C, warning threshold ~688°C) differ from the instantaneous EICAS EGT readings shown in Section 3.3 and Appendix 10.1, which reflect peak values during takeoff and high-power operations (typically 850–950°C for the CFM56-7B). The trend-monitoring scale detects gradual EGT margin deterioration over weeks and months rather than acute exceedances; the absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the CFM56-7B, the trend baseline is 658°C, with Advisory at 678°C, Caution at 688°C, and Warning at 698°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
+
+Instantaneous takeoff EGT peaks are typically 850–950°C for the CFM56-7B.
 
 **FADEC Integration:** The CFM56-7B features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation.
 

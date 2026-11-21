@@ -132,18 +132,26 @@ The A320-200 hydraulic system provides power for flight control surfaces, landin
 
 ### 2.2 Engine Health Monitoring
 
-Each V2500 engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each V2500-A1 engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust |
-| VIB | Engine Vibration | ips (inches/sec) | Fan case |
-| N1Speed | Fan Speed | % RPM | Fan shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust |
+| Engine | Vibration | Engine Vibration | ips | Fan case |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~645°C, warning threshold ~674°C) differ from the instantaneous ECAM EGT readings shown in Section 3.3 and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend-monitoring scale is used to detect gradual EGT margin deterioration over weeks and months rather than acute exceedances. Note: the digital twin dataset models this A320-200 variant as equipped with CFM56-5B engines; procedure steps in this manual reference the IAE V2500-A1 alternative powerplant.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the V2500-A1, the trend baseline is 560°C, with Advisory at 580°C, Caution at 590°C, and Warning at 600°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
 
 ### 2.3 Component Identification Schema
 

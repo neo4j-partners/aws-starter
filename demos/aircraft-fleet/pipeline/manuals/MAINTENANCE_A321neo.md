@@ -146,22 +146,28 @@ The A321neo hydraulic system provides power for flight control surfaces, slats/f
 
 ### 2.2 Engine Health Monitoring
 
-Each LEAP-1A engine is equipped with comprehensive monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each LEAP-1A engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | HPT exit (8 thermocouples) |
-| VIB | Engine Vibration | ips (inches/sec) | Fan case, core case |
-| N1Speed | Fan Speed | % RPM | Fan shaft |
-| N2 | Core Speed | % RPM | HP shaft |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
-| OIL-P | Oil Pressure | psi | Main oil gallery |
-| OIL-T | Oil Temperature | °C | Scavenge return |
-| OIL-Q | Oil Quantity | % | Oil tank |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | HPT exit (8 thermocouples) |
+| Engine | Vibration | Engine Vibration | ips | Fan case, core case |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering unit |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz flight data, 50 Hz vibration analysis)
 
-**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. These trend values (nominal baseline ~634°C, warning threshold ~663°C) differ from the instantaneous ECAM EGT readings shown in Section 3.4 and Appendix 10.1, which reflect peak values during takeoff and high-power operations (typically 950–1,040°C for the LEAP-1A). The trend-monitoring scale detects gradual EGT margin deterioration over weeks and months rather than acute exceedances; the absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the LEAP-1A, the trend baseline is 634°C, with Advisory at 654°C, Caution at 664°C, and Warning at 674°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
+
+Instantaneous takeoff EGT peaks are typically 950–1,040°C for the LEAP-1A.
 
 **Engine Monitoring Unit (EMU):** The LEAP-1A features an enhanced EMU providing:
 - Real-time trend monitoring

@@ -17,7 +17,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from .specs import ENGINE_SPECS, EngineSpec
+from .specs import ENGINE_SPECS, SYSTEM_SENSORS, EngineSpec, sensors_for
 
 MANUALS_DIR = Path(__file__).resolve().parent.parent.parent / "manuals"
 
@@ -33,11 +33,92 @@ MANUAL_FILES: dict[str, str] = {
 Stats = Mapping[str, Any]
 Renderer = Callable[[str, EngineSpec, Stats], str]
 
+# Where each sensor sits, as the manuals describe it. Only the manuals use
+# this, so it lives here and not in specs.
+_SENSOR_LOCATIONS: dict[str, str] = {
+    "EGT": "Turbine exhaust section",
+    "Vibration": "Fan frame, turbine frame",
+    "N1Speed": "Fan shaft",
+    "FuelFlow": "Fuel metering valve",
+    "BusVoltage": "DC essential bus",
+    "AirDataDisagree": "Captain and first officer air data sources",
+    "HydPressure": "System pressure manifold",
+    "HydQuantity": "Hydraulic reservoir",
+}
+_MODEL_SENSOR_LOCATIONS: dict[str, dict[str, str]] = {
+    "A220-300": {"N1Speed": "Fan shaft (gearbox output)"},
+    "A320-200": {
+        "EGT": "Turbine exhaust",
+        "Vibration": "Fan case",
+        "FuelFlow": "Fuel metering unit",
+    },
+    "A321neo": {
+        "EGT": "HPT exit (8 thermocouples)",
+        "Vibration": "Fan case, core case",
+        "FuelFlow": "Fuel metering unit",
+    },
+}
+_COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+
+def _count(n: int) -> str:
+    return _COUNT_WORDS.get(n, str(n))
+
+
+def _sensor_location(model: str, sensor_type: str) -> str:
+    return _MODEL_SENSOR_LOCATIONS.get(model, {}).get(sensor_type, _SENSOR_LOCATIONS[sensor_type])
+
+
+def _sensor_table(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§2.2: every generated sensor, by system, with its unit and location."""
+    counts = {system: len(sensors_for(system, model)) for system in SYSTEM_SENSORS}
+    others = sorted(system for system in counts if system != "Engine")
+    if len({counts[system] for system in others}) == 1:
+        rest = f"The {' and '.join(others)} systems carry {_count(counts[others[0]])} sensors each."
+    else:
+        rest = " ".join(
+            f"The {system} system carries {_count(counts[system])} sensors." for system in others
+        )
+    lines = [
+        f"Each {engine.engine_type} engine carries {_count(counts['Engine'])} monitoring "
+        f"sensors. {rest} The digital twin records every sensor hourly.",
+        "",
+        "| System | Sensor Type | Parameter | Unit | Location |",
+        "|--------|-------------|-----------|------|----------|",
+    ]
+    for system in SYSTEM_SENSORS:
+        for spec in sensors_for(system, model):
+            location = _sensor_location(model, spec.type)
+            lines.append(f"| {system} | {spec.type} | {spec.name} | {spec.unit} | {location} |")
+    return "\n".join(lines)
+
+
+def _egt_trend_note(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§2.2: the hourly EGT trend scale, with its baseline and bands."""
+    egt = next(s for s in engine.sensors if s.type == "EGT")
+    b = egt.bands
+    return (
+        "**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records "
+        "hourly trend-averaged EGT values on a normalized scale calibrated for long-term "
+        f"degradation detection. For the {engine.engine_type}, the trend baseline is "
+        f"{egt.baseline:g}°C, with Advisory at {b.advisory:g}°C, Caution at "
+        f"{b.caution:g}°C, and Warning at {b.warning:g}°C. These trend values differ from "
+        "the instantaneous EGT limits in the Normal Operating Parameters table and "
+        "Appendix 10.1, which reflect peak values during takeoff and high-power "
+        "operations. The trend scale detects gradual EGT margin deterioration over weeks "
+        "and months, not acute exceedances. The absolute limits in this manual refer to "
+        "instantaneous FADEC-monitored readings."
+    )
+
+
 # Block id -> renderer. Each takes (model, engine spec, fleet stats).
-RENDERERS: dict[str, Renderer] = {}
+RENDERERS: dict[str, Renderer] = {
+    "sensor-table": _sensor_table,
+    "egt-trend-note": _egt_trend_note,
+}
 
 # Blocks every manual must have, once each.
-REQUIRED_BLOCKS: tuple[str, ...] = ()
+REQUIRED_BLOCKS: tuple[str, ...] = tuple(RENDERERS)
 
 _MARKER = re.compile(r"^<!-- (BEGIN|END) GENERATED: ([a-z0-9-]+) -->$")
 # A line that looks like a marker but does not match _MARKER exactly.

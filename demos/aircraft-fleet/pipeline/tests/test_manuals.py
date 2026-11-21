@@ -14,7 +14,7 @@ from typer.testing import CliRunner
 from generator import main as generator_main
 from generator import manuals
 from generator.manuals import ManualBlockError, render_text
-from generator.specs import ENGINE_SPECS
+from generator.specs import ENGINE_SPECS, SYSTEM_SENSORS, sensors_for
 from populate_aircraft_db.pipeline import DOCUMENTS, read_manual_text, strip_comments
 
 MODEL = "B737-800"
@@ -218,3 +218,38 @@ def test_read_manual_text_strips_comments_and_outer_space(tmp_path: Path) -> Non
     path.write_text("\n" + _block("greeting", "Body.") + "\n", encoding="utf-8")
 
     assert read_manual_text(path) == "Body."
+
+
+# Spec-driven blocks.
+
+
+def _rows(markdown: str) -> list[list[str]]:
+    """The body rows of the first markdown table, as stripped cells."""
+    lines = [line for line in markdown.splitlines() if line.startswith("|")]
+    return [[cell.strip() for cell in line.strip("|").split("|")] for line in lines[2:]]
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_sensor_table_lists_every_generated_sensor_with_its_spec_unit(model: str) -> None:
+    table = manuals.RENDERERS["sensor-table"](model, ENGINE_SPECS[model], {})
+
+    expected = [
+        [system, spec.type, spec.name, spec.unit]
+        for system in SYSTEM_SENSORS
+        for spec in sensors_for(system, model)
+    ]
+    assert [row[:4] for row in _rows(table)] == expected
+    assert all(row[4] for row in _rows(table))
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_egt_note_quotes_the_spec_baseline_and_bands(model: str) -> None:
+    egt = {s.type: s for s in sensors_for("Engine", model)}["EGT"]
+    note = manuals.RENDERERS["egt-trend-note"](model, ENGINE_SPECS[model], {})
+
+    b = egt.bands
+    assert (
+        f"baseline is {egt.baseline:g}°C, with Advisory at {b.advisory:g}°C, "
+        f"Caution at {b.caution:g}°C, and Warning at {b.warning:g}°C"
+    ) in note
+    assert ENGINE_SPECS[model].engine_type in note

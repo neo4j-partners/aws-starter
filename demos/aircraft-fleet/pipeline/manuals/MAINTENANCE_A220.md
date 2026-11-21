@@ -137,16 +137,26 @@ The A220-300 hydraulic system provides power for primary flight control surface 
 
 ### 2.2 Engine Health Monitoring
 
-Each PW1500G engine is equipped with four primary monitoring sensors:
+<!-- BEGIN GENERATED: sensor-table -->
+Each PW1500G engine carries four monitoring sensors. The Avionics and Hydraulics systems carry two sensors each. The digital twin records every sensor hourly.
 
-| Sensor Type | Parameter | Unit | Location |
-|-------------|-----------|------|----------|
-| EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
-| Vibration | Engine Vibration | ips (inches/sec) | Fan frame, turbine frame |
-| N1Speed | Fan Speed N1 | rpm | Fan shaft (gearbox output) |
-| FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| System | Sensor Type | Parameter | Unit | Location |
+|--------|-------------|-----------|------|----------|
+| Engine | EGT | Exhaust Gas Temperature | °C | Turbine exhaust section |
+| Engine | Vibration | Engine Vibration | ips | Fan frame, turbine frame |
+| Engine | N1Speed | Fan Speed N1 | % | Fan shaft (gearbox output) |
+| Engine | FuelFlow | Fuel Flow | kg/s | Fuel metering valve |
+| Avionics | BusVoltage | DC Bus Voltage | V DC | DC essential bus |
+| Avionics | AirDataDisagree | Air Data Airspeed Disagreement | kt | Captain and first officer air data sources |
+| Hydraulics | HydPressure | Hydraulic Pressure | psi | System pressure manifold |
+| Hydraulics | HydQuantity | Hydraulic Fluid Quantity | % | Hydraulic reservoir |
+<!-- END GENERATED: sensor-table -->
 
 **Sensor Sampling Rate:** Continuous (1 Hz during flight, recorded hourly for trend analysis)
+
+<!-- BEGIN GENERATED: egt-trend-note -->
+**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the PW1500G, the trend baseline is 625°C, with Advisory at 645°C, Caution at 655°C, and Warning at 665°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
+<!-- END GENERATED: egt-trend-note -->
 
 **FADEC Integration:** The PW1500G features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation. The FADEC monitors fan speed (N1) and LPC speed (N1c) as independent parameters. N1Speed in the sensor dataset refers to fan shaft speed (gearbox output). The FADEC also monitors gearbox oil temperature and pressure as first-class parameters distinct from engine oil.
 

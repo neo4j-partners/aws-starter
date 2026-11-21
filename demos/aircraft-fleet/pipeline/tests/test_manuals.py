@@ -719,22 +719,40 @@ def test_the_fault_code_tables_are_the_canonical_list(model: str) -> None:
             assert (row[4] != b737[row[0]][4]) is overridden, row
 
 
-# A code-shaped token, loose enough to catch a variant of a code: any prefix,
-# any case, a "-", "_", or en dash between segments, two to four digits, and an
-# optional letter or "-<digits>" tail.
+# A code-shaped token, loose enough to catch a variant of a code. Two
+# segments of 2-8 letters and digits, starting with a letter, then 1-5 digits
+# and an optional letter or "-<digits>" tail. The separator is the same
+# throughout a token. A hyphen, underscore, or Unicode dash matches in any
+# case. A space matches only between uppercase segments, so prose such as
+# "accounts for 5" is not a code. A number followed by ".<digit>" is a decimal.
+_CODE_SEGMENT = r"[A-Z][A-Z0-9]{1,7}"
+_CODE_NUMBER = r"\d{1,5}(?!\.\d)[A-Za-z]?(?:-\d+)?\b"
 _CODE_TOKEN = re.compile(
-    r"\b[A-Z]{2,5}[-_\u2013][A-Z]{2,6}[-_\u2013]\d{2,4}[A-Za-z]?(?:-\d+)?\b", re.IGNORECASE
+    rf"\b(?i:{_CODE_SEGMENT}([-_\u2010-\u2015\u2212]){_CODE_SEGMENT}\1){_CODE_NUMBER}"
+    rf"|\b{_CODE_SEGMENT} {_CODE_SEGMENT} {_CODE_NUMBER}"
 )
+# Real references that share the code shape. Any other one fails until listed.
+_REFERENCES = {
+    # US military spec for turbine engine oil, not a fault code.
+    "MIL-PRF-23699",
+    # US military spec for fire-resistant hydraulic fluid, not a fault code.
+    "MIL-PRF-83282",
+    # Pratt & Whitney service bulletin series for gearbox oils, not a fault code.
+    "PW SB 72-600",
+}
 # A task card shares the code shape. Its id is valid in the manual that
 # defines it, so fault sections can refer to it.
 _TASK_CARD = re.compile(r"^#### Task Card: (\S+)", re.MULTILINE)
-# A part number shares it too. It is valid only in a part number field.
-_PART_NUMBER_FIELD = re.compile(r"\(P/N: [^)\n]*\)|^\*\*Part Number:\*\* .*$", re.MULTILINE)
+# Part numbers and the document number share it too. Each is valid only in
+# its own field.
+_PART_NUMBER_FIELD = re.compile(
+    r"\(P/N: [^)\n]*\)|^\*\*(?:Part|Document) Number:\*\* .*$", re.MULTILINE
+)
 
 
 def _unknown_codes(text: str) -> list[str]:
     """Code-shaped tokens that are not a fault code, task card, or part number."""
-    valid = {c.code for c in FAULT_CODES} | set(_TASK_CARD.findall(text))
+    valid = {c.code for c in FAULT_CODES} | _REFERENCES | set(_TASK_CARD.findall(text))
     fields = [m.span() for m in _PART_NUMBER_FIELD.finditer(text)]
     return [
         m.group()
@@ -767,10 +785,37 @@ def test_the_code_check_flags_a_mistyped_code_but_not_a_part_number() -> None:
         "ENG\u2013OVH\u2013006",
         "ENG_OVH_006",
         "AVN-SDR-01",
+        "ENG-OVH-6",
+        "ENG-OVH-00006",
+        "ENG OVH 006",
+        "ENG\u2010OVH\u2010006",
+        "ENG\u2014OVH\u2014006",
+        "ENG\u2212OVH\u2212006",
+        "AVN-FMS2-001",
+        "avn-fms2-001",
+        "ENGINE-OVERHEAT-006",
+        "MIL-PRF-5606",
     ],
 )
 def test_the_code_check_flags_a_variant_of_a_code(token: str) -> None:
     assert _unknown_codes(f"Record {token} in the log.") == [token]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Bus voltage accounts for 5 of the events.",
+        "Repair the A220-300 within 100 hours.",
+        "Inspect HPC stages 1-4 at the next check.",
+        "Fly RNP AR 0.1 approaches.",
+        "Record ENG-OVH 006 in the log.",
+        "Use oil to MIL-PRF-23699 or fluid to MIL-PRF-83282.",
+        "Approved per PW SB 72-600 series.",
+        "**Document Number:** AMM-B737-2024-001",
+    ],
+)
+def test_the_code_check_passes_prose_and_listed_references(text: str) -> None:
+    assert _unknown_codes(text) == []
 
 
 def test_a_part_number_counts_only_in_a_part_number_field() -> None:

@@ -57,6 +57,8 @@ _COMPONENTS = [
     # A manual name is an alias of its type.
     {"name": "Air Data Inertial Reference Unit", "type": "ADIRU"},
     {"name": "Turbine Stage", "type": "High-Pressure Turbine"},
+    # Spaces around the type are ignored.
+    {"name": "Padded Turbine", "type": " HP Turbine "},
     # No type, and types outside the vocabulary, link to nothing.
     {"name": "Fuel Filter", "type": "Fuel Filter"},
     {"name": "Fuel Nozzle", "type": "Nozzle"},
@@ -127,6 +129,7 @@ def test_references_link_on_exact_type(driver: Driver, database: str) -> None:
         (f"Engine-Driven Pump - {MODEL}", f"{MODEL}-H1"),
         (f"High-Pressure Turbine - {MODEL}", f"{MODEL}-E1"),
         (f"Main Fuel Pump - {MODEL}", f"{MODEL}-E1"),
+        (f"Padded Turbine - {MODEL}", f"{MODEL}-E1"),
         (f"Turbine Stage - {MODEL}", f"{MODEL}-E1"),
     ]
 

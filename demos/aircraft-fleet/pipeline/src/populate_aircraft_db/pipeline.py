@@ -620,8 +620,8 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     logger.info("  [OK] %d SystemReference -[:DESCRIBES_SYSTEM]-> System", records[0]["count"])
 
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
-    # (same aircraft model; componentType, ignoring case, is a component type
-    # or one of its manual names, and the Component has that type, within the
+    # (same aircraft model; componentType, ignoring case and outer spaces, is
+    # a component type or one of its aliases, and the Component has that type, within the
     # System type that has that component type in specs. Parent
     # SystemReferences with a fleet systemType must include that System
     # type, or the link is blocked. Parents with another systemType, or
@@ -630,7 +630,7 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         """
         MATCH (cr:ComponentReference)
         WHERE cr.aircraftType IS NOT NULL AND cr.componentType IS NOT NULL
-        WITH cr, $component_type_by_alias[toLower(cr.componentType)] AS ctype
+        WITH cr, $component_type_by_alias[toLower(trim(cr.componentType))] AS ctype
         WHERE ctype IS NOT NULL
         WITH cr, ctype, $system_types[toLower(ctype)] AS systemType
         OPTIONAL MATCH (sr:SystemReference)-[:HAS_COMPONENT]->(cr)

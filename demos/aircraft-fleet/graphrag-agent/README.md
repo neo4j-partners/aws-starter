@@ -171,7 +171,7 @@ A `mode` field picks one. With no `mode`, the full agent runs. Only the
 connection differs:
 
 - **`./agent.sh invoke-cloud "..."`:** This command sends one prompt through `agentcore invoke`.
-- **`uv run fleet-demo --remote`:** This command runs all four demo sections against the deployed agent.
+- **`uv run fleet-demo --remote`:** This command runs all five demo sections against the deployed agent.
 - **`uv run fleet-invoke "..."`:** This command sends one prompt and streams the answer as it arrives.
 - **`uv run fleet-invoke load-test [seconds]`:** This command sends a random query from `queries.txt` on an interval. The default interval is 5 seconds.
 - **`./agent.sh destroy`:** This command removes the runtime when you finish. It asks for confirmation first and cancels unless you answer `y`. Pass `--yes` to skip the question in a script. It does not read `../.env`. When it finishes, it lists anything `agentcore status` still reports as deployed. It also asks CloudFormation for the stack `AgentCore-AircraftFleet-default`. The status command reads local state that can be lost, so the CloudFormation answer is the one that counts. Destroy fails while the stack exists in any state other than `DELETE_COMPLETE`.
@@ -185,7 +185,7 @@ through its Strands `Neo4jSessionManager`.
 - **Separate database:** Memory needs its own Neo4j database or instance. Point `MEM_NEO4J_*` at it, not at the fleet graph. Text2Cypher reads the live schema, so memory labels in the fleet graph would reach its prompt. Locally, a second database in the same Neo4j Enterprise server works, such as one made with `CREATE DATABASE memory`.
 - **Session and user:** The session ID comes from the AgentCore session header. The `user_id` field in the payload scopes long-term memory. A missing or empty `user_id` becomes `anonymous`, so all anonymous callers share one profile.
 - **What it stores:** Each session keeps its messages. The agent extracts entities from them and retrieves related entities and preferences on later turns. Matches below a vector score of 0.75 are left out. Tool calls are not recorded.
-- **One manager per request:** Neo4j Agent Memory 0.8.0 cannot share one client across session managers. Each request builds its own manager, connects, restores the session history, and closes the manager when the answer ends. It also closes when the request fails or the client disconnects.
+- **One manager per request:** Neo4j Agent Memory 0.8.0 cannot share one client across session managers. Each request builds its own manager, connects, restores the session history, and closes the manager when the answer ends. It also closes when the request fails. A failed build closes its own manager before the error is reported. If the client disconnects while the agent is still being built, the close waits for the build to end, so the build cannot reopen a closed manager.
 - **Cost per request:** The first request after startup takes about 2.5 seconds longer, measured on a local Neo4j. It opens the memory driver and sets up the memory schema and indexes. Later requests add about 0.1 seconds. A remote instance adds a few network round trips to each.
 - **Extraction model:** Entity extraction runs on `global.anthropic.claude-sonnet-4-6` with Titan v2 embeddings at 1024 dimensions. Sonnet 5.5 rejects the forced tool choice and the temperature that the extractor sends. The agent itself still uses `MODEL_ID`.
 

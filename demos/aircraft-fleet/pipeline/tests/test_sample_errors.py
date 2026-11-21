@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from neo4j.exceptions import ClientError
+from neo4j.exceptions import ClientError, Forbidden
 
 from populate_aircraft_db.agent_samples import _run_similarity_search, _run_text2cypher
 from populate_aircraft_db.samples import (
@@ -24,18 +24,27 @@ SEED = "DOC-1:0"
 class FailingDriver:
     """Fail every query after the first `ok_queries`, which return no rows.
 
-    SHOW INDEXES never fails. It finds `index_count` matches.
+    SHOW INDEXES finds `index_count` matches, or raises `index_error` if set.
     """
 
-    def __init__(self, error: Exception, index_count: int = 0, ok_queries: int = 0) -> None:
+    def __init__(
+        self,
+        error: Exception,
+        index_count: int = 0,
+        ok_queries: int = 0,
+        index_error: Exception | None = None,
+    ) -> None:
         self.error = error
         self.index_count = index_count
         self.ok_queries = ok_queries
+        self.index_error = index_error
         self.index_lookups: list[str] = []
 
     def execute_query(self, cypher: str, /, **params: Any) -> tuple[list[dict], None, None]:
         if cypher.startswith("SHOW INDEXES"):
             self.index_lookups.append(params["index"])
+            if self.index_error is not None:
+                raise self.index_error
             return [{"count": self.index_count}], None, None
         if self.ok_queries:
             self.ok_queries -= 1
@@ -96,6 +105,22 @@ def test_missing_index_shows_the_error_and_the_setup_hint(
     out = capsys.readouterr().out
     assert f"[ERROR] {error.code}: {error.message}" in out
     assert f"index '{index}' not found; {SETUP_HINT}" in out
+    assert driver.index_lookups == [index]
+
+
+@pytest.mark.parametrize(("run", "index", "ok_queries"), SEARCHES)
+def test_failed_index_lookup_shows_only_the_original_error(
+    capsys, run, index: str, ok_queries: int
+) -> None:
+    error = ClientError()
+    driver = FailingDriver(error, ok_queries=ok_queries, index_error=Forbidden())
+
+    run(driver)
+
+    out = capsys.readouterr().out
+    assert f"[ERROR] {error.code}: {error.message}" in out
+    assert SETUP_HINT not in out
+    assert out.count("[ERROR]") == 1
     assert driver.index_lookups == [index]
 
 

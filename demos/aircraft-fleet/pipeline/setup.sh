@@ -28,10 +28,18 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 # Load the shared .env so the vendored tools and child processes see it.
+# .env.sample promises that existing environment variables are never
+# overridden, so NEO4J_DATABASE=x ./setup.sh load must keep x. Sourcing
+# would overwrite a shell export, so snapshot the exports first and restore
+# them after. .env still fills every key the shell did not export, and
+# export -p quotes each value safely for eval.
+saved_env="$(export -p)"
 set -a
 # shellcheck disable=SC1091
 source "$ENV_FILE"
 set +a
+eval "$saved_env"
+unset saved_env
 
 CMD="${1:-full}"
 

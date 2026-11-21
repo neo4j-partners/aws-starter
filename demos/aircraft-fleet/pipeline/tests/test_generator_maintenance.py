@@ -66,6 +66,11 @@ def in_memory() -> list[tuple[AircraftNode, dict[str, dict[str, np.ndarray]], Ma
     return out
 
 
+def _written(value: float) -> float:
+    """A reading as the CSV holds it, so the test checks what a reader sees."""
+    return round(float(value), 5)
+
+
 def _level(spec: SensorSpec, value: float) -> tuple[int, Direction]:
     """Band level and side of a value, compared with absolute thresholds."""
     b = spec.bands
@@ -95,13 +100,14 @@ def test_event_severity_is_exactly_the_band_of_its_trigger_reading(in_memory) ->
             // 3600
         )
         values = series[system.system_id][sensor.type]
-        level, side = _level(spec, values[hour])
+        value = _written(values[hour])
+        level, side = _level(spec, value)
         assert level >= 1, event
-        assert event.row["severity"] == SEVERITY_BY_LEVEL[level], (event, values[hour])
+        assert event.row["severity"] == SEVERITY_BY_LEVEL[level], (event, value)
         # An event marks a band entry, so the hour before sits in a lower band.
         if hour > 0:
-            previous, _ = _level(spec, values[hour - 1])
-            assert previous < level, (event, values[hour - 1], values[hour])
+            previous, _ = _level(spec, _written(values[hour - 1]))
+            assert previous < level, (event, values[hour - 1], value)
 
         routes = [r for r in spec.faults if r.side is side]
         assert event.row["fault"] in {r.fault for r in routes}, (event, side)

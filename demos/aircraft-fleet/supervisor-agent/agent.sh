@@ -311,23 +311,26 @@ strip_gateway_secret() {
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
     # The copy sits next to the file, so mv replaces the file in one step.
     # Anything already at the copy's name is removed first. A FIFO there
-    # would hang the open, and a link would send the lines elsewhere. umask
-    # 077 creates the copy with mode 0600 before the filtered lines go in,
-    # and set -C refuses a file that appears at that name in between. The
-    # copy must then be a regular file, not a link. chmod sets 0600, the
-    # mode the CLI writes .env.local with. On a normal filesystem it is
-    # redundant after the umask 077 create. It stays as defense in depth,
-    # because a default ACL or some filesystems can widen a new file's
-    # mode. .env.local is checked for a
+    # would hang the open, and a link would send the lines elsewhere. The
+    # copy is opened once, on fd 3, and the filtered lines go in through
+    # that fd, so nothing can swap the file between the create and the
+    # write. set -C refuses a file that appears at the name after the
+    # remove. umask 077 creates the copy with mode 0600, the mode the CLI
+    # writes .env.local with. chmod sets 0600 again before any line lands.
+    # On Linux a directory's default POSIX ACL overrides umask, see acl(5),
+    # and the copy could otherwise be group-readable. A macOS ACE does not
+    # widen the mode, so no test here can catch a missing chmod. The copy
+    # must then be a regular file, not a link. .env.local is checked for a
     # link again right before mv, which would replace the link and leave
     # the secret in its target.
     if ! remove_strip_copy \
-        || ! (umask 077 && set -C && : > "$ENV_STRIP_TMP") \
+        || ! (umask 077 && set -C && {
+                chmod 600 "$ENV_STRIP_TMP" \
+                    && awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
+                        '$0 !~ ("^[[:space:]]*(export[[:space:]]+)?" name "[[:space:]]*=") && $0 != comment' \
+                        "$ENV_LOCAL" >&3
+            } 3> "$ENV_STRIP_TMP") \
         || [ ! -f "$ENV_STRIP_TMP" ] || [ -L "$ENV_STRIP_TMP" ] \
-        || ! awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
-            '$0 !~ ("^[[:space:]]*(export[[:space:]]+)?" name "[[:space:]]*=") && $0 != comment' \
-            "$ENV_LOCAL" >> "$ENV_STRIP_TMP" \
-        || ! chmod 600 "$ENV_STRIP_TMP" \
         || [ -L "$ENV_LOCAL" ] \
         || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
         remove_strip_copy

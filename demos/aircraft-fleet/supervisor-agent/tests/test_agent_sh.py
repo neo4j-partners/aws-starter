@@ -88,22 +88,35 @@ case "$1 $2" in
 esac
 """
 
-# rm, cp, mv, and awk pass through to the real command. STUB_INTERRUPT_AFTER
+# rm, cp, mv, awk, and chmod pass through to the real command. STUB_INTERRUPT_AFTER
 # =cmd:N sends SIGINT to agent.sh right after the Nth call of cmd, the same as
 # a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
 # name right after the Nth rm of that name. STUB_RECORD_STRIP_MODE makes awk
-# record the copy's mode while the copy exists.
+# record the copy's mode while the copy exists. STUB_RECORD_STRIP_SIZE makes
+# chmod record the copy's size in bytes before it changes the mode.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
 real=/bin/"$name"
 [ -x "$real" ] || real=/usr/bin/"$name"
+if [ "$name" = chmod ] && [ -n "${STUB_RECORD_STRIP_SIZE:-}" ]; then
+    case "${!#}" in
+        *.env.local.strip.*)
+            wc -c < "${!#}" | tr -d ' ' >> "${STUB_LOG%/*}/strip-sizes" ;;
+    esac
+fi
 "$real" "$@"
 status=$?
 counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
 if [ "${STUB_INTERRUPT_AFTER:-}" = "$name:$count" ]; then
-    kill -s "${STUB_INTERRUPT_SIGNAL:-INT}" "$PPID"
+    # Signal agent.sh itself, even from inside one of its subshells.
+    owner=$PPID
+    while parent=$(ps -o ppid= -p "$owner" | tr -d ' ') \
+        && ps -o command= -p "$parent" | grep -qF /agent.sh; do
+        owner=$parent
+    done
+    kill -s "${STUB_INTERRUPT_SIGNAL:-INT}" "$owner"
 fi
 if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
     case "${!#}" in
@@ -172,6 +185,7 @@ def project(tmp_path: Path) -> Path:
         ("cp", STUB_PASSTHROUGH),
         ("mv", STUB_PASSTHROUGH),
         ("awk", STUB_PASSTHROUGH),
+        ("chmod", STUB_PASSTHROUGH),
         ("uv", "#!/bin/bash\n"),
     ):
         stub = bin_dir / name
@@ -584,6 +598,20 @@ def test_the_copy_is_0600_while_it_exists_under_a_wide_umask(project: Path) -> N
     assert result.returncode == 0, result.stdout + result.stderr
     assert (project.parent / "strip-modes").read_text() == "600\n"
     assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
+
+
+# A default ACL on Linux can override umask 077, so chmod must set 0600
+# before any line lands in the copy.
+def test_the_copy_is_0600_before_any_line_is_written(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o600)
+
+    result = run_destroy(project, STUB_RECORD_STRIP_SIZE="1")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (project.parent / "strip-sizes").read_text() == "0\n"
+    assert env_local.read_text() == "A=1\n"
 
 
 def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:

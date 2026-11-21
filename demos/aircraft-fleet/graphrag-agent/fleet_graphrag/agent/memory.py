@@ -9,7 +9,11 @@ reach the fleet schema that Text2Cypher reads.
 per process on the first request that needs it. It holds the memory client
 and the event-loop thread that every manager runs on. A failed open is not
 kept, so the next request tries again. :func:`close_memory` closes it at
-shutdown.
+shutdown, and no request opens it after that.
+
+AgentCore runs requests on its own worker event loop and the server lifespan
+on the main loop. So the open runs on its own thread, and any loop can wait
+for it.
 
 :func:`session_manager` builds one ``Neo4jSessionManager`` per request on the
 shared memory. The caller must ``close()`` the manager when the request ends.
@@ -20,10 +24,13 @@ background, so the answer does not wait for it.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import os
+import threading
 from collections.abc import Callable
 from functools import cache
 
+import neo4j
 from neo4j_agent_memory import (
     ExtractionConfig,
     ExtractorType,
@@ -56,10 +63,24 @@ MIN_SCORE = 0.75
 # Takes a background task's name and returns the callback for when it ends.
 BackgroundHook = Callable[[str], Callable[[], None]]
 
-# The open shared memory, and the open in flight. Both are only read and set
-# on the server's event loop, so no lock is needed.
+# The state below is read and set from the request loop and the lifespan
+# loop, which run on different threads, so the lock guards all of it.
+_lock = threading.Lock()
+# The open shared memory.
 _shared: SharedMemory | None = None
-_opening: asyncio.Task[SharedMemory] | None = None
+# The open in flight, and the thread that runs it.
+_opening: concurrent.futures.Future[SharedMemory] | None = None
+_open_thread: threading.Thread | None = None
+# Set by close_memory. No open starts after it.
+_closed = False
+
+
+class MemoryClosedError(neo4j.exceptions.ServiceUnavailable):
+    """The shared memory was closed at shutdown.
+
+    It is a ``ServiceUnavailable``, so a request that arrives after shutdown
+    gets the same error as a failed open.
+    """
 
 
 @cache
@@ -101,46 +122,71 @@ def memory_settings() -> MemorySettings:
 async def shared_memory(background_hook: BackgroundHook) -> SharedMemory:
     """Return the process's shared memory, opening it on the first call.
 
-    Concurrent first callers wait for the same open. The open runs in its own
-    task, so a caller that is cancelled does not stop it, and the next caller
-    gets the memory it opened. A failed open raises to every caller waiting
-    for it and is not kept.
+    Concurrent first callers, on any event loop, wait for the same open. The
+    open runs on its own thread, so a caller that is cancelled does not stop
+    it, and the next caller gets the memory it opened. A failed open raises
+    to every caller waiting for it and is not kept.
+
+    Raises :class:`MemoryClosedError` after :func:`close_memory`.
     """
-    global _opening
-    if _shared is not None:
-        return _shared
-    if _opening is None:
-        _opening = asyncio.create_task(_open(background_hook))
-    return await asyncio.shield(_opening)
+    global _opening, _open_thread
+    with _lock:
+        if _closed:
+            raise MemoryClosedError("The memory is closed. The server is shutting down.")
+        if _shared is not None:
+            return _shared
+        if _opening is None:
+            _opening = concurrent.futures.Future()
+            _open_thread = threading.Thread(
+                target=_open,
+                args=(_opening, background_hook),
+                name="memory-open",
+                daemon=True,
+            )
+            _open_thread.start()
+        opening = _opening
+    return await asyncio.shield(asyncio.wrap_future(opening))
 
 
-async def _open(background_hook: BackgroundHook) -> SharedMemory:
-    """Open the shared memory in a worker thread, since the open blocks."""
+def _open(
+    opening: concurrent.futures.Future[SharedMemory], background_hook: BackgroundHook
+) -> None:
+    """Open the shared memory and settle ``opening``. Runs on its own thread."""
     global _shared, _opening
+    # A running future cannot be cancelled, so no waiter can drop the open.
+    opening.set_running_or_notify_cancel()
     try:
-        _shared = await asyncio.to_thread(
-            lambda: SharedMemory.open(memory_settings(), background_hook=background_hook)
-        )
-        return _shared
-    finally:
+        shared = SharedMemory.open(memory_settings(), background_hook=background_hook)
+    except Exception as e:
+        with _lock:
+            _opening = None
+        opening.set_exception(e)
+        return
+    with _lock:
+        _shared = shared
         _opening = None
+    opening.set_result(shared)
 
 
 async def close_memory() -> None:
     """Close the shared memory if it is open. A second call does nothing.
 
-    An open still in flight is waited out first, so the client it opens is
-    closed too. Closing waits for the background extractions still running.
+    No open starts after this. An open still in flight is waited out first,
+    so the client it opens is closed too. Closing waits for the background
+    extractions still running. It works from any event loop.
     """
-    global _shared
-    if _opening is not None:
-        try:
-            await asyncio.shield(_opening)
-        except Exception:
-            # The failed open has nothing to close. Its error already went to
-            # the request that started it.
-            return
-    shared, _shared = _shared, None
+    global _shared, _closed
+    with _lock:
+        _closed = True
+        opening, thread = _opening, _open_thread
+    if opening is not None:
+        # A failed open leaves nothing to close. Its error already went to
+        # the request that started it, so it is not raised here.
+        await asyncio.wait({asyncio.wrap_future(opening)})
+    if thread is not None:
+        await asyncio.to_thread(thread.join)
+    with _lock:
+        shared, _shared = _shared, None
     if shared is not None:
         await shared.aclose()
 

@@ -32,12 +32,17 @@ def _fresh_settings() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _fresh_shared() -> Iterator[None]:
-    """Each test starts and ends with no shared memory and no open in flight."""
-    memory._shared = None
-    memory._opening = None
+    """Each test starts and ends with no shared memory, no open in flight, and not closed."""
+    _reset_memory()
     yield
+    _reset_memory()
+
+
+def _reset_memory() -> None:
     memory._shared = None
     memory._opening = None
+    memory._open_thread = None
+    memory._closed = False
 
 
 @pytest.fixture
@@ -280,3 +285,63 @@ def test_second_close_does_nothing(fake_shared: type[_FakeShared]) -> None:
     asyncio.run(open_then_close_twice())
     [shared] = fake_shared.opened
     assert shared.closes == 1
+
+
+def _in_new_loop(coro_fn: Callable[[], object], results: list[object]) -> threading.Thread:
+    """Run ``coro_fn()`` with ``asyncio.run`` on a new thread, as on a second loop."""
+
+    def run() -> None:
+        try:
+            results.append(asyncio.run(coro_fn()))
+        except Exception as e:
+            results.append(e)
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread
+
+
+def test_close_on_another_loop_waits_for_the_open(fake_shared: type[_FakeShared]) -> None:
+    """AgentCore runs requests on a worker loop and the lifespan on the main loop."""
+    fake_shared.release.clear()
+    opened: list[object] = []
+    request = _in_new_loop(lambda: memory.shared_memory(_hook), opened)
+
+    async def close_during_open() -> None:
+        await asyncio.sleep(0.1)
+        closing = asyncio.create_task(memory.close_memory())
+        await asyncio.sleep(0.1)
+        assert not closing.done()
+        fake_shared.release.set()
+        await closing
+
+    asyncio.run(close_during_open())
+    request.join(5)
+    [shared] = fake_shared.opened
+    assert opened == [shared]
+    assert shared.closes == 1
+    assert memory._shared is None
+
+
+def test_callers_on_two_loops_open_once(fake_shared: type[_FakeShared]) -> None:
+    fake_shared.release.clear()
+    results: list[object] = []
+    callers = [_in_new_loop(lambda: memory.shared_memory(_hook), results) for _ in range(2)]
+    threading.Event().wait(0.1)
+    fake_shared.release.set()
+    for caller in callers:
+        caller.join(5)
+    [shared] = fake_shared.opened
+    assert results == [shared, shared]
+
+
+def test_no_open_after_close(fake_shared: type[_FakeShared]) -> None:
+    """A request that arrives after shutdown must not open a client nothing closes."""
+
+    async def close_then_call() -> None:
+        await memory.close_memory()
+        with pytest.raises(memory.MemoryClosedError):
+            await memory.shared_memory(_hook)
+
+    asyncio.run(close_then_call())
+    assert fake_shared.opened == []

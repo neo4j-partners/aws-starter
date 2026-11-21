@@ -29,12 +29,17 @@ _SHARED = object()
 
 @pytest.fixture(autouse=True)
 def _fresh_shared() -> Iterator[None]:
-    """Each test starts and ends with no shared memory and no open in flight."""
-    memory._shared = None
-    memory._opening = None
+    """Each test starts and ends with no shared memory, no open in flight, and not closed."""
+    _reset_memory()
     yield
+    _reset_memory()
+
+
+def _reset_memory() -> None:
     memory._shared = None
     memory._opening = None
+    memory._open_thread = None
+    memory._closed = False
 
 
 def _run(payload: dict | None, session_id: str | None = None) -> list[dict]:

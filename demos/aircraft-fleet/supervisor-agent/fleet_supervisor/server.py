@@ -98,10 +98,12 @@ class Runtime:
 
 _runtime: Runtime | None = None
 _runtime_lock = threading.Lock()
-# Counts build and rebuild attempts, and records whether the last one
-# failed. Both change only under _runtime_lock. A caller that waited for the
-# lock while another caller's attempt failed skips its own attempt, so a
-# Gateway outage costs one connect attempt, not one per waiting caller.
+# Counts finished build and rebuild attempts, and records whether the last
+# one failed. Both change only under _runtime_lock, when an attempt ends. A
+# caller that waited for the lock while another caller's attempt failed
+# skips its own attempt, so a Gateway outage costs one connect attempt, not
+# one per waiting caller. That includes a caller that arrived while the
+# attempt was running, because the count changes only when it ends.
 _attempts = 0
 _last_attempt_failed = False
 
@@ -184,11 +186,14 @@ def _start_runtime(
             raise RecentRebuildFailedError(
                 "Another request's Gateway connect attempt just failed; not retrying yet"
             )
-        _attempts += 1
-        _last_attempt_failed = True
-        runtime = _build_or_rebuild(runtime)
-        _last_attempt_failed = False
-        return runtime
+        failed = True
+        try:
+            runtime = _build_or_rebuild(runtime)
+            failed = False
+            return runtime
+        finally:
+            _attempts += 1
+            _last_attempt_failed = failed
 
 
 def _build_or_rebuild(runtime: Runtime | None) -> Runtime:

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import threading
 
 import pytest
 from strands.types.events import ToolResultEvent
@@ -403,6 +404,36 @@ def test_a_caller_that_waited_through_a_failed_rebuild_skips_its_own(clients):
 
     runtime = asyncio.run(scenario())
     assert runtime.connection.client is good
+
+
+def test_a_caller_that_arrives_during_a_failed_rebuild_skips_its_own(clients):
+    started, release = threading.Event(), threading.Event()
+
+    class SlowFailingClient(FakeClient):
+        def start(self):
+            started.set()
+            release.wait(5)
+            raise PermissionError("401")
+
+    old, broken, good = FakeClient(), SlowFailingClient(), FakeClient(reply="rows")
+    clients.extend([old, broken, good])
+
+    async def scenario():
+        runtime, _ = await start(clients)
+        stale = runtime.connection
+        old.active = False
+        first = asyncio.create_task(server.get_runtime(stale))
+        await asyncio.to_thread(started.wait)
+        # This caller reads the attempt count while the first one connects.
+        second = asyncio.create_task(server.get_runtime(stale))
+        await asyncio.sleep(0.05)
+        release.set()
+        return await asyncio.gather(first, second, return_exceptions=True)
+
+    first, second = asyncio.run(scenario())
+    assert isinstance(first, ToolProviderException)
+    assert isinstance(second, server.RecentRebuildFailedError)
+    assert clients.built == [old, broken]  # no second connect attempt
 
 
 def test_tool_missing_after_rebuild_returns_unavailable(clients):

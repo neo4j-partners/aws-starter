@@ -116,6 +116,8 @@ def graph_schema(driver: Driver, database: str) -> str:
             names = properties.setdefault(label, set())
             if row["propertyName"] is not None:
                 names.add(row["propertyName"])
+    if not properties:
+        print(f"  [WARN] No node labels in database {database!r}; run 'setup' first.\n")
 
     relationships = set()
     for row in relationship_rows:
@@ -507,6 +509,16 @@ LIMIT $top_k"""
         report_query_error(driver, database, exc, "maintenanceChunkEmbeddings")
 
 
+def _text2cypher_prompt(driver: Driver, database: str) -> str | None:
+    """Return the text2cypher system prompt, or None if the schema read fails."""
+    try:
+        return system_prompt(graph_schema(driver, database))
+    except Neo4jError as exc:
+        print(f"  [ERROR] Schema read failed: {exc.code}: {exc.message}")
+        print("  (the text2cypher questions are skipped)\n")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -536,8 +548,6 @@ def run_agent_samples(
         embedding_dimensions=embedding_dimensions,
     )
 
-    prompt = system_prompt(graph_schema(driver, database))
-
     questions = SAMPLE_QUESTIONS
     if sample_size > 0:
         questions = questions[:sample_size]
@@ -548,6 +558,12 @@ def run_agent_samples(
     print(f"\n  LLM: {provider}/{llm_model}")
     print(f"  Questions: {len(questions)}\n")
 
+    # The schema is read only for text2cypher questions. If the read fails,
+    # those questions are skipped and the rest still run.
+    prompt = None
+    if any(sq.tool == "text2cypher" for sq in questions):
+        prompt = _text2cypher_prompt(driver, database)
+
     current_category = ""
     for i, sq in enumerate(questions, 1):
         if sq.category != current_category:
@@ -555,7 +571,11 @@ def run_agent_samples(
             header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
 
         if sq.tool == "text2cypher":
-            _run_text2cypher(driver, database, chat_fn, prompt, sq.question)
+            if prompt is None:
+                print(f'  Question: "{sq.question}"\n')
+                print("  [SKIP] No graph schema; see the error above.\n")
+            else:
+                _run_text2cypher(driver, database, chat_fn, prompt, sq.question)
         elif sq.tool == "similarity_search":
             _run_similarity_search(driver, database, chat_fn, embed_fn, sq.question)
 

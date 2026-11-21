@@ -18,6 +18,7 @@ from neo4j import (
     Query,
     RoutingControl,
 )
+from neo4j.exceptions import Forbidden
 
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
@@ -30,6 +31,7 @@ from generator.specs import (
 from populate_aircraft_db import agent_samples
 from populate_aircraft_db.agent_samples import (
     SAMPLE_QUESTIONS,
+    SampleQuestion,
     _extract_cypher,
     _run_text2cypher,
     graph_schema,
@@ -70,7 +72,9 @@ class SchemaDriver:
         tail_rows: list[tuple[str, str]] = (),
         operators: list[str] = (),
         airports: list[str] = (),
+        schema_error: Exception | None = None,
     ) -> None:
+        self.schema_error = schema_error
         self.rows = {
             agent_samples._NODE_PROPERTIES_Q: [
                 {"nodeLabels": labels, "propertyName": name} for labels, name in property_rows
@@ -106,6 +110,8 @@ class _SchemaSession:
         return None
 
     def run(self, cypher: str) -> SimpleNamespace:
+        if self.driver.schema_error is not None:
+            raise self.driver.schema_error
         if cypher not in self.driver.rows:
             raise AssertionError(f"unexpected schema query: {cypher}")
         rows = self.driver.rows[cypher]
@@ -279,6 +285,80 @@ def test_run_agent_samples_sends_the_schema_prompt_with_every_cypher_question(
     cypher_questions = [sq.question for sq in SAMPLE_QUESTIONS if sq.tool == "text2cypher"]
     assert [user for system, user in chats if system == prompt] == cypher_questions
     assert [config["database"] for config in driver.session_configs] == ["db"]
+
+
+def _run_samples(
+    monkeypatch: pytest.MonkeyPatch,
+    driver: SchemaDriver,
+    questions: list[SampleQuestion] | None = None,
+) -> list[tuple[str, str]]:
+    """Run the agent samples with a fake LLM and return its (system, user) calls."""
+    chats: list[tuple[str, str]] = []
+
+    def chat(system: str, user: str) -> str:
+        chats.append((system, user))
+        return "MATCH (n) RETURN n"
+
+    monkeypatch.setattr(
+        agent_samples, "_create_llm_client", lambda *args, **kwargs: (chat, lambda text: [0.1])
+    )
+    if questions is not None:
+        monkeypatch.setattr(agent_samples, "SAMPLE_QUESTIONS", questions)
+    run_agent_samples(
+        driver,
+        "db",
+        provider="test",
+        llm_model="model",
+        embedding_model="embedder",
+        embedding_dimensions=1,
+    )
+    return chats
+
+
+def _questions(tool: str) -> list[SampleQuestion]:
+    return [sq for sq in SAMPLE_QUESTIONS if sq.tool == tool]
+
+
+def test_schema_is_not_read_without_a_text2cypher_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver = SchemaDriver()
+
+    _run_samples(monkeypatch, driver, _questions("similarity_search"))
+
+    assert driver.session_configs == []
+
+
+def test_schema_read_error_skips_only_the_text2cypher_questions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    error = Forbidden()
+
+    chats = _run_samples(monkeypatch, SchemaDriver(schema_error=error))
+
+    out = capsys.readouterr().out
+    assert f"[ERROR] Schema read failed: {error.code}: {error.message}" in out
+    assert out.count("[SKIP] No graph schema") == len(_questions("text2cypher"))
+    similarity = [sq.question for sq in _questions("similarity_search")]
+    assert [user for _, user in chats] == similarity
+
+
+@pytest.mark.parametrize(
+    ("property_rows", "warns"),
+    [
+        ([], True),
+        ([(["__KGBuilder__"], "id")], True),
+        ([(["Aircraft"], "tail_number")], False),
+    ],
+)
+def test_schema_warns_when_the_database_has_no_labels(
+    capsys: pytest.CaptureFixture[str],
+    property_rows: list[tuple[list[str], str]],
+    warns: bool,
+) -> None:
+    graph_schema(SchemaDriver(property_rows=property_rows), "db")
+
+    assert ("[WARN] No node labels in database 'db'" in capsys.readouterr().out) == warns
 
 
 def test_system_prompt_puts_the_schema_after_the_rules() -> None:

@@ -511,20 +511,23 @@ def render_manuals(
         Path, typer.Option("--manuals-dir", help="Directory holding the manuals.")
     ] = manuals.MANUALS_DIR,
 ) -> None:
-    """Render the generated blocks of every maintenance manual from specs."""
+    """Render the generated blocks of every maintenance manual from specs.
+
+    Every manual renders before any is written, so a bad manual leaves them all
+    as they were.
+    """
     stats = manuals.load_stats(manuals_dir)
-    drifted: list[str] = []
+    pending: list[tuple[str, str, str]] = []
     for model, filename in manuals.MANUAL_FILES.items():
-        path = manuals_dir / filename
-        text = path.read_text(encoding="utf-8")
+        text = (manuals_dir / filename).read_text(encoding="utf-8")
         try:
             rendered = manuals.render_text(text, model, stats)
         except manuals.ManualBlockError as exc:
             console.print(f"[red]{escape(filename)}: {escape(str(exc))}[/red]", soft_wrap=True)
             raise typer.Exit(1) from exc
-        if rendered == text:
-            continue
-        drifted.append(filename)
+        if rendered != text:
+            pending.append((filename, text, rendered))
+    for filename, text, rendered in pending:
         if check:
             diff = difflib.unified_diff(
                 text.splitlines(keepends=True),
@@ -536,12 +539,12 @@ def render_manuals(
             print("".join(diff), end="")
             console.print(f"[red]{escape(filename)} has drifted[/red]")
         else:
-            path.write_text(rendered, encoding="utf-8")
+            (manuals_dir / filename).write_text(rendered, encoding="utf-8")
             console.print(f"Rendered {escape(filename)}")
-    if check and drifted:
+    if check and pending:
         console.print("Run `uv run generate-data render-manuals` to update them.")
         raise typer.Exit(1)
-    if not drifted:
+    if not pending:
         console.print(f"{len(manuals.MANUAL_FILES)} manuals in sync")
 
 

@@ -203,6 +203,23 @@ def test_render_rewrites_only_the_drifted_manual(manuals_dir: Path) -> None:
     assert f"Rendered {drifted.name}" in result.output
 
 
+def test_a_bad_manual_stops_the_render_before_any_manual_is_written(
+    manuals_dir: Path,
+) -> None:
+    first, *_, last = manuals.MANUAL_FILES.items()
+    drifted = manuals_dir / first[1]
+    stale = f"# {first[0]}\n" + _block("greeting", "stale")
+    drifted.write_text(stale)
+    (manuals_dir / last[1]).write_text(f"# {last[0]}\n<!-- BEGIN GENERATED: greeting -->\n")
+
+    result = _cli(manuals_dir)
+
+    assert result.exit_code == 1
+    assert f"{last[1]}: line 2: block 'greeting' has no END marker" in result.output
+    assert drifted.read_text() == stale
+    assert "Rendered" not in result.output
+
+
 def test_a_bad_marker_exits_1_with_the_file_and_line(manuals_dir: Path) -> None:
     broken = manuals_dir / manuals.MANUAL_FILES[MODEL]
     broken.write_text("# B737-800\n<!-- BEGIN GENERATED: greeting -->\n")

@@ -83,12 +83,14 @@ exec "$STUB_PYTHON" "$@"
 
 # macOS /usr/bin/mktemp ignores TMPDIR here, so without this stub a test of
 # temp file cleanup would pass on code that leaks.
-# npm logs its arguments and working folder. `npm ci` creates node_modules,
-# as the real install does, unless STUB_NPM_EXIT makes it fail.
+# npm logs its arguments and working folder. `npm ci` writes
+# node_modules/.package-lock.json, as a complete real install does, unless
+# STUB_NPM_EXIT makes it fail.
 STUB_NPM = r"""#!/bin/bash
 echo "npm $* in ${PWD##*/graphrag-agent/}" >> "$STUB_LOG"
 if [ -n "$STUB_NPM_EXIT" ]; then echo "npm ERR! stub failure" >&2; exit "$STUB_NPM_EXIT"; fi
-mkdir node_modules
+mkdir -p node_modules
+echo "{}" > node_modules/.package-lock.json
 """
 
 STUB_MKTEMP = r"""#!/bin/bash
@@ -414,7 +416,7 @@ def test_destroy_runs_when_confirmed(project: Path) -> None:
 
 def run_deploy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[str]:
     # deploy needs the shared ../.env and an installed .venv. The CDK project
-    # starts without node_modules, as in a fresh clone.
+    # starts with no install, as in a fresh clone.
     (project.parent / ".env").write_text("NEO4J_URI=bolt://localhost:27687\n")
     (project / ".venv").mkdir(exist_ok=True)
     (project / "agentcore" / "cdk").mkdir(exist_ok=True)
@@ -442,16 +444,29 @@ def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     logged = calls(project)
     assert logged == ["npm ci in agentcore/cdk", "agentcore deploy --target default"]
-    assert (project / "agentcore" / "cdk" / "node_modules").is_dir()
+    assert (project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json").is_file()
 
 
 def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> None:
-    (project / "agentcore" / "cdk" / "node_modules").mkdir(parents=True)
+    modules = project / "agentcore" / "cdk" / "node_modules"
+    modules.mkdir(parents=True)
+    (modules / ".package-lock.json").write_text("{}")
 
     result = run_deploy(project)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(project) == ["agentcore deploy --target default"]
+
+
+def test_a_partial_cdk_install_is_installed_again(project: Path) -> None:
+    # A failed npm ci can leave node_modules without the lockfile that npm
+    # writes only after a complete install.
+    (project / "agentcore" / "cdk" / "node_modules").mkdir(parents=True)
+
+    result = run_deploy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == ["npm ci in agentcore/cdk", "agentcore deploy --target default"]
 
 
 def test_a_failed_cdk_install_stops_before_deploy(project: Path) -> None:

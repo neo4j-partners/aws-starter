@@ -104,9 +104,11 @@ ensure_cli() {
 
 # agentcore deploy refuses to run without agentcore/cdk/node_modules, and
 # git ignores that folder, so a fresh clone has none. Install it from the
-# committed package-lock.json on the first deploy.
+# committed package-lock.json on the first deploy. npm writes
+# node_modules/.package-lock.json only after a complete install, so a
+# partial install from a failed npm ci is installed again.
 ensure_cdk_deps() {
-    if [ -d "$CDK_DIR/node_modules" ]; then
+    if [ -f "$CDK_DIR/node_modules/.package-lock.json" ]; then
         return
     fi
     if ! command -v npm >/dev/null 2>&1; then

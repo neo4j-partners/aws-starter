@@ -141,7 +141,10 @@ if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
 fi
 if [ "$name" = awk ] && [ -n "${STUB_RECORD_STRIP_MODE:-}" ]; then
     for copy in agentcore/.env.local.strip.*; do
-        [ -f "$copy" ] && stat -f %Lp "$copy" >> "${STUB_LOG%/*}/strip-modes"
+        # stat's flags differ between macOS and Linux, so Python reads it.
+        [ -f "$copy" ] && python3 -c 'import os, stat, sys
+print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' "$copy" \
+            >> "${STUB_LOG%/*}/strip-modes"
     done
 fi
 exit "$status"

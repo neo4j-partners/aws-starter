@@ -21,6 +21,12 @@ STUB_AGENTCORE = r"""#!/bin/bash
 echo "agentcore $*" >> "$STUB_LOG"
 case "$1" in
     status) printf '%s\n' "$STUB_STATUS_JSON" ;;
+    add)
+        # The CLI reads the secret on stdin and writes it to .env.local.
+        cat > /dev/null
+        printf '%s\n' "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=encrypted" \
+            >> agentcore/.env.local
+        ;;
     remove)
         jq --arg n "$4" 'del(.runtimes[] | select(.name == $n))' \
             agentcore/agentcore.json > agentcore/agentcore.json.stub
@@ -31,6 +37,11 @@ case "$1" in
             printf '%s\n' "$STUB_DEPLOY_TARGETS" > agentcore/aws-targets.json
         fi
         if [ -n "$STUB_DEPLOY_LOCK_SPEC" ]; then chmod 0444 agentcore/agentcore.json; fi
+        # Replace .env.local with a link after agent.sh checked it.
+        if [ -n "$STUB_DEPLOY_LINK_ENV_LOCAL" ]; then
+            rm -f agentcore/.env.local
+            ln -s "$STUB_DEPLOY_LINK_ENV_LOCAL" agentcore/.env.local
+        fi
         if [ -n "$STUB_DEPLOY_SIGNAL" ]; then kill -s "$STUB_DEPLOY_SIGNAL" "$PPID"; fi
         exit "${STUB_DEPLOY_EXIT:-0}"
         ;;
@@ -49,6 +60,20 @@ case "$1 $2" in
         # Ctrl+C reaches the whole foreground group, so the stub dies too.
         # bash ignores a SIGINT when its child exits normally.
         if [ -n "$STUB_LOOKUP_SIGNAL" ]; then kill -s "$STUB_LOOKUP_SIGNAL" "$PPID" "$$"; fi
+        # Leave something at the strip copy's name for agent.sh's pid. A
+        # $(...) subshell may sit between, so climb to the outermost agent.sh.
+        owner=$PPID
+        while parent=$(ps -o ppid= -p "$owner" | tr -d ' ') \
+            && ps -o command= -p "$parent" | grep -qF /agent.sh; do
+            owner=$parent
+        done
+        strip_copy="agentcore/.env.local.strip.$owner"
+        case "${STUB_LOOKUP_PLANT_STRIP:-}" in
+            fifo) mkfifo "$strip_copy" ;;
+            dangling) ln -s "$STUB_TMP/missing" "$strip_copy" ;;
+            devnull) ln -s /dev/null "$strip_copy" ;;
+            stale) printf 'STALE=1\n' > "$strip_copy" ;;
+        esac
         if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
         if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
         echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
@@ -128,6 +153,7 @@ def project(tmp_path: Path) -> Path:
         ("cp", STUB_PASSTHROUGH),
         ("mv", STUB_PASSTHROUGH),
         ("awk", STUB_PASSTHROUGH),
+        ("uv", "#!/bin/bash\n"),
     ):
         stub = bin_dir / name
         stub.write_text(body)
@@ -424,6 +450,65 @@ def test_a_linked_env_local_is_refused_before_any_change(
     assert target.read_text() == "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n"
     assert spec.read_bytes() == tracked
     assert not any("deploy" in call or "remove" in call or "add" in call for call in calls(project))
+
+
+# The start check passed, then .env.local became a link. mv would replace
+# the link and leave the secret in its target, so the strip refuses.
+def test_a_link_made_after_the_start_check_is_not_replaced(project: Path) -> None:
+    target = project.parent / "shared.env"
+    target.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("A=1\n")
+
+    result = run_destroy(project, STUB_DEPLOY_LINK_ENV_LOCAL=str(target))
+
+    assert result.returncode == 1
+    assert "agentcore/.env.local is a symbolic link" in result.stderr
+    assert env_local.is_symlink()
+    assert target.read_text() == "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n"
+    assert not list(env_local.parent.glob(".env.local.*"))
+
+
+def ready_to_deploy(project: Path) -> None:
+    """Add what deploy reads before the strip: a venv, ../.env, and credentials."""
+    (project / ".venv").mkdir()
+    (project.parent / ".env").write_text("")
+    (project.parent / ".mcp-credentials.json").write_text(
+        json.dumps(
+            {
+                "client_id": "id",
+                "client_secret": "secret",
+                "scope": "fleet/invoke",
+                "stack_name": "neo4j-mcp-server-fleet",
+            }
+        )
+    )
+
+
+# Whatever sits at the copy's name is removed first, so the copy is always a
+# new regular file. Before, a FIFO hung the open, a link to /dev/null took
+# the lines, and a dangling link or a stale copy stopped the deploy.
+@pytest.mark.parametrize("planted", ["fifo", "dangling", "devnull", "stale"])
+def test_anything_left_at_the_copy_name_does_not_stop_the_strip(
+    project: Path, planted: str
+) -> None:
+    ready_to_deploy(project)
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
+    env_local.chmod(0o600)
+
+    result = run_agent(
+        project,
+        "deploy",
+        STUB_STACK_STATUS="https://cognito-idp.example/.well-known/openid-configuration",
+        STUB_LOOKUP_PLANT_STRIP=planted,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not env_local.is_symlink()
+    assert env_local.read_text() == "A=1\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
+    assert not list(env_local.parent.glob(".env.local.*"))
 
 
 def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:

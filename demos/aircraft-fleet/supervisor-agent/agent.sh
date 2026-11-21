@@ -307,16 +307,27 @@ strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
     # The copy sits next to the file, so mv replaces the file in one step.
-    # umask 077 creates the copy with mode 0600 before the filtered lines go
-    # in, and set -C refuses a file already at that name. chmod sets 0600
-    # again, the mode the CLI writes .env.local with.
-    if ! (umask 077 && set -C && : > "$ENV_STRIP_TMP") \
+    # Anything already at the copy's name is removed first. A FIFO there
+    # would hang the open, and a link would send the lines elsewhere. umask
+    # 077 creates the copy with mode 0600 before the filtered lines go in,
+    # and set -C refuses a file that appears at that name in between. The
+    # copy must then be a regular file, not a link. chmod sets 0600 again,
+    # the mode the CLI writes .env.local with. .env.local is checked for a
+    # link again right before mv, which would replace the link and leave
+    # the secret in its target.
+    if ! remove_strip_copy \
+        || ! (umask 077 && set -C && : > "$ENV_STRIP_TMP") \
+        || [ ! -f "$ENV_STRIP_TMP" ] || [ -L "$ENV_STRIP_TMP" ] \
         || ! awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
             '$0 !~ ("^[ \t]*(export[ \t]+)?" name "[ \t]*=") && $0 != comment' \
             "$ENV_LOCAL" >> "$ENV_STRIP_TMP" \
         || ! chmod 600 "$ENV_STRIP_TMP" \
+        || [ -L "$ENV_LOCAL" ] \
         || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
         remove_strip_copy
+        if [ -L "$ENV_LOCAL" ]; then
+            echo -e "${RED}$ENV_LOCAL is a symbolic link, so it was not replaced.${NC}" >&2
+        fi
         echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2
         return 1
     fi

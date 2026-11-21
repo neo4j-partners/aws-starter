@@ -2,15 +2,27 @@
 
 This Strands supervisor agent answers questions about the aircraft fleet graph.
 It hands each question to one or both specialist agents. The specialists query
-Neo4j through the Neo4j MCP Gateway.
+Neo4j through the Neo4j MCP server and AgentCore Gateway.
+
+![Supervisor agent request flow](../docs/images/supervisor-request-flow.svg)
 
 ## Overview
 
 - **Supervisor:** The supervisor is a Strands `Agent`. Its two tools are the specialists, and the model picks one or both from the tool descriptions.
 - **Maintenance Agent:** This specialist handles faults, components, sensors, and reliability.
 - **Operations Agent:** This specialist handles flights, delays, routes, and airports. It also takes general questions, such as the schema or simple counts.
-- **Shared tools:** Both specialists use the same two Gateway tools: `get_neo4j_schema` and `read_neo4j_cypher`.
-- **Streaming:** The server streams events as the answer is produced. Clients see which specialists ran and which tools they called.
+- **Gateway tools:** Both specialists use the same two tools, `get_neo4j_schema` and `read_neo4j_cypher`, through the AgentCore Gateway.
+- **Memory:** The supervisor remembers each session and what it learns about each user. Memory lives in its own Neo4j database.
+
+## Features
+
+- **Parallel specialists:** The supervisor can call both specialists, or one specialist twice, in the same turn. Each call gets a fresh specialist `Agent`, so calls never wait on each other.
+- **Session recovery:** Each Gateway tool rebuilds its MCP session and retries once when the session drops.
+- **Error scrubbing:** The tools replace raw database errors before the model sees them. No database address reaches an answer.
+- **Two credential paths:** Local runs read a credentials file. The deployed runtime gets its Gateway token from AgentCore Identity and holds no client secret.
+- **Token refresh:** The cloud path caches the M2M token until shortly before it expires. A rejected token triggers one fresh fetch and one retry.
+- **Streaming:** The server streams `agent`, `tool`, `chunk`, `complete`, and `error` events over SSE.
+- **Safe deploys:** The deploy refuses to zip any credentials file. The Gateway client secret never appears on a command line.
 
 ## Quick start
 
@@ -20,36 +32,26 @@ Run these commands from `demos/aircraft-fleet/supervisor-agent/`:
 uv sync
 ../../../scripts/sync-credentials.sh   # writes ../.mcp-credentials.json
 
-./agent.sh start                       # Terminal 1: serves http://localhost:7071
-./agent.sh test-maintenance            # Terminal 2: a question for Maintenance
+./agent.sh start                       # terminal 1: serves http://localhost:7071
+./agent.sh test-maintenance            # terminal 2: a question for Maintenance
 ./agent.sh test-operations             # a question for Operations
+uv run fleet-supervisor-cli "Compare fault counts with delay counts"
 ```
 
-## Architecture
+## Prerequisites
 
-```
-                        User query
-                            |
-                        Supervisor
-              calls one or both specialist tools
-                            |
-              +-------------+-------------+
-              |                           |
-       Maintenance Agent          Operations Agent
-       faults, components         flights, delays
-       sensors, reliability       routes, airports
-              |                           |
-              +-------------+-------------+
-                            |
-          AgentCore Gateway -> Neo4j MCP Server -> Neo4j
-```
+- **Python:** You need Python 3.12 and the `uv` package manager.
+- **AWS:** You need AWS credentials with Bedrock access to Claude Sonnet 5.5.
+- **Graph:** You need the fleet graph loaded by the [pipeline](../pipeline/).
+- **MCP server:** You need a `fleet` Neo4j MCP server deployment that points at the same Neo4j database. Run `./deploy.py --env fleet` and `./deploy.py --env fleet credentials` from `neo4j-mcp-server/`.
+- **Memory database:** You need a second Neo4j database or instance for memory. It can be empty. Keep it apart from the fleet graph.
 
-### Routing
+## Routing
 
 The supervisor model reads the two tool descriptions in
-`fleet_supervisor/core/agents.py` and the supervisor prompt in
-`fleet_supervisor/core/prompts.py`. A question that spans both domains
-calls both specialists, and the supervisor combines their answers.
+`fleet_supervisor/core/agents.py` and the prompt in
+`fleet_supervisor/core/prompts.py`. A question that spans both domains calls
+both specialists, and the supervisor combines their answers.
 
 | Question mentions | Goes to |
 |-------------------|---------|
@@ -57,49 +59,21 @@ calls both specialists, and the supervisor combines their answers.
 | flights, delays, delay causes, routes, airports, operators, schedules, on-time performance | Operations Agent |
 | the schema, simple counts, or other general topics | Operations Agent |
 
-### One Agent per specialist call
+## Gateway connection
 
-The supervisor runs tool calls in parallel, so it can call the same specialist
-twice in one turn. A Strands `Agent` serves one call at a time. For that
-reason, `SpecialistTool` builds a fresh specialist `Agent` for every call.
-Parallel calls never wait on each other.
-
-### Gateway connection
-
-The model, the Gateway MCP client, and the Gateway tools are created on the
-first request and shared by later requests. If the MCP session ends, the next
-request opens a new one.
-
-### Gateway session recovery
-
-The Gateway can also end the MCP session while a request is running. Each
-Gateway tool is wrapped in `GatewayTool`, which handles both ways a call can
-fail then:
-
-- A call already in flight returns an error result while the session is down.
-- A later call raises `MCPClientInitializationError` before it is sent.
-
-In either case, the tool rebuilds the MCP client and retries the call once. A
-rebuild happens only if the failed client is still the current one. Calls that
-find the session down after another call rebuilt it reuse the new client. The
-old client stops when its last call finishes. The rebuild is logged at WARNING
-with the request's session ID and the cause class.
-
-If the retry fails too, or the rebuild fails, the specialist gets a fixed
-message: "The graph database is unavailable right now." The error details stay
-in the server log. This includes an auth failure that persists after the
-forced token refresh. The next request rebuilds the client again.
-
-The tool specs come from the first client and never change, so a rebuild never
-changes what the model sees. If a rebuilt client lacks a tool, calls to that
-tool get the same fixed message.
+- **Shared client:** The model, the Gateway MCP client, and the tools are created on the first request and shared by later requests.
+- **Session ends between requests:** The next request opens a new session.
+- **Session ends during a request:** A call in flight returns an error result, or a later call raises `MCPClientInitializationError`. In either case, `GatewayTool` rebuilds the client and retries once.
+- **One rebuild:** A rebuild happens only if the failed client is still the current one. Other calls reuse the new client. The old client stops when its last call finishes.
+- **Logging:** Each rebuild is logged at WARNING with the session ID and the cause class.
+- **Retry fails:** The specialist gets "The graph database is unavailable right now." The details stay in the server log.
+- **Stable specs:** The tool specs come from the first client, so a rebuild never changes what the model sees.
 
 ### Tool errors the model sees
 
 The Neo4j MCP server returns the driver's error message as the tool result.
-That message can name the database address, and the specialist could quote it
-to the user. So `GatewayTool` replaces every error result before the model
-sees it. The original text goes to the server log.
+That message can name the database address. `GatewayTool` replaces every error
+result before the model sees it and logs the original.
 
 | Error | What the model gets |
 |-------|---------------------|
@@ -108,72 +82,40 @@ sees it. The original text goes to the server log.
 | Neo4j, the MCP server, or the Gateway could not be reached, or auth failed | "The graph database is unavailable right now." |
 | Any other error | "The graph database returned an error." |
 
-The wording matches the graphrag agent's tools. The supervisor sees only the
-error text, so `fleet_supervisor/core/tool_errors.py` classifies it by the Neo4j code and the
-driver's connection messages.
-
-## Prerequisites
-
-1. **Python:** You need Python 3.12 and the `uv` package manager.
-2. **AWS:** You need the AWS CLI configured, with Bedrock access to Claude Sonnet 5.5.
-3. **Graph:** You need the fleet graph loaded into Neo4j by [`demos/aircraft-fleet/pipeline/`](../pipeline/).
-4. **MCP server:** You need a `fleet` Neo4j MCP server deployment that points at the same Neo4j database. Run these commands from the repo root:
-
-   ```bash
-   cd neo4j-mcp-server
-   ./deploy.py --env fleet
-   ./deploy.py --env fleet credentials
-   ```
-
-5. **Memory database:** You need a second Neo4j database or instance for the supervisor's conversation memory. It can be empty. The agent creates its schema on first connect. Keep it separate from the fleet graph.
+`fleet_supervisor/core/tool_errors.py` classifies the text by the Neo4j code
+and the driver's connection messages. The wording matches the GraphRAG agent.
 
 ## Gateway credentials
 
-The agent has two ways to get a Gateway token. The environment picks one.
+The environment picks one of two paths.
 
-- **Local:** The agent reads `demos/aircraft-fleet/.mcp-credentials.json`. The path is resolved from the package, so it works from any working directory. Set `MCP_CREDENTIALS_FILE` to use another file.
-- **Cloud:** When `CREDENTIAL_FLEET_GATEWAY_NAME` or `GATEWAY_URL` is set, the agent gets an M2M token from the AgentCore Identity credential provider that `CREDENTIAL_FLEET_GATEWAY_NAME` names. Both must be set. If one is missing, the agent stops with an error that names it. The AgentCore CDK construct sets `CREDENTIAL_FLEET_GATEWAY_NAME` on the runtime because `./agent.sh deploy` declares the `fleet-gateway` credential. `GATEWAY_URL` gives the Gateway endpoint. The runtime holds no client secret.
+- **Local:** The agent reads `demos/aircraft-fleet/.mcp-credentials.json`. Set `MCP_CREDENTIALS_FILE` to use another file.
+- **Local token:** The agent sends the OAuth `client_credentials` request to the `token_url` in that file. It does not use OAuth discovery, so the secret goes only to that URL.
+- **Cloud:** When `CREDENTIAL_FLEET_GATEWAY_NAME` or `GATEWAY_URL` is set, the agent gets an M2M token from the AgentCore Identity provider. Both must be set, or the agent stops with an error that names the missing one.
+- **Cloud token:** Each request fetches the token with its own workload access token. The cache is shared because the token is M2M and not tied to a user.
+- **File location:** The credentials file sits outside this folder on purpose, because `agentcore deploy` zips this whole folder.
 
-On the cloud path, each request fetches the Gateway token before it starts,
-because AgentCore Identity needs that request's workload access token. The
-token is cached until shortly before the expiry in its `exp` claim. If the
-Gateway rejects a token, the agent asks Identity for a new one, bypassing the
-token vault cache, and retries once. The cache is shared by all requests,
-which is valid only because the token is M2M and not tied to a user.
+## Conversation memory
 
-On the local path, the agent sends the OAuth `client_credentials` request to
-the `token_url` in the credentials file. It does not use OAuth discovery, so
-the client secret only goes to that URL.
+![Conversation memory lifecycle](../docs/images/memory-lifecycle.svg)
 
-The credentials file sits outside this folder on purpose. `agentcore deploy`
-zips this whole folder, and `./agent.sh deploy` refuses to run if any `.env*`,
-`.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem`
-file, or a `venv/` folder, is inside it.
+- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.7, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
+- **Extraction model:** The extractor runs on Claude Sonnet 5.5. It sends no temperature and lets the model choose the tool, because Sonnet 5.5 rejects both.
+- **What it stores:** Memory keeps the user and assistant text of each turn. It does not store specialist calls.
+- **One client per process:** The client opens on the first request and closes at shutdown. Each request gets its own session manager on it.
+- **Background extraction:** Entity extraction runs after the reply. The health check reports busy until it ends, so AgentCore Runtime keeps the session alive.
+- **Shutdown:** Shutdown waits up to 30 seconds for open requests to write their memory, then closes the client. The whole close takes at most about 100 seconds.
+- **Lost work:** An extraction still running at the deadline is lost. The stored message keeps its text without entities.
+- **Password rotation:** If Neo4j rejects the memory password, the server reads the secret again and reopens the client with it.
 
 ## Run locally
 
-Run these commands from `demos/aircraft-fleet/supervisor-agent/`:
-
-```bash
-uv sync
-../../../scripts/sync-credentials.sh
-
-./agent.sh start                   # Terminal 1: serves http://localhost:7071
-./agent.sh test-maintenance        # Terminal 2
-./agent.sh test-operations
-uv run fleet-supervisor-cli "Compare fault counts with delay counts"
-```
-
-- **Memory settings:** Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `demos/aircraft-fleet/.env`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. They point at the memory database, not the fleet graph. The server stops at startup if the URI or the password is missing.
-- **Memory package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.7, a build of the `neo4j-partners/agent-memory` fork. Its entity extractor runs on Claude Sonnet 5.5. Sonnet 5.5 rejects a temperature and a forced tool choice, so the extractor sends no temperature and lets the model choose the tool. `pyproject.toml` pins the wheel by its release URL, and `uv.lock` records the wheel's sha256, so `uv sync` rejects any other file. Memory stores the user and assistant text of each turn but no specialist calls, so the supervisor prompt says that a restored turn without one does not mean no specialist ran. The server holds one memory client per process. It opens on the first request and closes at shutdown. Shutdown waits up to 30 seconds for open requests to write their memory, then closes the client. Closing the memory clients takes at most about 100 seconds. An extraction still running at that deadline is lost. A client still opening when the 30-second wait ends closes itself after shutdown returns, so the process may exit first. No request used that client, so no memory is lost. Each request gets its own session manager on that client. Entity extraction runs after the reply, in the background. The health check reports busy until it finishes, so AgentCore Runtime does not stop the session in the middle of it.
-- **Shared .env:** The server loads `demos/aircraft-fleet/.env` at startup. The path comes from the package, so it works from any working directory. Set `FLEET_ENV_FILE` to use another file. A value already set in the environment wins.
-- **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server`. Set `AGENT_PORT` to change the port.
-- **Runtime entrypoint:** `uv run python main.py` starts the same server on 8080, the port AgentCore Runtime uses.
-- **Port:** The default port is 7071, so the supervisor can run beside `graphrag-agent` on 7070.
+- **Shared .env:** The server loads `demos/aircraft-fleet/.env` at startup. Set `FLEET_ENV_FILE` to use another file. A value already set in the environment wins.
+- **Memory settings:** Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. The server stops at startup if the URI or the password is missing.
+- **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server` on port 7071, beside the GraphRAG agent on 7070. Set `AGENT_PORT` to change it.
+- **Runtime entrypoint:** `uv run python main.py` starts the same server on port 8080, the port AgentCore Runtime uses.
 
 ### Events
-
-The server streams JSON events over SSE:
 
 | Event | Meaning |
 |-------|---------|
@@ -183,33 +125,73 @@ The server streams JSON events over SSE:
 | `{"type": "complete"}` | The answer is finished |
 | `{"type": "error", "error": ...}` | The request failed. The message is generic, and the details are in the server log. |
 
-## Deploy to AgentCore Runtime
-
-The project lives in `agentcore/`. It was created with the AgentCore CLI, and
-its runtime `codeLocation` is this folder.
-
-The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` and `./agent.sh destroy` run `npm ci` there when the install is missing or incomplete, or older than `package-lock.json`, as after a pull that changes it. `./agent.sh configure` always runs it. Where `package-lock.json` is missing, as in a project `agentcore create` has just made, each runs `npm install` instead, which writes it. To install them once by hand, run:
-
-```bash
-(cd agentcore/cdk && npm ci)
-```
-
-**Deploy settings:** Before the first deploy, set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env`. `./agent.sh deploy` exports them, plus `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. A value exported in the shell wins. The files are parsed, not sourced, and nothing else in them is exported. `agentcore/cdk/lib/cdk-stack.ts` copies the settings onto the runtime. Synth stops with one error that lists every missing or malformed setting. `GATEWAY_URL` must use `https://`, and `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`. `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN, and the runtime role can read only that secret.
-
-**Gateway credential provider:** `./agent.sh deploy` declares the `fleet-gateway` OAuth credential for that one deploy. It reads the client ID, scope, and secret from the fleet credentials file. It reads the discovery URL from the `CognitoDiscoveryUrl` output of the MCP server stack. The AgentCore CLI creates or updates the provider before CDK runs, because CDK cannot create it. The construct grants the runtime access to the provider, and sets `CREDENTIAL_FLEET_GATEWAY_NAME`, only while the entry exists.
-
-The script passes the secret to the CLI on stdin, never on the command line. The CLI stores it, encrypted, in `agentcore/.env.local`, which git ignores and the code zip leaves out. When the deploy ends, the script removes that line and restores the tracked `agentcore.json`. It does this on an error or Ctrl+C too. The tracked spec never declares the credential, so it holds no account-specific values.
-
-Never run a bare `agentcore deploy` in this folder. Without the entry, the CLI treats the provider as orphaned and deletes it, and the runtime loses its grant. If it happens, run `./agent.sh deploy` again. That recreates the provider and the grants.
-
-The runtime role has two `secretsmanager:GetSecretValue` resources. The `bedrock-agentcore-identity!*` wildcard comes from the AgentCore construct's own grant for the credential provider, not from `cdk-stack.ts`. The other is the memory password secret. The server reads it once. If Neo4j rejects the password, the server reads the secret again and reopens the shared memory client with it.
-
-Then run these commands:
+## Deploy
 
 ```bash
 ./agent.sh deploy                  # takes several minutes
 ./agent.sh invoke-cloud "What are the most common maintenance faults?"
 ./agent.sh invoke-cloud "Which routes have the most delays?"
+```
+
+### Deploy settings
+
+- **Memory:** Set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env` before the first deploy. `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`.
+- **Gateway:** The deploy reads `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. `GATEWAY_URL` must use `https://`.
+- **Password secret:** `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN. The runtime role can read only that secret.
+- **Parsing:** The files are parsed, not sourced. A value exported in the shell wins.
+- **Validation:** Synth stops with one error that lists every missing or malformed setting.
+
+### Gateway credential provider
+
+- **Declared per deploy:** `./agent.sh deploy` declares the `fleet-gateway` OAuth credential for that one deploy. The CLI creates or updates the provider before CDK runs.
+- **Sources:** The client ID, scope, and secret come from the fleet credentials file. The discovery URL comes from the MCP server stack's `CognitoDiscoveryUrl` output.
+- **Secret handling:** The script passes the secret on stdin. The CLI stores it, encrypted, in `agentcore/.env.local`, which git ignores and the zip leaves out.
+- **Cleanup:** When the deploy ends, on success, error, or Ctrl+C, the script removes that line and restores the tracked `agentcore.json`.
+- **Grants:** The runtime role reads the provider through the construct's `bedrock-agentcore-identity!*` grant, and the memory secret through its own grant.
+
+Never run a bare `agentcore deploy` in this folder. Without the entry, the CLI
+treats the provider as orphaned and deletes it. If it happens, run
+`./agent.sh deploy` again to recreate the provider and the grants.
+
+### How the deploy works
+
+- **Code zip:** The zip holds this folder except `.venv`, `agentcore/`, `__pycache__`, and `.pytest_cache`. The runtime runs `main.py`.
+- **Secret guard:** `./agent.sh deploy` refuses to run if any `.env*`, `.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem` file, or a `venv/` folder, is inside this folder.
+- **CDK dependencies:** `deploy` and `destroy` run `npm ci` in `agentcore/cdk` when the install is missing, incomplete, or older than `package-lock.json`. `configure` always runs it.
+
+### Remove the deployment
+
+`./agent.sh destroy` removes the runtime, its stack, and the Gateway credential provider.
+
+- **Confirmation:** It asks first. Pass `--yes` to skip the question.
+- **Account check:** It confirms that the active credentials belong to the account in `agentcore/aws-targets.json`, before it asks and again before its final lookups.
+- **How it works:** The CLI has no destroy command. The script removes the runtime from the spec and deploys, which deletes the stack and the provider.
+- **Final check:** It reads `agentcore status` and looks up the stack and the provider in AWS by name. If anything remains, it prints the command that deletes it and exits with an error.
+- **Lost local state:** If `agentcore/.cli/` is lost, destroy still deletes the stack. The AWS check then names the leftover provider.
+
+### Upgrade a checkout that already deployed
+
+Git used to track `agentcore/aws-targets.json`, and the first deploy edited it.
+A `git pull` in that checkout can stop with "Your local changes to the
+following files would be overwritten by merge", or with "cannot pull with
+rebase: You have unstaged changes".
+
+Keep the file, because destroy needs it. Run these two commands from this
+folder in one shell. The first backs the file up, prints the backup name, then
+discards the change and pulls. The second restores the file only if the backup
+was complete:
+
+```bash
+backed_up= && backup=$(mktemp) && cp agentcore/aws-targets.json "$backup" && backed_up=1 && echo "Backup: $backup" && git checkout -- agentcore/aws-targets.json && git pull
+[ "${backed_up:-}" = 1 ] && cp "$backup" agentcore/aws-targets.json && rm -f "$backup"
+```
+
+If the last `cp` fails, copy the backup back by hand from the printed name. If
+the backup is lost, recreate the file with the account and region you deployed
+to:
+
+```json
+[{"name": "default", "account": "<12-digit account ID>", "region": "<region>"}]
 ```
 
 ## Commands
@@ -220,120 +202,54 @@ Then run these commands:
 | `./agent.sh test ["question"]` | Send a question to the local agent. The default asks for the schema. |
 | `./agent.sh test-maintenance` | Send a question that goes to the Maintenance Agent |
 | `./agent.sh test-operations` | Send a question that goes to the Operations Agent |
-| `./agent.sh configure` | Create the AgentCore project in `agentcore/` if it is missing, and install its CDK dependencies |
+| `./agent.sh configure` | Create the AgentCore project if it is missing, and install its CDK dependencies |
 | `./agent.sh deploy` | Deploy to AgentCore Runtime |
 | `./agent.sh status` | Show the deployment status |
 | `./agent.sh logs [30m]` | Show runtime logs from the given window |
-| `./agent.sh invoke-cloud ["question"]` | Call the deployed agent |
-| `./agent.sh load-test [N]` | Send a random test question to the deployed agent every N seconds. The default is 5. |
-| `./agent.sh destroy [--yes]` | Remove the runtime, its stack, and the Gateway credential provider. It asks first. `--yes` skips the question. |
-
-`invoke-cloud` calls `agentcore invoke --runtime supervisor`. `load-test`
-finds the runtime ARN in `AGENT_ARN`. If it is unset, it reads the ARN from
-`agentcore status --json`.
-
-Before it asks, and before any AWS change, `./agent.sh destroy` confirms that
-the active AWS credentials belong to the account recorded for the target in
-`agentcore/aws-targets.json`. Credentials for another account would deploy
-there. The first deploy writes that file, and git ignores it. If the file is
-missing, destroy stops and says to run it from the checkout that deployed.
-
-**Upgrading a checkout that already deployed:** Git used to track
-`agentcore/aws-targets.json`, and the first deploy edited it. So a `git pull`
-in that checkout can stop with one of these errors:
-
-- A merge or fast-forward pull stops with "Your local changes to the
-  following files would be overwritten by merge".
-- A rebase pull stops with "cannot pull with rebase: You have unstaged
-  changes".
-
-Keep the file, because destroy needs it. Run these commands from this folder
-in one shell. The first command backs the file up to a temporary name and
-prints it. It discards your change and pulls only after the backup is made.
-The second command puts the file back, even if the pull failed, and removes
-the backup. It runs only if the backup was complete, so a partial backup
-never replaces the file:
-
-```bash
-backed_up= && backup=$(mktemp) && cp agentcore/aws-targets.json "$backup" && backed_up=1 && echo "Backup: $backup" && git checkout -- agentcore/aws-targets.json && git pull
-[ "${backed_up:-}" = 1 ] && cp "$backup" agentcore/aws-targets.json && rm -f "$backup"
-```
-
-After the pull, git ignores the file. If that last `cp` fails, the backup is
-kept, so copy it back by hand from the printed name. If the backup is lost,
-recreate the file with the account and region you deployed to:
-
-```json
-[{"name": "default", "account": "<12-digit account ID>", "region": "<region>"}]
-```
-
-The CLI has no destroy command. `./agent.sh destroy` removes the runtime from
-the spec and deploys. A deploy with nothing to deploy deletes the target's
-stack. It also deletes each credential provider that the CLI's state records
-but the spec no longer declares, and that includes the `fleet-gateway`
-provider. So destroy does not declare the credential, and it needs neither the
-fleet credentials file nor the MCP server stack. With no runtime in the spec,
-`cdk-stack.ts` reads no deploy settings. The script then restores the tracked
-spec and checks what remains. It reads `agentcore status`, and it looks up the
-stack and the credential provider in AWS by name. Before those lookups, it
-checks the account again, because the credentials can change during the
-deploy. Credentials for another account would not see the stack or the
-provider. If anything is still deployed, it
-lists it with the command that deletes it and exits with an error.
-
-The CLI's local state in `agentcore/.cli/` holds account-specific ARNs, so git
-ignores it. If it is lost, destroy still deletes the stack, which the CLI
-finds by name. The credential provider stays, because only that state records
-it. The AWS check then names the provider and prints the command that deletes
-it.
+| `./agent.sh invoke-cloud ["question"]` | Call the deployed agent through `agentcore invoke --runtime supervisor` |
+| `./agent.sh load-test [N]` | Send a random test question to the deployed agent every N seconds. It reads the ARN from `AGENT_ARN` or `agentcore status`. |
+| `./agent.sh destroy [--yes]` | Remove the runtime, its stack, and the Gateway credential provider |
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `main.py` | AgentCore entrypoint. It calls `fleet_supervisor.server.main` on port 8080. |
-| `fleet_supervisor/server.py` | The `BedrockAgentCoreApp`, its entrypoint, and `main()`, run by `fleet-supervisor-server` |
-| `fleet_supervisor/core/config.py` | Model ID, region, token limit, effort, and local port. Environment variables can override them. |
-| `fleet_supervisor/core/prompts.py` | The supervisor prompt and the two specialist system prompts |
+| `main.py` | The AgentCore entrypoint. It starts the server on port 8080. |
+| `fleet_supervisor/server.py` | The `BedrockAgentCoreApp`, its entrypoint, and `main()` |
+| `fleet_supervisor/core/config.py` | The model, region, token limit, effort, and local port |
+| `fleet_supervisor/core/prompts.py` | The supervisor prompt and the two specialist prompts |
 | `fleet_supervisor/core/agents.py` | The supervisor and `SpecialistTool` |
 | `fleet_supervisor/core/model.py` | The Bedrock model factory |
-| `fleet_supervisor/core/credentials.py` | Picks the local or cloud Gateway credentials |
+| `fleet_supervisor/core/credentials.py` | The local or cloud Gateway credentials |
 | `fleet_supervisor/core/mcp.py` | The Gateway MCP client, its bearer-token auth, and the tool filter |
-| `fleet_supervisor/core/gateway_tools.py` | `GatewayTool`, which reconnects and retries once when the MCP session ends, and scrubs error results |
-| `fleet_supervisor/core/tool_errors.py` | Classifies a tool's error text into the result the model may see |
-| `fleet_supervisor/core/events.py` | Maps Strands stream events to the client events |
-| `fleet_supervisor/client/cli.py` | Asks the local server one question, run by `fleet-supervisor-cli` |
-| `fleet_supervisor/client/invoke.py` | Cloud calls and load testing, run by `fleet-supervisor-invoke` |
+| `fleet_supervisor/core/gateway_tools.py` | `GatewayTool`, with the rebuild, retry, and error scrubbing |
+| `fleet_supervisor/core/tool_errors.py` | The error classifier |
+| `fleet_supervisor/core/events.py` | The mapping from Strands stream events to client events |
+| `fleet_supervisor/client/cli.py` | `fleet-supervisor-cli`, which asks the local server one question |
+| `fleet_supervisor/client/invoke.py` | `fleet-supervisor-invoke`, for cloud calls and load testing |
 | `fleet_supervisor/client/queries.txt` | 20 test questions: 10 for maintenance and 10 for operations |
 | `agentcore/` | The AgentCore CLI project and its CDK app |
 | `tests/` | Offline unit tests |
 | `agent.sh` | The command wrapper for local runs and deployment |
 
-The deployed code zip holds this whole folder except `.venv`, `agentcore/`,
-`__pycache__`, and `.pytest_cache`. The runtime runs `main.py`.
-
-AgentCore runs a file, not a module, and CodeZip installs the dependencies
-but not the project. The package imports because its folder sits next to
-`main.py`. Locally, `uv sync` installs the package for the console scripts.
-
 ## Environment variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `MODEL_ID` | `global.anthropic.claude-sonnet-5-5` | Bedrock model for all three agents |
-| `AWS_REGION` | `us-east-1` | Bedrock and AgentCore region |
-| `MAX_TOKENS` | `16000` | Output token limit |
-| `MODEL_EFFORT` | `high` | Adaptive thinking effort |
-| `AGENT_PORT` | `7071` | Local server port |
-| `MCP_CREDENTIALS_FILE` | `../.mcp-credentials.json` | Local credentials file |
-| `CREDENTIAL_FLEET_GATEWAY_NAME` | unset | AgentCore Identity provider name. The AgentCore construct sets it on deploy. Setting it, or `GATEWAY_URL`, selects the cloud path. |
-| `GATEWAY_URL` | unset | Gateway endpoint for the cloud path. It must use `https://`. On deploy it comes from `gateway_url` in the credentials file. |
-| `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path. On deploy they come from `scope` in the credentials file. |
-| `MEM_NEO4J_URI` | unset, required | Memory database URI. The deploy requires `neo4j+s://` or `bolt+s://`. |
-| `MEM_NEO4J_USERNAME` | `neo4j` | Memory database user |
-| `MEM_NEO4J_DATABASE` | `neo4j` | Memory database name |
+| `MODEL_ID` | `global.anthropic.claude-sonnet-5-5` | The Bedrock model for all three agents |
+| `AWS_REGION` | `us-east-1` | The Bedrock and AgentCore region |
+| `MAX_TOKENS` | `16000` | The output token limit |
+| `MODEL_EFFORT` | `high` | The adaptive thinking effort |
+| `AGENT_PORT` | `7071` | The local server port |
+| `MCP_CREDENTIALS_FILE` | `../.mcp-credentials.json` | The local credentials file |
+| `CREDENTIAL_FLEET_GATEWAY_NAME` | unset | The AgentCore Identity provider name. The deploy sets it. It selects the cloud path. |
+| `GATEWAY_URL` | unset | The Gateway endpoint for the cloud path. It must use `https://`. |
+| `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path |
+| `MEM_NEO4J_URI` | required | The memory database URI |
+| `MEM_NEO4J_USERNAME` | `neo4j` | The memory database user |
+| `MEM_NEO4J_DATABASE` | `neo4j` | The memory database name |
 | `MEM_NEO4J_PASSWORD` | unset | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
-| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Unset locally. Set by the deploy. The memory password comes from this secret, a JSON object with a `password` key. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Set by the deploy. The secret holds a JSON object with a `password` key. |
 | `FLEET_ENV_FILE` | `../.env` | The shared env file the server loads at startup |
 
 ## Tests
@@ -345,21 +261,20 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
-To try the agent without the Gateway, run the Neo4j MCP server locally with
-`neo4j-mcp-server/local.sh start`. The local server has no auth and no
-`___` tool prefix, so point a test launcher at it and loosen
-`SPECIALIST_TOOL_FILTERS` to the bare tool names.
+To try the agent without the Gateway, run `neo4j-mcp-server/local.sh start`.
+The local server has no auth and no `___` tool prefix. Point a test launcher at
+it and loosen `SPECIALIST_TOOL_FILTERS` to the bare tool names.
 
 ## Example questions
 
-- **Maintenance:** "Which components have the most failures?", "Show hydraulic system issues", and "What is the reliability history of avionics?"
-- **Operations:** "What are the most common delay causes?", "Compare on-time performance by airline", and "Which airports have the highest traffic?"
-- **Both:** "Compare maintenance fault counts with flight delay counts" calls both specialists.
-- **General:** "What is the database schema?" goes to the Operations Agent.
+- **Maintenance:** Try "Which components have the most failures?" or "What is the reliability history of avionics?"
+- **Operations:** Try "What are the most common delay causes?" or "Which airports have the highest traffic?"
+- **Both:** The question "Compare maintenance fault counts with flight delay counts" calls both specialists.
+- **General:** The question "What is the database schema?" goes to the Operations Agent.
 
 See `fleet_supervisor/client/queries.txt` for all 20 questions.
 
 ## See also
 
-- **System design:** [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md) describes the full system.
-- **Single agent:** [`demos/aircraft-fleet/graphrag-agent/`](../graphrag-agent/) is the single-agent version. It connects to Neo4j directly.
+- **Fleet demo:** The [fleet README](../README.md) shows how the pipeline and both agents fit together.
+- **Single agent:** The [GraphRAG agent](../graphrag-agent/) answers the same questions with a direct Neo4j driver.

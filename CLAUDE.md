@@ -75,6 +75,8 @@ cp .env.sample .env              # shared by pipeline/, graphrag-agent/, supervi
 cd pipeline
 uv sync
 ./setup.sh                       # five-stage ingest (LOAD_FULL_DATASET=true for full)
+uv run generate-data stats       # recount manuals/fleet-stats.json after a generator change
+uv run generate-data render-manuals   # re-render the manuals' generated blocks (--check to test)
 
 # Step 2: run the GraphRAG agent locally
 cd ../graphrag-agent

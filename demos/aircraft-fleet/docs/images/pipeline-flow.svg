@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="780" viewBox="0 0 1600 780" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Pipeline Flow</title>
+  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Stages 2 to 4 write the Neo4j fleet graph and stage 5 reads it.</desc>
+  <style>
+    .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
+    .sub { font-size: 17px; fill: #5C6470; }
+    .t { font-size: 20px; font-weight: 700; fill: #1E3A5F; }
+    .s { font-size: 15px; fill: #344054; }
+    .m { font-size: 13px; fill: #5C6470; font-family: Menlo, Consolas, monospace; }
+    .lbl { font-size: 13px; font-weight: 600; fill: #344054; }
+    .num { font-size: 16px; font-weight: 700; fill: #FFFFFF; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#101828" flood-opacity="0.10"/>
+    </filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker>
+    <marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker>
+    <marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker>
+    <marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+
+  <rect width="1600" height="780" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" class="h1">Pipeline Flow</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">./setup.sh runs five stages in order. Only stage 3 calls a model.</text>
+
+  <!-- Inputs -->
+  <rect x="60" y="116" width="230" height="64" rx="12" fill="#FFFFFF" stroke="#98A2B3" stroke-dasharray="6 4"/>
+  <text x="175" y="142" text-anchor="middle" class="lbl">Generator settings</text>
+  <text x="175" y="164" text-anchor="middle" class="m">GEN_* · LOAD_FULL_DATASET</text>
+  <path d="M175,180 V216" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+
+  <rect x="635" y="116" width="230" height="64" rx="12" fill="#FFFFFF" stroke="#98A2B3" stroke-dasharray="6 4"/>
+  <text x="750" y="142" text-anchor="middle" class="lbl">Maintenance manuals</text>
+  <text x="750" y="164" text-anchor="middle" class="m">manuals/*.md</text>
+  <path d="M750,180 V216" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+
+  <!-- Bedrock -->
+  <rect x="990" y="110" width="290" height="76" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1135" y="140" text-anchor="middle" font-size="18" font-weight="700" fill="#8A4B08">Amazon Bedrock</text>
+  <text x="1135" y="164" text-anchor="middle" font-size="14" fill="#8A5A24">Titan embeddings · Claude extraction</text>
+  <path d="M900,218 V148 H986" fill="none" stroke="#D97706" stroke-width="2.5" marker-start="url(#a-orange)" marker-end="url(#a-orange)"/>
+
+  <!-- Stage cards -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="220" width="270" height="250" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2"/>
+    <rect x="350" y="220" width="270" height="250" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2"/>
+    <rect x="660" y="220" width="270" height="250" rx="16" fill="#FFF7ED" stroke="#D97706" stroke-width="2"/>
+    <rect x="970" y="220" width="270" height="250" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2"/>
+    <rect x="1280" y="220" width="270" height="250" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2"/>
+  </g>
+
+  <circle cx="76" cy="256" r="18" fill="#2E6DB4"/><text x="76" y="262" text-anchor="middle" class="num">1</text>
+  <text x="104" y="263" class="t">Generate</text>
+  <text x="60" y="296" class="m">src/generator/</text>
+  <text x="60" y="334" class="s">Writes the fleet CSVs</text>
+  <text x="60" y="360" class="s">Same seed, same data</text>
+  <text x="60" y="386" class="s">Stamps settings and</text>
+  <text x="60" y="406" class="s">versions in .stamp.json</text>
+  <text x="60" y="446" class="m">generated/*.csv</text>
+
+  <circle cx="386" cy="256" r="18" fill="#2E6DB4"/><text x="386" y="262" text-anchor="middle" class="num">2</text>
+  <text x="414" y="263" class="t">Load</text>
+  <text x="370" y="296" class="m">loader.py · schema.py</text>
+  <text x="370" y="334" class="s">Builds the operational</text>
+  <text x="370" y="354" class="s">graph from the CSVs</text>
+  <text x="370" y="380" class="s">Creates constraints</text>
+  <text x="370" y="400" class="s">and indexes</text>
+  <text x="370" y="426" class="s">Writes one Dataset node</text>
+
+  <circle cx="696" cy="256" r="18" fill="#D97706"/><text x="696" y="262" text-anchor="middle" class="num">3</text>
+  <text x="724" y="263" class="t" fill="#8A4B08">Enrich</text>
+  <text x="680" y="296" class="m">pipeline.py</text>
+  <text x="680" y="334" class="s">Splits manuals into chunks</text>
+  <text x="680" y="354" class="s">with a document header</text>
+  <text x="680" y="380" class="s">Embeds each chunk</text>
+  <text x="680" y="406" class="s">Extracts faults, limits,</text>
+  <text x="680" y="426" class="s">and procedures</text>
+
+  <circle cx="1006" cy="256" r="18" fill="#2E6DB4"/><text x="1006" y="262" text-anchor="middle" class="num">4</text>
+  <text x="1034" y="263" class="t">Index and fuse</text>
+  <text x="990" y="296" class="m">schema.py · pipeline.py</text>
+  <text x="990" y="334" class="s">Vector index on chunks</text>
+  <text x="990" y="360" class="s">Fulltext index on chunks</text>
+  <text x="990" y="386" class="s">Links manual entities to</text>
+  <text x="990" y="406" class="s">real aircraft, systems,</text>
+  <text x="990" y="426" class="s">components, and sensors</text>
+
+  <circle cx="1316" cy="256" r="18" fill="#2E6DB4"/><text x="1316" y="262" text-anchor="middle" class="num">5</text>
+  <text x="1344" y="263" class="t">Verify</text>
+  <text x="1300" y="296" class="m">loader.py · pipeline.py</text>
+  <text x="1300" y="334" class="s">Node counts match CSVs</text>
+  <text x="1300" y="360" class="s">Graph stamp matches</text>
+  <text x="1300" y="380" class="s">the CSV stamp</text>
+  <text x="1300" y="406" class="s">--strict exits nonzero</text>
+  <text x="1300" y="426" class="s">on any warning</text>
+
+  <!-- Stage arrows -->
+  <path d="M310,345 H346" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <path d="M620,345 H656" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <path d="M930,345 H966" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <path d="M1240,345 H1276" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+
+  <!-- Neo4j fleet graph -->
+  <rect x="350" y="550" width="1200" height="90" rx="18" fill="#E8F6F2" stroke="#008C72" stroke-width="2.5" filter="url(#shadow)"/>
+  <text x="950" y="590" text-anchor="middle" font-size="21" font-weight="700" fill="#00594A">Neo4j fleet graph</text>
+  <text x="950" y="616" text-anchor="middle" class="s">Operational graph + knowledge graph + indexes, ready for both agents</text>
+  <path d="M485,470 V546" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <text x="495" y="516" class="lbl" fill="#00594A">writes</text>
+  <path d="M795,470 V546" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <text x="805" y="516" class="lbl" fill="#00594A">writes</text>
+  <path d="M1105,470 V546" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <text x="1115" y="516" class="lbl" fill="#00594A">writes</text>
+  <path d="M1415,550 V474" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <text x="1425" y="516" class="lbl" fill="#00594A">reads</text>
+
+  <!-- Commands strip -->
+  <rect x="40" y="680" width="1510" height="70" rx="14" fill="#FFFFFF" stroke="#E4E7EC"/>
+  <text x="70" y="721" class="m" fill="#16233A">./setup.sh</text>
+  <text x="170" y="721" font-size="15" fill="#475467">all five stages</text>
+  <text x="440" y="721" class="m" fill="#16233A">./setup.sh load-operational</text>
+  <text x="680" y="721" font-size="15" fill="#475467">stages 1, 2, and 5, no model calls</text>
+  <text x="1040" y="721" class="m" fill="#16233A">./setup.sh verify</text>
+  <text x="1190" y="721" font-size="15" fill="#475467">stage 5 only, read-only</text>
+</svg>

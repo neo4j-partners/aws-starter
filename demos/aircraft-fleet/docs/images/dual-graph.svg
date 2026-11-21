@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>The Dual Graph</title>
+  <desc>The operational graph from the CSVs holds aircraft, systems, components, sensors, readings, flights, delays, and maintenance events. The knowledge graph extracted from the manuals holds aircraft models, system and component references, faults, procedures, and operating limits. Stage 4 links the two with DESCRIBES_MODEL, DESCRIBES_SYSTEM, DESCRIBES_COMPONENT, HAS_LIMIT, and APPLIES_TO relationships.</desc>
+  <style>
+    .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
+    .sub { font-size: 17px; fill: #5C6470; }
+    .ph { font-size: 20px; font-weight: 700; }
+    .ps { font-size: 14px; fill: #5C6470; }
+    .op { font-size: 15px; font-weight: 600; fill: #00594A; }
+    .kg { font-size: 15px; font-weight: 600; fill: #4A2EB0; }
+    .dc { font-size: 15px; font-weight: 600; fill: #344054; }
+    .rel { font-size: 11.5px; fill: #475467; font-family: Menlo, Consolas, monospace; }
+    .fuse { font-size: 13px; font-weight: 700; fill: #8A4B08; font-family: Menlo, Consolas, monospace; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-25%" width="130%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#101828" flood-opacity="0.10"/>
+    </filter>
+    <marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+    <marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker>
+  </defs>
+
+  <rect width="1600" height="880" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" class="h1">The Dual Graph</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">Stage 4 links what the manuals say to the real aircraft, so one query can walk from a sensor to its limit.</text>
+
+  <!-- Panels -->
+  <rect x="40" y="150" width="540" height="590" rx="20" fill="#E8F6F2" stroke="#9AD3C5" stroke-width="1.5"/>
+  <text x="70" y="186" class="ph" fill="#00594A">Operational graph</text>
+  <text x="70" y="208" class="ps">Loaded from the CSVs in stage 2</text>
+  <rect x="1000" y="150" width="560" height="590" rx="20" fill="#F3F0FF" stroke="#C9BDFB" stroke-width="1.5"/>
+  <text x="1030" y="186" class="ph" fill="#4A2EB0">Knowledge graph</text>
+  <text x="1030" y="208" class="ps">Extracted from the manuals in stage 3</text>
+
+  <!-- APPLIES_TO over the top -->
+  <path d="M1425,254 V118 H430 V250" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="728" y="106" width="104" height="24" rx="6" fill="#F7F8FA"/>
+  <text x="780" y="123" text-anchor="middle" class="fuse">APPLIES_TO</text>
+
+  <!-- Operational nodes -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="254" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
+    <rect x="330" y="394" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
+    <rect x="330" y="534" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
+    <rect x="330" y="664" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
+    <rect x="70" y="254" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
+    <rect x="70" y="394" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
+    <rect x="70" y="534" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
+    <rect x="70" y="664" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
+  </g>
+  <text x="430" y="285" text-anchor="middle" class="op">Aircraft</text>
+  <text x="430" y="425" text-anchor="middle" class="op">System</text>
+  <text x="430" y="565" text-anchor="middle" class="op">Component</text>
+  <text x="430" y="695" text-anchor="middle" class="op">Sensor</text>
+  <text x="160" y="285" text-anchor="middle" class="op">Flight</text>
+  <text x="160" y="425" text-anchor="middle" class="op">Delay</text>
+  <text x="160" y="565" text-anchor="middle" class="op">MaintenanceEvent</text>
+  <text x="160" y="695" text-anchor="middle" class="op">Reading</text>
+
+  <!-- Operational edges -->
+  <path d="M430,306 V390" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="440" y="352" class="rel">HAS_SYSTEM</text>
+  <path d="M430,446 V530" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="440" y="492" class="rel">HAS_COMPONENT</text>
+  <path d="M340,436 C290,470 290,640 336,676" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="296" y="512" class="rel" transform="rotate(-90 296 512)" text-anchor="middle">HAS_SENSOR</text>
+  <path d="M330,280 H254" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="292" y="272" class="rel" text-anchor="middle">OPERATES_</text>
+  <text x="292" y="300" class="rel" text-anchor="middle">FLIGHT</text>
+  <path d="M160,306 V390" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="170" y="352" class="rel">HAS_DELAY</text>
+  <path d="M330,560 H254" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <path d="M330,690 H254" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="160" y="610" text-anchor="middle" class="rel">HAS_EVENT</text>
+  <text x="160" y="732" text-anchor="middle" class="rel">HAS_READING</text>
+
+  <!-- Knowledge nodes -->
+  <g filter="url(#shadow)">
+    <rect x="1030" y="254" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
+    <rect x="1030" y="394" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
+    <rect x="1030" y="534" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
+    <rect x="1030" y="664" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
+    <rect x="1320" y="254" width="210" height="52" rx="10" fill="#FFFFFF" stroke="#98A2B3" stroke-width="2"/>
+    <rect x="1320" y="394" width="210" height="52" rx="10" fill="#FFFFFF" stroke="#98A2B3" stroke-width="2"/>
+    <rect x="1320" y="534" width="210" height="52" rx="26" fill="#FFFFFF" stroke="#A48AFB" stroke-width="2"/>
+    <rect x="1320" y="664" width="210" height="52" rx="26" fill="#FFFFFF" stroke="#A48AFB" stroke-width="2"/>
+  </g>
+  <text x="1140" y="285" text-anchor="middle" class="kg">AircraftModel</text>
+  <text x="1140" y="425" text-anchor="middle" class="kg">SystemReference</text>
+  <text x="1140" y="565" text-anchor="middle" class="kg">ComponentReference</text>
+  <text x="1140" y="695" text-anchor="middle" class="kg">OperatingLimit</text>
+  <text x="1425" y="285" text-anchor="middle" class="dc">Document</text>
+  <text x="1425" y="425" text-anchor="middle" class="dc">Chunk</text>
+  <text x="1425" y="565" text-anchor="middle" class="kg">Fault</text>
+  <text x="1425" y="695" text-anchor="middle" class="kg">MaintenanceProcedure</text>
+
+  <!-- Knowledge edges -->
+  <path d="M1140,306 V390" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1150" y="352" class="rel">HAS_SYSTEM</text>
+  <path d="M1140,446 V530" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1150" y="492" class="rel">HAS_COMPONENT</text>
+  <path d="M1140,586 V660" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1150" y="628" class="rel">HAS_LIMIT</text>
+  <path d="M1250,560 H1316" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1285" y="550" class="rel" text-anchor="middle">HAS_</text>
+  <text x="1285" y="580" class="rel" text-anchor="middle">FAULT</text>
+  <path d="M1425,586 V660" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1435" y="628" class="rel">CORRECTED_BY</text>
+  <path d="M1425,394 V310" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1435" y="352" class="rel">FROM_DOCUMENT</text>
+
+  <!-- Fusion links -->
+  <g stroke="#D97706" stroke-width="3" fill="none">
+    <path d="M1030,280 H534" marker-end="url(#a-orange)"/>
+    <path d="M1030,420 H534" marker-end="url(#a-orange)"/>
+    <path d="M1030,560 H534" marker-end="url(#a-orange)"/>
+    <path d="M530,690 H1026" marker-end="url(#a-orange)"/>
+  </g>
+  <g>
+    <rect x="690" y="264" width="180" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
+    <text x="780" y="284" text-anchor="middle" class="fuse">DESCRIBES_MODEL</text>
+    <rect x="690" y="404" width="180" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
+    <text x="780" y="424" text-anchor="middle" class="fuse">DESCRIBES_SYSTEM</text>
+    <rect x="675" y="544" width="210" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
+    <text x="780" y="564" text-anchor="middle" class="fuse">DESCRIBES_COMPONENT</text>
+    <rect x="720" y="674" width="120" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
+    <text x="780" y="694" text-anchor="middle" class="fuse">HAS_LIMIT</text>
+  </g>
+  <text x="780" y="232" text-anchor="middle" font-size="15" font-weight="700" fill="#8A4B08">Stage 4 links</text>
+
+  <!-- Footer -->
+  <rect x="40" y="770" width="1520" height="84" rx="16" fill="#FFFFFF" stroke="#E4E7EC"/>
+  <text x="70" y="806" font-size="15" fill="#344054">An agent can start at a sensor on one aircraft, follow HAS_LIMIT to the limit the manual sets for that model,</text>
+  <text x="70" y="830" font-size="15" fill="#344054">then use vector search over the linked chunks to pull the repair procedure. Every extracted entity also links to its Chunk.</text>
+</svg>

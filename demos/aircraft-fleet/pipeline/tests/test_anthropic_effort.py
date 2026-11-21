@@ -8,6 +8,9 @@ import pytest
 
 from populate_aircraft_db.anthropic_effort import _MISS_PREFIX, EffortAnthropicLLM
 
+# The Anthropic client comes from the optional `anthropic` extra.
+pytest.importorskip("anthropic")
+
 
 def _reply(stop_reason: str, *blocks: SimpleNamespace) -> SimpleNamespace:
     return SimpleNamespace(content=list(blocks), stop_reason=stop_reason)

@@ -209,7 +209,8 @@ def _engine_sensors(
 # Engine bands come from each manual's own limits. The current EGT warning
 # value is the caution value. Vibration noise scales with the gap from
 # baseline to caution. EGT and vibration drift tops are 0.66 of the warning
-# gap, so the most degraded operator (1.5x) ends the window at warning.
+# gap, so the most degraded operator (1.5x) ends the window within 1% of
+# warning (0.66 x 1.5 = 0.99).
 ENGINE_SPECS: dict[str, EngineSpec] = {
     "B737-800": EngineSpec(
         engine_type="CFM56-7B",

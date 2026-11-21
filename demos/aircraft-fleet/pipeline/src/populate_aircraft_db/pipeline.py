@@ -604,14 +604,15 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     logger.info("  [OK] %d AircraftModel -[:DESCRIBES_MODEL]-> Aircraft", records[0]["count"])
 
     # SystemReference -[:DESCRIBES_SYSTEM]-> System
-    # (same aircraft model, systemType equals the System type, ignoring case;
-    # the extraction prompt limits systemType to the fleet system types)
+    # (same aircraft model, systemType equals the System type, ignoring case
+    # and outer spaces; the extraction prompt limits systemType to the fleet
+    # system types)
     records, _, _ = driver.execute_query(
         """
         MATCH (sr:SystemReference)
         WHERE sr.aircraftType IS NOT NULL AND sr.systemType IS NOT NULL
         MATCH (:Aircraft {model: sr.aircraftType})-[:HAS_SYSTEM]->(s:System)
-        WHERE toLower(s.type) = toLower(sr.systemType)
+        WHERE toLower(s.type) = toLower(trim(sr.systemType))
         MERGE (sr)-[:DESCRIBES_SYSTEM]->(s)
         RETURN count(*) AS count
     """,
@@ -623,9 +624,9 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     # (same aircraft model; componentType, ignoring case and outer spaces, is
     # a component type or one of its aliases, and the Component has that type, within the
     # System type that has that component type in specs. Parent
-    # SystemReferences with a fleet systemType must include that System
-    # type, or the link is blocked. Parents with another systemType, or
-    # none, are ignored.)
+    # SystemReferences with a fleet systemType, ignoring case and outer
+    # spaces, must include that System type, or the link is blocked.
+    # Parents with another systemType, or none, are ignored.)
     records, _, _ = driver.execute_query(
         """
         MATCH (cr:ComponentReference)
@@ -635,8 +636,8 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         WITH cr, ctype, $system_types[toLower(ctype)] AS systemType
         OPTIONAL MATCH (sr:SystemReference)-[:HAS_COMPONENT]->(cr)
         WITH cr, ctype, systemType,
-             [t IN collect(sr.systemType) WHERE toLower(t) IN $fleet_system_types] AS parentTypes
-        WHERE parentTypes = [] OR any(t IN parentTypes WHERE toLower(t) = toLower(systemType))
+             [t IN collect(toLower(trim(sr.systemType))) WHERE t IN $fleet_system_types] AS parentTypes
+        WHERE parentTypes = [] OR toLower(systemType) IN parentTypes
         MATCH (:Aircraft {model: cr.aircraftType})
             -[:HAS_SYSTEM]->(:System {type: systemType})
             -[:HAS_COMPONENT]->(c:Component {type: ctype})

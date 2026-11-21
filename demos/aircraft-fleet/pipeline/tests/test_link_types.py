@@ -49,6 +49,8 @@ _SYSTEMS = [
     {"name": "Engine", "type": "engine"},
     {"name": "Fuel System", "type": "Fuel"},
     {"name": "Hydraulics", "type": None},
+    # Spaces around the system type are ignored too.
+    {"name": "Hydraulic Power", "type": " Hydraulics "},
 ]
 _COMPONENTS = [
     {"name": "High-Pressure Turbine", "type": "hp turbine"},
@@ -128,6 +130,7 @@ def test_references_link_on_exact_type(driver: Driver, database: str) -> None:
         (f"Engine Fuel Pump - {MODEL}", f"{MODEL}-E2"),
         (f"Engine-Driven Pump - {MODEL}", f"{MODEL}-H1"),
         (f"High-Pressure Turbine - {MODEL}", f"{MODEL}-E1"),
+        (f"Hydraulic Power - {MODEL}", f"{MODEL}-H"),
         (f"Main Fuel Pump - {MODEL}", f"{MODEL}-E1"),
         (f"Padded Turbine - {MODEL}", f"{MODEL}-E1"),
         (f"Turbine Stage - {MODEL}", f"{MODEL}-E1"),
@@ -179,6 +182,16 @@ _PARENTS = [
         "type": "Fuel",
         "components": [{"name": "Main Fuel Pump", "type": "Main Fuel Pump"}],
     },
+    {
+        # A padded fleet type still counts, so it blocks the fuel pump and
+        # passes the hydraulic pump.
+        "name": "Padded Hydraulics",
+        "type": "Hydraulics ",
+        "components": [
+            {"name": "Misfiled Fuel Pump", "type": "Main Fuel Pump"},
+            {"name": "Padded Parent Pump", "type": "Hydraulic Pump"},
+        ],
+    },
 ]
 
 # A pump that the manuals list under both the engine and the hydraulic
@@ -214,6 +227,7 @@ def test_component_links_only_within_its_parent_system_type(driver: Driver, data
         (f"Fuel Pump - {MODEL}", f"{MODEL}-E2"),
         (f"Main Fuel Pump - {MODEL}", f"{MODEL}-E2"),
         (f"Main Hydraulic Pump - {MODEL}", f"{MODEL}-H1"),
+        (f"Padded Parent Pump - {MODEL}", f"{MODEL}-H1"),
         (f"Shared Engine-Driven Pump - {MODEL}", f"{MODEL}-H1"),
     ]
 

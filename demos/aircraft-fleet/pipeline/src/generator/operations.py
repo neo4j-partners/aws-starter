@@ -90,6 +90,8 @@ def generate_operations(
             # First departure from 05:00, late enough in the morning that the
             # last leg lands by midnight. So no leg flies into the next day.
             latest = min(_LATEST_FIRST_DEPARTURE, 24.0 - span)
+            # This fires only if the UTILIZATION or turnaround specs change:
+            # the current worst case starts at exactly 05:00.
             if latest < _FIRST_DEPARTURE:
                 raise ValueError(
                     f"{aircraft.aircraft_id}: {span:.1f} hours of flying a day "

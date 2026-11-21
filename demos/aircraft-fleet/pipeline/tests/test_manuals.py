@@ -22,6 +22,7 @@ from generator.specs import (
     COMPONENT_ALIASES,
     ENGINE_SPECS,
     MANUAL_FLEET_TAILS,
+    PHASES,
     SYSTEM_SENSORS,
     VIBRATION_LEVELS,
     sensors_for,
@@ -355,10 +356,127 @@ _BLOCK = re.compile(
 
 
 @pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
-def test_only_generated_blocks_quote_vibration_numbers_in_sections_4_and_8(model: str) -> None:
+def test_only_generated_blocks_quote_vibration_numbers(model: str) -> None:
     # Hand-written text names a level instead, so the numbers live in one place.
     text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
-    sections = re.findall(r"^## [48]\. .*?(?=^## \d)", _BLOCK.sub("", text), re.M | re.S)
 
-    assert len(sections) == 2
-    assert [line for s in sections for line in re.findall(r"^.*\d ips.*$", s, re.M)] == []
+    assert re.findall(r"^.*\d ips.*$", _BLOCK.sub("", text), re.M) == []
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_egt_limits_table_is_the_spec_limits(model: str) -> None:
+    table = manuals.RENDERERS["egt-limits"](model, ENGINE_SPECS[model], {})
+    limits = ENGINE_SPECS[model].egt_limits
+
+    def row(label: str, band) -> list[str]:
+        return [
+            label,
+            f"< {band.normal_below:,.0f}°C",
+            f"{band.normal_below:,.0f}-{band.caution_to:,.0f}°C",
+            f"{band.maximum:,.0f}°C",
+        ]
+
+    expected = [
+        row("EGT (Takeoff, 5 min)", limits.takeoff),
+        row("EGT (Max Continuous)", limits.max_continuous),
+    ]
+    if limits.start_max is not None:
+        expected.append(["EGT (Start)", "—", "—", f"{limits.start_max:,.0f}°C"])
+    assert table.splitlines()[0] == "| Parameter | Normal | Caution | Maximum |"
+    assert _rows(table) == expected
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_egt_limits_are_ordered_and_above_the_trend_scale(model: str) -> None:
+    limits = ENGINE_SPECS[model].egt_limits
+    for band in (limits.max_continuous, limits.takeoff):
+        assert band.normal_below < band.caution_to <= band.maximum, band
+    assert limits.max_continuous.maximum <= limits.takeoff.maximum
+    # Every trend reading the generator raises an event for stays below the
+    # instantaneous max continuous limit.
+    egt = {s.type: s for s in sensors_for("Engine", model)}["EGT"]
+    assert egt.bands.warning < limits.max_continuous.normal_below
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_n1_at_the_warning_band_stays_at_or_below_max_continuous(model: str) -> None:
+    n1 = {s.type: s for s in sensors_for("Engine", model)}["N1Speed"]
+    max_continuous = ENGINE_SPECS[model].phase_limits["N1Speed (%)"][2]
+
+    assert n1.baseline + n1.bands.warning <= float(max_continuous)
+
+
+def _phase_table(model: str) -> dict[str, list[str]]:
+    table = manuals.RENDERERS["normal-parameters"](model, ENGINE_SPECS[model], {})
+    assert table.splitlines()[0] == (
+        "| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) "
+        "| Max Continuous | Takeoff (5 min) |"
+    )
+    return {row[0]: row[1:] for row in _rows(table)}
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_both_parameter_tables_render_the_same_text(model: str) -> None:
+    engine = ENGINE_SPECS[model]
+    assert manuals.RENDERERS["normal-parameters"](model, engine, {}) == manuals.RENDERERS[
+        "quick-ref-engine"
+    ](model, engine, {})
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_parameter_table_rows_come_from_the_specs(model: str) -> None:
+    engine = ENGINE_SPECS[model]
+    rows = _phase_table(model)
+    specs = {s.type: s for s in engine.sensors}
+    limits = engine.egt_limits
+    advisory = f"< {specs['Vibration'].bands.advisory:.1f}"
+
+    assert rows["EGT (°C)"][:2] == [limits.ground_idle, limits.flight_idle]
+    assert rows["EGT (°C)"][3:] == [
+        f"< {limits.max_continuous.normal_below:,.0f}",
+        f"< {limits.takeoff.normal_below:,.0f}",
+    ]
+    vibration = rows["Vibration N1 (ips)"]
+    assert vibration[:2] + vibration[3:] == [advisory] * 4
+    for label, cells in engine.phase_limits.items():
+        assert rows[label][:2] + rows[label][3:] == list(cells), label
+        if label not in ("N1Speed (%)", "FuelFlow (kg/s)"):
+            assert rows[label][2] == "—", label
+    assert set(rows) == set(engine.phase_limits) | {"EGT (°C)", "Vibration N1 (ips)"}
+    assert len(PHASES) == 4
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_each_cruise_cell_holds_its_spec_baseline(model: str) -> None:
+    rows = _phase_table(model)
+    labels = {
+        "N1Speed": "N1Speed (%)",
+        "EGT": "EGT (°C)",
+        "FuelFlow": "FuelFlow (kg/s)",
+        "Vibration": "Vibration N1 (ips)",
+    }
+    for spec in sensors_for("Engine", model):
+        assert rows[labels[spec.type]][2].startswith(f"{spec.baseline:g} ("), spec.type
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_hydraulics_table_is_the_spec_bands(model: str) -> None:
+    table = manuals.RENDERERS["quick-ref-hydraulics"](model, ENGINE_SPECS[model], {})
+
+    assert table.splitlines()[0] == (
+        "| Parameter | Nominal | Normal | Advisory | Caution | Warning |"
+    )
+    expected = []
+    for spec in sensors_for("Hydraulics", model):
+        b, u = spec.bands, spec.unit
+        expected.append(
+            [
+                f"{spec.name} ({u})",
+                f"{spec.baseline:,g}",
+                f"> {b.advisory:,g}",
+                f"{b.caution:,g}-{b.advisory:,g}",
+                f"{b.warning:,g}-{b.caution:,g}",
+                f"≤ {b.warning:,g}",
+            ]
+        )
+    assert _rows(table) == expected

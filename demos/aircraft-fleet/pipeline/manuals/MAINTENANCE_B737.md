@@ -157,7 +157,7 @@ Each CFM56-7B engine carries four monitoring sensors. The Avionics and Hydraulic
 **Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the CFM56-7B, the trend baseline is 658°C, with Advisory at 678°C, Caution at 688°C, and Warning at 698°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
 <!-- END GENERATED: egt-trend-note -->
 
-Instantaneous takeoff EGT peaks are typically 850–950°C for the CFM56-7B.
+Instantaneous takeoff EGT for the CFM56-7B must stay within the Operating Limits table in section 3.2.3, High-Pressure Turbine.
 
 **FADEC Integration:** The CFM56-7B features Full Authority Digital Engine Control (FADEC) which provides automatic engine parameter management, thrust setting, and fault detection/isolation.
 
@@ -241,11 +241,13 @@ The 9-stage high-pressure compressor (HPC) achieves a pressure ratio of approxim
 The single-stage HPT drives the high-pressure compressor through a concentric shaft. Turbine blades feature advanced single-crystal alloy construction with thermal barrier coating and film cooling. The nozzle guide vanes are air-cooled with impingement and film cooling.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
 | EGT (Takeoff, 5 min) | < 930°C | 930-950°C | 950°C |
 | EGT (Max Continuous) | < 895°C | 895-925°C | 925°C |
 | EGT (Start) | — | — | 725°C |
+<!-- END GENERATED: egt-limits -->
 
 **Life-Limited Parts:**
 - HPT disk: 20,000 cycles
@@ -279,15 +281,17 @@ The #4 bearing (thrust bearing) absorbs axial loads from the high-pressure rotor
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 20-25% | 25-30% | 95% | 104% |
-| N2 (% RPM) | 55-62% | 62-68% | 95% | 101% |
-| EGT (°C) | 350-420 | 420-480 | 850-895 | 900-950 |
-| FuelFlow (kg/s) | 0.10-0.18 | 0.18-0.25 | 0.85-1.10 | 1.20-1.50 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temperature (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 20-25 | 25-30 | 88 (86-90) | 95 | 104 |
+| N2 (%) | 55-62 | 62-68 | — | 95 | 101 |
+| EGT (°C) | 350-420 | 420-480 | 658 (< 678) | < 895 | < 930 |
+| FuelFlow (kg/s) | 0.10-0.18 | 0.18-0.25 | 0.36 (0.33-0.39) | 0.85-1.10 | 1.20-1.50 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
 
 ### 3.4 FADEC System
 
@@ -919,22 +923,30 @@ START: HYD SYS PRESS (System A or B) Warning
 
 #### Engine Parameters (CFM56-7B)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (%) | 20-25 | 25-30 | 95 | 104 |
-| N2 (%) | 55-62 | 62-68 | 95 | 101 |
-| EGT (°C) | 350-420 | 420-480 | 895 | 950 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temp (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 20-25 | 25-30 | 88 (86-90) | 95 | 104 |
+| N2 (%) | 55-62 | 62-68 | — | 95 | 101 |
+| EGT (°C) | 350-420 | 420-480 | 658 (< 678) | < 895 | < 930 |
+| FuelFlow (kg/s) | 0.10-0.18 | 0.18-0.25 | 0.36 (0.33-0.39) | 0.85-1.10 | 1.20-1.50 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
 
 #### Hydraulic System
 
-| Parameter | System A | System B | Standby |
-|-----------|----------|----------|---------|
-| Pressure | 2,800-3,200 psi | 2,800-3,200 psi | 2,800-3,200 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** System A, System B, and Standby each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 

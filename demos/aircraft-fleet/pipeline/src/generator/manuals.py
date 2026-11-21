@@ -24,9 +24,13 @@ from .maintenance import SEVERITY_BY_LEVEL
 from .specs import (
     ENGINE_SPECS,
     MANUAL_FLEET_TAILS,
+    PHASES,
     SYSTEM_SENSORS,
     VIBRATION_LEVELS,
+    Direction,
+    EgtBand,
     EngineSpec,
+    SensorSpec,
     sensors_for,
 )
 
@@ -251,6 +255,115 @@ def _vibration_shutdown(model: str, engine: EngineSpec, stats: Stats) -> str:
     )
 
 
+def _table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> str:
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|" + "|".join("-" * (len(cell) + 2) for cell in header) + "|",
+        *("| " + " | ".join(row) + " |" for row in rows),
+    ]
+    return "\n".join(lines)
+
+
+# The rows of the Normal Operating Parameters table, in order. A row the
+# model has no data for is left out.
+_PHASE_ROWS = (
+    "N1Speed (%)",
+    "N2 (%)",
+    "EGT (°C)",
+    "FuelFlow (kg/s)",
+    "Oil Pressure (psi)",
+    "Oil Temperature (°C)",
+    "Vibration N1 (ips)",
+    "Gearbox Oil Pressure (psi)",
+    "Gearbox Oil Temperature (°C)",
+)
+# The sensor each row's cruise cell comes from.
+_CRUISE_SENSORS = {
+    "N1Speed (%)": "N1Speed",
+    "EGT (°C)": "EGT",
+    "FuelFlow (kg/s)": "FuelFlow",
+    "Vibration N1 (ips)": "Vibration",
+}
+_CRUISE_DECIMALS = {"N1Speed": 0, "EGT": 0, "FuelFlow": 2, "Vibration": 1}
+
+
+def _cruise_cell(spec: SensorSpec) -> str:
+    """The digital twin baseline, with the range before the Advisory band."""
+    places = _CRUISE_DECIMALS[spec.type]
+    advisory = spec.offsets()[0]
+    if spec.direction is Direction.DEVIATION:
+        low, high = spec.baseline - advisory, spec.baseline + advisory
+        return f"{spec.baseline:g} ({low:.{places}f}-{high:.{places}f})"
+    return f"{spec.baseline:g} (< {spec.bands.advisory:.{places}f})"
+
+
+def _phase_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.3 and §10.1: engine limits at each power setting, with the cruise baseline."""
+    specs = {s.type: s for s in engine.sensors}
+    limits = engine.egt_limits
+    advisory = f"< {specs['Vibration'].bands.advisory:.1f}"
+    cells = {
+        **engine.phase_limits,
+        "EGT (°C)": (
+            limits.ground_idle,
+            limits.flight_idle,
+            f"< {limits.max_continuous.normal_below:,.0f}",
+            f"< {limits.takeoff.normal_below:,.0f}",
+        ),
+        "Vibration N1 (ips)": (advisory,) * len(PHASES),
+    }
+    rows = []
+    for label in _PHASE_ROWS:
+        if label not in cells:
+            continue
+        sensor = _CRUISE_SENSORS.get(label)
+        cruise = "—" if sensor is None else _cruise_cell(specs[sensor])
+        idle, flight_idle, max_continuous, takeoff = cells[label]
+        rows.append((label, idle, flight_idle, cruise, max_continuous, takeoff))
+    header = ("Parameter", *PHASES[:2], "Cruise (digital twin)", *PHASES[2:])
+    return _table(header, rows)
+
+
+def _egt_row(label: str, band: EgtBand) -> tuple[str, ...]:
+    return (
+        label,
+        f"< {band.normal_below:,.0f}°C",
+        f"{band.normal_below:,.0f}-{band.caution_to:,.0f}°C",
+        f"{band.maximum:,.0f}°C",
+    )
+
+
+def _egt_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.2.3: the instantaneous turbine temperature limits."""
+    limits = engine.egt_limits
+    rows = [
+        _egt_row("EGT (Takeoff, 5 min)", limits.takeoff),
+        _egt_row("EGT (Max Continuous)", limits.max_continuous),
+    ]
+    if limits.start_max is not None:
+        rows.append(("EGT (Start)", "—", "—", f"{limits.start_max:,.0f}°C"))
+    return _table(("Parameter", "Normal", "Caution", "Maximum"), rows)
+
+
+def _hydraulic_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§10.1: the hydraulic bands every circuit shares."""
+    rows = []
+    for spec in sensors_for("Hydraulics", model):
+        b = spec.bands
+        rows.append(
+            (
+                f"{spec.name} ({spec.unit})",
+                f"{spec.baseline:,g}",
+                f"> {b.advisory:,g}",
+                f"{b.caution:,g}-{b.advisory:,g}",
+                f"{b.warning:,g}-{b.caution:,g}",
+                f"≤ {b.warning:,g}",
+            )
+        )
+    header = ("Parameter", "Nominal", "Normal", "Advisory", "Caution", "Warning")
+    return _table(header, rows)
+
+
 # Block id -> renderer. Each takes (model, engine spec, fleet stats).
 RENDERERS: dict[str, Renderer] = {
     "sensor-table": _sensor_table,
@@ -259,6 +372,10 @@ RENDERERS: dict[str, Renderer] = {
     "component-ids": _component_ids,
     "vibration-bands": _vibration_bands,
     "vibration-shutdown": _vibration_shutdown,
+    "egt-limits": _egt_limits,
+    "normal-parameters": _phase_limits,
+    "quick-ref-engine": _phase_limits,
+    "quick-ref-hydraulics": _hydraulic_limits,
 }
 
 # Blocks every manual must have, once each.

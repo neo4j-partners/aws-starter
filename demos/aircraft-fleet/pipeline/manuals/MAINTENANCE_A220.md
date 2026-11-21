@@ -245,11 +245,13 @@ The 8-stage high-pressure compressor (HPC) achieves a pressure ratio of approxim
 The 2-stage HPT drives the high-pressure compressor through a concentric shaft. Turbine blades feature third-generation single-crystal CMSX-10 alloy construction with ceramic thermal barrier coating (TBC) and advanced film cooling circuits. The nozzle guide vanes use impingement and film cooling. The 2-stage HPT design, compared to the single-stage configuration found in many contemporary engines, allows for higher expansion work per unit of blade stress, contributing to the high overall pressure ratio.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
 | EGT (Takeoff, 5 min) | < 855°C | 855-880°C | 890°C |
 | EGT (Max Continuous) | < 820°C | 820-855°C | 855°C |
 | EGT (Start) | — | — | 700°C |
+<!-- END GENERATED: egt-limits -->
 
 **Note:** PW1500G EGT limits are lower than conventional turbofans of comparable thrust class due to the higher-efficiency combustion cycle and gearbox-enabled LPC aerodynamic optimization. EGT values exceeding these limits have greater consequence given the reduced thermal margin of the high-efficiency combustor design.
 
@@ -295,14 +297,18 @@ See Section 3.5 for detailed gearbox maintenance information.
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 18-24% | 24-30% | 92% | 100% |
-| EGT (°C) | 310-380 | 380-440 | 820-855 | 855-890 |
-| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.80-1.10 | 1.15-1.35 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temperature (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-24 | 24-30 | 85 (83-87) | 92 | 100 |
+| EGT (°C) | 310-380 | 380-440 | 625 (< 645) | < 820 | < 855 |
+| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.28 (0.26-0.30) | 0.80-1.10 | 1.15-1.35 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 1.5 | < 1.5 | 0.6 (< 1.5) | < 1.5 | < 1.5 |
+| Gearbox Oil Pressure (psi) | 50-65 | 55-70 | — | 65-80 | 65-80 |
+| Gearbox Oil Temperature (°C) | 60-90 | 70-110 | — | 90-130 | 90-130 |
+<!-- END GENERATED: normal-parameters -->
 
 **Note on N1Speed:** N1Speed in this table and in the sensor dataset refers to fan shaft speed (gearbox output). N1c (LPC shaft speed) is approximately 3.1 times the fan shaft speed at all power settings and is monitored independently by the FADEC but is not separately captured in the digital twin sensor schema.
 
@@ -1144,24 +1150,31 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 
 #### Engine Parameters (PW1500G)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (% RPM) | 18-24 | 24-30 | 92 | 100 |
-| EGT (°C) | 310-380 | 380-440 | 855 | 890 |
-| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.80-1.10 | 1.15-1.35 |
-| Oil Pressure (psi) | 35-60 | 40-70 | 45-75 | 45-75 |
-| Oil Temp (°C) | 50-90 | 60-120 | 80-140 | 80-155 |
-| Vibration (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
-| GBX Oil Pressure (psi) | 50-65 | 55-70 | 65-80 | 65-80 |
-| GBX Oil Temp (°C) | 60-90 | 70-110 | 90-130 | 90-130 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-24 | 24-30 | 85 (83-87) | 92 | 100 |
+| EGT (°C) | 310-380 | 380-440 | 625 (< 645) | < 820 | < 855 |
+| FuelFlow (kg/s) | 0.09-0.16 | 0.16-0.24 | 0.28 (0.26-0.30) | 0.80-1.10 | 1.15-1.35 |
+| Oil Pressure (psi) | 35-60 | 40-70 | — | 45-75 | 45-75 |
+| Oil Temperature (°C) | 50-90 | 60-120 | — | 80-140 | 80-155 |
+| Vibration N1 (ips) | < 1.5 | < 1.5 | 0.6 (< 1.5) | < 1.5 | < 1.5 |
+| Gearbox Oil Pressure (psi) | 50-65 | 55-70 | — | 65-80 | 65-80 |
+| Gearbox Oil Temperature (°C) | 60-90 | 70-110 | — | 90-130 | 90-130 |
+<!-- END GENERATED: quick-ref-engine -->
 
 #### Hydraulic System
 
-| Parameter | Left System | Right System | Standby |
-|-----------|-------------|--------------|---------|
-| Pressure | 2,800-3,200 psi | 2,800-3,200 psi | 2,800-3,200 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Left, Right, and Standby systems each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 

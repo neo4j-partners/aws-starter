@@ -223,10 +223,12 @@ The 10-stage high-pressure compressor (HPC) achieves a pressure ratio of approxi
 The two-stage HPT extracts energy to drive the HPC. Turbine blades feature advanced cooling passages and thermal barrier coatings.
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
-| EGT (Takeoff) | < 650°C | 650-680°C | 695°C |
-| EGT (Continuous) | < 620°C | 620-650°C | 665°C |
+| EGT (Takeoff, 5 min) | < 650°C | 650-680°C | 695°C |
+| EGT (Max Continuous) | < 620°C | 620-650°C | 665°C |
+<!-- END GENERATED: egt-limits -->
 
 #### 3.2.4 Main Fuel Pump
 **Part Number:** V25-FP-7310
@@ -254,13 +256,17 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 
 ### 3.3 Normal Operating Parameters
 
-| Parameter | Idle | Cruise | Takeoff |
-|-----------|------|--------|---------|
-| N1Speed (% RPM) | 22-28% | 85-92% | 100-104% |
-| N2 (% RPM) | 58-65% | 92-97% | 100-102% |
-| EGT (°C) | 380-450 | 520-580 | 620-680 |
-| FuelFlow (kg/s) | 0.15-0.25 | 0.65-0.85 | 1.20-1.95 |
-| Vibration (ips) | < 0.8 | < 1.2 | < 2.0 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 22 | 28 | 87 (85-89) | 97 | 104 |
+| N2 (%) | 58 | 65 | — | 97 | 102 |
+| EGT (°C) | 380 | 450 | 560 (< 580) | < 620 | < 650 |
+| FuelFlow (kg/s) | 0.15-0.25 | 0.15-0.25 | 0.34 (0.31-0.37) | 0.85-1.20 | 1.20-1.95 |
+| Oil Pressure (psi) | 25-55 | 40-65 | — | 40-65 | 40-65 |
+| Oil Temperature (°C) | 40-90 | 60-120 | — | 60-150 | 60-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
 
 ---
 
@@ -810,22 +816,30 @@ START: Low Hydraulic Pressure Warning
 
 #### Engine Parameters (V2500-A1)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (%) | 22 | 28 | 97 | 104 |
-| N2 (%) | 58 | 65 | 97 | 102 |
-| EGT (°C) | 380 | 450 | 620 | 680 |
-| Oil Pressure (psi) | 25-55 | 40-65 | 40-65 | 40-65 |
-| Oil Temp (°C) | 40-90 | 60-120 | 60-150 | 60-155 |
-| Vibration (ips) | < 1.0 | < 1.5 | < 2.5 | < 3.0 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 22 | 28 | 87 (85-89) | 97 | 104 |
+| N2 (%) | 58 | 65 | — | 97 | 102 |
+| EGT (°C) | 380 | 450 | 560 (< 580) | < 620 | < 650 |
+| FuelFlow (kg/s) | 0.15-0.25 | 0.15-0.25 | 0.34 (0.31-0.37) | 0.85-1.20 | 1.20-1.95 |
+| Oil Pressure (psi) | 25-55 | 40-65 | — | 40-65 | 40-65 |
+| Oil Temperature (°C) | 40-90 | 60-120 | — | 60-150 | 60-155 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.8 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
 
 #### Hydraulic System
 
-| Parameter | Normal | Warning |
-|-----------|--------|---------|
-| System Pressure | 2,900-3,100 psi | < 2,500 psi |
-| Reservoir Level | 70-100% | < 50% |
-| Fluid Temperature | -40 to +100°C | > 110°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,800 | 2,600-2,800 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Green, Blue, and Yellow systems each operate from -40 to +100°C. Above 110°C is a warning.
 
 ### 10.2 Abbreviations and Acronyms
 

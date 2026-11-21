@@ -128,10 +128,47 @@ class SensorSpec:
 VIBRATION_LEVELS: tuple[str, str, str, str] = ("Normal", "Advisory", "Caution", "Warning")
 
 
+# The engine power settings of every manual's Normal Operating Parameters
+# table, in column order. The renderer adds a cruise column from the specs.
+PHASES: tuple[str, str, str, str] = (
+    "Ground Idle",
+    "Flight Idle",
+    "Max Continuous",
+    "Takeoff (5 min)",
+)
+
+
+@dataclass(frozen=True)
+class EgtBand:
+    """One row of a manual's turbine operating limits, in °C."""
+
+    normal_below: float
+    caution_to: float
+    maximum: float
+
+
+@dataclass(frozen=True)
+class EgtLimits:
+    """Instantaneous EGT limits, as the FADEC monitors them.
+
+    These are a different scale from the hourly EGT trend readings.
+    """
+
+    ground_idle: str
+    flight_idle: str
+    max_continuous: EgtBand
+    takeoff: EgtBand
+    start_max: float | None
+
+
 @dataclass(frozen=True)
 class EngineSpec:
     engine_type: str
     sensors: tuple[SensorSpec, ...]
+    egt_limits: EgtLimits
+    # Row label -> one cell per PHASES entry, for the rows the generator does
+    # not produce. The renderer builds the EGT and vibration rows from specs.
+    phase_limits: dict[str, tuple[str, str, str, str]]
 
 
 def _engine_sensors(
@@ -229,6 +266,20 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
             n1_cruise=88.0,
             fuel_cruise=0.36,
         ),
+        egt_limits=EgtLimits(
+            ground_idle="350-420",
+            flight_idle="420-480",
+            max_continuous=EgtBand(895, 925, 925),
+            takeoff=EgtBand(930, 950, 950),
+            start_max=725,
+        ),
+        phase_limits={
+            "N1Speed (%)": ("20-25", "25-30", "95", "104"),
+            "N2 (%)": ("55-62", "62-68", "95", "101"),
+            "FuelFlow (kg/s)": ("0.10-0.18", "0.18-0.25", "0.85-1.10", "1.20-1.50"),
+            "Oil Pressure (psi)": ("35-60", "40-70", "45-75", "45-75"),
+            "Oil Temperature (°C)": ("50-90", "60-120", "80-140", "80-155"),
+        },
     ),
     "A320-200": EngineSpec(
         engine_type="V2500-A1",
@@ -242,6 +293,22 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
             n1_cruise=87.0,
             fuel_cruise=0.34,
         ),
+        egt_limits=EgtLimits(
+            ground_idle="380",
+            flight_idle="450",
+            max_continuous=EgtBand(620, 650, 665),
+            takeoff=EgtBand(650, 680, 695),
+            start_max=None,
+        ),
+        phase_limits={
+            "N1Speed (%)": ("22", "28", "97", "104"),
+            "N2 (%)": ("58", "65", "97", "102"),
+            # The max continuous cell is interpolated between the idle and
+            # takeoff ranges, not taken from a source.
+            "FuelFlow (kg/s)": ("0.15-0.25", "0.15-0.25", "0.85-1.20", "1.20-1.95"),
+            "Oil Pressure (psi)": ("25-55", "40-65", "40-65", "40-65"),
+            "Oil Temperature (°C)": ("40-90", "60-120", "60-150", "60-155"),
+        },
     ),
     "A321neo": EngineSpec(
         engine_type="LEAP-1A",
@@ -255,6 +322,20 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
             n1_cruise=86.0,
             fuel_cruise=0.38,
         ),
+        egt_limits=EgtLimits(
+            ground_idle="320-400",
+            flight_idle="400-480",
+            max_continuous=EgtBand(950, 980, 1000),
+            takeoff=EgtBand(1000, 1040, 1060),
+            start_max=750,
+        ),
+        phase_limits={
+            "N1Speed (%)": ("18-23", "23-28", "92", "97"),
+            "N2 (%)": ("52-58", "58-64", "96", "100"),
+            "FuelFlow (kg/s)": ("0.12-0.20", "0.20-0.30", "0.95-1.25", "1.50-2.00"),
+            "Oil Pressure (psi)": ("40-65", "45-75", "50-80", "50-85"),
+            "Oil Temperature (°C)": ("45-85", "55-115", "75-135", "75-150"),
+        },
     ),
     "E190": EngineSpec(
         engine_type="CF34-10E",
@@ -268,6 +349,19 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
             n1_cruise=87.0,
             fuel_cruise=0.27,
         ),
+        egt_limits=EgtLimits(
+            ground_idle="330-400",
+            flight_idle="400-460",
+            max_continuous=EgtBand(840, 870, 870),
+            takeoff=EgtBand(870, 895, 900),
+            start_max=730,
+        ),
+        phase_limits={
+            "N1Speed (%)": ("22-28", "28-35", "96", "100"),
+            "FuelFlow (kg/s)": ("0.08-0.15", "0.15-0.22", "0.75-0.95", "1.00-1.20"),
+            "Oil Pressure (psi)": ("35-60", "40-70", "45-75", "45-75"),
+            "Oil Temperature (°C)": ("50-90", "60-120", "80-140", "80-155"),
+        },
     ),
     "A220-300": EngineSpec(
         engine_type="PW1500G",
@@ -281,6 +375,21 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
             n1_cruise=85.0,
             fuel_cruise=0.28,
         ),
+        egt_limits=EgtLimits(
+            ground_idle="310-380",
+            flight_idle="380-440",
+            max_continuous=EgtBand(820, 855, 855),
+            takeoff=EgtBand(855, 880, 890),
+            start_max=700,
+        ),
+        phase_limits={
+            "N1Speed (%)": ("18-24", "24-30", "92", "100"),
+            "FuelFlow (kg/s)": ("0.09-0.16", "0.16-0.24", "0.80-1.10", "1.15-1.35"),
+            "Oil Pressure (psi)": ("35-60", "40-70", "45-75", "45-75"),
+            "Oil Temperature (°C)": ("50-90", "60-120", "80-140", "80-155"),
+            "Gearbox Oil Pressure (psi)": ("50-65", "55-70", "65-80", "65-80"),
+            "Gearbox Oil Temperature (°C)": ("60-90", "70-110", "90-130", "90-130"),
+        },
     ),
 }
 

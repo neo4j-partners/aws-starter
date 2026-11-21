@@ -169,7 +169,7 @@ Each LEAP-1A engine carries four monitoring sensors. The Avionics and Hydraulics
 **Digital Twin Monitoring Note:** The Digital Twin Monitoring System records hourly trend-averaged EGT values on a normalized scale calibrated for long-term degradation detection. For the LEAP-1A, the trend baseline is 634°C, with Advisory at 654°C, Caution at 664°C, and Warning at 674°C. These trend values differ from the instantaneous EGT limits in the Normal Operating Parameters table and Appendix 10.1, which reflect peak values during takeoff and high-power operations. The trend scale detects gradual EGT margin deterioration over weeks and months, not acute exceedances. The absolute limits in this manual refer to instantaneous FADEC-monitored readings.
 <!-- END GENERATED: egt-trend-note -->
 
-Instantaneous takeoff EGT peaks are typically 950–1,040°C for the LEAP-1A.
+Instantaneous takeoff EGT for the LEAP-1A must stay within the Operating Limits table in section 3.3.3, High-Pressure Turbine.
 
 **Engine Monitoring Unit (EMU):** The LEAP-1A features an enhanced EMU providing:
 - Real-time trend monitoring
@@ -302,12 +302,15 @@ The two-stage HPT features advanced single-crystal nickel superalloy blades with
 - Reduced cooling air: +1% efficiency gain
 
 **Operating Limits:**
+<!-- BEGIN GENERATED: egt-limits -->
 | Parameter | Normal | Caution | Maximum |
 |-----------|--------|---------|---------|
 | EGT (Takeoff, 5 min) | < 1,000°C | 1,000-1,040°C | 1,060°C |
 | EGT (Max Continuous) | < 950°C | 950-980°C | 1,000°C |
 | EGT (Start) | — | — | 750°C |
-| Inter-turbine Temp | < 1,100°C | 1,100-1,150°C | 1,200°C |
+<!-- END GENERATED: egt-limits -->
+
+**Inter-turbine temperature:** Normal is below 1,100°C. Caution is 1,100-1,150°C. The maximum is 1,200°C.
 
 #### 3.3.4 Main Fuel Pump
 **Part Number:** LEAP-FP-1A32-400
@@ -343,16 +346,17 @@ The #3 main bearing assembly is a duplex ball bearing with squeeze film damper, 
 
 ### 3.4 Normal Operating Parameters
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff |
-|-----------|-------------|-------------|----------------|---------|
-| N1Speed (% RPM) | 18-23% | 23-28% | 92% | 97% |
-| N2 (% RPM) | 52-58% | 58-64% | 96% | 100% |
-| EGT (°C) | 320-400 | 400-480 | 900-950 | 980-1040 |
-| FuelFlow (kg/s) | 0.12-0.20 | 0.20-0.30 | 0.95-1.25 | 1.50-2.00 |
-| Oil Pressure (psi) | 40-65 | 45-75 | 50-80 | 50-85 |
-| Oil Temperature (°C) | 45-85 | 55-115 | 75-135 | 75-150 |
-| Vibration N1 (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
-| Vibration N2 (ips) | < 0.6 | < 1.0 | < 1.8 | < 2.2 |
+<!-- BEGIN GENERATED: normal-parameters -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-23 | 23-28 | 86 (84-88) | 92 | 97 |
+| N2 (%) | 52-58 | 58-64 | — | 96 | 100 |
+| EGT (°C) | 320-400 | 400-480 | 634 (< 654) | < 950 | < 1,000 |
+| FuelFlow (kg/s) | 0.12-0.20 | 0.20-0.30 | 0.38 (0.35-0.41) | 0.95-1.25 | 1.50-2.00 |
+| Oil Pressure (psi) | 40-65 | 45-75 | — | 50-80 | 50-85 |
+| Oil Temperature (°C) | 45-85 | 55-115 | — | 75-135 | 75-150 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.7 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: normal-parameters -->
 
 ### 3.5 FADEC System
 
@@ -1029,23 +1033,30 @@ START: Fan Blade Damage Reported/Suspected
 
 #### Engine Parameters (LEAP-1A)
 
-| Parameter | Ground Idle | Flight Idle | Max Continuous | Takeoff (5 min) |
-|-----------|-------------|-------------|----------------|-----------------|
-| N1Speed (%) | 18-23 | 23-28 | 92 | 97 |
-| N2 (%) | 52-58 | 58-64 | 96 | 100 |
-| EGT (°C) | 320-400 | 400-480 | 950 | 1,040 |
-| Oil Pressure (psi) | 40-65 | 45-75 | 50-80 | 50-85 |
-| Oil Temp (°C) | 45-85 | 55-115 | 75-135 | 75-150 |
-| Vibration N1 (ips) | < 0.8 | < 1.2 | < 2.0 | < 2.5 |
-| Vibration N2 (ips) | < 0.6 | < 1.0 | < 1.8 | < 2.2 |
+<!-- BEGIN GENERATED: quick-ref-engine -->
+| Parameter | Ground Idle | Flight Idle | Cruise (digital twin) | Max Continuous | Takeoff (5 min) |
+|-----------|-------------|-------------|-----------------------|----------------|-----------------|
+| N1Speed (%) | 18-23 | 23-28 | 86 (84-88) | 92 | 97 |
+| N2 (%) | 52-58 | 58-64 | — | 96 | 100 |
+| EGT (°C) | 320-400 | 400-480 | 634 (< 654) | < 950 | < 1,000 |
+| FuelFlow (kg/s) | 0.12-0.20 | 0.20-0.30 | 0.38 (0.35-0.41) | 0.95-1.25 | 1.50-2.00 |
+| Oil Pressure (psi) | 40-65 | 45-75 | — | 50-80 | 50-85 |
+| Oil Temperature (°C) | 45-85 | 55-115 | — | 75-135 | 75-150 |
+| Vibration N1 (ips) | < 2.0 | < 2.0 | 0.7 (< 2.0) | < 2.0 | < 2.0 |
+<!-- END GENERATED: quick-ref-engine -->
 
 #### Hydraulic System
 
-| Parameter | Green | Blue | Yellow |
-|-----------|-------|------|--------|
-| Pressure | 2,900-3,100 psi | 2,900-3,100 psi | 2,900-3,100 psi |
-| Quantity | 70-100% | 70-100% | 70-100% |
-| Fluid Temp | -40 to +107°C | -40 to +107°C | -40 to +107°C |
+<!-- BEGIN GENERATED: quick-ref-hydraulics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| Hydraulic Pressure (psi) | 3,000 | > 2,900 | 2,600-2,900 | 2,400-2,600 | ≤ 2,400 |
+| Hydraulic Fluid Quantity (%) | 90 | > 70 | 60-70 | 50-60 | ≤ 50 |
+<!-- END GENERATED: quick-ref-hydraulics -->
+
+The bands apply to every hydraulic system.
+
+**Fluid temperature:** The Green, Blue, and Yellow systems each operate from -40 to +107°C.
 
 ### 10.2 Abbreviations and Acronyms
 

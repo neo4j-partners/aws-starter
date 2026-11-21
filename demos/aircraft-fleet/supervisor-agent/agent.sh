@@ -145,18 +145,33 @@ ensure_cdk_deps() {
         && ! [ "$CDK_DIR/package-lock.json" -nt "$CDK_DIR/node_modules/.package-lock.json" ]; then
         return
     fi
+    local install
+    install=$(cdk_install_command)
     if ! command -v npm >/dev/null 2>&1; then
         echo -e "${RED}ERROR: npm is not installed, so the CDK dependencies cannot be installed${NC}"
-        echo "Install Node.js, then run: (cd $CDK_DIR && npm ci)"
+        echo "Install Node.js, then run: (cd $CDK_DIR && $install)"
         exit 1
     fi
     echo -e "${YELLOW}Installing the CDK dependencies...${NC}"
-    if ! (cd "$CDK_DIR" && npm ci); then
-        echo -e "${RED}ERROR: npm ci failed in $CDK_DIR${NC}"
-        echo "Fix the error above, then run: (cd $CDK_DIR && npm ci)"
+    # $install is two words, npm and its command, so it is left unquoted.
+    if ! (cd "$CDK_DIR" && $install); then
+        echo -e "${RED}ERROR: $install failed in $CDK_DIR${NC}"
+        echo "Fix the error above, then run: (cd $CDK_DIR && $install)"
         exit 1
     fi
     echo ""
+}
+
+# Print the npm command that installs the CDK dependencies. npm ci installs
+# exactly what package-lock.json lists and never rewrites it, but it refuses
+# to run without one. agentcore create --skip-install leaves agentcore/cdk
+# with no package-lock.json, so npm install writes it there.
+cdk_install_command() {
+    if [ -f "$CDK_DIR/package-lock.json" ]; then
+        echo "npm ci"
+    else
+        echo "npm install"
+    fi
 }
 
 # The code zip has no ignore file, so any secrets file in this folder would
@@ -696,9 +711,9 @@ case "${1:-help}" in
         fi
         echo ""
         echo -e "${GREEN}Installing CDK dependencies...${NC}"
-        # npm ci installs exactly what the tracked package-lock.json lists
-        # and never rewrites it.
-        (cd "$CDK_DIR" && npm ci)
+        # $install is two words, npm and its command, so it is left unquoted.
+        install=$(cdk_install_command)
+        (cd "$CDK_DIR" && $install)
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Set the deploy settings in ../.env, then run './agent.sh deploy'"

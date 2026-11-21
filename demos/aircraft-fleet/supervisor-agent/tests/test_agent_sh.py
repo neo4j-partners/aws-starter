@@ -157,12 +157,18 @@ if [ "${STUB_MKTEMP_LOSE:-}" = "$count" ]; then exit 1; fi
 echo "$made"
 """
 
-# npm logs its arguments and working folder. `npm ci` writes
+# npm logs its arguments and working folder. An install writes
 # node_modules/.package-lock.json, as a complete real install does, unless
-# STUB_NPM_EXIT makes it fail.
+# STUB_NPM_EXIT makes it fail. As in real npm, `npm ci` refuses to run
+# without package-lock.json, and `npm install` writes one.
 STUB_NPM = r"""#!/bin/bash
 echo "npm $* in ${PWD##*/supervisor-agent/}" >> "$STUB_LOG"
 if [ -n "${STUB_NPM_EXIT:-}" ]; then echo "npm ERR! stub failure" >&2; exit "$STUB_NPM_EXIT"; fi
+if [ "$1" = ci ] && [ ! -f package-lock.json ]; then
+    echo "npm ERR! The npm ci command can only install with an existing package-lock.json" >&2
+    exit 1
+fi
+if [ "$1" = install ]; then echo "{}" > package-lock.json; fi
 mkdir -p node_modules
 echo "{}" > node_modules/.package-lock.json
 """
@@ -633,6 +639,19 @@ def test_configure_installs_the_cdk_dependencies_with_npm_ci(project: Path) -> N
     assert calls(project) == ["npm ci in agentcore/cdk"]
 
 
+# agentcore create --skip-install scaffolds agentcore/cdk with no
+# package-lock.json, and npm ci refuses to run without one.
+def test_configure_without_a_package_lock_installs_with_npm_install(project: Path) -> None:
+    lock = project / "agentcore" / "cdk" / "package-lock.json"
+    lock.unlink()
+
+    result = run_agent(project, "configure")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == ["npm install in agentcore/cdk"]
+    assert lock.is_file()
+
+
 DISCOVERY_URL = "https://cognito-idp.example/.well-known/openid-configuration"
 
 # The system tools agent.sh runs before it installs the CDK dependencies.
@@ -683,6 +702,33 @@ def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> 
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert not any(call.startswith("npm") for call in calls(project))
+
+
+def test_deploy_without_a_package_lock_installs_with_npm_install(project: Path) -> None:
+    ready_to_deploy(project)
+    remove_cdk_install(project)
+    lock = project / "agentcore" / "cdk" / "package-lock.json"
+    lock.unlink()
+
+    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project)[0] == "npm install in agentcore/cdk"
+    assert lock.is_file()
+
+
+def test_a_failed_cdk_install_without_a_package_lock_names_npm_install(
+    project: Path,
+) -> None:
+    ready_to_deploy(project)
+    remove_cdk_install(project)
+    (project / "agentcore" / "cdk" / "package-lock.json").unlink()
+
+    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL, STUB_NPM_EXIT="1")
+
+    assert result.returncode == 1
+    assert "npm install failed in agentcore/cdk" in result.stdout
+    assert "(cd agentcore/cdk && npm install)" in result.stdout
 
 
 # A pull that changes package-lock.json leaves it newer than the install,

@@ -369,9 +369,10 @@ def _targets(account: object = ACCOUNT, region: object = "us-east-1") -> str:
         _targets("12345"),
         _targets("1111 2222 3333"),
         _targets(111122223333),
-        # A region must be a non-empty string.
+        # A region must be a non-empty string with no whitespace.
         _targets(region=""),
         _targets(region=None),
+        _targets(region="us east-1"),
     ],
 )
 def test_an_unknown_target_account_fails(project: Path, targets: str) -> None:

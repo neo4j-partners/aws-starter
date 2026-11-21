@@ -93,12 +93,14 @@ class SchemaDriver:
         self.relationship_rows = list(relationship_rows)
         self.session_configs: list[dict[str, Any]] = []
         self.session_queries: list[list[str]] = []
+        self.sessions: list[_SchemaSession] = []
         self.check_queries: list[str] = []
 
     def session(self, **config: Any) -> _SchemaSession:
         self.session_configs.append(config)
         self.session_queries.append([])
-        return _SchemaSession(self, self.session_queries[-1])
+        self.sessions.append(_SchemaSession(self, self.session_queries[-1]))
+        return self.sessions[-1]
 
     def execute_query(self, cypher: str, /, **params: Any) -> tuple[list[dict], None, None]:
         return [], None, None
@@ -108,6 +110,10 @@ class _SchemaSession:
     def __init__(self, driver: SchemaDriver, queries: list[str]) -> None:
         self.driver = driver
         self.queries = queries
+        self.bookmarks = object()
+
+    def last_bookmarks(self) -> object:
+        return self.bookmarks
 
     def __enter__(self) -> _SchemaSession:
         return self
@@ -440,7 +446,9 @@ def test_schema_sessions_disable_only_the_expected_notifications() -> None:
     # db.schema.nodeTypeProperties raises a GENERIC notice about its
     # propertyTypes field. Other GENERIC notices still reach the log. On a
     # partial database the fact queries name a label or property key that
-    # does not exist yet, which raises an UNRECOGNIZED notice.
+    # does not exist yet, which raises an UNRECOGNIZED notice. The second
+    # session starts from the first one's bookmarks, so on a cluster both
+    # read the same state.
     driver = SchemaDriver(relationship_rows=[(["Aircraft"], "HAS_SYSTEM", ["System"])])
 
     graph_schema(driver, "db")
@@ -456,6 +464,7 @@ def test_schema_sessions_disable_only_the_expected_notifications() -> None:
             "notifications_disabled_classifications": [
                 NotificationDisabledClassification.UNRECOGNIZED
             ],
+            "bookmarks": driver.sessions[0].bookmarks,
         },
     ]
     property_queries, other_queries = driver.session_queries

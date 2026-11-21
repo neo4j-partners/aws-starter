@@ -158,13 +158,16 @@ def graph_schema(driver: Driver, database: str) -> str:
         notifications_disabled_classifications=[NotificationDisabledClassification.GENERIC],
     ) as session:
         property_rows = session.run(_NODE_PROPERTIES_Q).data()
+        bookmarks = session.last_bookmarks()
     # On a partial database the fact queries can name a label or property
     # key that does not exist yet. The empty result is expected, so the
-    # UNRECOGNIZED warning is noise.
+    # UNRECOGNIZED warning is noise. The first session's bookmarks make this
+    # one read at least the state that one saw.
     with driver.session(
         database=database,
         default_access_mode=READ_ACCESS,
         notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
+        bookmarks=bookmarks,
     ) as session:
         candidates = _candidate_patterns(session.run(_SCHEMA_VISUALIZATION_Q).single(strict=True))
         found = [

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+
 from neo4j import Driver, RoutingControl
 from neo4j.exceptions import Neo4jError
 
@@ -23,6 +25,27 @@ def report_query_error(driver: Driver, database: str, exc: Neo4jError, index: st
     )
     if records[0]["count"] == 0:
         print(f"  (index '{index}' not found; run 'setup' first)\n")
+
+
+_SEED_CHUNKS_Q = """\
+MATCH (c:Chunk)
+WHERE c.embedding IS NOT NULL AND c.text IS NOT NULL
+RETURN c.chunkId AS chunk_id"""
+
+_NO_CHUNKS = "  (no chunks with embeddings \u2014 run 'setup' first)\n"
+
+
+def pick_seed_chunk(driver: Driver, database: str) -> str | None:
+    """Return the chunkId of one random embedded chunk, or None if there are none.
+
+    Sections 9 and 11-14 all search from this one chunk, so their results
+    can be compared within a run.
+    """
+    records, _, _ = driver.execute_query(
+        _SEED_CHUNKS_Q, database_=database, routing_=RoutingControl.READ
+    )
+    chunk_ids = [r["chunk_id"] for r in records]
+    return random.choice(chunk_ids) if chunk_ids else None
 
 
 # ---------------------------------------------------------------------------
@@ -321,9 +344,7 @@ def _cross_links(driver: Driver, database: str, limit: int) -> None:
 # ---------------------------------------------------------------------------
 
 _VECTOR_Q = """\
-MATCH (seed:Chunk)
-WHERE seed.embedding IS NOT NULL
-WITH seed, rand() AS r ORDER BY r LIMIT 1
+MATCH (seed:Chunk {chunkId: $seed_id})
 CALL db.index.vector.queryNodes(
     'maintenanceChunkEmbeddings', $top_k, seed.embedding
 ) YIELD node, score
@@ -334,16 +355,19 @@ RETURN substring(seed.text, 0, 100) AS seed_text,
        substring(node.text, 0, 100) AS match_text"""
 
 
-def _vector_similarity(driver: Driver, database: str, limit: int) -> None:
+def _vector_similarity(driver: Driver, database: str, limit: int, seed_id: str | None) -> None:
     header(
         "9. Vector Similarity Search",
         "Picks a random chunk and finds the most similar chunks using the\n"
         "  vector index (reuses stored embeddings \u2014 no API key needed).",
     )
     show_cypher(_VECTOR_Q)
+    if seed_id is None:
+        print(_NO_CHUNKS)
+        return
     try:
         rows, _, _ = driver.execute_query(
-            _VECTOR_Q, limit=limit, top_k=limit + 1, database_=database
+            _VECTOR_Q, seed_id=seed_id, limit=limit, top_k=limit + 1, database_=database
         )
     except Neo4jError as exc:
         report_query_error(driver, database, exc, _VECTOR_INDEX)
@@ -351,7 +375,7 @@ def _vector_similarity(driver: Driver, database: str, limit: int) -> None:
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
         return
-    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
+    print(f'  Seed {seed_id}: "{rows[0]["seed_text"]}\u2026"\n')
     print(f"  {'Score':<8}  Similar chunk")
     print("  " + "\u2500" * 8 + "  " + "\u2500" * 56)
     for r in rows:
@@ -403,9 +427,7 @@ def _fulltext_search(driver: Driver, database: str, limit: int) -> None:
 # ---------------------------------------------------------------------------
 
 _VECTOR_DOC_Q = """\
-MATCH (seed:Chunk)
-WHERE seed.embedding IS NOT NULL
-WITH seed, rand() AS r ORDER BY r LIMIT 1
+MATCH (seed:Chunk {chunkId: $seed_id})
 CALL db.index.vector.queryNodes(
     $index, $top_k, seed.embedding
 ) YIELD node, score
@@ -420,16 +442,26 @@ RETURN substring(seed.text, 0, 80) AS seed_text,
        substring(node.text, 0, 80) AS match_text"""
 
 
-def _vector_document_context(driver: Driver, database: str, limit: int) -> None:
+def _vector_document_context(
+    driver: Driver, database: str, limit: int, seed_id: str | None
+) -> None:
     header(
         "11. Vector Search \u2192 Document Context",
         "Semantic search enriched with source document metadata.\n"
         "  Mirrors the VectorCypherRetriever document-context pattern from Lab 3.",
     )
     show_cypher(_VECTOR_DOC_Q)
+    if seed_id is None:
+        print(_NO_CHUNKS)
+        return
     try:
         rows, _, _ = driver.execute_query(
-            _VECTOR_DOC_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
+            _VECTOR_DOC_Q,
+            index=_VECTOR_INDEX,
+            seed_id=seed_id,
+            limit=limit,
+            top_k=limit + 1,
+            database_=database,
         )
     except Neo4jError as exc:
         report_query_error(driver, database, exc, _VECTOR_INDEX)
@@ -437,7 +469,7 @@ def _vector_document_context(driver: Driver, database: str, limit: int) -> None:
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
         return
-    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
+    print(f'  Seed {seed_id}: "{rows[0]["seed_text"]}\u2026"\n')
     table(
         ["Score", "Doc ID", "Aircraft", "Chunk", "Preview"],
         [
@@ -458,9 +490,7 @@ def _vector_document_context(driver: Driver, database: str, limit: int) -> None:
 # ---------------------------------------------------------------------------
 
 _ADJACENT_Q = """\
-MATCH (seed:Chunk)
-WHERE seed.embedding IS NOT NULL
-WITH seed, rand() AS r ORDER BY r LIMIT 1
+MATCH (seed:Chunk {chunkId: $seed_id})
 CALL db.index.vector.queryNodes(
     $index, $top_k, seed.embedding
 ) YIELD node, score
@@ -478,16 +508,24 @@ RETURN substring(seed.text, 0, 80) AS seed_text,
        substring(node.text, 0, 80) AS match_text"""
 
 
-def _adjacent_chunks(driver: Driver, database: str, limit: int) -> None:
+def _adjacent_chunks(driver: Driver, database: str, limit: int, seed_id: str | None) -> None:
     header(
         "12. Adjacent Chunk Retrieval",
         "Vector search with surrounding context via NEXT_CHUNK traversal.\n"
         "  Mirrors the VectorCypherRetriever adjacent-chunks pattern from Lab 3.",
     )
     show_cypher(_ADJACENT_Q)
+    if seed_id is None:
+        print(_NO_CHUNKS)
+        return
     try:
         rows, _, _ = driver.execute_query(
-            _ADJACENT_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
+            _ADJACENT_Q,
+            index=_VECTOR_INDEX,
+            seed_id=seed_id,
+            limit=limit,
+            top_k=limit + 1,
+            database_=database,
         )
     except Neo4jError as exc:
         report_query_error(driver, database, exc, _VECTOR_INDEX)
@@ -495,7 +533,7 @@ def _adjacent_chunks(driver: Driver, database: str, limit: int) -> None:
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
         return
-    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
+    print(f'  Seed {seed_id}: "{rows[0]["seed_text"]}\u2026"\n')
     for r in rows:
         prev = f"Chunk {r['prev_idx']}" if r["prev_idx"] is not None else "\u2014"
         nxt = f"Chunk {r['next_idx']}" if r["next_idx"] is not None else "\u2014"
@@ -512,9 +550,7 @@ def _adjacent_chunks(driver: Driver, database: str, limit: int) -> None:
 # ---------------------------------------------------------------------------
 
 _VECTOR_TOPO_Q = """\
-MATCH (seed:Chunk)
-WHERE seed.embedding IS NOT NULL
-WITH seed, rand() AS r ORDER BY r LIMIT 1
+MATCH (seed:Chunk {chunkId: $seed_id})
 CALL db.index.vector.queryNodes(
     $index, $top_k, seed.embedding
 ) YIELD node, score
@@ -539,16 +575,24 @@ RETURN substring(seed.text, 0, 80) AS seed_text,
        substring(node.text, 0, 60) AS match_text"""
 
 
-def _vector_topology(driver: Driver, database: str, limit: int) -> None:
+def _vector_topology(driver: Driver, database: str, limit: int, seed_id: str | None) -> None:
     header(
         "13. Vector Search \u2192 Aircraft Topology",
         "Semantic search connected to the operational graph (Aircraft \u2192 System).\n"
         "  Mirrors the VectorCypherRetriever system-context pattern from Lab 3.",
     )
     show_cypher(_VECTOR_TOPO_Q)
+    if seed_id is None:
+        print(_NO_CHUNKS)
+        return
     try:
         rows, _, _ = driver.execute_query(
-            _VECTOR_TOPO_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
+            _VECTOR_TOPO_Q,
+            index=_VECTOR_INDEX,
+            seed_id=seed_id,
+            limit=limit,
+            top_k=limit + 1,
+            database_=database,
         )
     except Neo4jError as exc:
         report_query_error(driver, database, exc, _VECTOR_INDEX)
@@ -556,7 +600,7 @@ def _vector_topology(driver: Driver, database: str, limit: int) -> None:
     if not rows:
         print("  (no topology connections found \u2014 run 'setup' first)\n")
         return
-    print(f'  Seed: "{rows[0]["seed_text"]}\u2026"\n')
+    print(f'  Seed {seed_id}: "{rows[0]["seed_text"]}\u2026"\n')
     table(
         ["Score", "Aircraft", "System", "Doc", "Chunk", "Preview"],
         [
@@ -578,9 +622,7 @@ def _vector_topology(driver: Driver, database: str, limit: int) -> None:
 # ---------------------------------------------------------------------------
 
 _HYBRID_VECTOR_Q = """\
-MATCH (seed:Chunk)
-WHERE seed.embedding IS NOT NULL
-WITH seed, rand() AS r ORDER BY r LIMIT 1
+MATCH (seed:Chunk {chunkId: $seed_id})
 CALL db.index.vector.queryNodes(
     $index, $top_k, seed.embedding
 ) YIELD node, score
@@ -593,9 +635,7 @@ RETURN 'vector' AS method,
        substring(node.text, 0, 80) AS match_text"""
 
 _HYBRID_FT_Q = """\
-MATCH (seed:Chunk)
-WHERE seed.embedding IS NOT NULL AND seed.text IS NOT NULL
-WITH seed, rand() AS r ORDER BY r LIMIT 1
+MATCH (seed:Chunk {chunkId: $seed_id})
 WITH seed,
      reduce(s = seed.text, x IN
          ['\\n', '.', ',', ':', ';',
@@ -616,7 +656,7 @@ RETURN 'fulltext' AS method,
        substring(node.text, 0, 80) AS match_text"""
 
 
-def _hybrid_comparison(driver: Driver, database: str, limit: int) -> None:
+def _hybrid_comparison(driver: Driver, database: str, limit: int, seed_id: str | None) -> None:
     header(
         "14. Hybrid Search Comparison",
         "Side-by-side vector vs fulltext results for the same seed chunk.\n"
@@ -626,15 +666,23 @@ def _hybrid_comparison(driver: Driver, database: str, limit: int) -> None:
     # --- Vector results ---
     print("  [A] Vector similarity results:")
     show_cypher(_HYBRID_VECTOR_Q)
+    if seed_id is None:
+        print(_NO_CHUNKS)
+        return
     try:
         v_rows, _, _ = driver.execute_query(
-            _HYBRID_VECTOR_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
+            _HYBRID_VECTOR_Q,
+            index=_VECTOR_INDEX,
+            seed_id=seed_id,
+            limit=limit,
+            top_k=limit + 1,
+            database_=database,
         )
     except Neo4jError as exc:
         report_query_error(driver, database, exc, _VECTOR_INDEX)
         return
     if v_rows:
-        print(f'  Seed: "{v_rows[0]["seed_text"]}\u2026"\n')
+        print(f'  Seed {seed_id}: "{v_rows[0]["seed_text"]}\u2026"\n')
         table(
             ["Method", "Score", "Chunk", "Preview"],
             [
@@ -650,13 +698,13 @@ def _hybrid_comparison(driver: Driver, database: str, limit: int) -> None:
     show_cypher(_HYBRID_FT_Q)
     try:
         ft_rows, _, _ = driver.execute_query(
-            _HYBRID_FT_Q, ft_index=_FULLTEXT_INDEX, limit=limit, database_=database
+            _HYBRID_FT_Q, ft_index=_FULLTEXT_INDEX, seed_id=seed_id, limit=limit, database_=database
         )
     except Neo4jError as exc:
         report_query_error(driver, database, exc, _FULLTEXT_INDEX)
         return
     if ft_rows:
-        print(f'  Seed: "{ft_rows[0]["seed_text"]}\u2026"\n')
+        print(f'  Seed {seed_id}: "{ft_rows[0]["seed_text"]}\u2026"\n')
         table(
             ["Method", "Score", "Chunk", "Preview"],
             [
@@ -688,7 +736,9 @@ def run_all_samples(driver: Driver, database: str, sample_size: int = 10) -> Non
     print(f"\n{'#' * WIDTH}")
     print("  Aircraft Digital Twin \u2014 Sample Queries")
     print(f"{'#' * WIDTH}")
-    print(f"\n  Sample size: {sample_size} rows per section\n")
+    print(f"\n  Sample size: {sample_size} rows per section")
+    seed_id = pick_seed_chunk(driver, database)
+    print(f"  Seed chunk for sections 9 and 11-14: {seed_id or '(none)'}\n")
 
     _aircraft_fleet(driver, database)
     _system_hierarchy(driver, database)
@@ -698,12 +748,12 @@ def run_all_samples(driver: Driver, database: str, sample_size: int = 10) -> Non
     _document_chunks(driver, database, sample_size)
     _extracted_entities(driver, database, sample_size)
     _cross_links(driver, database, sample_size)
-    _vector_similarity(driver, database, sample_size)
+    _vector_similarity(driver, database, sample_size, seed_id)
     _fulltext_search(driver, database, sample_size)
-    _vector_document_context(driver, database, sample_size)
-    _adjacent_chunks(driver, database, sample_size)
-    _vector_topology(driver, database, sample_size)
-    _hybrid_comparison(driver, database, sample_size)
+    _vector_document_context(driver, database, sample_size, seed_id)
+    _adjacent_chunks(driver, database, sample_size, seed_id)
+    _vector_topology(driver, database, sample_size, seed_id)
+    _hybrid_comparison(driver, database, sample_size, seed_id)
 
     print(f"{'#' * WIDTH}")
     print("  All samples complete.")

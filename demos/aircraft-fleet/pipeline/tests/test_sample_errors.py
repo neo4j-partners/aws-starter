@@ -18,6 +18,7 @@ from populate_aircraft_db.samples import (
 )
 
 SETUP_HINT = "run 'setup' first"
+SEED = "DOC-1:0"
 
 
 class FailingDriver:
@@ -49,18 +50,30 @@ def _chat(system: str, user: str) -> str:
 # Each search query in the samples, the index it needs, and how many
 # queries before it succeed.
 SEARCHES = [
-    pytest.param(lambda d: _vector_similarity(d, "db", 3), "maintenanceChunkEmbeddings", 0, id="9"),
+    pytest.param(
+        lambda d: _vector_similarity(d, "db", 3, SEED), "maintenanceChunkEmbeddings", 0, id="9"
+    ),
     pytest.param(lambda d: _fulltext_search(d, "db", 3), "maintenanceChunkText", 0, id="10"),
     pytest.param(
-        lambda d: _vector_document_context(d, "db", 3), "maintenanceChunkEmbeddings", 0, id="11"
-    ),
-    pytest.param(lambda d: _adjacent_chunks(d, "db", 3), "maintenanceChunkEmbeddings", 0, id="12"),
-    pytest.param(lambda d: _vector_topology(d, "db", 3), "maintenanceChunkEmbeddings", 0, id="13"),
-    pytest.param(
-        lambda d: _hybrid_comparison(d, "db", 3), "maintenanceChunkEmbeddings", 0, id="14-vector"
+        lambda d: _vector_document_context(d, "db", 3, SEED),
+        "maintenanceChunkEmbeddings",
+        0,
+        id="11",
     ),
     pytest.param(
-        lambda d: _hybrid_comparison(d, "db", 3), "maintenanceChunkText", 1, id="14-fulltext"
+        lambda d: _adjacent_chunks(d, "db", 3, SEED), "maintenanceChunkEmbeddings", 0, id="12"
+    ),
+    pytest.param(
+        lambda d: _vector_topology(d, "db", 3, SEED), "maintenanceChunkEmbeddings", 0, id="13"
+    ),
+    pytest.param(
+        lambda d: _hybrid_comparison(d, "db", 3, SEED),
+        "maintenanceChunkEmbeddings",
+        0,
+        id="14-vector",
+    ),
+    pytest.param(
+        lambda d: _hybrid_comparison(d, "db", 3, SEED), "maintenanceChunkText", 1, id="14-fulltext"
     ),
     pytest.param(
         lambda d: _run_similarity_search(d, "db", _chat, lambda t: [0.1], "q"),

@@ -231,7 +231,8 @@ def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list
     Lines may end in ``\\r\\n``, ``\\r``, or ``\\n``, as the SSE format allows.
     A leading UTF-8 byte order mark is dropped, as the format requires. A
     final block with no blank line after it is incomplete. It is discarded,
-    and the stream is reported as cut off.
+    and the stream is reported as cut off, unless the complete event already
+    arrived. The answer is whole by then, so the block is only logged.
     """
     content_parts: list[str] = []
     errors: list[str] = []
@@ -266,6 +267,9 @@ def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list
     pending_bytes, _ = decoder.getstate()
     buffer = dispatch(buffer + _normalize_newlines(held_cr + decoder.decode(b"", final=True)))
     partial_event = bool(buffer.strip())
+    if completed and (pending_bytes or partial_event):
+        logger.warning("Discarded an unfinished event after the complete event")
+        pending_bytes, partial_event = b"", False
     if pending_bytes:
         logger.warning("Response stream ended inside a UTF-8 character")
     elif partial_event:

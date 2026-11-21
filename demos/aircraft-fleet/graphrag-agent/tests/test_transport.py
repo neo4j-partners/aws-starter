@@ -164,6 +164,23 @@ def test_trailing_block_without_blank_line_is_discarded(tail: bytes, caplog) -> 
 
 
 @pytest.mark.parametrize(
+    "tail",
+    [
+        b'data: {"type": "chunk", "data": "tail"}',
+        b'data: {"type": "chunk", "data": "tail"}\n',
+        # Cut inside a character of the trailing block.
+        "data: →".encode()[:-1],
+    ],
+)
+def test_unfinished_block_after_complete_is_discarded_quietly(tail: bytes, caplog) -> None:
+    raw = [_event({"type": "chunk", "data": "ok"}), COMPLETE, tail]
+    content, errors = _consume_sse(raw, stream=False)
+    assert content == ["ok"]
+    assert errors == []
+    assert "Discarded an unfinished event after the complete event" in caplog.text
+
+
+@pytest.mark.parametrize(
     "raw",
     [
         [b"\xef\xbb\xbf" + _event({"type": "chunk", "data": "a"}), COMPLETE],

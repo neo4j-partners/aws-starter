@@ -108,10 +108,14 @@ def graph_schema(driver: Driver, database: str) -> str:
         operator_rows = session.run(_OPERATORS_Q).data()
         airport_rows = session.run(_AIRPORTS_Q).data()
 
+    # A label whose nodes have no properties comes back once with a null
+    # propertyName. It is listed with an empty property set.
     properties: dict[str, set[str]] = {}
     for row in property_rows:
         if label := _domain_label(row["nodeLabels"]):
-            properties.setdefault(label, set()).add(row["propertyName"])
+            names = properties.setdefault(label, set())
+            if row["propertyName"] is not None:
+                names.add(row["propertyName"])
 
     relationships = set()
     for row in relationship_rows:

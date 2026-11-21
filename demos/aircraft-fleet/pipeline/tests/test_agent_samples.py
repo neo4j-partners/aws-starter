@@ -64,7 +64,7 @@ class SchemaDriver:
 
     def __init__(
         self,
-        property_rows: list[tuple[list[str], str]] = (),
+        property_rows: list[tuple[list[str], str | None]] = (),
         relationship_rows: list[tuple[list[str], str, list[str]]] = (),
         models: list[str] = (),
         tail_rows: list[tuple[str, str]] = (),
@@ -204,6 +204,17 @@ def test_schema_lists_labels_and_relationships_without_internal_labels() -> None
         "- (Chunk)-[:NEXT_CHUNK]->(Chunk)\n"
         "- (Fault)-[:FROM_CHUNK]->(Chunk)\n"
     )
+
+
+def test_schema_lists_a_label_without_properties() -> None:
+    # nodeTypeProperties returns one row with a null propertyName for a
+    # label whose nodes have no properties.
+    driver = SchemaDriver(property_rows=[(["Marker"], None), (["Aircraft"], "tail_number")])
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert "- Marker {}" in lines
+    assert "- Aircraft {tail_number}" in lines
 
 
 @pytest.mark.parametrize(

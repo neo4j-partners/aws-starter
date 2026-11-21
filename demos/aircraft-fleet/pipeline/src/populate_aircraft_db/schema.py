@@ -20,15 +20,27 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_TYPES: list[str] = list(COMPONENT_TYPES_BY_SYSTEM)
 
-# Lowercase component type -> the system type that has it.
-SYSTEM_TYPE_BY_COMPONENT_TYPE: dict[str, str] = {
-    component.lower(): system
-    for system, components in COMPONENT_TYPES_BY_SYSTEM.items()
-    for component in components
-}
-assert len(SYSTEM_TYPE_BY_COMPONENT_TYPE) == sum(
-    len(components) for components in COMPONENT_TYPES_BY_SYSTEM.values()
-), "a component type must belong to one system type"
+
+def system_type_by_component_type(components_by_system: dict[str, list[str]]) -> dict[str, str]:
+    """Return lowercase component type -> the system type that has it.
+
+    Raises ValueError if a component type, ignoring case, is listed under
+    more than one system type or twice under one.
+    """
+    mapping: dict[str, str] = {}
+    for system, components in components_by_system.items():
+        for component in components:
+            key = component.lower()
+            if key in mapping:
+                raise ValueError(
+                    f"component type {component!r} is listed under {mapping[key]!r} "
+                    f"and {system!r}; a component type must belong to one system type"
+                )
+            mapping[key] = system
+    return mapping
+
+
+SYSTEM_TYPE_BY_COMPONENT_TYPE = system_type_by_component_type(COMPONENT_TYPES_BY_SYSTEM)
 
 # "Engine: Turbine, Compressor, ...; Avionics: ...; Hydraulics: ..."
 COMPONENT_TYPES_TEXT = "; ".join(

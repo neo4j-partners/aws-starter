@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
 from generator.specs import COMPONENT_TYPES_BY_SYSTEM, SENSOR_TYPES
 from populate_aircraft_db.pipeline import EXTRACTION_PROMPT
-from populate_aircraft_db.schema import SYSTEM_TYPE_BY_COMPONENT_TYPE, build_extraction_schema
+from populate_aircraft_db.schema import (
+    SYSTEM_TYPE_BY_COMPONENT_TYPE,
+    build_extraction_schema,
+    system_type_by_component_type,
+)
 
 PROMPT = EXTRACTION_PROMPT.format(schema="", examples="", text="")
 
@@ -70,3 +76,17 @@ def test_each_component_type_maps_to_its_system() -> None:
         for component in components
     }
     assert expected == SYSTEM_TYPE_BY_COMPONENT_TYPE
+
+
+@pytest.mark.parametrize(
+    "components_by_system",
+    [
+        pytest.param({"Engine": ["Pump"], "Hydraulics": ["pump"]}, id="two-systems"),
+        pytest.param({"Engine": ["Pump", "PUMP"]}, id="one-system"),
+    ],
+)
+def test_a_component_type_in_two_places_raises_value_error(
+    components_by_system: dict[str, list[str]],
+) -> None:
+    with pytest.raises(ValueError, match="must belong to one system type"):
+        system_type_by_component_type(components_by_system)

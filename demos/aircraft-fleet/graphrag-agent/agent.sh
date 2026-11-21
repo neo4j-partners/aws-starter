@@ -263,12 +263,14 @@ report_remaining() {
     # The stderr files below go in one folder that the EXIT trap removes, so
     # Ctrl+C leaves nothing behind. stack_status writes there from its
     # command substitution, which does not run this shell's traps. destroy
-    # has cleared its own EXIT trap before this point.
+    # has cleared its own EXIT trap before this point. The trap is set
+    # first, so a Ctrl+C right after the folder is assigned still removes it.
+    REPORT_TMP=""
+    trap '[ -z "$REPORT_TMP" ] || rm -rf "$REPORT_TMP"' EXIT
     if ! REPORT_TMP=$(mktemp -d); then
         echo -e "${RED}Could not create a temp folder for the status check.${NC}"
         exit 1
     fi
-    trap 'rm -rf "$REPORT_TMP"' EXIT
     status_err="$REPORT_TMP/status.err"
     parse_err="$REPORT_TMP/parse.err"
     # stderr goes to its own file, so a CLI banner or warning cannot break

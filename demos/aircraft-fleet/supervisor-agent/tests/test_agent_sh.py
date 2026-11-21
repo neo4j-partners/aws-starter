@@ -172,6 +172,16 @@ if [ "${STUB_MKTEMP_LOSE:-}" = "$count" ]; then exit 1; fi
 echo "$made"
 """
 
+# npm logs its arguments and working folder. `npm ci` writes
+# node_modules/.package-lock.json, as a complete real install does, unless
+# STUB_NPM_EXIT makes it fail.
+STUB_NPM = r"""#!/bin/bash
+echo "npm $* in ${PWD##*/supervisor-agent/}" >> "$STUB_LOG"
+if [ -n "${STUB_NPM_EXIT:-}" ]; then echo "npm ERR! stub failure" >&2; exit "$STUB_NPM_EXIT"; fi
+mkdir -p node_modules
+echo "{}" > node_modules/.package-lock.json
+"""
+
 CLEAN_STATUS = json.dumps(
     {
         "resources": [
@@ -184,7 +194,7 @@ CLEAN_STATUS = json.dumps(
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     root = tmp_path / "supervisor-agent"
-    (root / "agentcore").mkdir(parents=True)
+    (root / "agentcore" / "cdk").mkdir(parents=True)
     shutil.copy2(AGENT_ROOT / "agent.sh", root / "agent.sh")
     shutil.copy2(AGENT_ROOT / "agentcore" / "agentcore.json", root / "agentcore" / "agentcore.json")
     # The first deploy writes this file. Git ignores it, so the test writes its own.
@@ -197,6 +207,7 @@ def project(tmp_path: Path) -> Path:
         ("agentcore", STUB_AGENTCORE),
         ("aws", STUB_AWS),
         ("mktemp", STUB_MKTEMP),
+        ("npm", STUB_NPM),
         ("rm", STUB_PASSTHROUGH),
         ("cp", STUB_PASSTHROUGH),
         ("mv", STUB_PASSTHROUGH),
@@ -684,6 +695,15 @@ def test_a_failed_configure_leaves_no_temporary_project(project: Path) -> None:
     assert "agentcore create --name fleetsupervisor --skip-install --skip-git" in calls(project)
     assert not list((project.parent / "tmp").iterdir())
     assert not (project / "agentcore").exists()
+
+
+# npm ci installs exactly what the tracked package-lock.json lists and
+# never rewrites it, unlike npm install.
+def test_configure_installs_the_cdk_dependencies_with_npm_ci(project: Path) -> None:
+    result = run_agent(project, "configure")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == ["npm ci in agentcore/cdk"]
 
 
 # destroy makes six temporary files: the spec backup, the status errors, and

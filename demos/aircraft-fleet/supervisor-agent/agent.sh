@@ -673,7 +673,9 @@ case "${1:-help}" in
         fi
         echo ""
         echo -e "${GREEN}Installing CDK dependencies...${NC}"
-        (cd agentcore/cdk && npm install)
+        # npm ci installs exactly what the tracked package-lock.json lists
+        # and never rewrites it.
+        (cd agentcore/cdk && npm ci)
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Set the deploy settings in ../.env, then run './agent.sh deploy'"

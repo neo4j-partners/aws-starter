@@ -104,7 +104,7 @@ ensure_cli() {
 
 # agentcore deploy refuses to run without agentcore/cdk/node_modules, and
 # git ignores that folder, so a fresh clone has none. Install it from the
-# committed package-lock.json on the first deploy. npm writes
+# committed package-lock.json before deploy or destroy. npm writes
 # node_modules/.package-lock.json only after a complete install, so a
 # partial install from a failed npm ci is installed again.
 ensure_cdk_deps() {
@@ -479,6 +479,9 @@ case "${1:-help}" in
         if [ "${2:-}" != "--yes" ]; then
             confirm_destroy
         fi
+        # destroy runs agentcore deploy too. Install before the spec changes,
+        # so a failed install stops with nothing changed.
+        ensure_cdk_deps
         # CLI 1.1.0 has no destroy command. A deploy of a project that
         # declares nothing removes the target's stack, so remove the Runtime
         # from the spec, deploy, and put the spec back.

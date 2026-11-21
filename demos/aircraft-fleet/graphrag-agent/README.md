@@ -139,7 +139,7 @@ Deployment uses the AgentCore CLI. Install it with
 `npm install -g @aws/agentcore`. The project lives in `agentcore/`, and
 `agentcore/agentcore.json` declares the `graphrag_agent` Runtime.
 
-The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` runs `npm ci` there on the first deploy. To run `agentcore deploy` directly, install them once first:
+The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` and `./agent.sh destroy` run `npm ci` there when the install is missing or incomplete. To run `agentcore deploy` directly, install them once first:
 
 ```bash
 (cd agentcore/cdk && npm ci)

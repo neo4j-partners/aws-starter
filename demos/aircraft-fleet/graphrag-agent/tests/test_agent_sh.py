@@ -117,6 +117,10 @@ def project(tmp_path: Path) -> Path:
     # The first deploy writes this file. Git ignores it, so the test writes its own.
     targets = [{"name": "default", "account": ACCOUNT, "region": "us-east-1"}]
     (root / "agentcore" / "aws-targets.json").write_text(json.dumps(targets))
+    # The checkout that deployed has a complete CDK install.
+    modules = root / "agentcore" / "cdk" / "node_modules"
+    modules.mkdir(parents=True)
+    (modules / ".package-lock.json").write_text("{}")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     stubs = {
@@ -414,12 +418,15 @@ def test_destroy_runs_when_confirmed(project: Path) -> None:
     assert "agentcore deploy --target default --yes" in calls(project)
 
 
+def remove_cdk_install(project: Path) -> None:
+    # Git ignores node_modules, so a fresh clone has no CDK install.
+    shutil.rmtree(project / "agentcore" / "cdk" / "node_modules")
+
+
 def run_deploy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[str]:
-    # deploy needs the shared ../.env and an installed .venv. The CDK project
-    # starts with no install, as in a fresh clone.
+    # deploy needs the shared ../.env and an installed .venv.
     (project.parent / ".env").write_text("NEO4J_URI=bolt://localhost:27687\n")
     (project / ".venv").mkdir(exist_ok=True)
-    (project / "agentcore" / "cdk").mkdir(exist_ok=True)
     env = {
         "PATH": f"{project.parent / 'bin'}:/usr/bin:/bin",
         "HOME": os.environ["HOME"],
@@ -439,6 +446,8 @@ def run_deploy(project: Path, **stub_env: str) -> subprocess.CompletedProcess[st
 
 
 def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
+    remove_cdk_install(project)
+
     result = run_deploy(project)
 
     assert result.returncode == 0, result.stdout + result.stderr
@@ -448,10 +457,6 @@ def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
 
 
 def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> None:
-    modules = project / "agentcore" / "cdk" / "node_modules"
-    modules.mkdir(parents=True)
-    (modules / ".package-lock.json").write_text("{}")
-
     result = run_deploy(project)
 
     assert result.returncode == 0, result.stdout + result.stderr
@@ -461,7 +466,7 @@ def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> 
 def test_a_partial_cdk_install_is_installed_again(project: Path) -> None:
     # A failed npm ci can leave node_modules without the lockfile that npm
     # writes only after a complete install.
-    (project / "agentcore" / "cdk" / "node_modules").mkdir(parents=True)
+    (project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json").unlink()
 
     result = run_deploy(project)
 
@@ -470,6 +475,8 @@ def test_a_partial_cdk_install_is_installed_again(project: Path) -> None:
 
 
 def test_a_failed_cdk_install_stops_before_deploy(project: Path) -> None:
+    remove_cdk_install(project)
+
     result = run_deploy(project, STUB_NPM_EXIT="1")
 
     assert result.returncode == 1
@@ -478,6 +485,7 @@ def test_a_failed_cdk_install_stops_before_deploy(project: Path) -> None:
 
 
 def test_deploy_without_npm_names_the_install_step(project: Path) -> None:
+    remove_cdk_install(project)
     (project.parent / "bin" / "npm").unlink()
 
     result = run_deploy(project)
@@ -486,3 +494,30 @@ def test_deploy_without_npm_names_the_install_step(project: Path) -> None:
     assert "npm is not installed" in result.stdout
     assert "(cd agentcore/cdk && npm ci)" in result.stdout
     assert calls(project) == []
+
+
+def test_destroy_installs_missing_cdk_dependencies_before_removing(project: Path) -> None:
+    remove_cdk_install(project)
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    logged = calls(project)
+    assert "npm ci in agentcore/cdk" in logged
+    assert logged.index("npm ci in agentcore/cdk") < logged.index(
+        "agentcore remove runtime --name graphrag_agent"
+    )
+
+
+def test_a_failed_cdk_install_stops_destroy_before_any_change(project: Path) -> None:
+    remove_cdk_install(project)
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_NPM_EXIT="1")
+
+    assert result.returncode == 1
+    assert "(cd agentcore/cdk && npm ci)" in result.stdout
+    assert not any(c.startswith("agentcore remove") for c in calls(project))
+    assert not any(c.startswith("agentcore deploy") for c in calls(project))
+    assert spec.read_bytes() == tracked

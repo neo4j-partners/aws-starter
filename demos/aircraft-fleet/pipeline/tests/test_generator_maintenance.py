@@ -94,10 +94,14 @@ def test_event_severity_is_exactly_the_band_of_its_trigger_reading(in_memory) ->
             ).total_seconds()
             // 3600
         )
-        value = series[system.system_id][sensor.type][hour]
-        level, side = _level(spec, value)
+        values = series[system.system_id][sensor.type]
+        level, side = _level(spec, values[hour])
         assert level >= 1, event
-        assert event.row["severity"] == SEVERITY_BY_LEVEL[level], (event, value)
+        assert event.row["severity"] == SEVERITY_BY_LEVEL[level], (event, values[hour])
+        # An event marks a band entry, so the hour before sits in a lower band.
+        if hour > 0:
+            previous, _ = _level(spec, values[hour - 1])
+            assert previous < level, (event, values[hour - 1], values[hour])
 
         routes = [r for r in spec.faults if r.side is side]
         assert event.row["fault"] in {r.fault for r in routes}, (event, side)

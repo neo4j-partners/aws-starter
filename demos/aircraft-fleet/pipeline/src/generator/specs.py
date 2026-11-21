@@ -38,6 +38,12 @@ class FaultRoute:
     components: tuple[str, ...]  # canonical component types it can hit
     weight: float  # pick weight when several routes match one side
 
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.weight):
+            raise ValueError(f"fault route {self.fault!r}: weight {self.weight} is not finite")
+        if self.weight < 0:
+            raise ValueError(f"fault route {self.fault!r}: weight {self.weight} is negative")
+
 
 @dataclass(frozen=True)
 class SensorSpec:
@@ -84,6 +90,15 @@ class SensorSpec:
                 raise ValueError(
                     f"sensor {self.type!r}: route {route.fault!r} side {route.side} "
                     f"cannot trigger on a {self.direction} sensor"
+                )
+        # A crossing picks one of its side's routes by weight, so each side
+        # with routes needs a positive total.
+        for side in {route.side for route in self.faults}:
+            total = sum(route.weight for route in self.faults if route.side is side)
+            if total <= 0:
+                raise ValueError(
+                    f"sensor {self.type!r}: {side} route weights sum to {total:g}; "
+                    "at least one must be positive"
                 )
 
     def offsets(self) -> tuple[float, float, float]:

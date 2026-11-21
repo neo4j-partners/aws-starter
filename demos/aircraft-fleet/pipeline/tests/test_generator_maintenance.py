@@ -191,3 +191,40 @@ def test_route_side_must_match_the_sensor_direction(direction: Direction, side: 
             bands=bands,
             faults=(FaultRoute("Leak", side, ("Hydraulic Pump",), 1.0),),
         )
+
+
+@pytest.mark.parametrize(
+    ("weight", "message"),
+    [
+        pytest.param(-0.5, "weight -0.5 is negative", id="negative"),
+        pytest.param(float("nan"), "weight nan is not finite", id="nan"),
+        pytest.param(float("inf"), "weight inf is not finite", id="inf"),
+    ],
+)
+def test_an_invalid_route_weight_raises_value_error(weight: float, message: str) -> None:
+    with pytest.raises(ValueError, match=f"^fault route 'Leak': {message}$"):
+        FaultRoute("Leak", Direction.HIGH, ("Hydraulic Pump",), weight)
+
+
+def test_a_side_whose_route_weights_sum_to_zero_raises_value_error() -> None:
+    # The high side is fine. The low side's only route has weight 0, so a
+    # low-side crossing could never pick a route.
+    routes = (
+        FaultRoute("Leak", Direction.HIGH, ("Hydraulic Pump",), 1.0),
+        FaultRoute("Leak", Direction.LOW, ("Hydraulic Pump",), 0.0),
+    )
+    with pytest.raises(
+        ValueError,
+        match="^sensor 'T': low route weights sum to 0; at least one must be positive$",
+    ):
+        SensorSpec(
+            type="T",
+            name="Test",
+            unit="u",
+            baseline=10.0,
+            noise_std=0.1,
+            drift_per_day=(0.0, 0.1),
+            direction=Direction.DEVIATION,
+            bands=Bands(1.0, 2.0, 3.0),
+            faults=routes,
+        )

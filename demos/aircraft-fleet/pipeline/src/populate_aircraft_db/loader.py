@@ -410,8 +410,9 @@ def load_nodes(driver: Driver, database: str, data_dir: Path) -> int:
 
 def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
     """Load every operational relationship type from its CSV file."""
-    for rel_type, filename, query in _REL_DEFINITIONS:
-        logger.info("Loading %s relationships...", rel_type)
+    for index, (rel_type, filename, query) in enumerate(_REL_DEFINITIONS):
+        # The CLI starts the relationship phase with a blank line.
+        logger.info("Loading %s relationships...", rel_type, extra={"blank_before": index == 0})
         count, _ = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
         logger.info("  [OK] Loaded %d %s relationships.", count, rel_type)
 
@@ -422,10 +423,12 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
     load_relationships(driver, database, data_dir)
     if skipped:
         logger.warning(
-            "[WARN] Skipped %s readings whose sensor_id matches no Sensor.", f"{skipped:,}"
+            "[WARN] Skipped %s readings whose sensor_id matches no Sensor.",
+            f"{skipped:,}",
+            extra={"blank_before": True},
         )
     else:
-        logger.info("[OK] No readings skipped.")
+        logger.info("[OK] No readings skipped.", extra={"blank_before": True})
 
 
 # Rows deleted per inner transaction when clearing nodes. DETACH DELETE also

@@ -55,6 +55,19 @@ class _SysStreamHandler(logging.StreamHandler):
         del value
 
 
+class _CliFormatter(logging.Formatter):
+    """Format a record as its bare message, after a blank line if it asks for one.
+
+    A library marks the start of a section with extra={"blank_before": True}.
+    Only the CLI turns the mark into a blank line, so other log consumers see
+    the record unchanged.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = super().format(record)
+        return f"\n{message}" if getattr(record, "blank_before", False) else message
+
+
 def _below_warning(record: logging.LogRecord) -> bool:
     return record.levelno < logging.WARNING
 
@@ -62,7 +75,8 @@ def _below_warning(record: logging.LogRecord) -> bool:
 def _configure_logging() -> None:
     """Write this package's records as bare messages.
 
-    INFO records go to stdout, and WARNING and higher go to stderr.
+    INFO records go to stdout, and WARNING and higher go to stderr. A record
+    with extra={"blank_before": True} follows a blank line.
 
     Only the package logger gets handlers, and its records do not propagate
     to the root logger. Other libraries keep the root logger's WARNING
@@ -79,7 +93,7 @@ def _configure_logging() -> None:
     stderr_handler = _SysStreamHandler("stderr")
     stderr_handler.setLevel(logging.WARNING)
     for handler in (stdout_handler, stderr_handler):
-        handler.setFormatter(logging.Formatter("%(message)s"))
+        handler.setFormatter(_CliFormatter("%(message)s"))
         package_logger.addHandler(handler)
 
 

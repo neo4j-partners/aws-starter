@@ -531,7 +531,7 @@ def process_all_documents(
 
     async def _run_all():
         for meta in DOCUMENTS:
-            logger.info("Processing: %s", meta.filename)
+            logger.info("Processing: %s", meta.filename, extra={"blank_before": True})
             filepath = document_dir / meta.filename
             text = filepath.read_text(encoding="utf-8").strip()
             logger.info("  Read %s characters.", f"{len(text):,}")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -198,3 +199,136 @@ def test_cli_logging_sends_warnings_to_stderr_and_info_to_stdout(
     captured = capsys.readouterr()
     assert captured.out == "retry line\n"
     assert captured.err == "[WARN] warning line\nerror line\n"
+
+
+def _fake_loader(monkeypatch: pytest.MonkeyPatch, skipped: int) -> None:
+    """Load one node type and two relationship types, five rows each."""
+    monkeypatch.setattr(loader, "_NODE_DEFINITIONS", [("Aircraft", "a.csv", "nodes")])
+    monkeypatch.setattr(
+        loader,
+        "_REL_DEFINITIONS",
+        [("HAS_SYSTEM", "r1.csv", "rels"), ("HAS_SENSOR", "r2.csv", "rels")],
+    )
+    monkeypatch.setattr(loader, "iter_csv_batches", lambda data_dir, filename: iter([]))
+    monkeypatch.setattr(
+        loader,
+        "_run_in_batches",
+        lambda driver, database, batches, query: (
+            (5 + skipped, skipped) if query == "nodes" else (5, 0)
+        ),
+    )
+
+
+_LOADER_LINES = [
+    "Loading Aircraft nodes...",
+    "  [OK] Loaded 5 Aircraft nodes.",
+    "Loading HAS_SYSTEM relationships...",
+    "  [OK] Loaded 5 HAS_SYSTEM relationships.",
+    "Loading HAS_SENSOR relationships...",
+    "  [OK] Loaded 5 HAS_SENSOR relationships.",
+]
+
+
+@pytest.mark.usefixtures("restore_package_logger")
+@pytest.mark.parametrize(
+    ("skipped", "summary"),
+    [
+        (0, "[OK] No readings skipped."),
+        (3, "[WARN] Skipped 3 readings whose sensor_id matches no Sensor."),
+    ],
+)
+def test_cli_load_shows_blank_lines_between_load_phases(
+    monkeypatch: pytest.MonkeyPatch, skipped: int, summary: str
+) -> None:
+    settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=None)
+    monkeypatch.setattr(main, "Settings", lambda: settings)
+    monkeypatch.setattr(main, "_connect", lambda s: nullcontext(object()))
+    for name in ("create_constraints", "create_indexes", "create_fulltext_indexes"):
+        monkeypatch.setattr(main, name, lambda driver, database: None)
+    monkeypatch.setattr(pipeline, "link_to_existing_graph", lambda driver, database: None)
+    monkeypatch.setattr(pipeline, "validate_enrichment", lambda driver, database: None)
+    _fake_loader(monkeypatch, skipped)
+
+    result = CliRunner().invoke(main.app, ["load-operational"])
+
+    assert result.exit_code == 0, result.output
+    loaded = result.output.split("Creating fulltext indexes...\n\n")[1].split("Linking")[0]
+    assert loaded == "\n".join([*_LOADER_LINES[:2], "", *_LOADER_LINES[2:], "", summary, "", ""])
+
+
+@pytest.mark.parametrize("skipped", [0, 3])
+def test_load_phase_records_have_no_empty_messages(
+    package_logs: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch, skipped: int
+) -> None:
+    _fake_loader(monkeypatch, skipped)
+
+    loader.load_operational_graph(CountDriver(), "db", None)
+
+    records = [r for r in package_logs.records if r.name == "populate_aircraft_db.loader"]
+    assert [r.getMessage() for r in records][:-1] == _LOADER_LINES
+    assert all(r.getMessage().strip() for r in records)
+    assert [i for i, r in enumerate(records) if getattr(r, "blank_before", False)] == [2, 6]
+
+
+def _process_two_documents(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    class FakePipeline:
+        async def run_async(self, **kwargs: Any) -> None:
+            return None
+
+    docs = [
+        SimpleNamespace(filename=f"{n}.md", aircraft_type="T", title="t", document_id=n)
+        for n in ("DOC-1", "DOC-2")
+    ]
+    for doc in docs:
+        (tmp_path / doc.filename).write_text("abc", encoding="utf-8")
+    monkeypatch.setattr(pipeline, "DOCUMENTS", docs)
+    monkeypatch.setattr(
+        pipeline, "_create_pipeline", lambda *a, **k: (FakePipeline(), SimpleNamespace())
+    )
+    pipeline.process_all_documents(
+        CountDriver(),
+        "db",
+        tmp_path,
+        provider="bedrock",
+        openai_api_key=None,
+        anthropic_api_key=None,
+        llm_model="m",
+        llm_max_tokens=1,
+        embedding_model="e",
+        embedding_dimensions=1,
+        chunk_size=10,
+        chunk_overlap=0,
+    )
+
+
+_DOCUMENT_LINES = [
+    "Processing: DOC-1.md",
+    "  Read 3 characters.",
+    "  [OK] Pipeline complete for DOC-1",
+    "Processing: DOC-2.md",
+    "  Read 3 characters.",
+    "  [OK] Pipeline complete for DOC-2",
+]
+
+
+@pytest.mark.usefixtures("restore_package_logger")
+def test_cli_logging_shows_a_blank_line_before_each_document(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    main._configure_logging()
+
+    _process_two_documents(monkeypatch, tmp_path)
+
+    assert capsys.readouterr().out == "\n".join(
+        ["", *_DOCUMENT_LINES[:3], "", *_DOCUMENT_LINES[3:], ""]
+    )
+
+
+def test_document_records_have_no_empty_messages(
+    package_logs: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _process_two_documents(monkeypatch, tmp_path)
+
+    records = [r for r in package_logs.records if r.name == "populate_aircraft_db.pipeline"]
+    assert [r.getMessage() for r in records] == _DOCUMENT_LINES
+    assert [i for i, r in enumerate(records) if getattr(r, "blank_before", False)] == [0, 3]

@@ -375,6 +375,9 @@ strip_gateway_secret() {
     # a regular file, not a link. .env.local is checked for a link again
     # right before mv, which would replace the link and leave the secret in
     # its target.
+    # awk's redirect would follow a link swapped in after mktemp. Only someone
+    # who can write to agentcore/ could do that, and they could replace
+    # .env.local anyway.
     if ! ENV_STRIP_TMP=$(umask 077 && mktemp "$ENV_STRIP_PREFIX.XXXXXX") \
         || ! (umask 077 \
                 && awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \

@@ -188,6 +188,7 @@ def test_the_stats_config_is_the_setup_default() -> None:
     assert int(defaults["AIRCRAFT"]) == STATS_CONFIG.n_aircraft
     assert int(defaults["DAYS"]) == STATS_CONFIG.n_days
     assert re.search(rf"GEN_SEED:-{STATS_CONFIG.seed}\}}", setup)
+    assert re.search(rf"GEN_AIRPORTS:-{STATS_CONFIG.n_airports}\}}", setup)
 
 
 # The committed file.

@@ -389,23 +389,35 @@ def _egt_exceedance(model: str, engine: EngineSpec, stats: Stats) -> str:
     return _table(("Category", "Temperature", "Duration", "Required Action"), rows)
 
 
+_BAND_HEADER = ("Parameter", "Nominal", "Normal", "Advisory", "Caution", "Warning")
+
+
+def _low_band_row(spec: SensorSpec) -> tuple[str, ...]:
+    """A quick reference row for a sensor that is bad when its value falls."""
+    if spec.direction is not Direction.LOW:
+        raise ValueError(f"sensor {spec.type!r} is {spec.direction}, not low")
+    b = spec.bands
+    return (
+        f"{spec.name} ({spec.unit})",
+        f"{spec.baseline:,g}",
+        f"> {b.advisory:,g}",
+        f"{b.caution:,g}-{b.advisory:,g}",
+        f"{b.warning:,g}-{b.caution:,g}",
+        f"≤ {b.warning:,g}",
+    )
+
+
 def _hydraulic_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     """§10.1: the hydraulic bands every circuit shares."""
-    rows = []
-    for spec in sensors_for("Hydraulics", model):
-        b = spec.bands
-        rows.append(
-            (
-                f"{spec.name} ({spec.unit})",
-                f"{spec.baseline:,g}",
-                f"> {b.advisory:,g}",
-                f"{b.caution:,g}-{b.advisory:,g}",
-                f"{b.warning:,g}-{b.caution:,g}",
-                f"≤ {b.warning:,g}",
-            )
-        )
-    header = ("Parameter", "Nominal", "Normal", "Advisory", "Caution", "Warning")
-    return _table(header, rows)
+    return _table(_BAND_HEADER, [_low_band_row(spec) for spec in sensors_for("Hydraulics", model)])
+
+
+def _avionics_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§10.1: the DC bus voltage bands."""
+    rows = [
+        _low_band_row(spec) for spec in sensors_for("Avionics", model) if spec.type == "BusVoltage"
+    ]
+    return _table(_BAND_HEADER, rows)
 
 
 # The section 7 text of each code, from the B737 manual: description, ATA
@@ -626,6 +638,7 @@ RENDERERS: dict[str, Renderer] = {
     "normal-parameters": _phase_limits,
     "quick-ref-engine": _phase_limits,
     "fuel-flow-range": _fuel_flow_range,
+    "quick-ref-avionics": _avionics_limits,
     "quick-ref-hydraulics": _hydraulic_limits,
     "fault-codes-engine": functools.partial(_fault_codes, "Engine"),
     "fault-codes-avionics": functools.partial(_fault_codes, "Avionics"),

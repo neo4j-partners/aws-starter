@@ -1204,6 +1204,14 @@ START: Fan Blade Damage Reported/Suspected
 | Vibration N1 (ips) | < 2.0 | < 2.0 | 0.7 (< 2.0) | < 2.0 | < 2.0 |
 <!-- END GENERATED: quick-ref-engine -->
 
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
+
 #### Hydraulic System
 
 <!-- BEGIN GENERATED: quick-ref-hydraulics -->

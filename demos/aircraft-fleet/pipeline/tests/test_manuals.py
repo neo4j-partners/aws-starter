@@ -754,6 +754,65 @@ def test_the_hydraulics_table_is_the_spec_bands(model: str) -> None:
     assert _rows(table) == expected
 
 
+def _bus_voltage(model: str):
+    return {s.type: s for s in sensors_for("Avionics", model)}["BusVoltage"]
+
+
+@pytest.mark.parametrize("model", sorted(ENGINE_SPECS))
+def test_the_avionics_table_is_the_bus_voltage_bands(model: str) -> None:
+    table = manuals.RENDERERS["quick-ref-avionics"](model, ENGINE_SPECS[model], {})
+    spec = _bus_voltage(model)
+    b = spec.bands
+
+    assert table.splitlines()[0] == (
+        "| Parameter | Nominal | Normal | Advisory | Caution | Warning |"
+    )
+    assert _rows(table) == [
+        [
+            f"{spec.name} ({spec.unit})",
+            f"{spec.baseline:,g}",
+            f"> {b.advisory:,g}",
+            f"{b.caution:,g}-{b.advisory:,g}",
+            f"{b.warning:,g}-{b.caution:,g}",
+            f"≤ {b.warning:,g}",
+        ]
+    ]
+
+
+def test_a_band_row_rejects_a_sensor_that_is_bad_when_high() -> None:
+    disagree = {s.type: s for s in sensors_for("Avionics", MODEL)}["AirDataDisagree"]
+
+    with pytest.raises(ValueError, match="^sensor 'AirDataDisagree' is high, not low$"):
+        manuals._low_band_row(disagree)
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_every_quick_reference_gives_the_bus_voltage_limits(model: str) -> None:
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+    quick_ref = text.split("### 10.1 Quick Reference")[1].split("\n### ")[0]
+
+    assert re.search(
+        r"^#### Avionics System\n\n<!-- BEGIN GENERATED: quick-ref-avionics -->$",
+        quick_ref,
+        re.M,
+    )
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_only_generated_blocks_quote_bus_voltage_bands(model: str) -> None:
+    # A nominal such as 28VDC is fine. A band value belongs in the block.
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+    b = _bus_voltage(model).bands
+    quoted = {
+        float(volts)
+        for volts in re.findall(
+            r"(\d+(?:\.\d+)?)\s*(?:V(?:\s*DC|DC)?|[Vv]olts?)\b", _BLOCK.sub("", text)
+        )
+    }
+
+    assert quoted & {b.advisory, b.caution, b.warning} == set()
+
+
 def _manual(model: str) -> str:
     return (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
 

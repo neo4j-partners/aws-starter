@@ -1278,6 +1278,14 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 | Gearbox Oil Temperature (°C) | 60-90 | 70-110 | — | 90-130 | 90-130 |
 <!-- END GENERATED: quick-ref-engine -->
 
+#### Avionics System
+
+<!-- BEGIN GENERATED: quick-ref-avionics -->
+| Parameter | Nominal | Normal | Advisory | Caution | Warning |
+|-----------|---------|--------|----------|---------|---------|
+| DC Bus Voltage (V DC) | 28 | > 26 | 25-26 | 24-25 | ≤ 24 |
+<!-- END GENERATED: quick-ref-avionics -->
+
 #### Hydraulic System
 
 <!-- BEGIN GENERATED: quick-ref-hydraulics -->

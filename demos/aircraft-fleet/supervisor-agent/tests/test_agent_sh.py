@@ -90,7 +90,7 @@ esac
 
 # rm, cp, mv, and awk pass through to the real command. STUB_INTERRUPT_AFTER
 # =cmd:N sends SIGINT to agent.sh right after the Nth call of cmd, the same as
-# a Ctrl+C. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
+# a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead. STUB_PLANT_AFTER_STRIP_RM=N writes a file at the strip copy's
 # name right after the Nth rm of that name. STUB_RECORD_STRIP_MODE makes awk
 # record the copy's mode while the copy exists.
 STUB_PASSTHROUGH = r"""#!/bin/bash
@@ -103,7 +103,7 @@ counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
 if [ "${STUB_INTERRUPT_AFTER:-}" = "$name:$count" ]; then
-    kill -s INT "$PPID"
+    kill -s "${STUB_INTERRUPT_SIGNAL:-INT}" "$PPID"
 fi
 if [ "$name" = rm ] && [ -n "${STUB_PLANT_AFTER_STRIP_RM:-}" ]; then
     case "${!#}" in
@@ -385,13 +385,17 @@ def test_destroy_needs_no_credentials_file_and_restores_the_spec(project: Path) 
     assert spec.read_bytes() == tracked
 
 
-def test_an_interrupt_during_deploy_restores_the_spec_once(project: Path) -> None:
+# Each signal exits with 128 plus its number, as the shell reports it.
+@pytest.mark.parametrize(("signal", "code"), [("INT", 130), ("TERM", 143), ("HUP", 129)])
+def test_an_interrupt_during_deploy_restores_the_spec_once(
+    project: Path, signal: str, code: int
+) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
 
-    result = run_destroy(project, STUB_DEPLOY_SIGNAL="INT")
+    result = run_destroy(project, STUB_DEPLOY_SIGNAL=signal)
 
-    assert result.returncode == 130
+    assert result.returncode == code
     assert spec.read_bytes() == tracked
     assert "Could not restore" not in result.stderr
     assert "Cleanup complete" not in result.stdout
@@ -675,8 +679,11 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
     assert not list((project.parent / "tmp").iterdir())
 
 
+# A closed terminal sends HUP, and kill sends TERM, so on_exit ignores both
+# as well as INT.
+@pytest.mark.parametrize("signal", ["INT", "TERM", "HUP"])
 def test_an_interrupt_during_the_restore_after_a_failed_deploy_still_finishes_it(
-    project: Path,
+    project: Path, signal: str
 ) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
@@ -686,7 +693,9 @@ def test_an_interrupt_during_the_restore_after_a_failed_deploy_still_finishes_it
     # The failed deploy exits through set -e while the INT trap still exits
     # 130. cp 1 backs up the spec and cp 2 restores it, so the Ctrl+C lands
     # mid-restore and only the EXIT trap ignoring INT lets the restore finish.
-    result = run_destroy(project, STUB_DEPLOY_EXIT="1", STUB_INTERRUPT_AFTER="cp:2")
+    result = run_destroy(
+        project, STUB_DEPLOY_EXIT="1", STUB_INTERRUPT_AFTER="cp:2", STUB_INTERRUPT_SIGNAL=signal
+    )
 
     assert result.returncode == 1
     assert spec.read_bytes() == tracked

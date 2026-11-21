@@ -6,7 +6,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification, Query, RoutingControl
+from neo4j import (
+    READ_ACCESS,
+    Driver,
+    NotificationDisabledClassification,
+    Query,
+    Record,
+    RoutingControl,
+)
 from neo4j.exceptions import Neo4jError
 
 from generator.specs import (
@@ -19,6 +26,7 @@ from generator.specs import (
 
 from .display import WIDTH, header, records_table, show_cypher
 from .query_errors import report_query_error
+from .schema import _quote_identifier
 
 # ---------------------------------------------------------------------------
 # Graph schema description fed to the LLM for Cypher generation
@@ -47,9 +55,10 @@ _NODE_PROPERTIES_Q = """\
 CALL db.schema.nodeTypeProperties() YIELD nodeLabels, propertyName
 RETURN nodeLabels, propertyName"""
 
-_RELATIONSHIPS_Q = """\
-MATCH (a)-[r]->(b)
-RETURN DISTINCT labels(a) AS from_labels, type(r) AS type, labels(b) AS to_labels"""
+# The count store pairs every label that starts a relationship type with
+# every label that ends it, without reading any relationships. Some pairs
+# may never be linked, so each one is checked against the data.
+_SCHEMA_VISUALIZATION_Q = "CALL db.schema.visualization() YIELD nodes, relationships"
 
 _MODELS_Q = """\
 MATCH (a:Aircraft)
@@ -86,12 +95,42 @@ def _domain_label(labels: list[str]) -> str | None:
     return ":".join(domain) or None
 
 
+def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
+    """Return the (start label, type, end label) triples the count store allows.
+
+    Triples with an internal label, such as __KGBuilder__, are left out.
+    """
+    names = {node.element_id: node["name"] for node in visualization["nodes"]}
+    candidates = set()
+    for rel in visualization["relationships"]:
+        start = names[rel.start_node.element_id]
+        end = names[rel.end_node.element_id]
+        if not start.startswith("__") and not end.startswith("__"):
+            candidates.add((start, rel.type, end))
+    return sorted(candidates)
+
+
+def _pattern_check_query(candidates: list[tuple[str, str, str]]) -> str:
+    """Return a query that yields the index of each candidate the data has.
+
+    Each branch stops at the first matching relationship. Fixed labels let
+    the planner start from a label scan.
+    """
+    return "\nUNION ALL\n".join(
+        f"MATCH (:{_quote_identifier(start)})-[:{_quote_identifier(rel_type)}]->"
+        f"(:{_quote_identifier(end)}) RETURN {index} AS candidate LIMIT 1"
+        for index, (start, rel_type, end) in enumerate(candidates)
+    )
+
+
 def graph_schema(driver: Driver, database: str) -> str:
     """Describe the graph's labels, properties, and relationships for the LLM.
 
-    Labels and properties come from db.schema.nodeTypeProperties and the
-    relationship patterns from the data, so the description matches the
-    database. The models, sample tails, operators, and airport codes come
+    Labels and properties come from db.schema.nodeTypeProperties. The
+    relationship patterns come from db.schema.visualization, each checked
+    against the data, so the description matches the database. A pattern
+    names one label at each end, so a node with two labels gives a pattern
+    for each. The models, sample tails, operators, and airport codes come
     from the data too. Value hints come from the generator specs.
     """
     # db.schema.nodeTypeProperties warns that its propertyTypes field will
@@ -102,7 +141,12 @@ def graph_schema(driver: Driver, database: str) -> str:
         notifications_disabled_classifications=[NotificationDisabledClassification.GENERIC],
     ) as session:
         property_rows = session.run(_NODE_PROPERTIES_Q).data()
-        relationship_rows = session.run(_RELATIONSHIPS_Q).data()
+        candidates = _candidate_patterns(session.run(_SCHEMA_VISUALIZATION_Q).single(strict=True))
+        found = (
+            [row["candidate"] for row in session.run(_pattern_check_query(candidates)).data()]
+            if candidates
+            else []
+        )
         model_rows = session.run(_MODELS_Q).data()
         tail_rows = session.run(_SAMPLE_TAILS_Q).data()
         operator_rows = session.run(_OPERATORS_Q).data()
@@ -119,12 +163,7 @@ def graph_schema(driver: Driver, database: str) -> str:
     if not properties:
         print(f"  [WARN] No node labels in database {database!r}; run 'setup' first.\n")
 
-    relationships = set()
-    for row in relationship_rows:
-        from_label = _domain_label(row["from_labels"])
-        to_label = _domain_label(row["to_labels"])
-        if from_label and to_label:
-            relationships.add((from_label, row["type"], to_label))
+    relationships = [candidates[index] for index in found]
 
     lines = ["Node labels and properties:"]
     for label in sorted(properties):

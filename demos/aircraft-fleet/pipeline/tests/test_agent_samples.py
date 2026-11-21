@@ -79,9 +79,6 @@ class SchemaDriver:
             agent_samples._NODE_PROPERTIES_Q: [
                 {"nodeLabels": labels, "propertyName": name} for labels, name in property_rows
             ],
-            agent_samples._RELATIONSHIPS_Q: [
-                {"from_labels": a, "type": rel, "to_labels": b} for a, rel, b in relationship_rows
-            ],
             agent_samples._MODELS_Q: [{"model": model} for model in models],
             agent_samples._SAMPLE_TAILS_Q: [
                 {"model": model, "tail": tail} for model, tail in tail_rows
@@ -89,7 +86,9 @@ class SchemaDriver:
             agent_samples._OPERATORS_Q: [{"operator": name} for name in operators],
             agent_samples._AIRPORTS_Q: [{"iata": code} for code in airports],
         }
+        self.relationship_rows = list(relationship_rows)
         self.session_configs: list[dict[str, Any]] = []
+        self.check_queries: list[str] = []
 
     def session(self, **config: Any) -> _SchemaSession:
         self.session_configs.append(config)
@@ -112,10 +111,76 @@ class _SchemaSession:
     def run(self, cypher: str) -> SimpleNamespace:
         if self.driver.schema_error is not None:
             raise self.driver.schema_error
+        if cypher == agent_samples._SCHEMA_VISUALIZATION_Q:
+            record = _visualization(self.driver.relationship_rows)
+            return SimpleNamespace(single=lambda strict=False: record)
+        if cypher.startswith("MATCH (:"):
+            self.driver.check_queries.append(cypher)
+            rows = _check_rows(cypher, self.driver.relationship_rows)
+            return SimpleNamespace(data=lambda: rows)
         if cypher not in self.driver.rows:
             raise AssertionError(f"unexpected schema query: {cypher}")
         rows = self.driver.rows[cypher]
         return SimpleNamespace(data=lambda: rows)
+
+
+class _VizNode(dict):
+    """A db.schema.visualization node: one label, with an element id."""
+
+    def __init__(self, label: str) -> None:
+        super().__init__(name=label)
+        self.element_id = f"viz:{label}"
+
+
+def _visualization(
+    relationship_rows: list[tuple[list[str], str, list[str]]],
+) -> dict[str, list[Any]]:
+    """Answer db.schema.visualization the way the count store does.
+
+    The count store knows, per type, which labels start and which end a
+    relationship, but not which pairs go together. So every start label of a
+    type is paired with every end label of that type, which can pair labels
+    that are never linked.
+    """
+    starts: dict[str, set[str]] = {}
+    ends: dict[str, set[str]] = {}
+    for from_labels, rel_type, to_labels in relationship_rows:
+        starts.setdefault(rel_type, set()).update(from_labels)
+        ends.setdefault(rel_type, set()).update(to_labels)
+    nodes = {
+        label: _VizNode(label) for labels in [*starts.values(), *ends.values()] for label in labels
+    }
+    relationships = [
+        SimpleNamespace(start_node=nodes[start], type=rel_type, end_node=nodes[end])
+        for rel_type in starts
+        for start in sorted(starts[rel_type])
+        for end in sorted(ends[rel_type])
+    ]
+    return {"nodes": list(nodes.values()), "relationships": relationships}
+
+
+_BRANCH = re.compile(
+    r"MATCH \(:`((?:[^`]|``)+)`\)-\[:`((?:[^`]|``)+)`\]->\(:`((?:[^`]|``)+)`\) "
+    r"RETURN (\d+) AS candidate LIMIT 1"
+)
+
+
+def _check_rows(
+    cypher: str, relationship_rows: list[tuple[list[str], str, list[str]]]
+) -> list[dict[str, int]]:
+    """Answer the pattern check: the candidates some relationship row matches."""
+    branches = cypher.split("\nUNION ALL\n")
+    rows = []
+    for branch in branches:
+        match = _BRANCH.fullmatch(branch)
+        assert match, f"unexpected check branch: {branch}"
+        start, rel_type, end = (name.replace("``", "`") for name in match.groups()[:3])
+        if any(
+            start in from_labels and rel == rel_type and end in to_labels
+            for from_labels, rel, to_labels in relationship_rows
+        ):
+            rows.append({"candidate": int(match.group(4))})
+    return rows
 
 
 def _prompt_line(schema: str, label: str) -> list[str]:
@@ -222,6 +287,68 @@ def test_schema_joins_the_notes_of_each_label_on_a_node() -> None:
         '- Chunk:Removal {chunkId}  (chunkId: "{documentId}:{index}"; '
         "hours_since_install and flight_hours_at_removal are flight hours)"
     ) in lines
+
+
+def test_schema_drops_count_store_pairs_that_no_relationship_links() -> None:
+    # Fault and Removal both start a HAS_LIMIT, so the count store also
+    # offers Fault-HAS_LIMIT->Sensor and Removal-HAS_LIMIT->OperatingLimit.
+    driver = SchemaDriver(
+        relationship_rows=[
+            (["Fault"], "HAS_LIMIT", ["OperatingLimit"]),
+            (["Removal"], "HAS_LIMIT", ["Sensor"]),
+        ]
+    )
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert [line for line in lines if "HAS_LIMIT" in line] == [
+        "- (Fault)-[:HAS_LIMIT]->(OperatingLimit)",
+        "- (Removal)-[:HAS_LIMIT]->(Sensor)",
+    ]
+    (check,) = driver.check_queries
+    assert check.count("UNION ALL") == 3
+
+
+def test_schema_lists_each_label_of_a_multi_label_node_in_relationships() -> None:
+    # Item 8 and the per-label patterns together: the node line joins the
+    # labels and gets each label's notes, and the relationship lines name
+    # each label on its own.
+    driver = SchemaDriver(
+        property_rows=[(["Sensor", "Calibrated"], "sensor_id")],
+        relationship_rows=[
+            (["Sensor", "Calibrated", "__Entity__"], "HAS_LIMIT", ["OperatingLimit"]),
+            (["System"], "HAS_SENSOR", ["Sensor"]),
+        ],
+    )
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    sensor_types = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)
+    assert f"- Calibrated:Sensor {{sensor_id}}  (type: {sensor_types})" in lines
+    assert lines[lines.index("Relationships:") + 1 :] == [
+        "- (Calibrated)-[:HAS_LIMIT]->(OperatingLimit)",
+        "- (Sensor)-[:HAS_LIMIT]->(OperatingLimit)",
+        "- (System)-[:HAS_SENSOR]->(Sensor)",
+    ]
+
+
+def test_schema_quotes_names_in_the_pattern_check() -> None:
+    driver = SchemaDriver(relationship_rows=[(["Odd`Label"], "ODD`TYPE", ["Plain"])])
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    (check,) = driver.check_queries
+    assert check == "MATCH (:`Odd``Label`)-[:`ODD``TYPE`]->(:`Plain`) RETURN 0 AS candidate LIMIT 1"
+    assert "- (Odd`Label)-[:ODD`TYPE]->(Plain)" in lines
+
+
+def test_schema_skips_the_pattern_check_without_relationships() -> None:
+    driver = SchemaDriver(property_rows=[(["Aircraft"], "tail_number")])
+
+    lines = graph_schema(driver, "db").splitlines()
+
+    assert driver.check_queries == []
+    assert lines[lines.index("Relationships:") + 1 :] == []
 
 
 def test_schema_lists_a_label_without_properties() -> None:
@@ -482,6 +609,39 @@ def test_graph_schema_reads_the_live_database(driver: Driver) -> None:
         assert "N2PYT (PYTEST-MODEL)" not in tails
         assert "PytestAir" in _prompt_line(schema, "Operators")
         assert "ZZQ" in _prompt_line(schema, "Airport IATA codes")
+    finally:
+        driver.execute_query(cleanup, database_=database)
+
+
+def test_graph_schema_finds_a_rare_pattern_next_to_a_common_one(driver: Driver) -> None:
+    database = os.environ.get("NEO4J_TEST_DATABASE", "neo4j")
+    cleanup = """
+    MATCH (n)
+    WHERE n:PytestCommon OR n:PytestCommonEnd OR n:PytestRare OR n:PytestRareEnd
+    DETACH DELETE n
+    """
+    driver.execute_query(cleanup, database_=database)
+    try:
+        # 2,000 common links and one rare link of the same type. The rare
+        # start node has a second label.
+        driver.execute_query(
+            """
+            UNWIND range(1, 2000) AS i
+            CREATE (:PytestCommon)-[:PYTEST_SHARED]->(:PytestCommonEnd)
+            WITH count(*) AS created
+            CREATE (:PytestRare:PytestRareAlso)-[:PYTEST_SHARED]->(:PytestRareEnd)
+            """,
+            database_=database,
+        )
+
+        lines = graph_schema(driver, database).splitlines()
+
+        shared = [line for line in lines if "PYTEST_SHARED" in line]
+        assert shared == [
+            "- (PytestCommon)-[:PYTEST_SHARED]->(PytestCommonEnd)",
+            "- (PytestRare)-[:PYTEST_SHARED]->(PytestRareEnd)",
+            "- (PytestRareAlso)-[:PYTEST_SHARED]->(PytestRareEnd)",
+        ]
     finally:
         driver.execute_query(cleanup, database_=database)
 

@@ -247,20 +247,19 @@ in that checkout can stop with one of these errors:
   changes".
 
 Keep the file, because destroy needs it. Run these commands from this folder
-in one shell. The backup gets its own temporary name, which the first command
-prints:
+in one shell. The first command backs the file up to a temporary name and
+prints it. It discards your change and pulls only after the backup is made.
+The second command puts the file back, even if the pull failed, and removes
+the backup:
 
 ```bash
-backup=$(mktemp) && echo "Backup: $backup"
-cp agentcore/aws-targets.json "$backup"
-git checkout -- agentcore/aws-targets.json
-git pull
+backup=$(mktemp) && cp agentcore/aws-targets.json "$backup" && echo "Backup: $backup" && git checkout -- agentcore/aws-targets.json && git pull
 cp "$backup" agentcore/aws-targets.json && rm -f "$backup"
 ```
 
-After the pull, git ignores the file. If the pull fails, copy the printed
-backup back by hand. If the backup is lost, recreate the file with the account
-and region you deployed to:
+After the pull, git ignores the file. If that last `cp` fails, the backup is
+kept, so copy it back by hand from the printed name. If the backup is lost,
+recreate the file with the account and region you deployed to:
 
 ```json
 [{"name": "default", "account": "<12-digit account ID>", "region": "<region>"}]

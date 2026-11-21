@@ -604,6 +604,8 @@ REQUIRED_BLOCKS: tuple[str, ...] = tuple(
 _MARKER = re.compile(r"^<!-- (BEGIN|END) GENERATED: ([a-z0-9-]+) -->$")
 # A line that looks like a marker but does not match _MARKER exactly.
 _MARKER_LIKE = re.compile(r"^\s*<!--\s*(BEGIN|END)\s+GENERATED", re.IGNORECASE)
+# The opening or closing line of a fenced code block.
+_FENCE = re.compile(r"^ {0,3}(```|~~~)")
 
 
 class ManualBlockError(ValueError):
@@ -623,20 +625,35 @@ def render_text(
     renderers: Mapping[str, Renderer] | None = None,
     required: tuple[str, ...] | None = None,
 ) -> str:
-    """Return text with every block body rendered for model."""
+    """Return text with every block body rendered for model.
+
+    A leading byte order mark is dropped and CRLF line endings become LF. A
+    marker inside a fenced code block raises, since Markdown shows it as text.
+    """
     renderers = RENDERERS if renderers is None else renderers
     required = REQUIRED_BLOCKS if required is None else required
     engine = ENGINE_SPECS[model]
+    text = text.removeprefix("\ufeff").replace("\r\n", "\n")
     out: list[str] = []
     seen: set[str] = set()
     open_id: str | None = None
     open_line = 0
+    fence: str | None = None
     for number, line in enumerate(text.splitlines(keepends=True), start=1):
         stripped = line.rstrip("\n")
-        if (match := _MARKER.match(stripped)) is None:
+        match = _MARKER.match(stripped)
+        if fence is not None and (match or _MARKER_LIKE.match(stripped)):
+            raise ManualBlockError(f"line {number}: marker inside a fenced code block")
+        if match is None:
             if _MARKER_LIKE.match(stripped):
                 raise ManualBlockError(f"line {number}: malformed marker {stripped!r}")
             if open_id is None:
+                # A block body is replaced, so only fences outside blocks count.
+                if fence_match := _FENCE.match(stripped):
+                    if fence is None:
+                        fence = fence_match.group(1)
+                    elif fence_match.group(1) == fence:
+                        fence = None
                 out.append(line)
             continue
         kind, block_id = match.groups()

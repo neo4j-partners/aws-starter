@@ -7,6 +7,7 @@ them and leaves every other line as it was.
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -116,11 +117,61 @@ def test_rendering_is_idempotent() -> None:
             "line 1: malformed marker '<!--BEGIN GENERATED: greeting-->'",
             id="malformed",
         ),
+        pytest.param(
+            "```markdown\n" + _block("greeting", "a") + "```\n",
+            "line 2: marker inside a fenced code block",
+            id="in-backtick-fence",
+        ),
+        pytest.param(
+            "Text.\n~~~\n<!-- END GENERATED: greeting -->\n~~~\n",
+            "line 3: marker inside a fenced code block",
+            id="in-tilde-fence",
+        ),
+        pytest.param(
+            "```\n<!--BEGIN GENERATED: greeting-->\n```\n",
+            "line 2: marker inside a fenced code block",
+            id="malformed-in-fence",
+        ),
     ],
 )
 def test_bad_markers_raise_with_the_line(text: str, message: str) -> None:
     with pytest.raises(ManualBlockError, match=f"^{message}$"):
         _render(text)
+
+
+def test_a_fence_inside_a_block_is_the_block_body() -> None:
+    # A block's old body is replaced, so an unclosed fence in it does not
+    # put the next block's markers inside a fence.
+    text = _block("greeting", "```\nstale") + _block("two-lines", "")
+
+    assert _render(text) == (
+        _block("greeting", "Hello from the B737-800.") + _block("two-lines", "Line one.\nLine two.")
+    )
+
+
+def test_a_leading_byte_order_mark_is_dropped() -> None:
+    assert _render("\ufeff" + _block("greeting", "stale")) == _block(
+        "greeting", "Hello from the B737-800."
+    )
+
+
+def test_crlf_line_endings_render_as_lf() -> None:
+    text = ("# Title\n" + _block("greeting", "stale")).replace("\n", "\r\n")
+
+    assert _render(text) == "# Title\n" + _block("greeting", "Hello from the B737-800.")
+
+
+def test_git_checks_out_the_manuals_with_lf_endings() -> None:
+    path = manuals.MANUALS_DIR / manuals.MANUAL_FILES[MODEL]
+    result = subprocess.run(
+        ["git", "check-attr", "text", "eol", "--", path.name],
+        cwd=path.parent,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.splitlines() == [f"{path.name}: text: set", f"{path.name}: eol: lf"]
 
 
 def test_a_missing_required_block_raises() -> None:

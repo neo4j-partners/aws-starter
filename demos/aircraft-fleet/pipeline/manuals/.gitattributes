@@ -1,0 +1,3 @@
+# Keep the manuals LF on every platform, so the block renderer and the
+# loader see the same text.
+*.md text eol=lf

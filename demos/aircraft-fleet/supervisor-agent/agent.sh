@@ -314,8 +314,11 @@ strip_gateway_secret() {
     # would hang the open, and a link would send the lines elsewhere. umask
     # 077 creates the copy with mode 0600 before the filtered lines go in,
     # and set -C refuses a file that appears at that name in between. The
-    # copy must then be a regular file, not a link. chmod sets 0600 again,
-    # the mode the CLI writes .env.local with. .env.local is checked for a
+    # copy must then be a regular file, not a link. chmod sets 0600, the
+    # mode the CLI writes .env.local with. On a normal filesystem it is
+    # redundant after the umask 077 create. It stays as defense in depth,
+    # because a default ACL or some filesystems can widen a new file's
+    # mode. .env.local is checked for a
     # link again right before mv, which would replace the link and leave
     # the secret in its target.
     if ! remove_strip_copy \

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import sys
 from contextlib import nullcontext
+from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -87,6 +89,48 @@ def test_if_stale_regenerates_after_a_code_change(
 
     assert marked.read_text() != MARKER
     assert stamp.read_stamp(tmp_path)["generator_hash"] == "changed"
+
+
+def test_the_stamp_records_the_python_faker_and_numpy_versions(tmp_path: Path) -> None:
+    # The CSVs depend on Faker's data and NumPy's random streams, not only
+    # on the generator code.
+    _generate(tmp_path)
+
+    assert stamp.read_stamp(tmp_path)["runtime"] == {
+        "faker": version("faker"),
+        "numpy": version("numpy"),
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}",
+    }
+
+
+def _bump_numpy(monkeypatch: pytest.MonkeyPatch) -> None:
+    current = stamp.runtime_versions()
+    monkeypatch.setattr(stamp, "runtime_versions", lambda: {**current, "numpy": "0.0.0"})
+
+
+def test_if_stale_regenerates_after_a_library_version_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generate(tmp_path)
+    marked = _mark(tmp_path)
+    _bump_numpy(monkeypatch)
+
+    _generate(tmp_path, if_stale=True)
+
+    assert marked.read_text() != MARKER
+    assert stamp.read_stamp(tmp_path)["runtime"]["numpy"] == "0.0.0"
+
+
+def test_stale_reason_names_a_changed_library(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _generate(tmp_path)
+    assert stamp.stale_reason(tmp_path) is None
+    _bump_numpy(monkeypatch)
+
+    assert stamp.stale_reason(tmp_path) == (
+        f"the numpy version changed since {tmp_path} was generated"
+    )
 
 
 def test_failed_generate_leaves_no_stamp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

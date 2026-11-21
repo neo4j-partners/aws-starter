@@ -2,13 +2,16 @@
 
 generate writes .stamp.json after every CSV is in place, and removes it
 first, so a run that fails partway leaves no stamp. The loader's verify
-command compares the stamp's code hash with the current source.
+command compares the stamp's code hash and library versions with the
+current ones.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import sys
+from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +19,8 @@ from .config import GeneratorConfig
 
 STAMP_NAME = ".stamp.json"
 _GENERATOR_DIR = Path(__file__).resolve().parent
+# Libraries whose data or random streams shape the CSVs.
+_LIBRARIES = ("faker", "numpy")
 
 
 def generator_hash() -> str:
@@ -29,6 +34,17 @@ def generator_hash() -> str:
     return digest.hexdigest()
 
 
+def runtime_versions() -> dict[str, str]:
+    """Return the Python major.minor and the version of each library the output depends on.
+
+    The same seed can give different CSVs under another Faker, whose data
+    files change between releases, or another NumPy or Python, whose random
+    streams may change.
+    """
+    python = f"{sys.version_info.major}.{sys.version_info.minor}"
+    return {"python": python} | {name: version(name) for name in _LIBRARIES}
+
+
 def stamp_for(config: GeneratorConfig) -> dict[str, Any]:
     """Return the stamp a run of this config writes with the current code."""
     return {
@@ -40,6 +56,7 @@ def stamp_for(config: GeneratorConfig) -> dict[str, Any]:
             "start_date": config.start_date.isoformat(),
         },
         "generator_hash": generator_hash(),
+        "runtime": runtime_versions(),
     }
 
 
@@ -70,12 +87,17 @@ def clear_stamp(directory: Path) -> None:
 def stale_reason(directory: Path) -> str | None:
     """Return why the directory's CSVs do not match the current generator code.
 
-    Returns None when the stamp's code hash matches. The config is not
-    checked here, since only setup.sh knows the GEN_* values.
+    Returns None when the stamp's code hash and library versions match. The
+    config is not checked here, since only setup.sh knows the GEN_* values.
     """
     stamp = read_stamp(directory)
     if stamp is None:
         return f"{directory} has no {STAMP_NAME}"
     if stamp.get("generator_hash") != generator_hash():
         return f"the generator code changed since {directory} was generated"
+    recorded = stamp.get("runtime")
+    if not isinstance(recorded, dict):
+        recorded = {}
+    if changed := [k for k, v in runtime_versions().items() if recorded.get(k) != v]:
+        return f"the {', '.join(changed)} version changed since {directory} was generated"
     return None

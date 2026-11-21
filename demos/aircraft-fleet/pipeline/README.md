@@ -40,11 +40,13 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |
 
-`generate` writes `generated/.stamp.json` with the generator settings and a hash of
-the generator code. `generated/` is stale when its stamp does not match the `GEN_*`
-values or the current code, and `load` and `load-operational` regenerate it then.
+`generate` writes `generated/.stamp.json` with the generator settings, a hash of
+the generator code, and the Python, Faker, and NumPy versions. The same seed can
+give different CSVs under another version of any of them. `generated/` is stale
+when its stamp does not match the `GEN_*` values, the current code, or the installed
+versions, and `load` and `load-operational` regenerate it then.
 The load copies the stamp onto a single `Dataset` node in the graph. `verify` makes
-two checks. It compares the stamp with the current code, and it compares the
+two checks. It compares the stamp with the current code and versions, and it compares the
 graph's `Dataset` node with the stamp. A graph with no `Dataset` node was loaded
 before stamps existed. Each warning says whether to regenerate or only reload.
 `verify --strict` fails on either mismatch, or when the stamp is missing.

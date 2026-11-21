@@ -363,10 +363,10 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 | 5 | Perform fan blade balance check | Correct imbalance if identified |
 
 #### Common Root Causes
-- Fan blade damage from FOD (40% of cases)
-- Bearing wear in thrust bearing assembly (25%)
-- Compressor blade erosion (20%)
-- Sensor malfunction / cable damage (15%)
+- Fan blade damage from FOD
+- Bearing wear in thrust bearing assembly
+- Compressor blade erosion
+- Sensor malfunction / cable damage
 
 ### 4.3 Fuel Starvation
 

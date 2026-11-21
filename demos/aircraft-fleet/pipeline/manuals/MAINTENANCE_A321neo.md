@@ -419,13 +419,11 @@ The LEAP-1A's lightweight composite fan and high bypass ratio make vibration mon
 
 #### Common Root Causes (LEAP-1A)
 
-| Cause | Frequency | Typical Indicator |
-|-------|-----------|-------------------|
-| Ice crystal icing | 30% | High altitude, humid conditions |
-| Fan blade damage | 25% | 1×N1 frequency dominant |
-| Bearing wear | 20% | Bearing-specific frequency |
-| Core contamination | 15% | 1×N2 with EGT rise |
-| Sensor/wiring fault | 10% | Erratic readings |
+- Ice crystal icing: high altitude, humid conditions
+- Fan blade damage: 1×N1 frequency dominant
+- Bearing wear: bearing-specific frequency
+- Core contamination: 1×N2 with EGT rise
+- Sensor/wiring fault: erratic readings
 
 #### Ice Crystal Icing (LEAP-1A Specific Issue)
 

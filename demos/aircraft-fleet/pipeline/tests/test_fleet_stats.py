@@ -280,3 +280,29 @@ def test_no_manual_quotes_industry_statistics(model: str) -> None:
     text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
 
     assert not re.findall(r".*industry.*", text, re.IGNORECASE)
+
+
+def _root_cause_sections(text: str) -> list[str]:
+    """The body of each "Common Root Causes" section, up to the next heading."""
+    return re.findall(
+        r"^#{3,5} Common Root Causes.*?\n(.*?)(?=^#|\Z)", text, re.MULTILINE | re.DOTALL
+    )
+
+
+def test_a_percentage_in_a_root_cause_section_is_found() -> None:
+    text = "#### Common Root Causes\n- Fan blade damage (40% of cases)\n\n### 4.3 Next\n"
+
+    assert re.findall(r"\d\s*%", _root_cause_sections(text)[0]) == ["0%"]
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_no_root_cause_section_quotes_a_percentage(model: str) -> None:
+    # The fleet's own fault shares are in the generated blocks. A hand-written
+    # percentage of cases is not drawn from the data, so it does not belong.
+    # A guard on every bare percentage in a fault section would also catch
+    # legitimate thresholds, such as sensor drift > 10% or motoring to 20% N2.
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+    sections = _root_cause_sections(text)
+
+    assert sections
+    assert not [s for s in sections if re.search(r"\d\s*%", s)]

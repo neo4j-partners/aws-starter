@@ -70,6 +70,7 @@ from fleet_supervisor.core.mcp import (  # noqa: E402
 )
 from fleet_supervisor.core.memory import (  # noqa: E402
     MemorySession,
+    SharedMemoryOpenError,
     build_session_manager,
     close_shared_memory,
     forget_memory_settings,
@@ -95,8 +96,10 @@ NO_PROMPT_ERROR = "No prompt provided. Include 'prompt' in the request."
 async def _lifespan(app: BedrockAgentCoreApp) -> AsyncIterator[None]:
     """Close the shared memory client when the server stops.
 
-    The close waits for open memory sessions, then for background
-    extraction, so a request cancelled at shutdown still writes its memory.
+    The close waits up to 30 seconds for open memory sessions. A request
+    cancelled at shutdown still writes its memory only if its session closes
+    in that time. Then the close waits for background extraction. Shutdown
+    takes 60 seconds at most in all.
     """
     yield
     await asyncio.to_thread(close_shared_memory)
@@ -300,7 +303,8 @@ def _build_agent(
     Neo4j rejects the password, the cached one may predate a secret
     rotation. So this drops it and retires the client that opened with it,
     unless another request already did, and builds once more with the
-    current settings.
+    current settings. When the shared client failed to open, the rejected
+    password is the one that open used, which may be another request's.
     """
     settings = memory_settings()
     try:
@@ -308,6 +312,8 @@ def _build_agent(
     except Exception as error:
         if not password_rejected(error):
             raise
+        if isinstance(error, SharedMemoryOpenError):
+            settings = error.settings
     # Outside the except block, so a second failure does not chain the first.
     logger.warning("Neo4j rejected the memory password; reading it again")
     forget_memory_settings(settings)

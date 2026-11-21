@@ -403,6 +403,32 @@ def test_a_password_rejected_twice_fails_without_a_third_try(
     assert failed.exc_info[1].__context__ is None
 
 
+def test_a_rejected_open_forgets_the_password_the_open_used(supervisor, monkeypatch):
+    """The open that failed may have used another request's older password."""
+    from fleet_supervisor.core.memory import SharedMemoryOpenError
+
+    ours = SimpleNamespace(name="ours")
+    opener = SimpleNamespace(name="opener")
+    monkeypatch.setattr(server, "memory_settings", lambda: ours)
+    forgotten: list[object] = []
+    monkeypatch.setattr(server, "forget_memory_settings", forgotten.append)
+    managers: list[FakeManager] = []
+
+    def build_session(session_id, user_id, settings, background_hook):
+        if not managers:
+            managers.append(FakeManager())
+            error = SharedMemoryOpenError(opener)
+            error.__cause__ = AuthError("unauthorized")
+            raise error
+        managers.append(FakeManager())
+        return managers[-1]
+
+    monkeypatch.setattr(server, "build_session_manager", build_session)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "complete"}
+    assert forgotten == [opener]
+
+
 def test_other_build_errors_keep_the_cached_password(supervisor, password_retry, monkeypatch):
     managers, forgotten = password_retry
 

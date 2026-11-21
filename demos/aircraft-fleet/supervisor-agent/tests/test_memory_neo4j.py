@@ -82,6 +82,7 @@ def local_memory(monkeypatch: pytest.MonkeyPatch, database: str) -> Iterator[Non
     monkeypatch.setattr(memory, "_shared_open", None)
     monkeypatch.setattr(memory, "_retired", set())
     monkeypatch.setattr(memory, "_closers", set())
+    monkeypatch.setattr(memory, "_shutting_down", False)
     secrets._read_secret.cache_clear()
     try:
         yield

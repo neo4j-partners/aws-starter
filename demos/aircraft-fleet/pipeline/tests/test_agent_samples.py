@@ -82,8 +82,12 @@ class SchemaDriver:
         schema_error: Exception | None = None,
         schema_error_times: int | None = None,
         extra_candidates: list[int] = (),
+        flaky_queries: dict[str, int] | None = None,
     ) -> None:
         self.schema_error = schema_error
+        # How many times each named query raises SessionExpired before it
+        # succeeds.
+        self.flaky_queries = dict(flaky_queries or {})
         # How many queries raise schema_error before the rest succeed. None
         # means every query raises it.
         self.schema_error_times = schema_error_times
@@ -148,6 +152,9 @@ class _SchemaSession:
             if self.driver.schema_error_times is not None:
                 self.driver.schema_error_times -= 1
             raise self.driver.schema_error
+        if self.driver.flaky_queries.get(cypher, 0) > 0:
+            self.driver.flaky_queries[cypher] -= 1
+            raise SessionExpired("session expired")
         if cypher == agent_samples._SCHEMA_VISUALIZATION_Q:
             record = _visualization(self.driver.relationship_rows)
             return SimpleNamespace(single=lambda strict=False: record)
@@ -694,6 +701,27 @@ def test_schema_read_retries_after_a_session_expires() -> None:
     assert "- Aircraft {tail_number}" in lines
     assert "- (Aircraft)-[:HAS_SYSTEM]->(System)" in lines
     assert _prompt_line(schema, "Aircraft models") == ["B737-800"]
+
+
+def test_a_retried_fact_read_prints_the_skip_warning_once(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The fact read fails after the skip warning, and the driver retries it.
+    # The warning is printed outside the retried function, so only once.
+    driver = SchemaDriver(
+        relationship_rows=[
+            (["Aircraft"], "HAS_SYSTEM", ["System"]),
+            (["Aircraft"], "ODD\\TYPE", ["System"]),
+        ],
+        models=["B737-800"],
+        flaky_queries={agent_samples._SAMPLE_TAILS_Q: 1},
+    )
+
+    schema = graph_schema(driver, "db")
+
+    assert driver.session_queries[1].count(agent_samples._SAMPLE_TAILS_Q) == 2
+    assert _prompt_line(schema, "Aircraft models") == ["B737-800"]
+    assert capsys.readouterr().out.count("[WARN] skipped 1 relationship pattern(s)") == 1
 
 
 @pytest.mark.parametrize(

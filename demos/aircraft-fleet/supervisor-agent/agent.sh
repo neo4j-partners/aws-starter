@@ -298,9 +298,10 @@ on_exit() {
 ENV_STRIP_TMP=""
 
 # Remove the client secret line, and the comment the CLI writes above it,
-# from agentcore/.env.local. Every other line is kept. The secret line must
-# start with the exact variable name, and the comment must match the whole
-# line.
+# from agentcore/.env.local. Every other line is kept. The secret line is
+# matched in each form the CLI reads: optional leading space, an optional
+# export, the exact variable name, then optional space before the =. The
+# comment must match the whole line.
 strip_gateway_secret() {
     [ -f "$ENV_LOCAL" ] || return 0
     local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
@@ -308,8 +309,9 @@ strip_gateway_secret() {
     # cp -p gives the copy the file's mode before the filtered lines go in.
     if ! ENV_STRIP_TMP=$(mktemp "$ENV_LOCAL.XXXXXX") \
         || ! cp -p "$ENV_LOCAL" "$ENV_STRIP_TMP" \
-        || ! awk -v prefix="$GATEWAY_SECRET_VAR=" -v comment="$comment" \
-            'index($0, prefix) != 1 && $0 != comment' "$ENV_LOCAL" > "$ENV_STRIP_TMP" \
+        || ! awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
+            '$0 !~ ("^[ \t]*(export[ \t]+)?" name "[ \t]*=") && $0 != comment' \
+            "$ENV_LOCAL" > "$ENV_STRIP_TMP" \
         || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
         remove_strip_copy
         echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL. Delete that line by hand.${NC}" >&2

@@ -351,7 +351,14 @@ def test_destroy_strips_only_the_exact_secret_variable(project: Path) -> None:
         "OLD_AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=other\n"
         "# AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET= is set by deploy\n"
     )
-    env_local.write_text(kept + "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n")
+    # The CLI reads these forms too, so each one is removed.
+    removed = (
+        "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
+        "export AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
+        "  AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
+        "\texport\tAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET = value\n"
+    )
+    env_local.write_text(kept + removed)
 
     result = run_destroy(project)
 

@@ -97,7 +97,7 @@ local compute.
 
 | Stage | Code | Output |
 |-------|------|--------|
-| 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 114 MB. |
+| 1. Generate | `src/generator/` | CSVs in `generated/`. The folder is git-ignored. The full readings file is about 170 MB. |
 | 2. Load | `loader.py`, `schema.py` | The operational graph: `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`. It also creates uniqueness constraints, property indexes, and fulltext indexes. |
 | 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings. It also extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. |
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The `maintenanceChunkEmbeddings` vector index, the `maintenanceChunkText` fulltext index, and typed links into the operational graph |
@@ -177,8 +177,8 @@ no LLM calls and needs no keys.
 
 `LOAD_FULL_DATASET` sets the dataset size:
 
-- **`false`:** This default loads 30 aircraft over 90 days. That covers every tail listed in the maintenance manuals. It is about 36 MB of readings and about 240 maintenance events. It loads in minutes and fits free or small Aura tiers.
-- **`true`:** This option loads about 100 aircraft over 90 days. That is about 114 MB of readings. It is slow to load and needs a larger Aura tier.
+- **`false`:** This default loads 30 aircraft over 90 days. That covers every tail listed in the maintenance manuals. It is about 54 MB of readings and about 240 maintenance events. It loads in minutes and fits free or small Aura tiers.
+- **`true`:** This option loads about 100 aircraft over 90 days. That is about 170 MB of readings. It is slow to load and needs a larger Aura tier.
 
 The 90-day window matters. Sensor wear grows over time, and most maintenance
 events come from that wear. A shorter window creates far fewer events. For

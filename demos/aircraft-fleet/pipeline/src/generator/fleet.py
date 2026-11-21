@@ -20,9 +20,9 @@ from .specs import (
     MANUFACTURER,
     MODEL_DISTRIBUTION,
     OPERATORS,
-    SENSOR_TYPES,
     UTILIZATION,
     OperatorProfile,
+    sensors_for,
 )
 
 # Six hex digits are 24 bits. Tests shrink this to force collisions.
@@ -108,7 +108,7 @@ def _generated_tails(registry_tails: set[str]) -> Iterator[str]:
 class SensorNode:
     sensor_id: str
     system_id: str
-    type: str  # EGT | Vibration | N1Speed | FuelFlow
+    type: str  # a SensorSpec type, such as EGT or HydPressure
     name: str
     unit: str
 
@@ -179,18 +179,17 @@ def _build_system(
             )
         )
 
-    # Sensors (engines only)
-    if system_type == "Engine":
-        for sensor_index, (s_type, s_name, s_unit) in enumerate(SENSOR_TYPES, start=1):
-            system.sensors.append(
-                SensorNode(
-                    sensor_id=f"{system_id}-SN{sensor_index:02d}",
-                    system_id=system_id,
-                    type=s_type,
-                    name=s_name,
-                    unit=s_unit,
-                )
+    # Sensors
+    for sensor_index, spec in enumerate(sensors_for(system_type, model), start=1):
+        system.sensors.append(
+            SensorNode(
+                sensor_id=f"{system_id}-SN{sensor_index:02d}",
+                system_id=system_id,
+                type=spec.type,
+                name=spec.name,
+                unit=spec.unit,
             )
+        )
 
     return system
 

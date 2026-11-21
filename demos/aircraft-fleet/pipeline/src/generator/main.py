@@ -17,7 +17,7 @@ from .fleet import AircraftNode, generate_fleet
 from .maintenance import generate_maintenance_events
 from .operations import generate_operations
 from .removals import generate_removals
-from .sensors import EngineSeries, generate_engine_readings
+from .sensors import generate_system_readings
 from .specs import EVENT_SEVERITIES
 from .stamp import clear_stamp, read_stamp, stamp_for, write_stamp
 from .writers import write_csv
@@ -194,19 +194,16 @@ def generate(
         rw.writeheader()
 
         for ac_idx, ac in enumerate(fleet):
-            engine_series: dict[str, EngineSeries] = {}
+            system_series: dict[str, dict[str, np.ndarray]] = {}
 
             for system in ac.systems:
-                if system.type != "Engine":
-                    continue
-
-                series, rows = generate_engine_readings(ac, system, config, rng_np)
-                engine_series[system.system_id] = series
+                series, rows = generate_system_readings(ac, system, config, rng_np)
+                system_series[system.system_id] = series
                 rw.writerows(rows)
                 total_readings += len(rows)
 
             # Maintenance events for this aircraft
-            ac_events = generate_maintenance_events(ac, engine_series, config, event_counter, rng)
+            ac_events = generate_maintenance_events(ac, system_series, config, event_counter, rng)
             maintenance_rows.extend(ac_events)
 
             if (ac_idx + 1) % 20 == 0 or ac_idx + 1 == len(fleet):

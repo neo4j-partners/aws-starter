@@ -1,8 +1,8 @@
 """
 Correlated maintenance event generation.
 
-Events are triggered probabilistically when sensor readings exceed model-specific
-warning and critical thresholds. The fault type is determined by which sensor
+Events are triggered probabilistically when engine EGT and vibration readings
+cross their model's caution and warning bands. The fault type is determined by which sensor
 crossed its threshold, and severity follows from how far above the threshold it went.
 
 This produces the causal signal the GDS algorithms need: aircraft with steeper
@@ -14,15 +14,11 @@ from __future__ import annotations
 import random
 from datetime import timedelta
 
+import numpy as np
+
 from .config import GeneratorConfig
 from .fleet import AircraftNode, ComponentNode, SystemNode
-from .sensors import EngineSeries
-from .specs import (
-    CORRECTIVE_ACTIONS,
-    ENGINE_SPECS,
-    SENSOR_FAULT_MAP,
-    EngineSpec,
-)
+from .specs import CORRECTIVE_ACTIONS, SENSOR_FAULT_MAP, sensors_for
 
 # Per-reading probability of generating a maintenance event when above threshold
 _WARN_EVENT_PROB = 0.015
@@ -57,7 +53,7 @@ def _pick_component(system: SystemNode, rng: random.Random) -> ComponentNode:
 
 def generate_maintenance_events(
     aircraft: AircraftNode,
-    engine_series: dict[str, EngineSeries],  # system_id -> written EGT/vib values
+    system_series: dict[str, dict[str, np.ndarray]],  # system_id -> type -> written values
     config: GeneratorConfig,
     event_counter: list[int],  # mutable counter for global event IDs
     rng: random.Random,
@@ -67,31 +63,33 @@ def generate_maintenance_events(
     exceedances and emit maintenance events with realistic fault types and
     corrective actions.
     """
-    spec: EngineSpec = ENGINE_SPECS[aircraft.model]
+    specs = {spec.type: spec for spec in sensors_for("Engine", aircraft.model)}
+    egt_bands = specs["EGT"].bands
+    vib_bands = specs["Vibration"].bands
     events: list[dict] = []
 
     for system in aircraft.systems:
         if system.type != "Engine":
             continue
 
-        series = engine_series.get(system.system_id)
+        series = system_series.get(system.system_id)
         if series is None:
             continue
 
-        egt_vals = series.egt
-        vib_vals = series.vib
+        egt_vals = series["EGT"]
+        vib_vals = series["Vibration"]
 
         last_event_hour: dict[str, int] = {}  # sensor_type -> last event hour
 
         for h in range(config.n_hours):
             # Check EGT threshold
             egt = egt_vals[h]
-            if egt >= spec.egt_warning:
-                p = _CRIT_EVENT_PROB if egt >= spec.egt_critical else _WARN_EVENT_PROB
+            if egt >= egt_bands.caution:
+                p = _CRIT_EVENT_PROB if egt >= egt_bands.warning else _WARN_EVENT_PROB
                 last_h = last_event_hour.get("EGT", -_MIN_EVENT_SPACING_HOURS)
                 if h - last_h >= _MIN_EVENT_SPACING_HOURS and rng.random() < p:
                     fault, severity = _fault_and_severity(
-                        "EGT", egt, spec.egt_warning, spec.egt_critical, rng
+                        "EGT", egt, egt_bands.caution, egt_bands.warning, rng
                     )
                     events.append(
                         _make_event(
@@ -102,12 +100,12 @@ def generate_maintenance_events(
 
             # Check Vibration threshold
             vib = vib_vals[h]
-            if vib >= spec.vib_warning:
-                p = _CRIT_EVENT_PROB if vib >= spec.vib_critical else _WARN_EVENT_PROB
+            if vib >= vib_bands.caution:
+                p = _CRIT_EVENT_PROB if vib >= vib_bands.warning else _WARN_EVENT_PROB
                 last_h = last_event_hour.get("Vibration", -_MIN_EVENT_SPACING_HOURS)
                 if h - last_h >= _MIN_EVENT_SPACING_HOURS and rng.random() < p:
                     fault, severity = _fault_and_severity(
-                        "Vibration", vib, spec.vib_warning, spec.vib_critical, rng
+                        "Vibration", vib, vib_bands.caution, vib_bands.warning, rng
                     )
                     events.append(
                         _make_event(

@@ -13,7 +13,7 @@ import pytest
 
 from generator.fleet import entry_into_service
 from generator.main import generate
-from generator.specs import ENGINE_SPECS, SENSOR_FAULT_MAP
+from generator.specs import SENSOR_FAULT_MAP, sensors_for
 
 AIRCRAFT, DAYS, SEED = 20, 30, 42
 
@@ -55,20 +55,16 @@ def test_event_fault_matches_the_crossing_sensor(large_dataset: Path) -> None:
             values.setdefault(key, {})[sensor_type[r["sensor_id"]]] = float(r["value"])
 
     for e in events:
-        spec = ENGINE_SPECS[model[e["aircraft_id"]]]
+        specs = {s.type: s for s in sensors_for("Engine", model[e["aircraft_id"]])}
         v = values.get((e["system_id"], e["reported_at"]), {})
-        thresholds = {
-            "EGT": (spec.egt_warning, spec.egt_critical),
-            "Vibration": (spec.vib_warning, spec.vib_critical),
-        }
-        # Some sensor crossed warning at this hour, the fault is one that
-        # sensor maps to, and a CRITICAL event's sensor is at or above critical.
+        # Some sensor crossed caution at this hour, the fault is one that
+        # sensor maps to, and a CRITICAL event's sensor is at or above warning.
         explained = [
             sensor
-            for sensor, (warning, critical) in thresholds.items()
-            if v.get(sensor, 0.0) >= warning
+            for sensor in ("EGT", "Vibration")
+            if v.get(sensor, 0.0) >= specs[sensor].bands.caution
             and (e["fault"], e["severity"]) in SENSOR_FAULT_MAP[sensor]
-            and (e["severity"] != "CRITICAL" or v[sensor] >= critical)
+            and (e["severity"] != "CRITICAL" or v[sensor] >= specs[sensor].bands.warning)
         ]
         assert explained, f"{e[':ID(MaintenanceEvent)']} {e['fault']} {e['severity']}: {v}"
 

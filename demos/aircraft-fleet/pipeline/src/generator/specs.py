@@ -2,118 +2,274 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
+from enum import StrEnum
+
+
+class Direction(StrEnum):
+    """Which way a sensor's value moves when something is wrong."""
+
+    HIGH = "high"  # bad when the value rises, such as EGT
+    LOW = "low"  # bad when the value falls, such as hydraulic pressure
+    DEVIATION = "deviation"  # bad either way from baseline, such as N1
+
+
+@dataclass(frozen=True)
+class Bands:
+    """Three thresholds, one per severity.
+
+    HIGH and LOW sensors hold absolute values. DEVIATION sensors hold
+    offsets from the baseline.
+    """
+
+    advisory: float  # crossing it gives MINOR
+    caution: float  # crossing it gives MAJOR
+    warning: float  # crossing it gives CRITICAL
+
+
+@dataclass(frozen=True)
+class SensorSpec:
+    """One sensor type on one model: its unit, normal value, noise, drift, and bands."""
+
+    type: str
+    name: str
+    unit: str
+    baseline: float
+    noise_std: float
+    # Drift toward the bad side, in units per day, before the operator's
+    # degradation multiplier. Each sensor draws one rate from this range.
+    drift_per_day: tuple[float, float]
+    direction: Direction
+    bands: Bands
+    # Readings never go below this value, such as 0 for a disagreement.
+    minimum: float | None = None
+
+    def __post_init__(self) -> None:
+        low, high = self.drift_per_day
+        if not 0 <= low <= high:
+            raise ValueError(f"sensor {self.type!r}: drift range {self.drift_per_day} is invalid")
+        b = self.bands
+        match self.direction:
+            case Direction.HIGH:
+                ordered = self.baseline < b.advisory < b.caution < b.warning
+            case Direction.LOW:
+                ordered = self.baseline > b.advisory > b.caution > b.warning
+            case Direction.DEVIATION:
+                ordered = 0 < b.advisory < b.caution < b.warning
+        if not ordered:
+            raise ValueError(
+                f"sensor {self.type!r}: {self.direction} bands {b} are out of order "
+                f"for baseline {self.baseline}"
+            )
 
 
 @dataclass(frozen=True)
 class EngineSpec:
     engine_type: str
-    egt_baseline: float
-    egt_noise_std: float
-    egt_degradation_range: tuple[float, float]  # (min_slope, max_slope) °C/hour
-    egt_warning: float
-    egt_critical: float
-    vib_baseline: float
-    vib_noise_std: float
-    vib_degradation_range: tuple[float, float]  # ips/hour
-    vib_warning: float
-    vib_critical: float
-    n1_baseline: float
-    n1_noise_std: float
-    fuel_baseline: float
-    fuel_noise_std: float
+    sensors: tuple[SensorSpec, ...]
 
 
+def _engine_sensors(
+    egt: tuple[float, float, float, float],
+    egt_noise_std: float,
+    egt_drift_per_day: tuple[float, float],
+    vib: tuple[float, float, float, float],
+    vib_noise_std: float,
+    vib_drift_per_day: tuple[float, float],
+    n1_cruise: float,
+    fuel_cruise: float,
+) -> tuple[SensorSpec, ...]:
+    """Build one model's four engine sensors.
+
+    egt and vib are (baseline, advisory, caution, warning). N1 bands are
+    2, 4, and 6 % from cruise N1. Fuel flow bands are 8, 15, and 25 % of
+    cruise fuel flow.
+    """
+    return (
+        SensorSpec(
+            "EGT",
+            "Exhaust Gas Temperature",
+            "°C",
+            baseline=egt[0],
+            noise_std=egt_noise_std,
+            drift_per_day=egt_drift_per_day,
+            direction=Direction.HIGH,
+            bands=Bands(*egt[1:]),
+        ),
+        SensorSpec(
+            "Vibration",
+            "Engine Vibration",
+            "ips",
+            baseline=vib[0],
+            noise_std=vib_noise_std,
+            drift_per_day=vib_drift_per_day,
+            direction=Direction.HIGH,
+            bands=Bands(*vib[1:]),
+        ),
+        SensorSpec(
+            "N1Speed",
+            "Fan Speed N1",
+            "%",
+            baseline=n1_cruise,
+            noise_std=0.5,
+            drift_per_day=(0.0, 0.0),
+            direction=Direction.DEVIATION,
+            bands=Bands(2.0, 4.0, 6.0),
+        ),
+        SensorSpec(
+            "FuelFlow",
+            "Fuel Flow",
+            "kg/s",
+            baseline=fuel_cruise,
+            noise_std=round(0.02 * fuel_cruise, 4),
+            drift_per_day=(0.0, 0.0),
+            direction=Direction.DEVIATION,
+            bands=Bands(*(fuel_cruise * share for share in (0.08, 0.15, 0.25))),
+        ),
+    )
+
+
+# Engine bands come from each manual's own limits. The current EGT warning
+# value is the caution value. Vibration noise and drift scale with the gap
+# from baseline to caution.
 ENGINE_SPECS: dict[str, EngineSpec] = {
     "B737-800": EngineSpec(
         engine_type="CFM56-7B",
-        egt_baseline=658.0,
-        egt_noise_std=3.5,
-        egt_degradation_range=(0.002, 0.014),
-        egt_warning=688.0,
-        egt_critical=696.0,
-        vib_baseline=0.180,
-        vib_noise_std=0.010,
-        vib_degradation_range=(0.00004, 0.00018),
-        vib_warning=0.38,
-        vib_critical=0.45,
-        n1_baseline=4750.0,
-        n1_noise_std=45.0,
-        fuel_baseline=1.08,
-        fuel_noise_std=0.025,
+        sensors=_engine_sensors(
+            egt=(658.0, 678.0, 688.0, 698.0),
+            egt_noise_std=3.5,
+            egt_drift_per_day=(0.048, 0.336),
+            vib=(0.8, 2.0, 3.5, 4.5),
+            vib_noise_std=0.135,
+            vib_drift_per_day=(0.013, 0.058),
+            n1_cruise=88.0,
+            fuel_cruise=0.36,
+        ),
     ),
     "A320-200": EngineSpec(
         engine_type="V2500-A1",
-        egt_baseline=645.0,
-        egt_noise_std=3.0,
-        egt_degradation_range=(0.001, 0.011),
-        egt_warning=674.0,
-        egt_critical=682.0,
-        vib_baseline=0.150,
-        vib_noise_std=0.008,
-        vib_degradation_range=(0.00003, 0.00015),
-        vib_warning=0.33,
-        vib_critical=0.40,
-        n1_baseline=4820.0,
-        n1_noise_std=50.0,
-        fuel_baseline=0.92,
-        fuel_noise_std=0.020,
+        sensors=_engine_sensors(
+            egt=(560.0, 580.0, 590.0, 600.0),
+            egt_noise_std=3.0,
+            egt_drift_per_day=(0.024, 0.264),
+            vib=(0.8, 2.0, 3.5, 5.0),
+            vib_noise_std=0.12,
+            vib_drift_per_day=(0.011, 0.054),
+            n1_cruise=87.0,
+            fuel_cruise=0.34,
+        ),
     ),
     "A321neo": EngineSpec(
         engine_type="LEAP-1A",
-        egt_baseline=634.0,
-        egt_noise_std=2.8,
-        egt_degradation_range=(0.001, 0.010),
-        egt_warning=663.0,
-        egt_critical=671.0,
-        vib_baseline=0.120,
-        vib_noise_std=0.007,
-        vib_degradation_range=(0.00002, 0.00012),
-        vib_warning=0.29,
-        vib_critical=0.35,
-        n1_baseline=5100.0,
-        n1_noise_std=55.0,
-        fuel_baseline=1.35,
-        fuel_noise_std=0.030,
+        sensors=_engine_sensors(
+            egt=(634.0, 654.0, 664.0, 674.0),
+            egt_noise_std=2.8,
+            egt_drift_per_day=(0.024, 0.240),
+            vib=(0.7, 2.0, 3.0, 4.0),
+            vib_noise_std=0.095,
+            vib_drift_per_day=(0.0065, 0.039),
+            n1_cruise=86.0,
+            fuel_cruise=0.38,
+        ),
     ),
     "E190": EngineSpec(
         engine_type="CF34-10E",
-        egt_baseline=641.0,
-        egt_noise_std=3.2,
-        egt_degradation_range=(0.002, 0.013),
-        egt_warning=672.0,
-        egt_critical=680.0,
-        vib_baseline=0.140,
-        vib_noise_std=0.009,
-        vib_degradation_range=(0.00003, 0.00016),
-        vib_warning=0.34,
-        vib_critical=0.41,
-        n1_baseline=4680.0,
-        n1_noise_std=42.0,
-        fuel_baseline=0.88,
-        fuel_noise_std=0.018,
+        sensors=_engine_sensors(
+            egt=(641.0, 661.0, 671.0, 681.0),
+            egt_noise_std=3.2,
+            egt_drift_per_day=(0.048, 0.312),
+            vib=(0.8, 2.0, 3.0, 4.0),
+            vib_noise_std=0.10,
+            vib_drift_per_day=(0.008, 0.042),
+            n1_cruise=87.0,
+            fuel_cruise=0.27,
+        ),
     ),
-    # PW1500G geared turbofan: fan runs ~30% slower than conventional engines due to
-    # epicyclic gearbox, so n1_baseline is ~2600 RPM vs ~4700+ for CFM/LEAP types.
     "A220-300": EngineSpec(
         engine_type="PW1500G",
-        egt_baseline=625.0,
-        egt_noise_std=2.5,
-        egt_degradation_range=(0.001, 0.009),
-        egt_warning=652.0,
-        egt_critical=660.0,
-        vib_baseline=0.110,
-        vib_noise_std=0.006,
-        vib_degradation_range=(0.00002, 0.00010),
-        vib_warning=0.25,
-        vib_critical=0.30,
-        n1_baseline=2600.0,
-        n1_noise_std=30.0,
-        fuel_baseline=1.05,
-        fuel_noise_std=0.022,
+        sensors=_engine_sensors(
+            egt=(625.0, 645.0, 655.0, 665.0),
+            egt_noise_std=2.5,
+            egt_drift_per_day=(0.024, 0.216),
+            vib=(0.6, 1.5, 2.5, 3.5),
+            vib_noise_std=0.08,
+            vib_drift_per_day=(0.0065, 0.033),
+            n1_cruise=85.0,
+            fuel_cruise=0.28,
+        ),
     ),
 }
+
+_HYDRAULICS_SENSORS: tuple[SensorSpec, ...] = (
+    SensorSpec(
+        "HydPressure",
+        "Hydraulic Pressure",
+        "psi",
+        baseline=3000.0,
+        noise_std=20.0,
+        drift_per_day=(0.0, 1.0),
+        direction=Direction.LOW,
+        bands=Bands(2800.0, 2600.0, 2400.0),
+    ),
+    SensorSpec(
+        "HydQuantity",
+        "Hydraulic Fluid Quantity",
+        "%",
+        baseline=90.0,
+        noise_std=0.5,
+        drift_per_day=(0.0, 0.12),
+        direction=Direction.LOW,
+        bands=Bands(70.0, 60.0, 50.0),
+    ),
+)
+
+_AVIONICS_SENSORS: tuple[SensorSpec, ...] = (
+    SensorSpec(
+        "BusVoltage",
+        "DC Bus Voltage",
+        "V DC",
+        baseline=28.0,
+        noise_std=0.15,
+        drift_per_day=(0.0, 0.004),
+        direction=Direction.LOW,
+        bands=Bands(26.0, 25.0, 24.0),
+    ),
+    SensorSpec(
+        "AirDataDisagree",
+        "Air Data Airspeed Disagreement",
+        "kt",
+        baseline=0.5,
+        noise_std=0.15,
+        drift_per_day=(0.0, 0.008),
+        direction=Direction.HIGH,
+        bands=Bands(3.0, 5.0, 8.0),
+        minimum=0.0,
+    ),
+)
+
+
+def _a321neo_hydraulics() -> tuple[SensorSpec, ...]:
+    """The A321neo manual's normal pressure band is 2,900 to 3,100 psi."""
+    pressure, quantity = _HYDRAULICS_SENSORS
+    return (replace(pressure, bands=replace(pressure.bands, advisory=2900.0)), quantity)
+
+
+# Sensors on each system type, per model. Key order is the system order.
+SYSTEM_SENSORS: dict[str, dict[str, tuple[SensorSpec, ...]]] = {
+    "Engine": {model: spec.sensors for model, spec in ENGINE_SPECS.items()},
+    "Avionics": dict.fromkeys(ENGINE_SPECS, _AVIONICS_SENSORS),
+    "Hydraulics": {
+        model: _a321neo_hydraulics() if model == "A321neo" else _HYDRAULICS_SENSORS
+        for model in ENGINE_SPECS
+    },
+}
+
+
+def sensors_for(system_type: str, model: str) -> tuple[SensorSpec, ...]:
+    """Return the sensors on one system type of one model, in sensor id order."""
+    return SYSTEM_SENSORS.get(system_type, {}).get(model, ())
+
 
 # Model allocation for aircraft beyond the manual registry. Proportions must
 # sum to 1.0. The first 30 aircraft are the registry in MANUAL_FLEET_TAILS,
@@ -730,13 +886,15 @@ AIRPORTS: list[AirportSpec] = [
 ]
 
 
-# Sensors on every Engine system, as (type, name, unit).
-SENSOR_TYPES: list[tuple[str, str, str]] = [
-    ("EGT", "Exhaust Gas Temperature", "C"),
-    ("Vibration", "Engine Vibration", "ips"),
-    ("N1Speed", "Fan Speed N1", "rpm"),
-    ("FuelFlow", "Fuel Flow", "kg/s"),
-]
+# Every fleet sensor type once, as (type, name, unit), in system order.
+SENSOR_TYPES: list[tuple[str, str, str]] = list(
+    dict.fromkeys(
+        (sensor.type, sensor.name, sensor.unit)
+        for by_model in SYSTEM_SENSORS.values()
+        for sensors in by_model.values()
+        for sensor in sensors
+    )
+)
 
 
 @dataclass(frozen=True)

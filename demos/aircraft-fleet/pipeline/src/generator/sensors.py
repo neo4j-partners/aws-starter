@@ -1,52 +1,29 @@
 """
-Sensor time-series generation with per-aircraft degradation profiles.
+Sensor time-series generation with per-sensor degradation drift.
 
-Each engine draws a random degradation slope from the model's range, scaled by
-the operator's maintenance quality factor. The slope determines how fast the engine
-degrades over the 90-day window. Higher slopes produce threshold exceedances that
+Each sensor draws a drift rate from its spec's range, scaled by the operator's
+maintenance quality factor. The drift moves the value toward the bad side of
+the sensor's bands over the generation window. Readings that cross the bands
 then trigger correlated maintenance events in maintenance.py.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import numpy as np
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode, SystemNode
-from .specs import ENGINE_SPECS, EngineSpec
+from .specs import Direction, SensorSpec, sensors_for
+
+# The sensors that maintenance.py scans get random spikes past caution.
+_SPIKED_SENSORS = frozenset({"EGT", "Vibration"})
 
 
-@dataclass(frozen=True, slots=True)
-class EngineSeries:
-    """The EGT and vibration values written for one engine, spikes included.
-
-    maintenance.py scans these same values, so every event traces back to
-    readings that are in the graph.
-    """
-
-    egt: np.ndarray
-    vib: np.ndarray
-
-
-@dataclass
-class DegradationProfile:
-    egt_slope: float  # °C per operational hour
-    vib_slope: float  # ips per operational hour
-    # Fraction of readings that receive random anomaly spikes (0–1)
-    anomaly_rate: float
-
-
-def _draw_profile(
-    spec: EngineSpec, degradation_multiplier: float, rng: np.random.Generator
-) -> DegradationProfile:
-    egt_slope = float(rng.uniform(*spec.egt_degradation_range)) * degradation_multiplier
-    vib_slope = float(rng.uniform(*spec.vib_degradation_range)) * degradation_multiplier
-    # Anomaly rate correlates loosely with degradation speed
-    anomaly_rate = 0.003 + 0.015 * (degradation_multiplier - 0.75)
-    return DegradationProfile(egt_slope=egt_slope, vib_slope=vib_slope, anomaly_rate=anomaly_rate)
+def _anomaly_rate(degradation_multiplier: float) -> float:
+    """Fraction of readings that get a spike. It rises with degradation."""
+    return 0.003 + 0.015 * (degradation_multiplier - 0.75)
 
 
 def _timestamps(start: datetime, n_hours: int) -> list[str]:
@@ -56,7 +33,7 @@ def _timestamps(start: datetime, n_hours: int) -> list[str]:
 def _add_spikes(
     values: np.ndarray, threshold: float, anomaly_rate: float, rng: np.random.Generator
 ) -> np.ndarray:
-    """Randomly spike a fraction of readings above the warning threshold."""
+    """Randomly spike a fraction of readings above the threshold."""
     n = len(values)
     n_spikes = max(1, int(n * anomaly_rate))
     spike_idx = rng.choice(n, size=n_spikes, replace=False)
@@ -68,49 +45,58 @@ def _add_spikes(
     return values
 
 
-def generate_engine_readings(
+def _drift_sign(direction: Direction, rng: np.random.Generator) -> float:
+    match direction:
+        case Direction.HIGH:
+            return 1.0
+        case Direction.LOW:
+            return -1.0
+        case Direction.DEVIATION:
+            return float(rng.choice((-1.0, 1.0)))
+
+
+def _series(
+    spec: SensorSpec,
+    degradation_multiplier: float,
+    anomaly_rate: float,
+    n_hours: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Return one sensor's hourly values: baseline, drift, noise, and spikes."""
+    drift_per_day = float(rng.uniform(*spec.drift_per_day)) * degradation_multiplier
+    slope = _drift_sign(spec.direction, rng) * drift_per_day / 24
+    values = spec.baseline + slope * np.arange(n_hours, dtype=float)
+    values = values + rng.normal(0, spec.noise_std, n_hours)
+    if spec.type in _SPIKED_SENSORS:
+        values = _add_spikes(values, spec.bands.caution, anomaly_rate, rng)
+    if spec.minimum is not None:
+        values = np.maximum(values, spec.minimum)
+    return values
+
+
+def generate_system_readings(
     aircraft: AircraftNode,
     system: SystemNode,
     config: GeneratorConfig,
     rng: np.random.Generator,
-) -> tuple[EngineSeries, list[dict]]:
+) -> tuple[dict[str, np.ndarray], list[dict]]:
     """
-    Generate sensor readings for one engine system.
+    Generate hourly readings for every sensor on one system.
 
-    Returns the EGT and vibration series exactly as written, for the
-    maintenance module to scan, and a flat list of reading dicts ready for
-    CSV serialisation.
+    Returns each sensor type's values exactly as written, for the maintenance
+    module to scan, and a flat list of reading dicts ready for CSV
+    serialisation.
     """
-    spec: EngineSpec = ENGINE_SPECS[aircraft.model]
-    profile = _draw_profile(spec, aircraft.operator_profile.degradation_multiplier, rng)
+    specs = {spec.type: spec for spec in sensors_for(system.type, aircraft.model)}
+    multiplier = aircraft.operator_profile.degradation_multiplier
+    anomaly_rate = _anomaly_rate(multiplier)
     timestamps = _timestamps(config.start_date, config.n_hours)
-    t = np.arange(config.n_hours, dtype=float)
 
-    # Build per-sensor time series
-    sensor_series: dict[str, np.ndarray] = {}
     series_by_type: dict[str, np.ndarray] = {}
-    for sensor in system.sensors:
-        if sensor.type == "EGT":
-            base = spec.egt_baseline + profile.egt_slope * t
-            noise = rng.normal(0, spec.egt_noise_std, config.n_hours)
-            values = base + noise
-            values = _add_spikes(values, spec.egt_warning, profile.anomaly_rate, rng)
-        elif sensor.type == "Vibration":
-            base = spec.vib_baseline + profile.vib_slope * t
-            noise = rng.normal(0, spec.vib_noise_std, config.n_hours)
-            values = base + noise
-            values = _add_spikes(values, spec.vib_warning, profile.anomaly_rate, rng)
-        elif sensor.type == "N1Speed":
-            values = rng.normal(spec.n1_baseline, spec.n1_noise_std, config.n_hours)
-        else:  # FuelFlow
-            values = rng.normal(spec.fuel_baseline, spec.fuel_noise_std, config.n_hours)
-
-        sensor_series[sensor.sensor_id] = values
-        series_by_type[sensor.type] = values
-
     rows: list[dict] = []
     for sensor in system.sensors:
-        values = sensor_series[sensor.sensor_id]
+        values = _series(specs[sensor.type], multiplier, anomaly_rate, config.n_hours, rng)
+        series_by_type[sensor.type] = values
         # The reading number is the hour offset from the first timestamp.
         for h, (ts, val) in enumerate(zip(timestamps, values, strict=True)):
             rows.append(
@@ -122,4 +108,4 @@ def generate_engine_readings(
                 }
             )
 
-    return EngineSeries(egt=series_by_type["EGT"], vib=series_by_type["Vibration"]), rows
+    return series_by_type, rows

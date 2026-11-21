@@ -235,6 +235,19 @@ def test_failed_open_is_not_cached(fake_shared: type[_FakeShared]) -> None:
     assert fake_shared.opened == [shared]
 
 
+def test_failed_open_is_logged_without_a_traceback(
+    fake_shared: type[_FakeShared], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A failed open is logged even when no caller is left to see its error."""
+    fake_shared.fail.append(RuntimeError("memory is down"))
+    with pytest.raises(RuntimeError):
+        asyncio.run(memory.shared_memory(_hook))
+    [record] = [r for r in caplog.records if r.name == memory.__name__]
+    assert record.levelname == "WARNING"
+    assert record.getMessage() == "Memory open failed: memory is down"
+    assert record.exc_info is None
+
+
 def test_cancelled_first_caller_keeps_the_open(fake_shared: type[_FakeShared]) -> None:
     """A disconnect during the open must not lose the client it opens."""
     fake_shared.release.clear()

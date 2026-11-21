@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import logging
 import os
 import threading
 from collections.abc import Callable
@@ -50,6 +51,8 @@ from pydantic import SecretStr
 
 from fleet_graphrag.agent.config import ConfigError, settings
 from fleet_graphrag.agent.secrets import memory_password
+
+logger = logging.getLogger(__name__)
 
 # Sonnet 5.5 rejects a temperature and a forced toolChoice, so the extractor
 # is built with send_temperature=False and tool_choice="auto".
@@ -158,6 +161,9 @@ def _open(
     try:
         shared = SharedMemory.open(memory_settings(), background_hook=background_hook)
     except Exception as e:
+        # Logged here, since every caller waiting for it may be gone. The
+        # error goes to the callers that are left.
+        logger.warning("Memory open failed: %s", e)
         with _lock:
             _opening = None
         opening.set_exception(e)
@@ -180,8 +186,8 @@ async def close_memory() -> None:
         _closed = True
         opening, thread = _opening, _open_thread
     if opening is not None:
-        # A failed open leaves nothing to close. Its error already went to
-        # the request that started it, so it is not raised here.
+        # A failed open leaves nothing to close. The open thread logged its
+        # error, so it is not raised here.
         await asyncio.wait({asyncio.wrap_future(opening)})
     if thread is not None:
         await asyncio.to_thread(thread.join)

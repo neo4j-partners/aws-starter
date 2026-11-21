@@ -39,6 +39,7 @@ RUNTIME_VERSION="PYTHON_3_12"
 # Deployment-specific settings are not written here. See DEPLOY_VARS below.
 RUNTIME_ENV='{"MODEL_ID":"global.anthropic.claude-sonnet-5-5"}'
 PROJECT_SPEC="agentcore/agentcore.json"
+CDK_DIR="agentcore/cdk"
 TARGET="default"
 # The deploy targets. The first deploy writes this file, and git ignores it.
 TARGETS_FILE="agentcore/aws-targets.json"
@@ -130,6 +131,29 @@ ensure_project() {
         echo "Run './agent.sh configure' first."
         exit 1
     fi
+}
+
+# agentcore deploy refuses to run without agentcore/cdk/node_modules, and
+# git ignores that folder, so a fresh clone has none. Install it from the
+# tracked package-lock.json before deploy or destroy. npm writes
+# node_modules/.package-lock.json only after a complete install, so a
+# partial install from a failed npm ci is installed again.
+ensure_cdk_deps() {
+    if [ -f "$CDK_DIR/node_modules/.package-lock.json" ]; then
+        return
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        echo -e "${RED}ERROR: npm is not installed, so the CDK dependencies cannot be installed${NC}"
+        echo "Install Node.js, then run: (cd $CDK_DIR && npm ci)"
+        exit 1
+    fi
+    echo -e "${YELLOW}Installing the CDK dependencies (first deploy)...${NC}"
+    if ! (cd "$CDK_DIR" && npm ci); then
+        echo -e "${RED}ERROR: npm ci failed in $CDK_DIR${NC}"
+        echo "Fix the error above, then run: (cd $CDK_DIR && npm ci)"
+        exit 1
+    fi
+    echo ""
 }
 
 # The code zip has no ignore file, so any secrets file in this folder would
@@ -675,7 +699,7 @@ case "${1:-help}" in
         echo -e "${GREEN}Installing CDK dependencies...${NC}"
         # npm ci installs exactly what the tracked package-lock.json lists
         # and never rewrites it.
-        (cd agentcore/cdk && npm ci)
+        (cd "$CDK_DIR" && npm ci)
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Set the deploy settings in ../.env, then run './agent.sh deploy'"
@@ -686,6 +710,7 @@ case "${1:-help}" in
         refuse_linked_env_local
         ensure_no_secrets_in_zip
         load_deploy_env
+        ensure_cdk_deps
         begin_spec_restore
         add_gateway_credential
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
@@ -749,6 +774,9 @@ case "${1:-help}" in
         if [ "${2:-}" != "--yes" ]; then
             confirm_destroy
         fi
+        # destroy runs agentcore deploy too. Install before the spec changes,
+        # so a failed install stops with nothing changed.
+        ensure_cdk_deps
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
         # The CLI has no destroy command. A deploy of a project that declares

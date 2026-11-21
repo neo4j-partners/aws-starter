@@ -187,6 +187,12 @@ The server streams JSON events over SSE:
 The project lives in `agentcore/`. It was created with the AgentCore CLI, and
 its runtime `codeLocation` is this folder.
 
+The CLI also needs the CDK dependencies in `agentcore/cdk/node_modules`. Git ignores that folder, so a fresh clone has none. `./agent.sh deploy` and `./agent.sh destroy` run `npm ci` there when the install is missing or incomplete, and `./agent.sh configure` always runs it. To install them once by hand, run:
+
+```bash
+(cd agentcore/cdk && npm ci)
+```
+
 **Deploy settings:** Before the first deploy, set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env`. `./agent.sh deploy` exports them, plus `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. A value exported in the shell wins. The files are parsed, not sourced, and nothing else in them is exported. `agentcore/cdk/lib/cdk-stack.ts` copies the settings onto the runtime. Synth stops with one error that lists every missing or malformed setting. `GATEWAY_URL` must use `https://`, and `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`. `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN, and the runtime role can read only that secret.
 
 **Gateway credential provider:** `./agent.sh deploy` declares the `fleet-gateway` OAuth credential for that one deploy. It reads the client ID, scope, and secret from the fleet credentials file. It reads the discovery URL from the `CognitoDiscoveryUrl` output of the MCP server stack. The AgentCore CLI creates or updates the provider before CDK runs, because CDK cannot create it. The construct grants the runtime access to the provider, and sets `CREDENTIAL_FLEET_GATEWAY_NAME`, only while the entry exists.

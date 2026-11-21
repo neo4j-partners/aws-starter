@@ -218,6 +218,10 @@ def project(tmp_path: Path) -> Path:
         stub = bin_dir / name
         stub.write_text(body)
         stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
+    # The CDK dependencies are installed unless a test removes them.
+    install = root / "agentcore" / "cdk" / "node_modules"
+    install.mkdir()
+    (install / ".package-lock.json").write_text("{}")
     return root
 
 
@@ -704,6 +708,120 @@ def test_configure_installs_the_cdk_dependencies_with_npm_ci(project: Path) -> N
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(project) == ["npm ci in agentcore/cdk"]
+
+
+DISCOVERY_URL = "https://cognito-idp.example/.well-known/openid-configuration"
+
+# The system tools agent.sh runs before it installs the CDK dependencies.
+# make_temp hides mkdir's errors, so a missing tool does not always print
+# "command not found". The no-npm test checks that the run got as far as
+# the npm check.
+SYSTEM_TOOLS = ("bash", "cat", "dirname", "find", "grep", "jq", "mkdir", "sed", "tr")
+
+
+def remove_cdk_install(project: Path) -> None:
+    shutil.rmtree(project / "agentcore" / "cdk" / "node_modules")
+
+
+def isolate_path(project: Path) -> str:
+    """Return a PATH that holds only the stubs and links to SYSTEM_TOOLS.
+
+    A test that removes a stub needs this, so a real npm in /usr/bin is not
+    found in its place.
+    """
+    isolated = project.parent / "isolated-bin"
+    isolated.mkdir()
+    for stub in (project.parent / "bin").iterdir():
+        (isolated / stub.name).symlink_to(stub)
+    for name in SYSTEM_TOOLS:
+        tool = shutil.which(name)
+        assert tool is not None, f"{name} is not on PATH"
+        (isolated / name).symlink_to(tool)
+    return str(isolated)
+
+
+def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
+    ready_to_deploy(project)
+    remove_cdk_install(project)
+
+    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    logged = calls(project)
+    assert logged[0] == "npm ci in agentcore/cdk"
+    assert "agentcore deploy" in logged
+    assert (project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json").is_file()
+
+
+def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> None:
+    ready_to_deploy(project)
+
+    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not any(call.startswith("npm") for call in calls(project))
+
+
+# A failed npm ci can leave node_modules without the lockfile that npm
+# writes only after a complete install.
+def test_a_partial_cdk_install_is_installed_again(project: Path) -> None:
+    ready_to_deploy(project)
+    (project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json").unlink()
+
+    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project)[0] == "npm ci in agentcore/cdk"
+
+
+@pytest.mark.parametrize("args", [("deploy",), ("destroy", "--yes")])
+def test_a_failed_cdk_install_stops_before_the_spec_changes(
+    project: Path, args: tuple[str, ...]
+) -> None:
+    ready_to_deploy(project)
+    remove_cdk_install(project)
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_agent(project, *args, STUB_STACK_STATUS=DISCOVERY_URL, STUB_NPM_EXIT="1")
+
+    assert result.returncode == 1
+    assert "npm ci failed in agentcore/cdk" in result.stdout
+    assert "(cd agentcore/cdk && npm ci)" in result.stdout
+    assert not any(call.startswith("agentcore") for call in calls(project))
+    assert spec.read_bytes() == tracked
+    assert not list((project.parent / "tmp").iterdir())
+
+
+def test_deploy_without_npm_names_the_install_step(project: Path) -> None:
+    ready_to_deploy(project)
+    remove_cdk_install(project)
+    (project.parent / "bin" / "npm").unlink()
+    path = isolate_path(project)
+    assert shutil.which("npm", path=path) is None
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_agent(project, "deploy", PATH=path)
+
+    assert result.returncode == 1
+    assert "command not found" not in result.stderr, result.stderr
+    assert "npm is not installed" in result.stdout
+    assert "(cd agentcore/cdk && npm ci)" in result.stdout
+    assert calls(project) == []
+    assert spec.read_bytes() == tracked
+
+
+def test_destroy_installs_missing_cdk_dependencies_before_removing(project: Path) -> None:
+    remove_cdk_install(project)
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    logged = calls(project)
+    assert logged.index("npm ci in agentcore/cdk") < logged.index(
+        "agentcore remove runtime --name supervisor"
+    )
 
 
 # destroy makes six temporary files: the spec backup, the status errors, and

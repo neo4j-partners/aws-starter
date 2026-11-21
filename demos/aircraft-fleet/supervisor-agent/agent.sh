@@ -401,12 +401,13 @@ target_region() {
 }
 
 # The account that $TARGET deploys to, from $TARGETS_FILE, where the first
-# deploy records it. Fails unless there is exactly one.
+# deploy records it. Fails unless there is exactly one, and it is a string
+# of 12 digits.
 target_account() {
     jq -r -e --arg t "$TARGET" '
         [.[] | select(.name == $t) | .account]
-        | if length == 1 and (.[0] | type) == "string" then .[0]
-          else error("no single account for the target") end' \
+        | if length == 1 and (.[0] | type == "string" and test("^[0-9]{12}$")) then .[0]
+          else error("no single 12-digit account for the target") end' \
         "$TARGETS_FILE" 2>/dev/null
 }
 

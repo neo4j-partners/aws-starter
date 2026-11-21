@@ -79,14 +79,24 @@ def test_each_component_type_maps_to_its_system() -> None:
 
 
 @pytest.mark.parametrize(
-    "components_by_system",
+    ("components_by_system", "message"),
     [
-        pytest.param({"Engine": ["Pump"], "Hydraulics": ["pump"]}, id="two-systems"),
-        pytest.param({"Engine": ["Pump", "PUMP"]}, id="one-system"),
+        pytest.param(
+            {"Engine": ["Pump"], "Hydraulics": ["pump"]},
+            "component type 'pump' is listed under 'Engine' and 'Hydraulics'; "
+            "a component type must belong to one system type",
+            id="two-systems",
+        ),
+        pytest.param(
+            {"Engine": ["Pump", "PUMP"]},
+            "component type 'PUMP' is listed twice under 'Engine', ignoring case; "
+            "a component type must be listed once",
+            id="one-system",
+        ),
     ],
 )
 def test_a_component_type_in_two_places_raises_value_error(
-    components_by_system: dict[str, list[str]],
+    components_by_system: dict[str, list[str]], message: str
 ) -> None:
-    with pytest.raises(ValueError, match="must belong to one system type"):
+    with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
         system_type_by_component_type(components_by_system)

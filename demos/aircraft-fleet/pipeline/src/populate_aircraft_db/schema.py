@@ -31,6 +31,11 @@ def system_type_by_component_type(components_by_system: dict[str, list[str]]) ->
     for system, components in components_by_system.items():
         for component in components:
             key = component.lower()
+            if key in mapping and mapping[key] == system:
+                raise ValueError(
+                    f"component type {component!r} is listed twice under {system!r}, "
+                    "ignoring case; a component type must be listed once"
+                )
             if key in mapping:
                 raise ValueError(
                     f"component type {component!r} is listed under {mapping[key]!r} "

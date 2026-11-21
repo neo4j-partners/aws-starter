@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from fleet_graphrag.agent.config import DEFAULT_EFFORT, DEFAULT_MAX_TOKENS, Settings
+from fleet_graphrag.agent.config import (
+    DEFAULT_EFFORT,
+    DEFAULT_MAX_TOKENS,
+    SYSTEM_PROMPT_TEMPLATE,
+    Settings,
+)
 
 
 def test_defaults_when_unset() -> None:
@@ -69,3 +74,11 @@ def test_bad_embed_dimensions_names_the_variable(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("EMBED_DIMENSIONS", "big")
     with pytest.raises(ValueError, match="EMBED_DIMENSIONS must be an integer"):
         Settings.from_env()
+
+
+def test_prompt_says_restored_history_has_no_tool_calls() -> None:
+    """Memory restores message text only, so the agent must not read a missing call as none."""
+    prompt = SYSTEM_PROMPT_TEMPLATE.format(schema="(schema)")
+    assert "does not include tool calls or tool results" in prompt
+    assert "does not mean no tool ran" in prompt
+    assert "run the tool again" in prompt

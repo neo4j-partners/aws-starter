@@ -1,7 +1,7 @@
 """Gateway tools that survive the end of an MCP session.
 
 The Gateway can end the MCP session at any time, for example when it
-restarts. A call made while the session is down fails in one of two ways:
+restarts. A call made while the session is down fails in one of three ways:
 
 - A call already in flight returns an error ``MCPToolResult``.
 - A later call raises ``MCPClientInitializationError`` before
@@ -11,7 +11,7 @@ restarts. A call made while the session is down fails in one of two ways:
   running, so the session still looks active. The connection is marked
   ended, so later requests rebuild it too.
 
-:class:`GatewayTool` catches both. It asks for a rebuilt client once and
+:class:`GatewayTool` catches all three. It asks for a rebuilt client once and
 retries the call once. If the retry also fails, or the rebuild fails, the
 model gets :data:`UNAVAILABLE_RESULT`. The next request rebuilds again.
 

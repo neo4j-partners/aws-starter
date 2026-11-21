@@ -314,12 +314,14 @@ async def _close_after_build(build: asyncio.Task[tuple[Agent, Neo4jSessionManage
 async def _release(build: asyncio.Task[tuple[Agent, Neo4jSessionManager | None]]) -> None:
     """Close the request's manager once its build ends, even if cancelled.
 
-    A client disconnect cancels the request through an anyio cancel scope,
-    which cancels every await in this finally block again. So the wait for
-    the build and the close run as one task under one shield. If the request
-    is cancelled, that task finishes on its own. Closing before the build
-    ends would race the constructor, which connects the manager after the
-    close and leaves the connection open.
+    A client disconnect cancels the request. The AgentCore SDK calls
+    ``task.cancel()`` once, which interrupts whichever await in this finally
+    block is running. Under an anyio cancel scope, every later await is
+    cancelled too. So the wait for the build and the close run as one task
+    under one shield, and that task finishes on its own if the request is
+    cancelled. Closing before the build ends would race the constructor,
+    which connects the manager after the close and leaves the connection
+    open.
     """
     cleanup = asyncio.create_task(_close_after_build(build))
     _cleanups.add(cleanup)

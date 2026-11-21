@@ -7,10 +7,12 @@ from dataclasses import dataclass
 from typing import Literal
 
 from neo4j import Driver, RoutingControl
+from neo4j.exceptions import Neo4jError
 
 from generator.specs import AIRPORTS, MANUAL_FLEET_TAILS, MODEL_DISTRIBUTION, OPERATORS
 
 from .display import WIDTH, header, records_table, show_cypher
+from .samples import report_query_error
 
 # ---------------------------------------------------------------------------
 # Graph schema description fed to the LLM for Cypher generation
@@ -374,8 +376,8 @@ def _run_text2cypher(
         )
         rows = [dict(r) for r in records]
         records_table(rows)
-    except Exception as exc:
-        print(f"  [ERROR] Cypher execution failed: {exc}\n")
+    except Neo4jError as exc:
+        print(f"  [ERROR] Cypher execution failed: {exc.code}: {exc.message}\n")
 
 
 def _run_similarity_search(
@@ -429,9 +431,8 @@ LIMIT $top_k"""
             for r in rows:
                 r["score"] = f"{r['score']:.4f}"
         records_table(rows)
-    except Exception as exc:
-        print(f"  [ERROR] Vector search failed: {exc}\n")
-        print("  (vector index may not be available \u2014 run 'setup' first)\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, "maintenanceChunkEmbeddings")
 
 
 # ---------------------------------------------------------------------------

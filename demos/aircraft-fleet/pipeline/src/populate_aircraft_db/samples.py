@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
-from neo4j import Driver
+from neo4j import Driver, RoutingControl
+from neo4j.exceptions import Neo4jError
 
 from .display import WIDTH, header, show_cypher, table, val
 
 _EXTRACTED_LABELS = ["OperatingLimit"]
 _VECTOR_INDEX = "maintenanceChunkEmbeddings"
 _FULLTEXT_INDEX = "maintenanceChunkText"
+
+
+def report_query_error(driver: Driver, database: str, exc: Neo4jError, index: str) -> None:
+    """Print a failed search query's error, and the setup hint if its index is missing."""
+    print(f"  [ERROR] {exc.code}: {exc.message}\n")
+    records, _, _ = driver.execute_query(
+        "SHOW INDEXES YIELD name WHERE name = $index RETURN count(*) AS count",
+        index=index,
+        database_=database,
+        routing_=RoutingControl.READ,
+    )
+    if records[0]["count"] == 0:
+        print(f"  (index '{index}' not found; run 'setup' first)\n")
 
 
 # ---------------------------------------------------------------------------
@@ -331,8 +345,8 @@ def _vector_similarity(driver: Driver, database: str, limit: int) -> None:
         rows, _, _ = driver.execute_query(
             _VECTOR_Q, limit=limit, top_k=limit + 1, database_=database
         )
-    except Exception:
-        print("  (vector index not available \u2014 run 'setup' first)\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, _VECTOR_INDEX)
         return
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
@@ -372,8 +386,8 @@ def _fulltext_search(driver: Driver, database: str, limit: int) -> None:
             rows, _, _ = driver.execute_query(
                 _FULLTEXT_Q, index=_FULLTEXT_INDEX, query=term, limit=limit, database_=database
             )
-        except Exception:
-            print("  (fulltext index not available \u2014 run 'setup' first)\n")
+        except Neo4jError as exc:
+            report_query_error(driver, database, exc, _FULLTEXT_INDEX)
             return
         if not rows:
             print("  (no results)\n")
@@ -417,8 +431,8 @@ def _vector_document_context(driver: Driver, database: str, limit: int) -> None:
         rows, _, _ = driver.execute_query(
             _VECTOR_DOC_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
         )
-    except Exception:
-        print("  (vector index not available \u2014 run 'setup' first)\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, _VECTOR_INDEX)
         return
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
@@ -475,8 +489,8 @@ def _adjacent_chunks(driver: Driver, database: str, limit: int) -> None:
         rows, _, _ = driver.execute_query(
             _ADJACENT_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
         )
-    except Exception:
-        print("  (vector index not available \u2014 run 'setup' first)\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, _VECTOR_INDEX)
         return
     if not rows:
         print("  (no chunks with embeddings \u2014 run 'setup' first)\n")
@@ -536,8 +550,8 @@ def _vector_topology(driver: Driver, database: str, limit: int) -> None:
         rows, _, _ = driver.execute_query(
             _VECTOR_TOPO_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
         )
-    except Exception:
-        print("  (vector index not available \u2014 run 'setup' first)\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, _VECTOR_INDEX)
         return
     if not rows:
         print("  (no topology connections found \u2014 run 'setup' first)\n")
@@ -616,8 +630,8 @@ def _hybrid_comparison(driver: Driver, database: str, limit: int) -> None:
         v_rows, _, _ = driver.execute_query(
             _HYBRID_VECTOR_Q, index=_VECTOR_INDEX, limit=limit, top_k=limit + 1, database_=database
         )
-    except Exception:
-        print("  (vector index not available \u2014 run 'setup' first)\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, _VECTOR_INDEX)
         return
     if v_rows:
         print(f'  Seed: "{v_rows[0]["seed_text"]}\u2026"\n')
@@ -638,8 +652,8 @@ def _hybrid_comparison(driver: Driver, database: str, limit: int) -> None:
         ft_rows, _, _ = driver.execute_query(
             _HYBRID_FT_Q, ft_index=_FULLTEXT_INDEX, limit=limit, database_=database
         )
-    except Exception as exc:
-        print(f"  (fulltext query failed: {exc})\n")
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, _FULLTEXT_INDEX)
         return
     if ft_rows:
         print(f'  Seed: "{ft_rows[0]["seed_text"]}\u2026"\n')

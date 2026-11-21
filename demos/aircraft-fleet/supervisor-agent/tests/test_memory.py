@@ -226,10 +226,47 @@ def test_concurrent_callers_share_one_failed_build(monkeypatch: pytest.MonkeyPat
     results, elapsed = _concurrent_calls(5)
 
     assert len(builds) == 1
-    assert all(result is results[0] for result in results)
-    assert isinstance(results[0], ConfigError)
+    assert all(isinstance(result, ConfigError) for result in results)
+    # The caller that built raises the build's error. Each other caller
+    # raises its own error, caused by it.
+    (error,) = (result for result in results if result.__cause__ is None)
+    waiters = [result for result in results if result is not error]
+    assert len(waiters) == 4
+    assert len({id(waiter) for waiter in waiters}) == 4
+    assert all(waiter.__cause__ is error for waiter in waiters)
+    assert all(str(waiter) == "cannot read the secret" for waiter in waiters)
+    # Raising one object in every thread would add each thread's frames to
+    # its traceback.
+    assert _frames_named(error, "memory_settings") == 1
     # One build's time, not one per caller in turn.
     assert elapsed < 2 * BUILD_SECONDS
+
+
+def _frames_named(error: BaseException, name: str) -> int:
+    count = 0
+    tb = error.__traceback__
+    while tb is not None:
+        count += tb.tb_frame.f_code.co_name == name
+        tb = tb.tb_next
+    return count
+
+
+def test_a_waiter_still_finds_an_auth_error_from_the_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def rejected_build():
+        time.sleep(BUILD_SECONDS)
+        raise AuthError("unauthorized")
+
+    monkeypatch.setattr(memory, "_build_memory_settings", rejected_build)
+
+    results, _ = _concurrent_calls(3)
+
+    waiters = [result for result in results if not isinstance(result, AuthError)]
+    assert len(waiters) == 2
+    assert all(isinstance(waiter, RuntimeError) for waiter in waiters)
+    assert all(isinstance(waiter.__cause__, AuthError) for waiter in waiters)
+    assert all(memory.password_rejected(waiter) for waiter in waiters)
 
 
 def test_concurrent_callers_share_one_successful_build(monkeypatch: pytest.MonkeyPatch) -> None:

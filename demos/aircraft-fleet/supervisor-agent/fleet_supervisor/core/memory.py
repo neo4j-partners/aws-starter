@@ -106,7 +106,9 @@ def memory_settings() -> MemorySettings:
     """Return the memory settings, built once per process.
 
     Concurrent callers share one build. Each gets that build's settings or
-    its error.
+    an error. The caller that built raises the build's error. Each other
+    caller raises its own error, caused by the build's error, so no two
+    threads add frames to one traceback.
 
     Raises :class:`~fleet_supervisor.core.config.ConfigError` when
     ``MEM_NEO4J_URI`` or the password is missing, or the password secret
@@ -124,8 +126,10 @@ def memory_settings() -> MemorySettings:
             owner = False
     if not owner:
         build.done.wait()
+        if isinstance(build.error, ConfigError):
+            raise ConfigError(str(build.error)) from build.error
         if build.error is not None:
-            raise build.error
+            raise RuntimeError("The memory settings build failed.") from build.error
         return build.settings
     try:
         build.settings = _build_memory_settings()

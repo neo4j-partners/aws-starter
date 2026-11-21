@@ -20,6 +20,7 @@ from .schema import (
     COMPONENT_TYPES_TEXT,
     SENSOR_PARAMETER_NAMES,
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
+    SYSTEM_TYPES,
     SYSTEM_TYPES_TEXT,
 )
 
@@ -621,8 +622,10 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     # ComponentReference -[:DESCRIBES_COMPONENT]-> Component
     # (same aircraft model; componentType, ignoring case, is a component type
     # or one of its manual names, and the Component has that type, within the
-    # System type that has that component type in specs. A parent
-    # SystemReference with another systemType blocks the link.)
+    # System type that has that component type in specs. Parent
+    # SystemReferences with a fleet systemType must include that System
+    # type, or the link is blocked. Parents with another systemType, or
+    # none, are ignored.)
     records, _, _ = driver.execute_query(
         """
         MATCH (cr:ComponentReference)
@@ -631,8 +634,9 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         WHERE ctype IS NOT NULL
         WITH cr, ctype, $system_types[toLower(ctype)] AS systemType
         OPTIONAL MATCH (sr:SystemReference)-[:HAS_COMPONENT]->(cr)
-        WITH cr, ctype, systemType, collect(sr.systemType) AS parentTypes
-        WHERE all(t IN parentTypes WHERE toLower(t) = toLower(systemType))
+        WITH cr, ctype, systemType,
+             [t IN collect(sr.systemType) WHERE toLower(t) IN $fleet_system_types] AS parentTypes
+        WHERE parentTypes = [] OR any(t IN parentTypes WHERE toLower(t) = toLower(systemType))
         MATCH (:Aircraft {model: cr.aircraftType})
             -[:HAS_SYSTEM]->(:System {type: systemType})
             -[:HAS_COMPONENT]->(c:Component {type: ctype})
@@ -641,6 +645,7 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
     """,
         component_type_by_alias=COMPONENT_TYPE_BY_ALIAS,
         system_types=SYSTEM_TYPE_BY_COMPONENT_TYPE,
+        fleet_system_types=[t.lower() for t in SYSTEM_TYPES],
         database_=database,
     )
     logger.info(

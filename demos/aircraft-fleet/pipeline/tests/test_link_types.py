@@ -170,11 +170,29 @@ _PARENTS = [
         "type": None,
         "components": [{"name": "Boost Pump", "type": "Hydraulic Pump"}],
     },
+    {
+        # Nor does a parent whose type is outside the fleet system types.
+        "name": "Fuel Feed",
+        "type": "Fuel",
+        "components": [{"name": "Main Fuel Pump", "type": "Main Fuel Pump"}],
+    },
 ]
+
+# A pump that the manuals list under both the engine and the hydraulic
+# system, as the E190 Engine-Driven Pump is. One matching parent is enough.
+_SHARED_PARENTS = """
+MATCH (e:SystemReference {name: 'Engine - ' + $model})
+MATCH (h:SystemReference {name: 'Hydraulic System - ' + $model})
+CREATE (e)-[:HAS_COMPONENT]->(n:ComponentReference {
+    name: 'Shared Engine-Driven Pump - ' + $model, aircraftType: $model,
+    componentType: 'Hydraulic Pump'
+})<-[:HAS_COMPONENT]-(h)
+"""
 
 
 def test_component_links_only_within_its_parent_system_type(driver: Driver, database: str) -> None:
     driver.execute_query(_PARENT_SETUP, model=MODEL, parents=_PARENTS, database_=database)
+    driver.execute_query(_SHARED_PARENTS, model=MODEL, database_=database)
 
     link_to_existing_graph(driver, database)
 
@@ -191,7 +209,9 @@ def test_component_links_only_within_its_parent_system_type(driver: Driver, data
     assert [(r["ref"], r["target"]) for r in records] == [
         (f"Boost Pump - {MODEL}", f"{MODEL}-H1"),
         (f"Fuel Pump - {MODEL}", f"{MODEL}-E2"),
+        (f"Main Fuel Pump - {MODEL}", f"{MODEL}-E2"),
         (f"Main Hydraulic Pump - {MODEL}", f"{MODEL}-H1"),
+        (f"Shared Engine-Driven Pump - {MODEL}", f"{MODEL}-H1"),
     ]
 
 

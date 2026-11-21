@@ -17,6 +17,7 @@ import neo4j
 import pytest
 from bedrock_agentcore.runtime import RequestContext
 from bedrock_agentcore.runtime.models import PingStatus
+from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
 from neo4j_agent_memory.integrations.base import AsyncBridge
 from neo4j_agent_memory.integrations.strands import SharedMemory
 
@@ -626,39 +627,90 @@ def test_second_cancel_does_not_stop_the_close(monkeypatch) -> None:
     assert made[0].closed == 1
 
 
+def _unreachable() -> Exception:
+    """The error the memory library raises when its server is unreachable."""
+    try:
+        raise MemoryConnectionError("Neo4j service unavailable: down") from (
+            neo4j.exceptions.ServiceUnavailable("down")
+        )
+    except MemoryConnectionError as e:
+        return e
+
+
+def _rejected_password() -> Exception:
+    """The error the memory library raises when its password is rejected."""
+    try:
+        raise MemoryConnectionError("Authentication failed: bad") from (
+            neo4j.exceptions.AuthError("bad")
+        )
+    except MemoryConnectionError as e:
+        return e
+
+
 class _FailingOpen:
-    """Stands in for ``SharedMemory``. Every open fails as an unreachable server."""
+    """Stands in for ``SharedMemory``. Every open raises ``error``."""
 
     opens = 0
+    error: Exception = _unreachable()
 
     @classmethod
     def open(cls, settings: object, *, background_hook: object) -> None:
         cls.opens += 1
-        raise neo4j.exceptions.ServiceUnavailable("memory is down")
+        raise cls.error
 
 
-def test_data_modes_work_when_the_memory_open_fails(monkeypatch) -> None:
+@pytest.fixture
+def failing_open(monkeypatch: pytest.MonkeyPatch) -> Iterator[type[_FailingOpen]]:
     monkeypatch.setenv("MEM_NEO4J_URI", "neo4j://memory.invalid")
     monkeypatch.setenv("MEM_NEO4J_PASSWORD", "local-only")
     memory.memory_settings.cache_clear()
-    monkeypatch.setattr(memory, "SharedMemory", _FailingOpen)
+
+    class Failing(_FailingOpen):
+        opens = 0
+
+    monkeypatch.setattr(memory, "SharedMemory", Failing)
+    yield Failing
+    memory.memory_settings.cache_clear()
+
+
+def test_data_modes_work_when_the_memory_open_fails(
+    monkeypatch, failing_open: type[_FailingOpen]
+) -> None:
     monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
     monkeypatch.setattr(server, "graph_query", lambda q: f"rows for {q}")
-    try:
-        [agent_event] = _run({"prompt": "hi"}, session_id="s-1")
-        assert agent_event["type"] == "error"
-        assert "Could not reach the Neo4j database" in agent_event["error"]
-        assert _run({"mode": "schema"}) == [
-            {"type": "chunk", "data": "SCHEMA"},
-            {"type": "complete"},
-        ]
-        assert _run({"mode": "graph_query", "query": "count"})[0] == {
-            "type": "chunk",
-            "data": "rows for count",
-        }
-        assert _FailingOpen.opens == 1
-    finally:
-        memory.memory_settings.cache_clear()
+    [agent_event] = _run({"prompt": "hi"}, session_id="s-1")
+    assert agent_event == {"type": "error", "error": server.MEMORY_UNREACHABLE_ERROR}
+    assert "MEM_NEO4J_URI" in server.MEMORY_UNREACHABLE_ERROR
+    assert _run({"mode": "schema"}) == [
+        {"type": "chunk", "data": "SCHEMA"},
+        {"type": "complete"},
+    ]
+    assert _run({"mode": "graph_query", "query": "count"})[0] == {
+        "type": "chunk",
+        "data": "rows for count",
+    }
+    assert failing_open.opens == 1
+
+
+def test_rejected_memory_password_names_the_memory_password(
+    monkeypatch, failing_open: type[_FailingOpen]
+) -> None:
+    failing_open.error = _rejected_password()
+    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
+    [agent_event] = _run({"prompt": "hi"}, session_id="s-1")
+    assert agent_event == {"type": "error", "error": server.MEMORY_AUTH_ERROR}
+    assert "MEM_NEO4J_PASSWORD" in server.MEMORY_AUTH_ERROR
+    assert "Could not reach" not in server.MEMORY_AUTH_ERROR
+
+
+def test_memory_config_error_on_open_says_not_configured(
+    monkeypatch, failing_open: type[_FailingOpen]
+) -> None:
+    failing_open.error = server.ConfigError("Could not read the secret.")
+    monkeypatch.setattr(server, "get_graph_schema", lambda: "SCHEMA")
+    assert _run({"prompt": "hi"}, session_id="s-1") == [
+        {"type": "error", "error": "The agent is not configured. Check the server logs."}
+    ]
 
 
 class _ClosableShared:

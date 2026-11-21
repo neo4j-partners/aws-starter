@@ -74,6 +74,7 @@ from fleet_graphrag.agent.memory import (  # noqa: E402
 from fleet_graphrag.agent.model import build_bedrock_model  # noqa: E402
 from fleet_graphrag.agent.neo4j_errors import (  # noqa: E402
     UNREACHABLE,
+    is_auth_error,
     is_transaction_timeout,
 )
 from fleet_graphrag.agent.secrets import (  # noqa: E402
@@ -131,6 +132,15 @@ GENERIC_ERROR = (
 )
 
 INVALID_PAYLOAD = "Invalid request payload."
+
+MEMORY_UNREACHABLE_ERROR = (
+    "Could not open the conversation memory database. Check MEM_NEO4J_URI "
+    "and that the instance is running."
+)
+MEMORY_AUTH_ERROR = (
+    "The conversation memory database rejected its password. Check "
+    "MEM_NEO4J_PASSWORD, or the secret in MEM_NEO4J_PASSWORD_SECRET_ARN."
+)
 
 model = build_bedrock_model(
     settings.model_id,
@@ -322,8 +332,16 @@ async def invoke(
 
         # The first request opens the shared memory. A failed open raises
         # here and the next request tries again. The data modes above never
-        # need it, so they keep working while the memory is down.
-        shared = await shared_memory(_track_background)
+        # need it, so they keep working while the memory is down. The open
+        # logs its own failure, so it is not logged again here.
+        try:
+            shared = await shared_memory(_track_background)
+        except ConfigError:
+            raise
+        except Exception as e:
+            error = MEMORY_AUTH_ERROR if is_auth_error(e) else MEMORY_UNREACHABLE_ERROR
+            yield {"type": "error", "error": error}
+            return
 
         # One memory manager per request, closed on every path below. The
         # build blocks, so it runs in a worker thread.

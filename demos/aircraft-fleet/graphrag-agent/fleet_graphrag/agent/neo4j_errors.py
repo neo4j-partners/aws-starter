@@ -21,6 +21,20 @@ UNREACHABLE = (
 _QUERY_ERROR_PREFIXES = ("Neo.ClientError.Statement.", "Neo.ClientError.Procedure.")
 
 
+def is_auth_error(error: BaseException) -> bool:
+    """True when ``error``, or an error it was raised from, is a rejected login.
+
+    The memory library raises its own ``ConnectionError`` from the driver's
+    ``AuthError``, so the chain of causes is checked too.
+    """
+    cause: BaseException | None = error
+    while cause is not None:
+        if isinstance(cause, neo4j.exceptions.AuthError):
+            return True
+        cause = cause.__cause__
+    return False
+
+
 def is_transaction_timeout(error: neo4j.exceptions.Neo4jError) -> bool:
     """True for a server-side transaction timeout.
 

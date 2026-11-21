@@ -36,9 +36,9 @@ from pydantic import SecretStr
 from fleet_graphrag.agent.config import ConfigError, settings
 from fleet_graphrag.agent.secrets import memory_password
 
-# Sonnet 5.5 rejects the forced toolChoice and the temperature that the
-# extractor sends, so extraction stays on Sonnet 4.6.
-EXTRACTOR_MODEL_ID = "bedrock/global.anthropic.claude-sonnet-4-6"
+# Sonnet 5.5 rejects a temperature and a forced toolChoice, so the extractor
+# is built with send_temperature=False and tool_choice="auto".
+EXTRACTOR_MODEL_ID = "bedrock/global.anthropic.claude-sonnet-5-5"
 EMBED_MODEL_ID = "bedrock/amazon.titan-embed-text-v2:0"
 EMBED_DIMENSIONS = 1024
 
@@ -72,7 +72,12 @@ def memory_settings() -> MemorySettings:
         embedding=BedrockEmbeddingProvider(
             EMBED_MODEL_ID, aws_region=region, dimensions=EMBED_DIMENSIONS
         ),
-        llm=BedrockProvider(EXTRACTOR_MODEL_ID, aws_region=region),
+        llm=BedrockProvider(
+            EXTRACTOR_MODEL_ID,
+            aws_region=region,
+            send_temperature=False,
+            tool_choice="auto",
+        ),
         extraction=ExtractionConfig(extractor_type=ExtractorType.LLM),
     )
 

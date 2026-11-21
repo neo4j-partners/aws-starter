@@ -58,7 +58,9 @@ def test_extraction_and_embeddings_are_set_in_code() -> None:
     assert built.embedding.model == "bedrock/amazon.titan-embed-text-v2:0"
     assert built.embedding.dimensions == 1024
     assert isinstance(built.llm, BedrockProvider)
-    assert built.llm.model == "bedrock/global.anthropic.claude-sonnet-4-6"
+    assert built.llm.model == "bedrock/global.anthropic.claude-sonnet-5-5"
+    assert built.llm._send_temperature is False
+    assert built.llm._tool_choice == "auto"
     assert built.extraction.extractor_type is ExtractorType.LLM
 
 

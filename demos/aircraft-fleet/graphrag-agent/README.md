@@ -193,7 +193,7 @@ through its Strands `Neo4jSessionManager`.
 - **What it stores:** Each session keeps its messages. The agent extracts entities from them and retrieves related entities and preferences on later turns. Matches below a vector score of 0.75 are left out. Tool calls are not recorded.
 - **One manager per request:** Neo4j Agent Memory 0.8.0 cannot share one client across session managers. Each request builds its own manager, connects, restores the session history, and closes the manager when the answer ends. It also closes when the request fails. A failed build closes its own manager before the error is reported. If the client disconnects while the agent is still being built, the close waits for the build to end, so the build cannot reopen a closed manager.
 - **Cost per request:** The first request after startup takes about 2.5 seconds longer, measured on a local Neo4j. It opens the memory driver and sets up the memory schema and indexes. Later requests add about 0.1 seconds. A remote instance adds a few network round trips to each.
-- **Extraction model:** Entity extraction runs on `global.anthropic.claude-sonnet-4-6` with Titan v2 embeddings at 1024 dimensions. Sonnet 5.5 rejects the forced tool choice and the temperature that the extractor sends. The agent itself still uses `MODEL_ID`.
+- **Extraction model:** Entity extraction runs on `global.anthropic.claude-sonnet-5-5` with Titan v2 embeddings at 1024 dimensions. Sonnet 5.5 rejects a temperature and a forced tool choice. The extractor is built with `send_temperature=False` and `tool_choice="auto"`, two options that the fleet fork of Neo4j Agent Memory adds. The agent itself still uses `MODEL_ID`.
 
 ## Layout
 

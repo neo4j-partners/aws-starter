@@ -606,12 +606,13 @@ def test_graph_schema_reads_the_live_database(
             "-[:PYTEST_SCHEMA_LINK]->(:PytestSchemaTo {pytest_to: 2})",
             database_=database,
         )
-        # The lowest aircraft_id of a model gives its sample tail.
+        # The lowest aircraft_id number of a model gives its sample tail.
+        # As text, AC10000 would sort before AC9999.
         driver.execute_query(
             """
-            CREATE (:Aircraft {aircraft_id: 'PYTEST-AC2', tail_number: 'N2PYT',
+            CREATE (:Aircraft {aircraft_id: 'AC10000', tail_number: 'N2PYT',
                                model: 'PYTEST-MODEL', operator: 'PytestAir'})
-            CREATE (:Aircraft {aircraft_id: 'PYTEST-AC1', tail_number: 'N1PYT',
+            CREATE (:Aircraft {aircraft_id: 'AC9999', tail_number: 'N1PYT',
                                model: 'PYTEST-MODEL', operator: 'PytestAir'})
             CREATE (:Airport {iata: 'ZZQ'})
             """,

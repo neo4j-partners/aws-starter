@@ -66,15 +66,16 @@ WHERE a.model IS NOT NULL
 RETURN DISTINCT a.model AS model
 ORDER BY model"""
 
-# The tail of each model's lowest aircraft_id, which is its first registry
-# tail in a generated fleet.
+# The tail of each model's lowest aircraft_id number, which is its first
+# registry tail in a generated fleet. An aircraft_id is "AC" and a number.
+# As text AC10000 sorts before AC1001, so the query sorts by the number.
 _SAMPLE_TAILS_Q = """\
 MATCH (a:Aircraft)
 WHERE a.model IS NOT NULL AND a.tail_number IS NOT NULL
-WITH a ORDER BY a.aircraft_id
+WITH a ORDER BY toInteger(substring(a.aircraft_id, 2))
 WITH a.model AS model, collect(a)[0] AS first
 RETURN model, first.tail_number AS tail
-ORDER BY first.aircraft_id"""
+ORDER BY toInteger(substring(first.aircraft_id, 2))"""
 
 _OPERATORS_Q = """\
 MATCH (a:Aircraft)

@@ -69,7 +69,7 @@ Point everything at the same Neo4j instance with a matching embedder.
 
 ```bash
 cd demos/aircraft-fleet
-cp .env.sample .env              # shared by pipeline/ and graphrag-agent/
+cp .env.sample .env              # shared by pipeline/, graphrag-agent/, supervisor-agent/
 
 # Step 1: populate the graph
 cd pipeline

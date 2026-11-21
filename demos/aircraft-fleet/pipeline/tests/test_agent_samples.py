@@ -425,8 +425,40 @@ def test_schema_keeps_a_control_character_name_out_of_the_pattern_check(
     assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
     # The names are escaped, so a control character never reaches the terminal.
     assert (
-        "  [WARN] skipped 2 relationship pattern(s) with a control character: "
+        "  [WARN] skipped 2 relationship pattern(s) with an unprintable character: "
         "(Aircraft)-[:LINE\\nBREAK]->(System), (Nul\\x00Label)-[:HAS_SYSTEM]->(System)\n"
+    ) in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("char", "shown"),
+    [
+        # str.splitlines() breaks a line at each separator, the same
+        # injection as a newline.
+        pytest.param("\u2028", "\\u2028", id="line-separator"),
+        pytest.param("\u2029", "\\u2029", id="paragraph-separator"),
+        # A bidi override reverses the text that follows it on screen.
+        pytest.param("\u202e", "\\u202e", id="right-to-left-override"),
+    ],
+)
+def test_schema_keeps_an_unprintable_name_out_of_the_pattern_check(
+    capsys: pytest.CaptureFixture[str], char: str, shown: str
+) -> None:
+    driver = SchemaDriver(
+        relationship_rows=[
+            ([f"Bad{char}Label"], "HAS_SYSTEM", ["System"]),
+            (["Aircraft"], "HAS_SYSTEM", ["System"]),
+        ]
+    )
+
+    schema = graph_schema(driver, "db")
+
+    assert char not in schema
+    lines = schema.splitlines()
+    assert lines[lines.index("Relationships:") + 1 :] == ["- (Aircraft)-[:HAS_SYSTEM]->(System)"]
+    assert (
+        "  [WARN] skipped 1 relationship pattern(s) with an unprintable character: "
+        f"(Bad{shown}Label)-[:HAS_SYSTEM]->(System)\n"
     ) in capsys.readouterr().out
 
 

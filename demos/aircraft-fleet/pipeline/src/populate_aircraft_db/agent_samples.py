@@ -3,7 +3,6 @@ configured LLM, generating Cypher or vector searches, and executing them."""
 
 from __future__ import annotations
 
-import unicodedata
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -121,26 +120,28 @@ def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
     Triples with an internal label, such as __KGBuilder__, are left out.
     So are triples with a backslash in any name. Inside backticks Cypher
     decodes an escape such as \\u0060 to a backtick, so doubling backticks
-    cannot keep such a name inside its quotes. Triples with a control
-    character, such as NUL or a newline, are left out too. Each skipped
-    triple is reported, since the schema then omits a real relationship.
+    cannot keep such a name inside its quotes. Triples with a character
+    that str.isprintable() rejects are left out too. That covers NUL, a
+    newline, the U+2028 and U+2029 separators that str.splitlines() breaks
+    on, and bidi overrides. A space is printable. Each skipped triple is
+    reported, since the schema then omits a real relationship.
     """
     names = {node.element_id: node["name"] for node in visualization["nodes"]}
     candidates = set()
     with_backslash = set()
-    with_control = set()
+    with_unprintable = set()
     for rel in visualization["relationships"]:
         triple = (names[rel.start_node.element_id], rel.type, names[rel.end_node.element_id])
         if triple[0].startswith("__") or triple[2].startswith("__"):
             continue
         if any("\\" in name for name in triple):
             with_backslash.add(triple)
-        elif any(unicodedata.category(c) == "Cc" for name in triple for c in name):
-            with_control.add(triple)
+        elif not all(name.isprintable() for name in triple):
+            with_unprintable.add(triple)
         else:
             candidates.add(triple)
     _warn_skipped(with_backslash, "a backslash")
-    _warn_skipped(with_control, "a control character")
+    _warn_skipped(with_unprintable, "an unprintable character")
     return sorted(candidates)
 
 

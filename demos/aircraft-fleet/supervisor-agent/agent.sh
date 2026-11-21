@@ -176,10 +176,10 @@ runtime_arn() {
 # Create agentcore/ the way `agentcore create` and `agentcore add runtime`
 # lay it out, then point the runtime at this folder's existing code.
 create_project() {
-    CREATE_TMP="$(mktemp -d)"
-    # A failed step exits through this trap, so the temporary project and a
-    # partial spec do not stay behind.
-    trap 'rm -rf "${CREATE_TMP:?}"; rm -f "$PROJECT_SPEC.tmp"' EXIT
+    CREATE_TMP=$(make_temp -d) || exit 1
+    # A failed step exits through this trap, so a partial spec does not stay
+    # behind. on_exit removes the temporary project with TMP_ROOT.
+    trap 'rm -f "$PROJECT_SPEC.tmp"; on_exit' EXIT
     (cd "$CREATE_TMP" && agentcore create --name "$PROJECT_NAME" --skip-install --skip-git)
     # add runtime runs inside the temporary project, because it writes starter
     # docs to app/<name>/ next to agentcore/. The code lives here instead, so
@@ -196,7 +196,7 @@ create_project() {
         '(.runtimes[] | select(.name == $name)) |= (.codeLocation = "." | .entrypoint = $entry | .runtimeVersion = $ver)' \
         "$PROJECT_SPEC" > "$PROJECT_SPEC.tmp"
     mv "$PROJECT_SPEC.tmp" "$PROJECT_SPEC"
-    trap - EXIT
+    trap on_exit EXIT
     rm -rf "${CREATE_TMP:?}"
 }
 
@@ -247,6 +247,49 @@ add_gateway_credential() {
         --discovery-url "$discovery_url" \
         --scopes "$scope" \
         --client-secret -
+}
+
+# Temporary files go in one folder per run, which on_exit removes, so Ctrl+C
+# leaves none behind. The name is fixed before the folder exists, so a file
+# whose name an interrupt lost inside $(make_temp) is removed with it.
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}/fleet-supervisor.$$"
+
+# Print the name of a new temporary file in TMP_ROOT, or a folder with -d.
+# A TMP_ROOT that already exists is used only if this user owns it and it is
+# not a link.
+make_temp() {
+    if ! mkdir -m 700 "$TMP_ROOT" 2>/dev/null; then
+        if [ -L "$TMP_ROOT" ] || [ ! -d "$TMP_ROOT" ] || [ ! -O "$TMP_ROOT" ]; then
+            echo -e "${RED}Cannot use $TMP_ROOT for temporary files.${NC}" >&2
+            return 1
+        fi
+    fi
+    mktemp "$@" "$TMP_ROOT/tmp.XXXXXX"
+}
+
+# Set when the spec backup in TMP_ROOT could not be copied back, so on_exit
+# keeps the folder that the error message points to.
+KEEP_TMP_ROOT=""
+
+# Set while a deploy or destroy has the tracked spec changed.
+RESTORE_ARMED=""
+
+# The EXIT trap for the whole run, Ctrl+C included. It ignores INT and TERM
+# first, so a second Ctrl+C cannot stop the restore halfway. A failed restore
+# exits 1.
+on_exit() {
+    local failed=0
+    trap '' INT TERM
+    if [ -n "$RESTORE_ARMED" ]; then
+        restore_project || failed=1
+    fi
+    if [ -z "$KEEP_TMP_ROOT" ] && [ -d "$TMP_ROOT" ] && [ ! -L "$TMP_ROOT" ] && [ -O "$TMP_ROOT" ]; then
+        rm -rf "${TMP_ROOT:?}"
+    fi
+    if [ "$failed" -ne 0 ]; then
+        exit 1
+    fi
 }
 
 # The copy strip_gateway_secret writes before it replaces .env.local. It
@@ -300,6 +343,7 @@ restore_project() {
             rm -f "$backup"
         else
             echo -e "${RED}Could not restore $PROJECT_SPEC. The backup is at $SPEC_BACKUP${NC}" >&2
+            KEEP_TMP_ROOT=1
             failed=1
         fi
     fi
@@ -308,25 +352,23 @@ restore_project() {
 }
 
 # Back up the tracked spec and arm the restore. INT and TERM exit through
-# the EXIT trap, so Ctrl+C restores too. The EXIT trap ignores INT and TERM
-# first, so a second Ctrl+C cannot stop the restore halfway.
+# on_exit, so Ctrl+C restores too. The restore is not armed yet when the
+# backup fails, and on_exit removes a partial backup with TMP_ROOT.
 begin_spec_restore() {
-    SPEC_BACKUP=$(mktemp)
-    # The trap is not armed yet, so a failed copy removes the backup here.
-    if ! cp "$PROJECT_SPEC" "$SPEC_BACKUP"; then
-        rm -f "$SPEC_BACKUP"
+    if ! SPEC_BACKUP=$(make_temp) || ! cp "$PROJECT_SPEC" "$SPEC_BACKUP"; then
         exit 1
     fi
-    trap "trap '' INT TERM; restore_project || exit 1" EXIT
+    RESTORE_ARMED=1
     trap 'exit 130' INT TERM
 }
 
-# Restore while the traps are still armed, so an interrupt during the
-# restore still finishes it through the EXIT trap. Then clear them.
+# Restore while the restore is still armed, so an interrupt during it still
+# finishes it through on_exit. Then disarm it.
 end_spec_restore() {
     local status=0
     restore_project || status=$?
-    trap - EXIT INT TERM
+    RESTORE_ARMED=""
+    trap - INT TERM
     return "$status"
 }
 
@@ -401,8 +443,10 @@ require_target_account() {
 aws_lookup() {
     local not_found="$1" output errors status=0
     shift
-    output=$(mktemp)
-    errors=$(mktemp)
+    # aws_lookup runs inside if, where set -e is off, so check these.
+    if ! output=$(make_temp) || ! errors=$(make_temp); then
+        exit 1
+    fi
     "$@" >"$output" 2>"$errors" || status=$?
     AWS_LOOKUP_OUTPUT=$(cat "$output")
     rm -f "$output"
@@ -425,7 +469,7 @@ aws_lookup() {
 # stack and the credential provider are also looked up in AWS by name.
 report_remaining() {
     local status errors remaining region
-    errors=$(mktemp)
+    errors=$(make_temp) || exit 1
     if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
         cat "$errors"
@@ -522,6 +566,8 @@ ensure_credentials() {
         exit 1
     fi
 }
+
+trap on_exit EXIT
 
 case "${1:-help}" in
     start)

@@ -30,6 +30,7 @@ case "$1" in
         if [ -n "$STUB_DEPLOY_TARGETS" ]; then
             printf '%s\n' "$STUB_DEPLOY_TARGETS" > agentcore/aws-targets.json
         fi
+        if [ -n "$STUB_DEPLOY_LOCK_SPEC" ]; then chmod 0444 agentcore/agentcore.json; fi
         if [ -n "$STUB_DEPLOY_SIGNAL" ]; then kill -s "$STUB_DEPLOY_SIGNAL" "$PPID"; fi
         exit "${STUB_DEPLOY_EXIT:-0}"
         ;;
@@ -45,6 +46,9 @@ case "$1 $2" in
         echo "${STUB_CALLER_ACCOUNT:-111122223333}"
         ;;
     "cloudformation describe-stacks")
+        # Ctrl+C reaches the whole foreground group, so the stub dies too.
+        # bash ignores a SIGINT when its child exits normally.
+        if [ -n "$STUB_LOOKUP_SIGNAL" ]; then kill -s "$STUB_LOOKUP_SIGNAL" "$PPID" "$$"; fi
         if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
         if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
         echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
@@ -76,10 +80,20 @@ exit "$status"
 
 # This macOS mktemp ignores TMPDIR, so a call without a template gets one
 # in the test's own folder. That lets a test check that nothing was left
-# behind. A call with a template keeps it.
+# behind. A call with a template keeps it. STUB_MKTEMP_LOSE=N makes the Nth
+# call create its file and then fail without printing the name, the same as
+# a Ctrl+C inside $(mktemp) before the caller stores the name.
 STUB_MKTEMP = r"""#!/bin/bash
-if [ "$#" -gt 0 ]; then exec /usr/bin/mktemp "$@"; fi
-exec /usr/bin/mktemp "$STUB_TMP/tmp.XXXXXX"
+counter="${STUB_LOG%/*}/mktemp-calls"
+count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+echo "$count" > "$counter"
+if [ "$#" -gt 0 ]; then
+    made=$(/usr/bin/mktemp "$@") || exit
+else
+    made=$(/usr/bin/mktemp "$STUB_TMP/tmp.XXXXXX") || exit
+fi
+if [ "${STUB_MKTEMP_LOSE:-}" = "$count" ]; then exit 1; fi
+echo "$made"
 """
 
 CLEAN_STATUS = json.dumps(
@@ -128,6 +142,7 @@ def run_agent(
     temp_dir.mkdir(exist_ok=True)
     env = {
         "STUB_TMP": str(temp_dir),
+        "TMPDIR": str(temp_dir),
         "PATH": f"{project.parent / 'bin'}:{os.environ['PATH']}",
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
@@ -155,6 +170,7 @@ def test_clean_destroy_checks_aws_by_name_and_succeeds(project: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Cleanup complete" in result.stdout
+    assert not list((project.parent / "tmp").iterdir())
     logged = calls(project)
     assert any(
         "describe-stacks --region us-west-2 --stack-name AgentCore-fleetsupervisor-default" in c
@@ -378,6 +394,44 @@ def test_a_failed_configure_leaves_no_temporary_project(project: Path) -> None:
     assert "agentcore create --name fleetsupervisor --skip-install --skip-git" in calls(project)
     assert not list((project.parent / "tmp").iterdir())
     assert not (project / "agentcore").exists()
+
+
+# destroy makes six temporary files: the spec backup, the status errors, and
+# an output and an errors file for each of the two AWS lookups.
+@pytest.mark.parametrize("lost", range(1, 7))
+def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lost: int) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_MKTEMP_LOSE=str(lost))
+
+    assert result.returncode != 0
+    assert (project.parent / "mktemp-calls").read_text() == f"{lost}\n"
+    assert spec.read_bytes() == tracked
+    assert not list((project.parent / "tmp").iterdir())
+
+
+def test_an_interrupt_during_an_aws_lookup_leaves_no_temporary_file(project: Path) -> None:
+    result = run_destroy(project, STUB_LOOKUP_SIGNAL="INT")
+
+    assert result.returncode != 0
+    assert "Cleanup complete" not in result.stdout
+    assert not list((project.parent / "tmp").iterdir())
+
+
+def test_a_failed_restore_keeps_the_backup_it_names(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+    try:
+        result = run_destroy(project, STUB_DEPLOY_LOCK_SPEC="1")
+    finally:
+        spec.chmod(0o644)
+
+    assert result.returncode == 1
+    message = f"Could not restore agentcore/agentcore.json. The backup is at {project.parent}/tmp/"
+    assert message in result.stderr
+    backup = Path(result.stderr.split("The backup is at ")[1].split("\x1b")[0].strip())
+    assert backup.read_bytes() == tracked
 
 
 def test_a_failed_spec_backup_leaves_no_temporary_file(project: Path) -> None:

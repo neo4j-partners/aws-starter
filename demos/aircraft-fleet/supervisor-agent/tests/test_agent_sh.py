@@ -842,11 +842,13 @@ def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lo
     assert not list((project.parent / "tmp").iterdir())
 
 
+# A Ctrl+C during a lookup after the restore stops the run, and on_exit
+# still removes the temporary files. The run dies by SIGINT with or without
+# the restore trap, so the trap reset is tested with a signal to agent.sh
+# alone, and the re-raise by the deploy signal tests.
 def test_an_interrupt_during_an_aws_lookup_leaves_no_temporary_file(project: Path) -> None:
     result = run_destroy(project, STUB_LOOKUP_SIGNAL="INT")
 
-    # end_spec_restore reset the INT trap, so the lookups after it end in a
-    # death by SIGINT, not the restore trap's exit 130.
     assert result.returncode == -SIGINT
     assert "Cleanup complete" not in result.stdout
     assert not list((project.parent / "tmp").iterdir())

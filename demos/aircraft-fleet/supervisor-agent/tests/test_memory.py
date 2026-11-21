@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory.config.settings import ExtractorType
@@ -180,3 +183,87 @@ def test_password_rejected_follows_an_implicit_context() -> None:
 def test_other_connection_errors_are_not_a_rejected_password() -> None:
     error = MemoryConnectionError("Neo4j service unavailable")
     assert not memory.password_rejected(error)
+
+
+BUILD_SECONDS = 0.5
+
+
+def _concurrent_calls(count: int) -> tuple[list[object], float]:
+    """Call memory_settings from ``count`` threads at once.
+
+    Returns each thread's result or exception, and the seconds until the
+    last one finished.
+    """
+    results: list[object] = [None] * count
+    start = threading.Barrier(count)
+
+    def call(index: int) -> None:
+        start.wait(timeout=10)
+        try:
+            results[index] = memory.memory_settings()
+        except Exception as error:
+            results[index] = error
+
+    threads = [threading.Thread(target=call, args=(i,)) for i in range(count)]
+    began = time.monotonic()
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    return results, time.monotonic() - began
+
+
+def test_concurrent_callers_share_one_failed_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    builds: list[bool] = []
+
+    def failing_build():
+        builds.append(True)
+        time.sleep(BUILD_SECONDS)
+        raise ConfigError("cannot read the secret")
+
+    monkeypatch.setattr(memory, "_build_memory_settings", failing_build)
+
+    results, elapsed = _concurrent_calls(5)
+
+    assert len(builds) == 1
+    assert all(result is results[0] for result in results)
+    assert isinstance(results[0], ConfigError)
+    # One build's time, not one per caller in turn.
+    assert elapsed < 2 * BUILD_SECONDS
+
+
+def test_concurrent_callers_share_one_successful_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    builds: list[bool] = []
+    built = object()
+
+    def slow_build():
+        builds.append(True)
+        time.sleep(BUILD_SECONDS)
+        return built
+
+    monkeypatch.setattr(memory, "_build_memory_settings", slow_build)
+
+    results, elapsed = _concurrent_calls(5)
+
+    assert len(builds) == 1
+    assert results == [built] * 5
+    assert elapsed < 2 * BUILD_SECONDS
+
+
+def test_a_call_after_a_failed_build_builds_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    outcomes: list[object] = [ConfigError("cannot read the secret"), object()]
+
+    def build():
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(memory, "_build_memory_settings", build)
+
+    with pytest.raises(ConfigError):
+        memory.memory_settings()
+    rebuilt = memory.memory_settings()
+
+    assert outcomes == []
+    assert memory.memory_settings() is rebuilt

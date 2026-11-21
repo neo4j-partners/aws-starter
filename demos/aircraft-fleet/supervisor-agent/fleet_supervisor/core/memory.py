@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import threading
+from dataclasses import dataclass, field
 
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory import MemorySettings
@@ -48,10 +49,21 @@ def memory_password() -> str:
     return password_from("MEM_NEO4J_PASSWORD_SECRET_ARN", "MEM_NEO4J_PASSWORD")
 
 
-# The settings built once per process, or None until the next build. Read
-# and change it only under _settings_lock, so a build and a forget never
-# overlap.
+@dataclass
+class _Build:
+    """One settings build in progress, which concurrent callers wait on."""
+
+    done: threading.Event = field(default_factory=threading.Event)
+    settings: MemorySettings | None = None
+    error: BaseException | None = None
+
+
+# The settings built once per process, or None until the next build, and
+# the build in progress, if any. Read and change both only under
+# _settings_lock. The build itself runs outside the lock. A forget changes
+# only built settings, so it never overlaps a build.
 _settings: MemorySettings | None = None
+_settings_build: _Build | None = None
 _settings_lock = threading.Lock()
 
 
@@ -93,15 +105,40 @@ def password_rejected(error: BaseException) -> bool:
 def memory_settings() -> MemorySettings:
     """Return the memory settings, built once per process.
 
+    Concurrent callers share one build. Each gets that build's settings or
+    its error.
+
     Raises :class:`~fleet_supervisor.core.config.ConfigError` when
     ``MEM_NEO4J_URI`` or the password is missing, or the password secret
-    cannot be read. A failure is not cached.
+    cannot be read. A failure is not cached, so the next call builds again.
     """
-    global _settings
+    global _settings, _settings_build
     with _settings_lock:
-        if _settings is None:
-            _settings = _build_memory_settings()
-        return _settings
+        if _settings is not None:
+            return _settings
+        build = _settings_build
+        if build is None:
+            build = _settings_build = _Build()
+            owner = True
+        else:
+            owner = False
+    if not owner:
+        build.done.wait()
+        if build.error is not None:
+            raise build.error
+        return build.settings
+    try:
+        build.settings = _build_memory_settings()
+    except BaseException as error:
+        # Every failure, even an interrupt, must reach the waiters.
+        build.error = error
+        raise
+    finally:
+        with _settings_lock:
+            _settings = build.settings
+            _settings_build = None
+        build.done.set()
+    return build.settings
 
 
 def _build_memory_settings() -> MemorySettings:

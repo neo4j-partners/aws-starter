@@ -226,14 +226,27 @@ def _stats_blocks(text: str) -> list[tuple[str, str]]:
 
 
 def _fault_code_lines(text: str) -> list[tuple[str, str]]:
+    """Each "**Fault Code:**" line's code, with the heading above it.
+
+    A line that starts like one in any other form raises, so a variant fails
+    a test instead of being skipped.
+    """
     out = []
     heading = ""
     for line in text.splitlines():
         if re.match(r"^#{3,5} \d", line):
             heading = line.lstrip("# ")
-        elif match := re.match(r"^\*\*Fault Code:\*\* (\S+)$", line):
+        elif re.match(r"^\*\*Fault Codes?:\*\*", line, re.IGNORECASE):
+            match = re.fullmatch(r"\*\*Fault Code:\*\* (\S+)", line)
+            if match is None:
+                raise ValueError(f"not a plain Fault Code line: {line!r}")
             out.append((match.group(1), heading))
     return out
+
+
+def test_a_fault_code_line_variant_fails_instead_of_vanishing() -> None:
+    with pytest.raises(ValueError, match="not a plain Fault Code line"):
+        _fault_code_lines("### 4.1 Overheat\n**Fault Codes:** ENG-OVH-006\n")
 
 
 @pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))

@@ -705,15 +705,36 @@ _SECTION_SYSTEMS = {"4": "Engine", "5": "Avionics", "6": "Hydraulics"}
 
 
 def _fault_code_lines(text: str) -> list[tuple[str, str]]:
-    """Each "**Fault Code:**" line's code, with the heading above it."""
+    """Each "**Fault Code:**" line's code, with the heading above it.
+
+    A line that starts like one in any other form raises, so a variant fails
+    a test instead of being skipped.
+    """
     out = []
     heading = ""
     for line in text.splitlines():
         if re.match(r"^#{3,5} \d", line):
             heading = line.lstrip("# ")
-        elif match := re.match(r"^\*\*Fault Code:\*\* (\S+)$", line):
+        elif re.match(r"^\*\*Fault Codes?:\*\*", line, re.IGNORECASE):
+            match = re.fullmatch(r"\*\*Fault Code:\*\* (\S+)", line)
+            if match is None:
+                raise ValueError(f"not a plain Fault Code line: {line!r}")
             out.append((match.group(1), heading))
     return out
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "**Fault Code:** ENG-OVH-006 (EGT)",
+        "**Fault Codes:** ENG-OVH-006",
+        "**Fault Code:** ENG-OVH-006 ",
+        "**Fault Code:**ENG-OVH-006",
+    ],
+)
+def test_a_fault_code_line_variant_fails_instead_of_vanishing(line: str) -> None:
+    with pytest.raises(ValueError, match="not a plain Fault Code line"):
+        _fault_code_lines(f"### 4.1 Overheat\n{line}\n")
 
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))

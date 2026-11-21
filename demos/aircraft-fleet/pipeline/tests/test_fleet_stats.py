@@ -184,9 +184,33 @@ def test_count_events_lists_every_routed_fault_with_zero_counts() -> None:
     assert counts["by_fault"]["Hydraulics"] == {"Contamination": 0, "Leak": 0}
 
 
+def _setup_defaults(setup: str) -> dict[str, str]:
+    """The DEFAULT_ sizes setup.sh sets when LOAD_FULL_DATASET is not true."""
+    branch = re.search(
+        r'^if \[\[ "\$LOAD_FULL_DATASET" == "true" \]\]; then\n.*?^else\n(.*?)^fi$',
+        setup,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert branch is not None, "setup.sh has no LOAD_FULL_DATASET if/else"
+    return dict(re.findall(r"^\s*DEFAULT_(AIRCRAFT|DAYS)=(\d+)", branch[1], re.MULTILINE))
+
+
+def test_the_setup_defaults_come_only_from_the_default_branch() -> None:
+    setup = (
+        'if [[ "$LOAD_FULL_DATASET" == "true" ]]; then\n'
+        "  DEFAULT_AIRCRAFT=100\n"
+        "  DEFAULT_DAYS=90\n"
+        "else\n"
+        "  DEFAULT_AIRCRAFT=30\n"
+        "fi\n"
+    )
+
+    assert _setup_defaults(setup) == {"AIRCRAFT": "30"}
+
+
 def test_the_stats_config_is_the_setup_default() -> None:
     setup = (Path(__file__).parent.parent / "setup.sh").read_text(encoding="utf-8")
-    defaults = dict(re.findall(r"^\s*DEFAULT_(AIRCRAFT|DAYS)=(\d+)", setup, re.MULTILINE))
+    defaults = _setup_defaults(setup)
 
     assert len(defaults) == 2, defaults
     assert int(defaults["AIRCRAFT"]) == STATS_CONFIG.n_aircraft

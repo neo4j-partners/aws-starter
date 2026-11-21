@@ -146,6 +146,38 @@ def test_the_stream_finishes_before_the_manager_closes_on_a_disconnect(superviso
     assert order == ["flushed", "closed"]
 
 
+def test_a_flush_error_on_a_disconnect_still_closes_the_manager(supervisor, manager, caplog):
+    """The flush can raise while the stream closes, for example with Neo4j down.
+
+    That error must not replace GeneratorExit, or invoke would yield inside a
+    closing generator, aclose would raise, and the manager would stay open
+    until a garbage collection.
+    """
+
+    async def stream_with_failing_flush(prompt):
+        try:
+            for i in range(1000):
+                yield {"data": f"t{i}"}
+                await asyncio.sleep(0)
+        finally:
+            raise RuntimeError("flush failed")
+
+    supervisor.stream_async = stream_with_failing_flush
+    closed_after_aclose: list[int] = []
+
+    async def disconnect_mid_answer():
+        stream = server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1"))
+        for _ in range(3):
+            await anext(stream)
+        await stream.aclose()
+        closed_after_aclose.append(manager.closed)
+
+    asyncio.run(disconnect_mid_answer())
+    assert closed_after_aclose == [1]
+    assert "The agent stream failed while closing" in caplog.text
+    assert "flush failed" in caplog.text
+
+
 def test_memory_manager_is_closed_when_the_request_is_cancelled(supervisor, manager):
     async def slow_stream(prompt):
         yield {"data": "partial"}

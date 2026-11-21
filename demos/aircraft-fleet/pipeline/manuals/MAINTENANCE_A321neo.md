@@ -533,12 +533,14 @@ The LEAP engine is approved for on-wing water wash to restore performance:
 
 #### EGT Exceedance Categories
 
+<!-- BEGIN GENERATED: egt-exceedance -->
 | Category | Temperature | Duration | Required Action |
 |----------|-------------|----------|-----------------|
 | Start exceedance | > 750°C | Any | Abort start, inspect |
 | Takeoff exceedance | > 1,060°C | > 5 sec | Borescope within 10 FH |
 | Max continuous exceed | > 1,000°C | > 2 min | Borescope inspection |
 | Hot start (hung) | EGT rising, N2 stagnant | — | Motor cool, inspect |
+<!-- END GENERATED: egt-exceedance -->
 
 #### Troubleshooting Procedure
 
@@ -1021,7 +1023,7 @@ START: EGT Limit Exceedance Recorded
 │
 ├─► Was exceedance during start?
 │   │
-│   ├─► YES (> 750°C)
+│   ├─► YES (above the start maximum)
 │   │   ├─► Hot start likely
 │   │   ├─► Allow engine to cool (30+ minutes)
 │   │   ├─► Borescope combustor and HPT
@@ -1032,13 +1034,13 @@ START: EGT Limit Exceedance Recorded
 │
 ├─► Was exceedance during takeoff/climb?
 │   │
-│   ├─► > 1,060°C for > 5 seconds
+│   ├─► Above the takeoff maximum for > 5 seconds
 │   │   ├─► Ground aircraft
 │   │   ├─► Full HPT borescope inspection
 │   │   ├─► Inspect CMC shrouds for thermal damage
 │   │   └─► END: Engineering assessment required
 │   │
-│   └─► < 1,060°C, brief
+│   └─► Below the takeoff maximum, brief
 │       ├─► Document in log
 │       ├─► Schedule borescope within 100 FH
 │       └─► END: Monitor EGT margin trend

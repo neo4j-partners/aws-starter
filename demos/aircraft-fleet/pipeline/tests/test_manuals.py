@@ -6,6 +6,7 @@ them and leaves every other line as it was.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import shutil
 import subprocess
@@ -30,6 +31,7 @@ from generator.specs import (
     PHASES,
     SYSTEM_SENSORS,
     VIBRATION_LEVELS,
+    EgtBand,
     FaultCode,
     sensors_for,
 )
@@ -243,6 +245,7 @@ def test_manuals_in_sync(model: str) -> None:
 def manuals_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(manuals, "RENDERERS", RENDERERS)
     monkeypatch.setattr(manuals, "REQUIRED_BLOCKS", ("greeting",))
+    monkeypatch.setattr(manuals, "MODEL_BLOCKS", {})
     monkeypatch.setattr(manuals, "load_stats", lambda manuals_dir: {})
     for model, filename in manuals.MANUAL_FILES.items():
         body = f"Hello from the {model}."
@@ -497,6 +500,56 @@ def test_only_generated_blocks_quote_vibration_numbers(model: str) -> None:
     text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
 
     assert re.findall(r"^.*\d ips.*$", _BLOCK.sub("", text), re.M) == []
+
+
+def _egt_limit_values(model: str) -> set[int]:
+    limits = ENGINE_SPECS[model].egt_limits
+    bands = (limits.takeoff, limits.max_continuous)
+    values = {round(v) for band in bands for v in (band.normal_below, band.maximum)}
+    return values | ({round(limits.start_max)} if limits.start_max is not None else set())
+
+
+@pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))
+def test_only_generated_blocks_quote_egt_limits(model: str) -> None:
+    # Hand-written text names the limit instead, so the numbers live in one place.
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES[model]).read_text(encoding="utf-8")
+    quoted = {
+        int(number.replace(",", ""))
+        for number in re.findall(r"(\d[\d,]*)\s*°C", _BLOCK.sub("", text))
+    }
+
+    assert quoted & _egt_limit_values(model) == set()
+
+
+def test_the_exceedance_table_quotes_the_egt_maxima() -> None:
+    engine = ENGINE_SPECS["A321neo"]
+    limits = dataclasses.replace(
+        engine.egt_limits,
+        takeoff=EgtBand(1000, 1099),
+        max_continuous=EgtBand(950, 1011),
+        start_max=777,
+    )
+    engine = dataclasses.replace(engine, egt_limits=limits)
+
+    rows = manuals.RENDERERS["egt-exceedance"]("A321neo", engine, {}).splitlines()
+
+    assert rows[2].startswith("| Start exceedance | > 777°C |")
+    assert rows[3].startswith("| Takeoff exceedance | > 1,099°C |")
+    assert rows[4].startswith("| Max continuous exceed | > 1,011°C |")
+
+
+def test_the_a321neo_manual_requires_its_exceedance_block() -> None:
+    text = (manuals.MANUALS_DIR / manuals.MANUAL_FILES["A321neo"]).read_text(encoding="utf-8")
+    without = re.sub(
+        r"^<!-- BEGIN GENERATED: egt-exceedance -->$.*?^<!-- END GENERATED: egt-exceedance -->\n",
+        "",
+        text,
+        flags=re.M | re.S,
+    )
+
+    assert without != text
+    with pytest.raises(ManualBlockError, match="^missing required block 'egt-exceedance'$"):
+        manuals.render_text(without, "A321neo", manuals.load_stats())
 
 
 @pytest.mark.parametrize("model", sorted(ENGINE_SPECS))

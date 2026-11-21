@@ -304,7 +304,7 @@ The thrust bearing assembly absorbs axial loads from the high-pressure rotor sys
 #### Immediate Actions
 1. Reduce thrust to idle if flight conditions permit
 2. Monitor EGT trend for stabilization
-3. If EGT exceeds 695°C, initiate engine shutdown procedures per QRH
+3. If EGT exceeds the takeoff maximum in the Operating Limits table, initiate engine shutdown procedures per QRH
 
 #### Troubleshooting Procedure
 

@@ -360,6 +360,32 @@ def _egt_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     return _table(("Parameter", "Normal", "Caution", "Maximum"), rows)
 
 
+def _egt_exceedance(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """The A321neo's EGT exceedance categories, past each EGT maximum."""
+    limits = engine.egt_limits
+    rows = []
+    if limits.start_max is not None:
+        rows.append(
+            ("Start exceedance", f"> {limits.start_max:,.0f}°C", "Any", "Abort start, inspect")
+        )
+    rows += [
+        (
+            "Takeoff exceedance",
+            f"> {limits.takeoff.maximum:,.0f}°C",
+            "> 5 sec",
+            "Borescope within 10 FH",
+        ),
+        (
+            "Max continuous exceed",
+            f"> {limits.max_continuous.maximum:,.0f}°C",
+            "> 2 min",
+            "Borescope inspection",
+        ),
+        ("Hot start (hung)", "EGT rising, N2 stagnant", "—", "Motor cool, inspect"),
+    ]
+    return _table(("Category", "Temperature", "Duration", "Required Action"), rows)
+
+
 def _hydraulic_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     """§10.1: the hydraulic bands every circuit shares."""
     rows = []
@@ -590,6 +616,7 @@ RENDERERS: dict[str, Renderer] = {
     "vibration-bands": _vibration_bands,
     "vibration-shutdown": _vibration_shutdown,
     "egt-limits": _egt_limits,
+    "egt-exceedance": _egt_exceedance,
     "normal-parameters": _phase_limits,
     "quick-ref-engine": _phase_limits,
     "fuel-flow-range": _fuel_flow_range,
@@ -605,10 +632,16 @@ RENDERERS: dict[str, Renderer] = {
     "fleet-statistics": _fleet_statistics,
 }
 
+# Blocks only one model's manual has, which that manual must have once.
+MODEL_BLOCKS: dict[str, tuple[str, ...]] = {"A321neo": ("egt-exceedance",)}
+
 # Blocks every manual must have, once each. A manual has a fault's statistics
 # block only in the section of that fault.
 REQUIRED_BLOCKS: tuple[str, ...] = tuple(
-    block_id for block_id in RENDERERS if not block_id.startswith(FAULT_STATS_PREFIX)
+    block_id
+    for block_id in RENDERERS
+    if not block_id.startswith(FAULT_STATS_PREFIX)
+    and all(block_id not in ids for ids in MODEL_BLOCKS.values())
 )
 
 _MARKER = re.compile(r"^<!-- (BEGIN|END) GENERATED: ([a-z0-9-]+) -->$")
@@ -666,7 +699,8 @@ def render_text(
     marker inside a fenced code block raises, since Markdown shows it as text.
     """
     renderers = RENDERERS if renderers is None else renderers
-    required = REQUIRED_BLOCKS if required is None else required
+    if required is None:
+        required = REQUIRED_BLOCKS + MODEL_BLOCKS.get(model, ())
     engine = ENGINE_SPECS[model]
     text = text.removeprefix("\ufeff").replace("\r\n", "\n")
     out: list[str] = []

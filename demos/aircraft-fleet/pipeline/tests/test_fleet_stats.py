@@ -129,9 +129,25 @@ def test_the_fleet_statistics_name_the_config_and_rank_the_faults() -> None:
         "| Sensor drift | Engine | 3 | 8% |\n"
         "| Sensor drift | Avionics | 3 | 8% |\n"
         "| Contamination | Engine | 2 | 5% |\n"
-        "| Leak | Engine | 1 | 2% |\n"
-        "| Electrical fault | Avionics | 1 | 2% |"
+        "| Leak | Engine | 1 | 3% |\n"
+        "| Electrical fault | Avionics | 1 | 3% |"
     )
+
+
+@pytest.mark.parametrize(
+    ("count", "total", "share"),
+    [
+        (1, 8, "13%"),  # 12.5 rounds half up, not to the even 12
+        (5, 200, "3%"),  # 2.5 rounds half up, not to the even 2
+        (199, 200, "99%"),  # 99.5 would show 100% for a share below all
+        (200, 200, "100%"),
+        (0, 0, "0%"),
+    ],
+)
+def test_a_share_rounds_half_up_and_only_all_events_show_100(
+    count: int, total: int, share: str
+) -> None:
+    assert manuals._share(count, total) == share
 
 
 def test_every_fault_code_has_its_own_stats_block() -> None:

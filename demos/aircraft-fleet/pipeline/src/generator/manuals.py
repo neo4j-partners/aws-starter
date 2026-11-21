@@ -16,6 +16,7 @@ import functools
 import json
 import re
 from collections.abc import Callable, Mapping
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -455,7 +456,16 @@ def _fault_codes(system: str, model: str, engine: EngineSpec, stats: Stats) -> s
 
 
 def _share(count: int, total: int) -> str:
-    return f"{round(100 * count / total)}%" if total else "0%"
+    """count as a whole percent of total, rounded half up.
+
+    A share below all of the events shows at most 99%, so 100% means all.
+    """
+    if not total:
+        return "0%"
+    percent = (Decimal(100) * count / total).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    if count < total:
+        percent = min(percent, Decimal(99))
+    return f"{percent}%"
 
 
 def _events(count: int) -> str:

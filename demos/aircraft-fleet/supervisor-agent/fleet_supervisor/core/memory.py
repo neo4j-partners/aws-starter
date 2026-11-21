@@ -108,7 +108,9 @@ def memory_settings() -> MemorySettings:
     Concurrent callers share one build. Each gets that build's settings or
     an error. The caller that built raises the build's error. Each other
     caller raises its own error, caused by the build's error, so no two
-    threads add frames to one traceback.
+    threads add frames to one traceback. A waiter raises a ConfigError for
+    a ConfigError and a RuntimeError for any other error, so only the
+    caller that built sees the original type.
 
     Raises :class:`~fleet_supervisor.core.config.ConfigError` when
     ``MEM_NEO4J_URI`` or the password is missing, or the password secret

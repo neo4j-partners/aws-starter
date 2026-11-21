@@ -125,8 +125,9 @@ def test_event_volume_is_mostly_engine(default_run: Path) -> None:
     assert by_type["Avionics"] > 0 and by_type["Hydraulics"] > 0, by_type
 
 
-def test_every_fault_occurs(default_run: Path) -> None:
-    faults = {e["fault"] for e in _rows(default_run / "nodes_maintenance.csv")}
+def test_every_fault_occurs(year_dataset: Path) -> None:
+    # A year, so the rarest routes are not left to one 90-day draw.
+    faults = {e["fault"] for e in _rows(year_dataset / "nodes_maintenance.csv")}
     assert faults == set(CORRECTIVE_ACTIONS)
 
 

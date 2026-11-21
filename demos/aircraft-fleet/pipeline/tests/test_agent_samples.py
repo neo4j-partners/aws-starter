@@ -10,7 +10,13 @@ from typing import Any
 from urllib.parse import urlparse
 
 import pytest
-from neo4j import READ_ACCESS, Driver, GraphDatabase, NotificationDisabledClassification
+from neo4j import (
+    READ_ACCESS,
+    Driver,
+    GraphDatabase,
+    NotificationDisabledClassification,
+    RoutingControl,
+)
 
 from generator.config import GeneratorConfig
 from generator.fleet import generate_fleet
@@ -254,6 +260,26 @@ def test_system_prompt_puts_the_schema_after_the_rules() -> None:
     assert prompt.startswith("You are an expert Neo4j Cypher query generator")
     assert "\nRules:\n- Return ONLY the Cypher query text." in prompt
     assert prompt.endswith("\nGraph schema:\nSCHEMA")
+
+
+class RecordingDriver:
+    """Record each execute_query call and return no rows."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Any, dict[str, Any]]] = []
+
+    def execute_query(self, query: Any, /, **params: Any) -> tuple[list[dict], None, None]:
+        self.calls.append((query, params))
+        return [], None, None
+
+
+def test_generated_cypher_runs_in_a_read_transaction() -> None:
+    driver = RecordingDriver()
+
+    _run_text2cypher(driver, "db", lambda _system, _user: "MATCH (n) RETURN n", "prompt", "q")
+
+    ((_, params),) = driver.calls
+    assert params == {"database_": "db", "routing_": RoutingControl.READ}
 
 
 @pytest.fixture

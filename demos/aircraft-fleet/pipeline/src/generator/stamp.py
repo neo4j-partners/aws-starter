@@ -94,6 +94,35 @@ def write_stamp(directory: Path, stamp: dict[str, Any]) -> None:
     )
 
 
+def stamp_differences(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
+    """Return the stamp keys whose values differ, naming nested keys as <key>.<subkey>."""
+    keys = []
+    for key in sorted(old.keys() | new.keys()):
+        old_value, new_value = old.get(key), new.get(key)
+        if isinstance(old_value, dict) and isinstance(new_value, dict):
+            keys += [
+                f"{key}.{k}"
+                for k in sorted(old_value.keys() | new_value.keys())
+                if old_value.get(k) != new_value.get(k)
+            ]
+        elif old_value != new_value:
+            keys.append(key)
+    return keys
+
+
+def regenerate_reason(directory: Path, stamp: dict[str, Any]) -> str | None:
+    """Return why a run with this stamp must rewrite directory.
+
+    Returns None when the directory's stamp already matches.
+    """
+    current = read_stamp(directory)
+    if current is None:
+        return f"there is no {STAMP_NAME}"
+    if differs := stamp_differences(current, stamp):
+        return f"the stamp has a different {', '.join(differs)}"
+    return None
+
+
 def clear_stamp(directory: Path) -> None:
     (directory / STAMP_NAME).unlink(missing_ok=True)
 

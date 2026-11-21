@@ -14,7 +14,7 @@ from typing import Any
 from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
 
-from generator.stamp import STAMP_NAME, read_stamp
+from generator.stamp import STAMP_NAME, read_stamp, stamp_differences
 
 from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
 
@@ -453,20 +453,6 @@ def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> Non
     logger.info("[OK] Recorded the generator stamp on a Dataset node.")
 
 
-def _stamp_differences(graph: dict[str, Any], local: dict[str, Any]) -> list[str]:
-    """Return the stamp keys whose values differ, naming config keys as config.<key>."""
-    keys = []
-    for key in sorted(graph.keys() | local.keys()):
-        old, new = graph.get(key), local.get(key)
-        if isinstance(old, dict) and isinstance(new, dict):
-            keys += [
-                f"{key}.{k}" for k in sorted(old.keys() | new.keys()) if old.get(k) != new.get(k)
-            ]
-        elif old != new:
-            keys.append(key)
-    return keys
-
-
 def dataset_mismatch(driver: Driver, database: str, data_dir: Path) -> str | None:
     """Return why the graph's Dataset node does not match data_dir's stamp.
 
@@ -496,7 +482,7 @@ def dataset_mismatch(driver: Driver, database: str, data_dir: Path) -> str | Non
         graph = None
     if not isinstance(graph, dict):
         return "the graph's Dataset node has no readable stamp"
-    if differs := _stamp_differences(graph, local):
+    if differs := stamp_differences(graph, local):
         return (
             f"the graph was loaded from a run with a different {', '.join(differs)} than {data_dir}"
         )

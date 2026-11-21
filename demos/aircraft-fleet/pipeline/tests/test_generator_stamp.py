@@ -122,6 +122,60 @@ def test_if_stale_regenerates_after_a_library_version_change(
     assert stamp.read_stamp(tmp_path)["runtime"]["numpy"] == "0.0.0"
 
 
+def _change_seed(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    return {"seed": 7}
+
+
+def _change_code(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    monkeypatch.setattr(stamp, "generator_hash", lambda: "changed")
+    return {}
+
+
+def _change_numpy(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    _bump_numpy(monkeypatch)
+    return {}
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        pytest.param(_change_seed, "the stamp has a different config.seed", id="config"),
+        pytest.param(_change_code, "the stamp has a different generator_hash", id="code"),
+        pytest.param(_change_numpy, "the stamp has a different runtime.numpy", id="numpy"),
+    ],
+)
+def test_if_stale_says_why_it_regenerates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    change: Callable[[pytest.MonkeyPatch], dict[str, int]],
+    message: str,
+) -> None:
+    _generate(tmp_path)
+    overrides = change(monkeypatch)
+    capsys.readouterr()
+
+    _generate(tmp_path, if_stale=True, **overrides)
+
+    assert f"Regenerating, since {message}." in capsys.readouterr().out
+
+
+def test_if_stale_says_when_there_is_no_stamp(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _generate(tmp_path, if_stale=True)
+
+    assert "Regenerating, since there is no .stamp.json." in capsys.readouterr().out
+
+
+def test_generate_without_if_stale_gives_no_reason(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _generate(tmp_path)
+
+    assert "Regenerating" not in capsys.readouterr().out
+
+
 def test_stale_reason_names_a_changed_library(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

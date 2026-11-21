@@ -22,7 +22,7 @@ from .operations import generate_operations
 from .removals import _check_start_date, generate_removals
 from .sensors import generate_system_readings
 from .specs import EVENT_SEVERITIES
-from .stamp import STAMP_NAME, clear_stamp, read_stamp, stamp_for, write_stamp
+from .stamp import STAMP_NAME, clear_stamp, regenerate_reason, stamp_for, write_stamp
 from .writers import CSV_COLUMNS, write_csv
 
 app = typer.Typer(
@@ -145,9 +145,11 @@ def generate(
     output.mkdir(parents=True, exist_ok=True)
     stamp = stamp_for(config)
     _remove_orphaned_work_dirs(output)
-    if if_stale and read_stamp(output) == stamp:
-        console.print(f"{output.resolve()} is current for this config and code. Skipping.")
-        return
+    if if_stale:
+        if (reason := regenerate_reason(output, stamp)) is None:
+            console.print(f"{output.resolve()} is current for this config and code. Skipping.")
+            return
+        console.print(f"Regenerating, since {reason}.")
     # Write the run into a temp directory, so a failure leaves the
     # previous output and its stamp as they were.
     work = Path(tempfile.mkdtemp(dir=output, prefix=_WORK_PREFIX))

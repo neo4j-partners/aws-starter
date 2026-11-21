@@ -44,7 +44,11 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 the generator code, and the Python, Faker, and NumPy versions. The same seed can
 give different CSVs under another version of any of them. `generated/` is stale
 when its stamp does not match the `GEN_*` values, the current code, or the installed
-versions, and `load` and `load-operational` regenerate it then.
+versions, and `load` and `load-operational` regenerate it then. They print the
+reason, such as `Regenerating, since the stamp has a different config.days.`
+A `generated/` made before stamps existed has no `.stamp.json`, so the first
+`load` after you update regenerates it once. Any files you added to `generated/`
+are kept.
 `generate` writes each run into a `generated/.generating-*` temp directory first.
 A run that fails or is stopped before it finishes leaves the previous CSVs and
 stamp in place. When the run finishes, it removes the old stamp, moves each CSV

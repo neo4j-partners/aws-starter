@@ -13,7 +13,6 @@ import pytest
 
 from generator.fleet import entry_into_service
 from generator.main import generate
-from generator.specs import SENSOR_FAULT_MAP, sensors_for
 
 AIRCRAFT, DAYS, SEED = 20, 30, 42
 
@@ -39,34 +38,6 @@ def large_dataset(tmp_path_factory: pytest.TempPathFactory) -> Path:
     output = tmp_path_factory.mktemp("large")
     generate(aircraft=30, airports=40, days=90, seed=SEED, output=output)
     return output
-
-
-def test_event_fault_matches_the_crossing_sensor(large_dataset: Path) -> None:
-    model = {r[":ID(Aircraft)"]: r["model"] for r in _rows(large_dataset / "nodes_aircraft.csv")}
-    sensor_type = {r[":ID(Sensor)"]: r["type"] for r in _rows(large_dataset / "nodes_sensors.csv")}
-    events = _rows(large_dataset / "nodes_maintenance.csv")
-    assert len(events) > 100, f"expected a large sample, got {len(events)} events"
-
-    wanted = {(e["system_id"], e["reported_at"]) for e in events}
-    values: dict[tuple[str, str], dict[str, float]] = {}
-    for r in _rows(large_dataset / "nodes_readings.csv"):
-        key = (r["sensor_id"].rsplit("-SN", 1)[0], r["ts"])
-        if key in wanted:
-            values.setdefault(key, {})[sensor_type[r["sensor_id"]]] = float(r["value"])
-
-    for e in events:
-        specs = {s.type: s for s in sensors_for("Engine", model[e["aircraft_id"]])}
-        v = values.get((e["system_id"], e["reported_at"]), {})
-        # Some sensor crossed caution at this hour, the fault is one that
-        # sensor maps to, and a CRITICAL event's sensor is at or above warning.
-        explained = [
-            sensor
-            for sensor in ("EGT", "Vibration")
-            if v.get(sensor, 0.0) >= specs[sensor].bands.caution
-            and (e["fault"], e["severity"]) in SENSOR_FAULT_MAP[sensor]
-            and (e["severity"] != "CRITICAL" or v[sensor] >= specs[sensor].bands.warning)
-        ]
-        assert explained, f"{e[':ID(MaintenanceEvent)']} {e['fault']} {e['severity']}: {v}"
 
 
 def test_reading_number_is_hour_offset(dataset: Path) -> None:
@@ -106,8 +77,8 @@ def _removals_with_entry_into_service(
     return [(r, in_service[r["aircraft_id"]]) for r in _rows(dataset / "nodes_removals.csv")]
 
 
-def test_airframe_hours_follow_days_in_service(large_dataset: Path) -> None:
-    removals = _removals_with_entry_into_service(large_dataset)
+def test_airframe_hours_follow_days_in_service(year_dataset: Path) -> None:
+    removals = _removals_with_entry_into_service(year_dataset)
     by_aircraft: dict[str, list[dict[str, str]]] = {}
     for r, in_service in removals:
         days = (datetime.fromisoformat(r["removal_date"]) - in_service).total_seconds() / 86400

@@ -29,6 +29,16 @@ class Bands:
 
 
 @dataclass(frozen=True)
+class FaultRoute:
+    """A fault that a band crossing on one side can raise, and the parts it hits."""
+
+    fault: str  # one of the CORRECTIVE_ACTIONS faults
+    side: Direction  # HIGH or LOW: the side of the crossing that raises it
+    components: tuple[str, ...]  # canonical component types it can hit
+    weight: float  # pick weight when several routes match one side
+
+
+@dataclass(frozen=True)
 class SensorSpec:
     """One sensor type on one model: its unit, normal value, noise, drift, and bands."""
 
@@ -42,6 +52,7 @@ class SensorSpec:
     drift_per_day: tuple[float, float]
     direction: Direction
     bands: Bands
+    faults: tuple[FaultRoute, ...] = ()
     # Readings never go below this value, such as 0 for a disagreement.
     minimum: float | None = None
 
@@ -62,6 +73,36 @@ class SensorSpec:
                 f"sensor {self.type!r}: {self.direction} bands {b} are out of order "
                 f"for baseline {self.baseline}"
             )
+        sides = (
+            {Direction.HIGH, Direction.LOW}
+            if self.direction is Direction.DEVIATION
+            else {self.direction}
+        )
+        for route in self.faults:
+            if route.side not in sides:
+                raise ValueError(
+                    f"sensor {self.type!r}: route {route.fault!r} side {route.side} "
+                    f"cannot trigger on a {self.direction} sensor"
+                )
+
+    def offsets(self) -> tuple[float, float, float]:
+        """Advisory, caution, and warning as distances from baseline toward the bad side."""
+        b = self.bands
+        match self.direction:
+            case Direction.HIGH:
+                return (
+                    b.advisory - self.baseline,
+                    b.caution - self.baseline,
+                    b.warning - self.baseline,
+                )
+            case Direction.LOW:
+                return (
+                    self.baseline - b.advisory,
+                    self.baseline - b.caution,
+                    self.baseline - b.warning,
+                )
+            case Direction.DEVIATION:
+                return (b.advisory, b.caution, b.warning)
 
 
 @dataclass(frozen=True)
@@ -96,6 +137,7 @@ def _engine_sensors(
             drift_per_day=egt_drift_per_day,
             direction=Direction.HIGH,
             bands=Bands(*egt[1:]),
+            faults=(FaultRoute("Overheat", Direction.HIGH, ("HP Turbine",), 1.0),),
         ),
         SensorSpec(
             "Vibration",
@@ -106,6 +148,12 @@ def _engine_sensors(
             drift_per_day=vib_drift_per_day,
             direction=Direction.HIGH,
             bands=Bands(*vib[1:]),
+            faults=(
+                FaultRoute(
+                    "Bearing wear", Direction.HIGH, ("Thrust Bearing", "Reduction Gearbox"), 0.55
+                ),
+                FaultRoute("Vibration exceedance", Direction.HIGH, ("Fan Module",), 0.45),
+            ),
         ),
         SensorSpec(
             "N1Speed",
@@ -116,6 +164,11 @@ def _engine_sensors(
             drift_per_day=(0.0, 0.0),
             direction=Direction.DEVIATION,
             bands=Bands(2.0, 4.0, 6.0),
+            # The N1 pickup sits at the fan.
+            faults=tuple(
+                FaultRoute("Sensor drift", side, ("Fan Module",), 1.0)
+                for side in (Direction.HIGH, Direction.LOW)
+            ),
         ),
         SensorSpec(
             "FuelFlow",
@@ -126,6 +179,11 @@ def _engine_sensors(
             drift_per_day=(0.0, 0.0),
             direction=Direction.DEVIATION,
             bands=Bands(*(fuel_cruise * share for share in (0.08, 0.15, 0.25))),
+            faults=(
+                FaultRoute("Fuel starvation", Direction.LOW, ("Main Fuel Pump",), 0.6),
+                FaultRoute("Contamination", Direction.LOW, ("Main Fuel Pump",), 0.4),
+                FaultRoute("Leak", Direction.HIGH, ("Main Fuel Pump",), 1.0),
+            ),
         ),
     )
 
@@ -211,6 +269,10 @@ _HYDRAULICS_SENSORS: tuple[SensorSpec, ...] = (
         drift_per_day=(0.0, 1.0),
         direction=Direction.LOW,
         bands=Bands(2800.0, 2600.0, 2400.0),
+        faults=(
+            FaultRoute("Leak", Direction.LOW, ("Hydraulic Pump",), 0.6),
+            FaultRoute("Contamination", Direction.LOW, ("Hydraulic Pump",), 0.4),
+        ),
     ),
     SensorSpec(
         "HydQuantity",
@@ -221,6 +283,11 @@ _HYDRAULICS_SENSORS: tuple[SensorSpec, ...] = (
         drift_per_day=(0.0, 0.12),
         direction=Direction.LOW,
         bands=Bands(70.0, 60.0, 50.0),
+        faults=(
+            FaultRoute(
+                "Leak", Direction.LOW, ("Hydraulic Reservoir", "Flight Control Actuator"), 1.0
+            ),
+        ),
     ),
 )
 
@@ -234,6 +301,14 @@ _AVIONICS_SENSORS: tuple[SensorSpec, ...] = (
         drift_per_day=(0.0, 0.004),
         direction=Direction.LOW,
         bands=Bands(26.0, 25.0, 24.0),
+        faults=(
+            FaultRoute(
+                "Electrical fault",
+                Direction.LOW,
+                ("Flight Management System", "Air Data Unit", "Navigation Receiver"),
+                1.0,
+            ),
+        ),
     ),
     SensorSpec(
         "AirDataDisagree",
@@ -244,6 +319,7 @@ _AVIONICS_SENSORS: tuple[SensorSpec, ...] = (
         drift_per_day=(0.0, 0.008),
         direction=Direction.HIGH,
         bands=Bands(3.0, 5.0, 8.0),
+        faults=(FaultRoute("Sensor drift", Direction.HIGH, ("Air Data Unit",), 1.0),),
         minimum=0.0,
     ),
 )
@@ -933,29 +1009,7 @@ DELAY_CAUSES: tuple[str, ...] = tuple(spec.cause for spec in DELAY_CAUSE_SPECS)
 # Maintenance event severities, most severe first.
 EVENT_SEVERITIES: tuple[str, ...] = ("CRITICAL", "MAJOR", "MINOR")
 
-# Which sensor type triggers which fault types (fault, severity)
-SENSOR_FAULT_MAP: dict[str, list[tuple[str, str]]] = {
-    "EGT": [
-        ("Overheat", "CRITICAL"),
-        ("Overheat", "MAJOR"),
-        ("Sensor drift", "MINOR"),
-    ],
-    "Vibration": [
-        ("Vibration exceedance", "CRITICAL"),
-        ("Bearing wear", "MAJOR"),
-        ("Bearing wear", "MINOR"),
-    ],
-    "N1Speed": [
-        ("Sensor drift", "MINOR"),
-        ("Contamination", "MAJOR"),
-    ],
-    "FuelFlow": [
-        ("Fuel starvation", "CRITICAL"),
-        ("Contamination", "MAJOR"),
-        ("Leak", "MINOR"),
-    ],
-}
-
+# One corrective action per fault. The sensor fault routes use these faults.
 CORRECTIVE_ACTIONS: dict[str, str] = {
     "Overheat": "Inspected hot section; replaced affected turbine stage and seals",
     "Vibration exceedance": "Balanced rotating assembly; replaced damper pads and inspected bearings",

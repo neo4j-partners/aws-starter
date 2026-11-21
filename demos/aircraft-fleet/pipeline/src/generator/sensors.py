@@ -17,31 +17,67 @@ from .config import GeneratorConfig
 from .fleet import AircraftNode, SystemNode
 from .specs import Direction, SensorSpec, sensors_for
 
-# The sensors that maintenance.py scans get random spikes past caution.
-_SPIKED_SENSORS = frozenset({"EGT", "Vibration"})
+# Fraction of hours that spike past advisory on one sensor, at a degradation
+# multiplier of 1.0. Avionics and Hydraulics drift never reaches advisory in
+# 90 days, so their events come from spikes. Tuned once with the event
+# probabilities in maintenance.py so the default run is mostly Engine events.
+_SPIKE_RATE: dict[str, float] = {"Engine": 0.009, "Avionics": 0.013, "Hydraulics": 0.013}
+
+# Mean overshoot past advisory, in band widths. One width carries a spike from
+# advisory to caution, and two carry it to warning.
+_OVERSHOOT_SCALE = 0.85
 
 
-def _anomaly_rate(degradation_multiplier: float) -> float:
+def _spike_rate(system_type: str, degradation_multiplier: float) -> float:
     """Fraction of readings that get a spike. It rises with degradation."""
-    return 0.003 + 0.015 * (degradation_multiplier - 0.75)
+    return _SPIKE_RATE.get(system_type, 0.0) * degradation_multiplier
 
 
 def _timestamps(start: datetime, n_hours: int) -> list[str]:
     return [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M:%S") for h in range(n_hours)]
 
 
+def _overshoot(offsets: tuple[float, float, float], widths: np.ndarray) -> np.ndarray:
+    """Map overshoots in band widths to distances from baseline toward the bad side.
+
+    0 to 1 width lands in the advisory band, 1 to 2 in the caution band, and 2
+    or more at or past warning, where the last band's width continues.
+    """
+    advisory, caution, warning = offsets
+    return np.where(
+        widths < 1,
+        advisory + widths * (caution - advisory),
+        np.where(
+            widths < 2,
+            caution + (widths - 1) * (warning - caution),
+            warning + (widths - 2) * (warning - caution),
+        ),
+    )
+
+
 def _add_spikes(
-    values: np.ndarray, threshold: float, anomaly_rate: float, rng: np.random.Generator
+    values: np.ndarray, spec: SensorSpec, spike_rate: float, rng: np.random.Generator
 ) -> np.ndarray:
-    """Randomly spike a fraction of readings above the threshold."""
+    """Push a fraction of readings past advisory, most of them only just past.
+
+    A spike never makes a reading less severe than it already was.
+    """
     n = len(values)
-    n_spikes = max(1, int(n * anomaly_rate))
+    n_spikes = int(rng.binomial(n, min(spike_rate, 1.0)))
+    if n_spikes == 0:
+        return values
     spike_idx = rng.choice(n, size=n_spikes, replace=False)
-    # Spike amplitude: 0.5–2.5× the gap between current value and threshold
-    gap = threshold - values[spike_idx]
-    amplitude = rng.uniform(0.5, 2.5, size=n_spikes) * np.abs(gap)
+    distance = _overshoot(spec.offsets(), rng.exponential(_OVERSHOOT_SCALE, n_spikes))
+    match spec.direction:
+        case Direction.HIGH:
+            sides = np.ones(n_spikes)
+        case Direction.LOW:
+            sides = -np.ones(n_spikes)
+        case Direction.DEVIATION:
+            sides = rng.choice((-1.0, 1.0), size=n_spikes)
+    current = (values[spike_idx] - spec.baseline) * sides
     values = values.copy()
-    values[spike_idx] += amplitude
+    values[spike_idx] = spec.baseline + sides * np.maximum(current, distance)
     return values
 
 
@@ -58,7 +94,7 @@ def _drift_sign(direction: Direction, rng: np.random.Generator) -> float:
 def _series(
     spec: SensorSpec,
     degradation_multiplier: float,
-    anomaly_rate: float,
+    spike_rate: float,
     n_hours: int,
     rng: np.random.Generator,
 ) -> np.ndarray:
@@ -67,8 +103,7 @@ def _series(
     slope = _drift_sign(spec.direction, rng) * drift_per_day / 24
     values = spec.baseline + slope * np.arange(n_hours, dtype=float)
     values = values + rng.normal(0, spec.noise_std, n_hours)
-    if spec.type in _SPIKED_SENSORS:
-        values = _add_spikes(values, spec.bands.caution, anomaly_rate, rng)
+    values = _add_spikes(values, spec, spike_rate, rng)
     if spec.minimum is not None:
         values = np.maximum(values, spec.minimum)
     return values
@@ -89,13 +124,13 @@ def generate_system_readings(
     """
     specs = {spec.type: spec for spec in sensors_for(system.type, aircraft.model)}
     multiplier = aircraft.operator_profile.degradation_multiplier
-    anomaly_rate = _anomaly_rate(multiplier)
+    spike_rate = _spike_rate(system.type, multiplier)
     timestamps = _timestamps(config.start_date, config.n_hours)
 
     series_by_type: dict[str, np.ndarray] = {}
     rows: list[dict] = []
     for sensor in system.sensors:
-        values = _series(specs[sensor.type], multiplier, anomaly_rate, config.n_hours, rng)
+        values = _series(specs[sensor.type], multiplier, spike_rate, config.n_hours, rng)
         series_by_type[sensor.type] = values
         # The reading number is the hour offset from the first timestamp.
         for h, (ts, val) in enumerate(zip(timestamps, values, strict=True)):

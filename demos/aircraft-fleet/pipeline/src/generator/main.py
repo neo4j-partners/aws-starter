@@ -204,7 +204,7 @@ def generate(
 
             # Maintenance events for this aircraft
             ac_events = generate_maintenance_events(ac, system_series, config, event_counter, rng)
-            maintenance_rows.extend(ac_events)
+            maintenance_rows.extend(event.row for event in ac_events)
 
             if (ac_idx + 1) % 20 == 0 or ac_idx + 1 == len(fleet):
                 console.print(

@@ -11,9 +11,9 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "@types/node": "~26.6.6",
+    "@types/node": "~24.13.3",
     "aws-cdk": ">=2.1149.0 <3",
-    "typescript": "~7.0.2"
+    "typescript": "~5.9.3"
   },
   "dependencies": {
     "@aws/agentcore-cdk": "1.2.0",

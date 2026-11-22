@@ -35,7 +35,7 @@ Run this command from `docs/slides/`:
 npm run build:html
 ```
 
-- **Output:** The command writes HTML files to `docs/slides/dist/`. It builds `aws-neo4j-finance-overview.md`, `fraud-data-architecture.md`, `neocarta-slides.md`, `neocarta-slides-v2.md`, and `neosemantics.md`.
+- **Output:** The command writes HTML files to `docs/slides/dist/`. It builds `hyperscaler-overview.md`, `aws-main-services.md`, `aws-neo4j-finance-overview.md`, `fraud-data-architecture.md`, `neocarta-slides.md`, `neocarta-slides-v2.md`, `neosemantics.md`, and `enterprise-knowledge-layer.md`.
 - **Local files:** Keep `--allow-local-files` in the preview and build commands. Marp needs this flag to load the images in `images/<deck-name>/`.
 
 ## AWS technical review

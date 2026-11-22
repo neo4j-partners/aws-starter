@@ -2,7 +2,7 @@
 name = "neo4j-mcp-quickstart"
 version = "0.1.0"
 description = "LangGraph ReAct agent for Neo4j MCP server via AgentCore Gateway"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "langchain>=1.2.0",
     "langgraph>=1.0.6",

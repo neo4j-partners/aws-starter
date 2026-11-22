@@ -249,7 +249,7 @@ declared explicitly rather than relying on transitive dependencies.
 - A dedicated empty Neo4j Aura Free database.
 - AWS credentials with access to Titan Text Embeddings V2 and the selected
   Bedrock text model.
-- `uv` and Python 3.10 or later.
+- `uv` and Python 3.11 or later.
 
 Use Aura Free as the documented path. Local Docker can be mentioned in one
 sentence as an alternative, but it should not create a second setup guide.

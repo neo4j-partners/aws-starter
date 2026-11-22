@@ -26,7 +26,7 @@ and run the notebook from top to bottom.
 
 ## Requirements
 
-- **Python:** You need Python 3.10 or later and `uv`.
+- **Python:** You need Python 3.11 or later and `uv`.
 - **Neo4j:** You need a dedicated, empty Neo4j Aura Free database. A local Neo4j database also works, but these docs cover Aura Free.
 - **AWS:** Your AWS credentials need access to Amazon Titan Text Embeddings V2 in the configured region.
 

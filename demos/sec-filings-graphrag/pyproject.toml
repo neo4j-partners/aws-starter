@@ -2,7 +2,7 @@
 name = "sec-filings-graphrag"
 version = "0.1.0"
 description = "A small SEC-filings GraphRAG retrieval comparison using Neo4j and Amazon Bedrock"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "ipykernel",
     "neo4j",

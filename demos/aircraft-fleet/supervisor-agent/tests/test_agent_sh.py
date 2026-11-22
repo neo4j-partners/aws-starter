@@ -19,6 +19,9 @@ import pytest
 
 AGENT_ROOT = Path(__file__).resolve().parents[1]
 ACCOUNT = "111122223333"
+RUNTIME_ID = "fleetsupervisor_default_supervisor-AbCdE12345"
+LOG_PREFIX = f"/aws/bedrock-agentcore/runtimes/{RUNTIME_ID}-"
+LOG_GROUP = f"{LOG_PREFIX}DEFAULT"
 
 STUB_AGENTCORE = r"""#!/bin/bash
 echo "agentcore $*" >> "$STUB_LOG"
@@ -103,6 +106,24 @@ case "$1 $2" in
         if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
         echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
         exit 254
+        ;;
+    # describe-log-groups lists the STUB_LOG_GROUPS names that start with
+    # the prefix in $4. delete-log-group fails for a name in
+    # STUB_LOG_DELETE_FAIL and reports a name in STUB_LOG_MISSING as not
+    # found.
+    "logs describe-log-groups")
+        if [ -n "${STUB_LOGS_LIST_ERROR:-}" ]; then echo "$STUB_LOGS_LIST_ERROR" >&2; exit 254; fi
+        for name in ${STUB_LOG_GROUPS:-}; do
+            if [[ "$name" == "$4"* ]]; then echo "$name"; fi
+        done
+        ;;
+    "logs delete-log-group")
+        case " ${STUB_LOG_DELETE_FAIL:-} " in
+            *" $4 "*) echo "An error occurred (AccessDeniedException) when calling the DeleteLogGroup operation" >&2; exit 254 ;;
+        esac
+        case " ${STUB_LOG_MISSING:-} " in
+            *" $4 "*) echo "An error occurred (ResourceNotFoundException) when calling the DeleteLogGroup operation" >&2; exit 254 ;;
+        esac
         ;;
     "bedrock-agentcore-control get-oauth2-credential-provider")
         if [ -n "$STUB_PROVIDER_EXISTS" ]; then echo '{}'; exit 0; fi
@@ -205,6 +226,14 @@ CLEAN_STATUS = json.dumps(
 )
 
 
+def write_deployed_state(root: Path, runtime_id: object) -> None:
+    runtime = {"runtimeId": runtime_id, "runtimeArn": "arn", "roleArn": "arn"}
+    state = {"targets": {"default": {"resources": {"runtimes": {"supervisor": runtime}}}}}
+    path = root / "agentcore" / ".cli" / "deployed-state.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state))
+
+
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     root = tmp_path / "supervisor-agent"
@@ -215,6 +244,8 @@ def project(tmp_path: Path) -> Path:
     (root / "agentcore" / "aws-targets.json").write_text(
         json.dumps([{"name": "default", "account": ACCOUNT, "region": "us-west-2"}])
     )
+    # The deploy records the Runtime ID here. Git ignores it too.
+    write_deployed_state(root, RUNTIME_ID)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for name, body in (
@@ -1114,3 +1145,125 @@ def test_a_second_interrupt_during_the_restore_still_finishes_it(project: Path) 
     assert "Could not restore" not in result.stderr
     assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
+
+
+def logs_calls(project: Path) -> list[str]:
+    return [c for c in calls(project) if c.startswith("aws logs ")]
+
+
+def test_destroy_removes_only_the_runtime_log_groups(project: Path) -> None:
+    # Another Runtime's ID starts with the same characters, but its group
+    # does not start with the prefix, which ends with the dash after the ID.
+    other = "/aws/bedrock-agentcore/runtimes/fleetsupervisor_default_supervisor-AbCdE123456-DEFAULT"
+
+    result = run_destroy(project, STUB_LOG_GROUPS=f"{LOG_GROUP} {other}")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Removed: log group {LOG_GROUP}" in result.stdout
+    assert "Cleanup complete. Nothing is deployed in target 'default'." in result.stdout
+    assert logs_calls(project) == [
+        f"aws logs describe-log-groups --log-group-name-prefix {LOG_PREFIX} --region us-west-2 "
+        "--query logGroups[].[logGroupName] --output text",
+        f"aws logs delete-log-group --log-group-name {LOG_GROUP} --region us-west-2",
+    ]
+    assert not list((project.parent / "tmp").iterdir())
+
+
+def test_no_runtime_log_groups_are_reported_as_not_found(project: Path) -> None:
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Not found: log groups under {LOG_PREFIX} in us-west-2" in result.stdout
+    assert "Cleanup complete. Nothing is deployed in target 'default'." in result.stdout
+    assert not any(c.startswith("aws logs delete-log-group") for c in calls(project))
+
+
+def test_a_log_group_gone_before_its_delete_is_not_an_error(project: Path) -> None:
+    result = run_destroy(project, STUB_LOG_GROUPS=LOG_GROUP, STUB_LOG_MISSING=LOG_GROUP)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Not found: log group {LOG_GROUP}" in result.stdout
+    assert "Cleanup complete. Nothing is deployed in target 'default'." in result.stdout
+
+
+def test_a_failed_log_group_delete_names_the_group_and_fails(project: Path) -> None:
+    second = f"{LOG_PREFIX}other"
+
+    result = run_destroy(
+        project, STUB_LOG_GROUPS=f"{LOG_GROUP} {second}", STUB_LOG_DELETE_FAIL=LOG_GROUP
+    )
+
+    assert result.returncode == 1
+    assert "AccessDeniedException" in result.stderr
+    assert f"Could not delete these log groups in us-west-2:\x1b[0m\n  {LOG_GROUP}\n" in (
+        result.stdout
+    )
+    # The other group is still deleted.
+    assert f"Removed: log group {second}" in result.stdout
+    assert "Cleanup complete" not in result.stdout
+    assert not list((project.parent / "tmp").iterdir())
+
+
+def test_a_failed_log_group_listing_fails(project: Path) -> None:
+    result = run_destroy(
+        project,
+        STUB_LOGS_LIST_ERROR="An error occurred (ExpiredToken) when calling DescribeLogGroups",
+    )
+
+    assert result.returncode == 1
+    assert f"Could not list the log groups under {LOG_PREFIX} in us-west-2." in result.stdout
+    assert "ExpiredToken" in result.stderr
+    assert "Cleanup complete" not in result.stdout
+    assert not list((project.parent / "tmp").iterdir())
+
+
+@pytest.mark.parametrize(
+    "runtime_id", [None, "", "supervisor", "fleetsupervisor_default_supervisor-*", 12345]
+)
+def test_destroy_without_a_runtime_id_skips_the_log_groups(
+    project: Path, runtime_id: object
+) -> None:
+    if runtime_id is None:
+        (project / "agentcore" / ".cli" / "deployed-state.json").unlink()
+    else:
+        write_deployed_state(project, runtime_id)
+
+    result = run_destroy(project, STUB_LOG_GROUPS=LOG_GROUP)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "No Runtime ID is recorded" in result.stdout
+    assert "Cleanup complete. Nothing is deployed in target 'default'." in result.stdout
+    assert logs_calls(project) == []
+
+
+@pytest.mark.parametrize(
+    "stub_env",
+    [
+        # The teardown fails.
+        {"STUB_DEPLOY_EXIT": "3"},
+        # The stack is left behind.
+        {"STUB_STACK_STATUS": "DELETE_FAILED"},
+        # The stack was already absent.
+        {"STUB_STACK_BEFORE_DEPLOY": ""},
+    ],
+)
+def test_the_log_groups_stay_unless_the_teardown_finishes(
+    project: Path, stub_env: dict[str, str]
+) -> None:
+    run_destroy(project, STUB_LOG_GROUPS=LOG_GROUP, **stub_env)
+
+    assert logs_calls(project) == []
+
+
+def test_a_cancelled_destroy_keeps_the_log_groups(project: Path) -> None:
+    result = run_agent(
+        project,
+        "destroy",
+        stdin="n\n",
+        STUB_STACK_BEFORE_DEPLOY="CREATE_COMPLETE",
+        STUB_LOG_GROUPS=LOG_GROUP,
+    )
+
+    assert result.returncode == 1
+    assert "Cancelled. Nothing was changed." in result.stdout
+    assert logs_calls(project) == []

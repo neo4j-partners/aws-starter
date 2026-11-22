@@ -43,6 +43,10 @@ CDK_DIR="agentcore/cdk"
 TARGET="default"
 # The deploy targets. The first deploy writes this file, and git ignores it.
 TARGETS_FILE="agentcore/aws-targets.json"
+# The CLI records each deployed Runtime's ID here. Git ignores it.
+DEPLOYED_STATE="agentcore/.cli/deployed-state.json"
+# AgentCore writes each Runtime's logs to <prefix><runtime-id>-<endpoint>.
+RUNTIME_LOG_PREFIX="/aws/bedrock-agentcore/runtimes/"
 # The AgentCore Identity OAuth2 credential that holds the Gateway client
 # secret. deploy and destroy declare it for the one CLI run, then restore the
 # tracked agentcore.json. The construct then sets CREDENTIAL_FLEET_GATEWAY_NAME
@@ -557,9 +561,65 @@ aws_lookup() {
     exit 1
 }
 
+# Print the ID of $RUNTIME_NAME in $TARGET from the CLI's deployed state, or
+# fail. The deploy that destroy runs drops the Runtime from that file, so
+# destroy reads it first. The ID must match the AgentCore pattern, so the
+# log group prefix built from it can only match this Runtime.
+runtime_id() {
+    jq -r -e --arg t "$TARGET" --arg n "$RUNTIME_NAME" '
+        .targets[$t].resources.runtimes[$n].runtimeId
+        | if type == "string" and test("\\A[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}\\z") then .
+          else error("no valid runtimeId") end' "$DEPLOYED_STATE" 2>/dev/null
+}
+
+# Delete the CloudWatch log groups of Runtime $1 in region $2. Neither the
+# CLI nor the stack deletes them. The prefix ends with the dash after the
+# full ID, so it cannot match another Runtime's group. A missing group is
+# not an error. A failed delete does not stop the others. The function
+# names each group it could not delete and returns 1.
+delete_runtime_logs() {
+    local prefix="$RUNTIME_LOG_PREFIX$1-" region="$2" names name errors
+    local failed="" found=""
+    errors=$(make_temp) || return 1
+    if ! names=$(aws logs describe-log-groups --log-group-name-prefix "$prefix" \
+            --region "$region" --query 'logGroups[].[logGroupName]' --output text \
+            2>"$errors"); then
+        cat "$errors" >&2
+        rm -f "$errors"
+        echo -e "${RED}Could not list the log groups under $prefix in $region.${NC}"
+        return 1
+    fi
+    while IFS= read -r name; do
+        if [ -z "$name" ] || [[ "$name" != "$prefix"* ]]; then
+            continue
+        fi
+        found=yes
+        if aws logs delete-log-group --log-group-name "$name" --region "$region" \
+                2>"$errors" </dev/null; then
+            echo "Removed: log group $name"
+        elif grep -q "ResourceNotFoundException" "$errors"; then
+            echo "Not found: log group $name"
+        else
+            cat "$errors" >&2
+            failed+="${failed:+$'\n'}  $name"
+        fi
+    done <<<"$names"
+    rm -f "$errors"
+    if [ -z "$found" ]; then
+        echo "Not found: log groups under $prefix in $region"
+    fi
+    if [ -n "$failed" ]; then
+        echo -e "${RED}Could not delete these log groups in $region:${NC}"
+        echo "$failed"
+        return 1
+    fi
+}
+
 # Report everything destroy may have left. `agentcore status` reads the
 # CLI's deployed-state.json, so a lost state file would read as clean. The
-# stack and the credential provider are also looked up in AWS by name.
+# stack and the credential provider are also looked up in AWS by name. When
+# $1 holds a Runtime ID and nothing remains, delete that Runtime's log
+# groups too.
 report_remaining() {
     local status errors remaining region
     local failure="Could not check AWS for remaining resources:"
@@ -602,6 +662,9 @@ report_remaining() {
     if [ -n "$remaining" ]; then
         echo -e "${RED}Still deployed in target '$TARGET':${NC}"
         echo "$remaining"
+        exit 1
+    fi
+    if [ -n "${1:-}" ] && ! delete_runtime_logs "$1" "$region"; then
         exit 1
     fi
     echo -e "${GREEN}Cleanup complete. Nothing is deployed in target '$TARGET'.${NC}"
@@ -814,6 +877,13 @@ case "${1:-help}" in
         # destroy runs agentcore deploy too. Install before the spec changes,
         # so a failed install stops with nothing changed.
         ensure_cdk_deps
+        # The Runtime's log groups outlive the stack. Read its ID now, while
+        # the deployed state still records it, and delete them once the
+        # report confirms nothing remains.
+        if ! RUNTIME_ID=$(runtime_id); then
+            RUNTIME_ID=""
+            echo -e "${YELLOW}No Runtime ID is recorded, so destroy will not remove the Runtime's log groups.${NC}"
+        fi
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
         # The CLI has no destroy command. A deploy of a project that declares
@@ -830,7 +900,7 @@ case "${1:-help}" in
         agentcore deploy --target "$TARGET" --yes
         end_spec_restore
         echo ""
-        report_remaining
+        report_remaining "$RUNTIME_ID"
         ;;
 
     help|--help|-h)

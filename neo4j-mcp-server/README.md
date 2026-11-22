@@ -392,7 +392,7 @@ Agent → Cognito (client_credentials) → JWT Token
 Agent → Gateway + JWT → Gateway validates token
 Gateway → OAuth Provider → Gets Runtime token
 Gateway → Runtime + OAuth Token → MCP Request
-Runtime → Neo4j (env credentials) → Query
+Runtime → Neo4j (password from Secrets Manager) → Query
 ```
 
 The Runtime never holds the password itself. The stack sets
@@ -427,7 +427,7 @@ neo4j-mcp-server/
 ├── docs/
 │   └── CLAUDE_DESKTOP.md             # Claude Desktop setup
 ├── image/
-│   ├── Dockerfile                    # Layer that adds the startup entrypoint
+│   ├── Dockerfile                    # Layer that adds the startup entrypoint and a non-root user
 │   └── secret_entrypoint.py          # Reads the password secret, starts the server
 ├── tests/                            # Unit tests for the entrypoint (uv run pytest)
 ├── deploy.py                         # Deployment script

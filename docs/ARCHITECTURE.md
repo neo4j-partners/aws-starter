@@ -189,7 +189,7 @@ The stack takes six parameters.
 | `Neo4jPasswordSecretArn` | The Secrets Manager ARN of the Neo4j password |
 | `NetworkMode` | The Runtime network mode, `PUBLIC` or `PRIVATE`. The default is `PUBLIC`. |
 
-- **Runtime environment:** The container gets `NEO4J_URI`, `NEO4J_DATABASE`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`. It also gets `NEO4J_TRANSPORT=http`, port `8000`, path `/mcp`, and `NEO4J_READ_ONLY=true`.
+- **Runtime environment:** The container gets `NEO4J_URI`, `NEO4J_DATABASE`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD_SECRET_ARN`. It also gets `NEO4J_TRANSPORT=http`, port `8000`, path `/mcp`, and `NEO4J_READ_ONLY=true`.
 - **Outputs:** The stack exports the Runtime ID, ARN, and invocation URL, the Gateway URL, ID, and target name, the Cognito pool ID, client ID, token URL, and scope, and the agent execution role ARN. `./deploy.py credentials` reads these outputs.
 
 ### Authentication Architecture

@@ -40,7 +40,7 @@ uv run fleet-supervisor-cli "Compare fault counts with delay counts"
 
 ## Prerequisites
 
-- **Python:** You need Python 3.12 and the `uv` package manager.
+- **Python:** You need Python 3.12 or later and the `uv` package manager.
 - **AWS:** You need AWS credentials with Bedrock access to Claude Sonnet 5.5.
 - **Graph:** You need the fleet graph loaded by the [pipeline](../pipeline/).
 - **MCP server:** You need a `fleet` Neo4j MCP server deployment that points at the same Neo4j database. Run `./deploy.py --env fleet` and `./deploy.py --env fleet credentials` from `neo4j-mcp-server/`.
@@ -137,7 +137,7 @@ The environment picks one of two paths.
 
 - **Memory:** Set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env` before the first deploy. `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`.
 - **Gateway:** The deploy reads `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. `GATEWAY_URL` must use `https://`.
-- **Password secret:** `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN. The runtime role can read only that secret.
+- **Password secret:** `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN. The runtime role can read only that secret. [Create the secrets](../graphrag-agent/README.md#create-the-secrets) shows how to create it.
 - **Parsing:** The files are parsed, not sourced. A value exported in the shell wins.
 - **Validation:** Synth stops with one error that lists every missing or malformed setting.
 

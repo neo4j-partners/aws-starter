@@ -40,9 +40,11 @@ itself.
 - **Password:** `deploy.py` writes the password to the secret `<stack>/neo4j-password` and passes only the ARN to the stack. The Runtime gets the ARN as `NEO4J_PASSWORD_SECRET_ARN`. At startup, the image entrypoint reads the password with the Runtime role, which can read only that secret.
 - **Tokens:** Cognito issues 24-hour access tokens to the machine client, with the scope `neo4j-mcp-server-fleet-mcp/invoke`.
 
-`NEO4J_USERNAME` in `.env.fleet` names the read-only Neo4j user
+`NEO4J_USERNAME` in `.env.fleet` should name a read-only Neo4j user, such as
 `fleet_reader`, not the admin user. The MCP server already refuses writes,
-so the read-only user is a second guard. `./deploy.py redeploy` replaces
+so the read-only user is a second guard. The
+[MCP server README](../../../../neo4j-mcp-server/README.md#use-a-read-only-database-user-recommended)
+shows how to create one. `./deploy.py redeploy` replaces
 only the image. A change to the Neo4j settings needs a full `./deploy.py
 --env fleet`.
 

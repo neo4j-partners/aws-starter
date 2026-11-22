@@ -95,6 +95,21 @@ aws sso login --sso-session <your-sso-session>     # only if you use AWS SSO
 ./agent.sh logs --tail       # follows the Runtime logs
 ```
 
+### Create the secrets
+
+Create the two password secrets once, in the region you deploy to:
+
+```bash
+aws secretsmanager create-secret --region us-east-1 --name fleet/neo4j-reader \
+  --secret-string '{"username": "fleet_reader", "password": "<fleet-password>"}'
+aws secretsmanager create-secret --region us-east-1 --name fleet/memory-neo4j \
+  --secret-string '{"password": "<memory-password>"}'
+```
+
+- **ARNs:** Each command prints the complete secret ARN. Copy them into `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` in `../.env`.
+- **Read-only user:** The `username` key is optional. The [MCP server README](../../../neo4j-mcp-server/README.md#use-a-read-only-database-user-recommended) shows how to create a read-only Neo4j user on Aura.
+- **Supervisor:** The supervisor agent reuses the memory secret.
+
 ### Deploy settings
 
 `./agent.sh deploy` reads these from the shared `../.env`. A value exported in
@@ -246,7 +261,7 @@ exports them with the rest.
 | Symptom | Cause and fix |
 |---------|---------------|
 | `MEM_NEO4J_URI is not set` at startup | Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `.env`. They point at the memory database. |
-| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env`. For a deployed Runtime, set them and run `./agent.sh deploy` again. |
+| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env`. A deployed Runtime reads the password from its secret instead, so set `NEO4J_URI` and run `./agent.sh deploy` again. |
 | `Missing or invalid deploy settings for runtime "graphrag_agent"` | A deploy setting is unset, a Neo4j URI lacks TLS, or a secret ARN is incomplete. Fix the listed names. |
 | `Could not read the secret in NEO4J_PASSWORD_SECRET_ARN` | The secret is missing in that region, or the Runtime role cannot read it. Check the ARN and the KMS key. |
 | `vector_search` returns poor results or nothing | Align `EMBED_MODEL_ID` and `EMBED_DIMENSIONS` with the pipeline, and confirm the vector index exists. |

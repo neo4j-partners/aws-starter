@@ -67,7 +67,7 @@ uv run fleet-cli "How many aircraft are in the database?"   # terminal 2
 - **Memory database:** You need a second Neo4j database or instance for agent memory. It can start empty.
 - **AWS:** You need AWS credentials with Bedrock access to Claude and the Titan embedding model.
 - **Tools:** You need the [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.12 or later.
-- **Deploy tools:** Cloud deploys need the AgentCore CLI, installed with `npm install -g @aws/agentcore`.
+- **Deploy tools:** Cloud deploys need the AgentCore CLI, installed with `npm install -g @aws/agentcore`. The agents are tested with version 1.2.0.
 
 ## Configure
 
@@ -129,16 +129,20 @@ Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 - **Passwords:** The deploy never sends a password. The runtime reads each one from the Secrets Manager secret named by `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN`.
 - **User names:** A secret with a `username` key also sets the Neo4j user. The shared `.env` can then keep the admin user for the pipeline while the agents read as a read-only user.
 
-See [Deploy](graphrag-agent/README.md#deploy) for the one-time setup.
+See [Deploy](graphrag-agent/README.md#deploy) for the one-time setup, which
+creates the two secrets.
 
 ## Step 4: Run the supervisor agent over the MCP Gateway (optional)
 
 The supervisor needs a Neo4j MCP server that points at the same `NEO4J_URI`.
-Run these commands from the repo root:
+The MCP server deploy also needs Docker with buildx, the AWS CDK CLI, and a
+local clone of the server source. See the
+[MCP server README](../../neo4j-mcp-server/README.md) for these and for how to
+create a read-only Neo4j user. Run these commands from the repo root:
 
 ```bash
 cd neo4j-mcp-server
-cp .env.sample .env.fleet    # set the same NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
+cp .env.sample .env.fleet    # set the same NEO4J_URI, a read-only NEO4J_USERNAME and NEO4J_PASSWORD, and NEO4J_MCP_REPO
 ./deploy.py --env fleet
 ./deploy.py --env fleet credentials
 ../scripts/sync-credentials.sh   # copies the credentials to demos/aircraft-fleet/.mcp-credentials.json

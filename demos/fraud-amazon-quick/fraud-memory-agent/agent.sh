@@ -184,8 +184,9 @@ print_usage() {
 
 destroy_agent() {
     # `agentcore destroy` keeps the CodeBuild source bucket, the memory log
-    # group and the local build cache. It also deletes the config, so copy it
-    # first for scripts/clean_destroy_leftovers.py to read.
+    # group, the local build cache and the Runtime's log groups. It also
+    # deletes the config, so copy it first for
+    # scripts/clean_destroy_leftovers.py to read.
     if [ ! -f "$CONFIG_FILE" ]; then
         uv run agentcore destroy
         echo -e "${YELLOW}No $(basename "$CONFIG_FILE"), so the leftover cleanup was skipped.${NC}"

@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import yaml
 from botocore.exceptions import ClientError
@@ -24,6 +24,9 @@ ACCOUNT = "111122223333"
 REGION = "us-east-1"
 BUCKET = f"bedrock-agentcore-codebuild-sources-{ACCOUNT}-{REGION}"
 LOG_GROUP = "/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/mem-123"
+RUNTIME_ID = "fraud_memory_agent-AbCdE12345"
+RUNTIME_PREFIX = f"/aws/bedrock-agentcore/runtimes/{RUNTIME_ID}-"
+RUNTIME_LOG_GROUP = f"{RUNTIME_PREFIX}DEFAULT"
 
 
 def client_error(code: str) -> ClientError:
@@ -33,6 +36,7 @@ def client_error(code: str) -> ClientError:
 def agent_config(**memory: object) -> dict:
     return {
         "aws": {"account": ACCOUNT, "region": REGION},
+        "bedrock_agentcore": {"agent_id": RUNTIME_ID},
         "memory": {
             "mode": "STM_ONLY",
             "memory_id": "mem-123",
@@ -49,13 +53,21 @@ class FakeClients:
         self.s3 = Mock()
         self.s3.list_object_versions.return_value = {}
         self.logs = Mock()
+        self.runtime_log_groups = [RUNTIME_LOG_GROUP]
+        self.logs.get_paginator.return_value.paginate.side_effect = self.paginate
         self.sts = Mock()
         self.sts.get_caller_identity.return_value = {"Account": ACCOUNT}
+        self.control = Mock()
+        self.control.get_agent_runtime.side_effect = client_error("ResourceNotFoundException")
         self.regions: list[str] = []
+
+    def paginate(self, logGroupNamePrefix: str) -> list[dict]:
+        groups = [name for name in self.runtime_log_groups if name.startswith(logGroupNamePrefix)]
+        return [{"logGroups": [{"logGroupName": name} for name in groups]}]
 
     def __call__(self, service: str, *, region_name: str) -> Mock:
         self.regions.append(region_name)
-        return getattr(self, service)
+        return self.control if service == "bedrock-agentcore-control" else getattr(self, service)
 
 
 class CleanLeftoversTests(unittest.TestCase):
@@ -75,7 +87,7 @@ class CleanLeftoversTests(unittest.TestCase):
     def run_clean(self, agent: dict) -> tuple[list[str], list[str]]:
         return clean.clean_leftovers(agent, AGENT, self.cache_dir, self.clients)
 
-    def test_all_three_leftovers_are_removed(self) -> None:
+    def test_all_four_leftovers_are_removed(self) -> None:
         self.make_agent_cache()
 
         report, failures = self.run_clean(agent_config())
@@ -87,6 +99,7 @@ class CleanLeftoversTests(unittest.TestCase):
                 f"Removed: S3 bucket {BUCKET}",
                 f"Removed: log group {LOG_GROUP}",
                 f"Removed: local cache {self.cache_dir / AGENT}",
+                f"Removed: log group {RUNTIME_LOG_GROUP}",
             ],
         )
         self.clients.s3.list_object_versions.assert_called_once_with(
@@ -95,13 +108,18 @@ class CleanLeftoversTests(unittest.TestCase):
         self.clients.s3.delete_bucket.assert_called_once_with(
             Bucket=BUCKET, ExpectedBucketOwner=ACCOUNT
         )
-        self.clients.logs.delete_log_group.assert_called_once_with(logGroupName=LOG_GROUP)
+        self.assertEqual(
+            self.clients.logs.delete_log_group.call_args_list,
+            [call(logGroupName=LOG_GROUP), call(logGroupName=RUNTIME_LOG_GROUP)],
+        )
+        self.clients.control.get_agent_runtime.assert_called_once_with(agentRuntimeId=RUNTIME_ID)
         self.assertFalse(self.cache_dir.exists())
         self.assertEqual(set(self.clients.regions), {REGION})
 
     def test_missing_resources_are_reported_as_not_found(self) -> None:
         self.clients.s3.list_object_versions.side_effect = client_error("NoSuchBucket")
         self.clients.logs.delete_log_group.side_effect = client_error("ResourceNotFoundException")
+        self.clients.runtime_log_groups = []
 
         report, failures = self.run_clean(agent_config())
 
@@ -112,6 +130,7 @@ class CleanLeftoversTests(unittest.TestCase):
                 f"Not found: S3 bucket {BUCKET}",
                 f"Not found: log group {LOG_GROUP}",
                 f"Not found: local cache {self.cache_dir / AGENT}",
+                f"Not found: log groups under {RUNTIME_PREFIX} in {REGION}",
             ],
         )
         self.clients.s3.delete_bucket.assert_not_called()
@@ -137,7 +156,8 @@ class CleanLeftoversTests(unittest.TestCase):
         report, _ = self.run_clean(agent_config(was_created_by_toolkit=False))
 
         self.assertEqual(report[1], "Skipped: memory log group; memory mem-123 was pre-existing")
-        self.clients.logs.delete_log_group.assert_not_called()
+        # Only the runtime's log group is deleted.
+        self.clients.logs.delete_log_group.assert_called_once_with(logGroupName=RUNTIME_LOG_GROUP)
 
     def test_an_agent_without_memory_has_no_log_group(self) -> None:
         for memory in ({"mode": "NO_MEMORY"}, {"memory_id": None}):
@@ -145,7 +165,11 @@ class CleanLeftoversTests(unittest.TestCase):
                 report, _ = self.run_clean(agent_config(**memory))
 
                 self.assertEqual(report[1], "Skipped: memory log group; the agent had no memory")
-        self.clients.logs.delete_log_group.assert_not_called()
+        # Only the runtime's log group is deleted, once per subtest.
+        self.assertEqual(
+            self.clients.logs.delete_log_group.call_args_list,
+            [call(logGroupName=RUNTIME_LOG_GROUP)] * 2,
+        )
 
     def test_the_account_comes_from_sts_when_the_config_has_none(self) -> None:
         agent = agent_config()
@@ -164,7 +188,8 @@ class CleanLeftoversTests(unittest.TestCase):
 
         self.assertEqual(failures, [])
         self.assertEqual(
-            report[0], "Skipped: S3 bucket and memory log group; no Region in the config"
+            report[0],
+            "Skipped: S3 bucket, memory log group and runtime log groups; no Region in the config",
         )
         self.assertEqual(self.clients.regions, [])
 
@@ -175,11 +200,126 @@ class CleanLeftoversTests(unittest.TestCase):
 
         report, failures = self.run_clean(agent_config())
 
-        self.assertEqual(len(failures), 2)
+        self.assertEqual(len(failures), 3)
         self.assertIn("S3 source bucket", failures[0])
         self.assertIn("AccessDenied", failures[0])
         self.assertIn("log group of memory mem-123 in us-east-1", failures[1])
+        self.assertIn(f"Could not remove log group {RUNTIME_LOG_GROUP} in us-east-1", failures[2])
         self.assertEqual(report, [f"Removed: local cache {self.cache_dir / AGENT}"])
+
+    def test_only_this_runtimes_log_groups_are_removed(self) -> None:
+        other = "/aws/bedrock-agentcore/runtimes/fraud_memory_agent-AbCdE123456-DEFAULT"
+        self.clients.runtime_log_groups = [RUNTIME_LOG_GROUP, other]
+
+        report, failures = self.run_clean(agent_config())
+
+        self.assertEqual(failures, [])
+        self.assertEqual(report[3], f"Removed: log group {RUNTIME_LOG_GROUP}")
+        self.clients.logs.get_paginator.return_value.paginate.assert_called_once_with(
+            logGroupNamePrefix=RUNTIME_PREFIX
+        )
+        self.assertNotIn(
+            call(logGroupName=other), self.clients.logs.delete_log_group.call_args_list
+        )
+
+    def test_a_failed_runtime_log_group_delete_names_the_group(self) -> None:
+        second = f"{RUNTIME_PREFIX}other"
+        self.clients.runtime_log_groups = [RUNTIME_LOG_GROUP, second]
+
+        def delete(logGroupName: str) -> None:
+            if logGroupName == RUNTIME_LOG_GROUP:
+                raise client_error("AccessDeniedException")
+
+        self.clients.logs.delete_log_group.side_effect = delete
+
+        report, failures = self.run_clean(agent_config())
+
+        self.assertEqual(len(failures), 1)
+        self.assertIn(f"Could not remove log group {RUNTIME_LOG_GROUP} in {REGION}", failures[0])
+        self.assertEqual(report[3:], [f"Removed: log group {second}"])
+
+    def test_a_runtime_log_group_gone_before_its_delete_is_not_an_error(self) -> None:
+        def delete(logGroupName: str) -> None:
+            if logGroupName == RUNTIME_LOG_GROUP:
+                raise client_error("ResourceNotFoundException")
+
+        self.clients.logs.delete_log_group.side_effect = delete
+
+        report, failures = self.run_clean(agent_config())
+
+        self.assertEqual(failures, [])
+        self.assertEqual(report[3], f"Not found: log group {RUNTIME_LOG_GROUP}")
+
+    def test_no_valid_runtime_id_skips_the_runtime_log_groups(self) -> None:
+        for runtime in (
+            None,
+            {},
+            {"agent_id": None},
+            {"agent_id": "fraud_memory_agent"},
+            {"agent_id": f"{RUNTIME_ID}*"},
+        ):
+            with self.subTest(runtime=runtime):
+                agent = agent_config()
+                agent["bedrock_agentcore"] = runtime
+
+                report, failures = self.run_clean(agent)
+
+                self.assertEqual(failures, [])
+                self.assertEqual(
+                    report[3], "Skipped: runtime log groups; no valid runtime ID in the config"
+                )
+        self.clients.control.get_agent_runtime.assert_not_called()
+        self.clients.logs.get_paginator.assert_not_called()
+
+    def test_the_runtime_log_groups_wait_until_the_runtime_is_gone(self) -> None:
+        self.clients.control.get_agent_runtime.side_effect = [
+            {"status": "DELETING"},
+            client_error("ResourceNotFoundException"),
+        ]
+
+        with patch.object(clean.time, "sleep") as sleep:
+            report, failures = self.run_clean(agent_config())
+
+        self.assertEqual(failures, [])
+        self.assertEqual(report[3], f"Removed: log group {RUNTIME_LOG_GROUP}")
+        sleep.assert_called_once_with(clean.RUNTIME_DELETE_POLL)
+
+    def test_a_runtime_that_outlasts_the_wait_keeps_its_log_groups(self) -> None:
+        self.clients.control.get_agent_runtime.side_effect = None
+        self.clients.control.get_agent_runtime.return_value = {"status": "DELETING"}
+
+        with (
+            patch.object(clean, "RUNTIME_DELETE_TIMEOUT", 0),
+            patch.object(clean.time, "sleep") as sleep,
+        ):
+            report, failures = self.run_clean(agent_config())
+
+        self.assertEqual(len(report), 3)
+        self.assertEqual(len(failures), 1)
+        self.assertIn(f"Runtime {RUNTIME_ID} is still present after 0s", failures[0])
+        self.assertIn(RUNTIME_PREFIX, failures[0])
+        sleep.assert_not_called()
+        self.clients.logs.get_paginator.assert_not_called()
+
+    def test_a_failed_runtime_check_or_listing_is_a_failure(self) -> None:
+        for target in ("get_agent_runtime", "paginate"):
+            with self.subTest(target=target):
+                clients = FakeClients()
+                error = client_error("ExpiredTokenException")
+                if target == "get_agent_runtime":
+                    clients.control.get_agent_runtime.side_effect = error
+                else:
+                    clients.logs.get_paginator.return_value.paginate.side_effect = error
+
+                report, failures = clean.clean_leftovers(
+                    agent_config(), AGENT, self.cache_dir, clients
+                )
+
+                self.assertEqual(len(report), 3)
+                self.assertEqual(len(failures), 1)
+                self.assertIn(
+                    f"Could not remove the log groups under {RUNTIME_PREFIX}", failures[0]
+                )
 
     def test_another_agents_cache_is_kept(self) -> None:
         self.make_agent_cache()

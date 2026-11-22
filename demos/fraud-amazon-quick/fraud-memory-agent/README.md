@@ -167,19 +167,21 @@ Recovery and diagnostics commands:
 
 ### Tear down
 
-`agentcore destroy` leaves three things behind. `./agent.sh destroy` removes them after destroy finishes:
+`agentcore destroy` leaves four things behind. `./agent.sh destroy` removes them after destroy finishes:
 
 - **Source bucket:** It deletes the S3 bucket `bedrock-agentcore-codebuild-sources-<account>-<region>` only when the bucket is empty. Every toolkit agent in that account and Region shares it.
 - **Memory log group:** It deletes `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` only when the toolkit created the memory. Destroy keeps a pre-existing memory, so its log group stays too.
 - **Build cache:** It deletes the local `.bedrock_agentcore/fraud_memory_agent/` folder, which can hold about 50 MB. It deletes `.bedrock_agentcore/` only when nothing else is left in it.
+- **Runtime log groups:** It deletes the log groups under `/aws/bedrock-agentcore/runtimes/<runtime-id>-`, such as the `-DEFAULT` endpoint's group. The runtime ID is the `agent_id` from the config. Destroy does not wait for AgentCore to delete the Runtime, so the cleanup waits up to 10 minutes for the Runtime to disappear first. If the Runtime is still there, the log groups stay and `agent.sh` exits 1.
 
 It prints `Removed`, `Skipped` or `Not found` for each one. A missing resource is not an error. When destroy is cancelled or fails, the cleanup does not run. When an AWS call fails, `agent.sh` exits 1.
 
-If the cleanup fails, remove the leftovers by hand. `destroy` has already deleted `.bedrock_agentcore.yaml`, so take the Region and memory ID from the `Could not remove` lines:
+If the cleanup fails, remove the leftovers by hand. `destroy` has already deleted `.bedrock_agentcore.yaml`, so take the Region, memory ID and runtime ID from the `Could not remove` lines:
 
 ```bash
 REGION=us-east-1
 MEMORY_ID=<memory-id>
+RUNTIME_ID=<runtime-id>
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET=bedrock-agentcore-codebuild-sources-$ACCOUNT-$REGION
 
@@ -190,6 +192,14 @@ aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
 aws logs delete-log-group --region "$REGION" \
     --log-group-name "/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/$MEMORY_ID"
 rm -rf .bedrock_agentcore/fraud_memory_agent/
+
+# Run these only after get-agent-runtime reports that the Runtime is not found.
+aws bedrock-agentcore-control get-agent-runtime --region "$REGION" --agent-runtime-id "$RUNTIME_ID"
+aws logs describe-log-groups --region "$REGION" \
+    --log-group-name-prefix "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-" \
+    --query 'logGroups[].logGroupName' --output text
+aws logs delete-log-group --region "$REGION" \
+    --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT"
 ```
 
 ## Generate NAMS traffic

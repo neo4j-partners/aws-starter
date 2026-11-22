@@ -131,7 +131,7 @@ Run this from `neo4j-mcp-server/`:
 ```
 
 This command writes `.mcp-credentials.json`. The file holds the Gateway URL,
-the client ID and secret, and a JWT token. The token lasts about 1 hour. Run
+the client ID and secret, and a JWT token. The token lasts 24 hours. Run
 the command again to get a new one.
 
 ## Step 5: Test through the Gateway

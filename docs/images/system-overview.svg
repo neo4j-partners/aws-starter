@@ -36,7 +36,7 @@
   <text x="710.0" y="578" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Claude and Titan</text>
   <rect x="980" y="320" width="340" height="170" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
   <text x="1150.0" y="352" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">AgentCore Runtime</text>
-  <text x="1150.0" y="378" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Neo4j MCP server in Go</text>
+  <text x="1150.0" y="378" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">mcp-neo4j-cypher (Python)</text>
   <text x="1150.0" y="400" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">port 8000, read-only mode</text>
   <text x="1150.0" y="422" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">get_neo4j_schema</text>
   <text x="1150.0" y="444" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read_neo4j_cypher</text>

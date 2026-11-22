@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1010" viewBox="0 0 1600 1010" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Supervisor Routing and Gateway Auth</title>
+  <desc>The supervisor model picks the Maintenance Agent, the Operations Agent, or both from their tool descriptions. Each call builds a fresh specialist that uses the shared Gateway MCP client, filtered to the two prefixed tools. BearerTokenAuth attaches a Gateway token on every request. Locally the token comes from a client_credentials grant against Cognito with the secret from .mcp-credentials.json. On AgentCore Runtime it comes from AgentCore Identity, using the request&#x27;s workload access token and the fleet-gateway credential provider, so the runtime holds no client secret.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="1010" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Supervisor Routing and Gateway Auth</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">The model routes by tool description. Both specialists share one Gateway client and one token source.</text>
+  <text x="40" y="140" font-size="14" font-weight="700" fill="#5C6470" text-anchor="start">ROUTING</text>
+  <rect x="40" y="160" width="240" height="150" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="160.0" y="192" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Question</text>
+  <text x="160.0" y="218" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">“Compare fault counts</text>
+  <text x="160.0" y="240" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">with delay counts”</text>
+  <rect x="350" y="150" width="300" height="170" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="500.0" y="182" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Supervisor</text>
+  <text x="500.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands Agent, Sonnet 5.5</text>
+  <text x="500.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">tools: maintenance_specialist,</text>
+  <text x="500.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">operations_specialist</text>
+  <text x="500.0" y="274" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">combines the answers</text>
+  <path d="M280,235 H346" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="740" y="150" width="320" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="900.0" y="182" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Maintenance Agent</text>
+  <text x="900.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">faults, components, systems</text>
+  <text x="900.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sensors, readings, severity</text>
+  <text x="900.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fresh Agent per call</text>
+  <rect x="740" y="310" width="320" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="900.0" y="342" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Operations Agent</text>
+  <text x="900.0" y="368" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">flights, delays, routes, airports</text>
+  <text x="900.0" y="390" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">schema and simple counts</text>
+  <text x="900.0" y="412" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fresh Agent per call</text>
+  <path d="M650,210 H695 V220 H736" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <path d="M650,270 H695 V375 H736" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="599" y="337" width="93" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="685" y="352" font-size="12" font-weight="600" fill="#1E3A5F" text-anchor="end">one or both</text>
+  <rect x="1140" y="230" width="420" height="160" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1350.0" y="262" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">Gateway MCP client</text>
+  <text x="1350.0" y="288" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">one shared MCPClient</text>
+  <text x="1350.0" y="310" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">tool filter: neo4j-mcp-server-target___</text>
+  <text x="1350.0" y="332" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">get_neo4j_schema, read_neo4j_cypher</text>
+  <text x="1350.0" y="354" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">GatewayTool rebuilds and retries once</text>
+  <path d="M1060,220 H1100 V290 H1136" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <path d="M1060,375 H1100 V330 H1136" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <line x1="40" y1="480" x2="1560" y2="480" stroke="#D0D5DD" stroke-width="1.5" stroke-dasharray="6 6"/>
+  <text x="40" y="515" font-size="14" font-weight="700" fill="#5C6470" text-anchor="start">GATEWAY AUTH</text>
+  <rect x="560" y="530" width="480" height="140" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="800.0" y="562" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">BearerTokenAuth</text>
+  <text x="800.0" y="588" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">adds Authorization: Bearer on every MCP request</text>
+  <text x="800.0" y="610" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">refreshes 60 s before the token&#x27;s exp</text>
+  <text x="800.0" y="632" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">a 401 forces one new token and one retry</text>
+  <path d="M1350,394 V600 H1044" fill="none" stroke="#D97706" stroke-width="2.5" marker-start="url(#a-orange)" marker-end="url(#a-orange)"/>
+  <rect x="1282" y="505" width="136" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1350" y="520" font-size="12" font-weight="600" fill="#8A4B08" text-anchor="middle">token per request</text>
+  <rect x="40" y="720" width="740" height="250" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="60" y="752" font-size="17" font-weight="700" fill="#344054" text-anchor="start">Local run (./agent.sh start)</text>
+  <rect x="70" y="780" width="300" height="160" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="220.0" y="812" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">.mcp-credentials.json</text>
+  <text x="220.0" y="838" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">written by deploy.py --env fleet</text>
+  <text x="220.0" y="860" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">copied by sync-credentials.sh</text>
+  <text x="220.0" y="882" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">gateway_url, token_url</text>
+  <text x="220.0" y="904" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client_id, client_secret</text>
+  <rect x="450" y="780" width="300" height="160" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="600.0" y="812" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Cognito token URL</text>
+  <text x="600.0" y="838" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client_credentials grant</text>
+  <text x="600.0" y="860" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">HTTP Basic client auth</text>
+  <text x="600.0" y="882" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">scope from the file</text>
+  <text x="600.0" y="904" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">token lasts 24 hours</text>
+  <path d="M370,860 H446" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="379" y="833" width="57" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="408" y="848" font-size="12" font-weight="600" fill="#344054" text-anchor="middle">secret</text>
+  <rect x="820" y="720" width="740" height="250" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="840" y="752" font-size="17" font-weight="700" fill="#344054" text-anchor="start">AgentCore Runtime (./agent.sh deploy)</text>
+  <rect x="850" y="780" width="300" height="160" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1000.0" y="812" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">Runtime environment</text>
+  <text x="1000.0" y="838" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CREDENTIAL_FLEET_GATEWAY_NAME</text>
+  <text x="1000.0" y="860" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">GATEWAY_URL, GATEWAY_SCOPES</text>
+  <text x="1000.0" y="882" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">workload access token</text>
+  <text x="1000.0" y="904" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">from each request</text>
+  <rect x="1230" y="780" width="300" height="160" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1380.0" y="812" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">AgentCore Identity</text>
+  <text x="1380.0" y="838" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet-gateway OAuth provider</text>
+  <text x="1380.0" y="860" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">holds the client secret</text>
+  <text x="1380.0" y="882" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">M2M flow, force on a 401</text>
+  <text x="1380.0" y="904" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Cognito issues the token</text>
+  <path d="M1150,860 H1226" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="1149" y="833" width="79" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1188" y="848" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">get_token</text>
+  <path d="M600,780 V708 H700 V674" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M1380,780 V708 H900 V674" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="706" y="688" width="108" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="760" y="703" font-size="12" font-weight="600" fill="#8A4B08" text-anchor="middle">local fetcher</text>
+  <rect x="923" y="688" width="115" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="980" y="703" font-size="12" font-weight="600" fill="#8A4B08" text-anchor="middle">IdentityTokens</text>
+</svg>

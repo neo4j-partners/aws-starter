@@ -176,9 +176,15 @@ The diagrams live in [`docs/images/`](./docs/images/) as SVG files.
 | [`graphrag-request-flow.svg`](docs/images/graphrag-request-flow.svg) | One request through the GraphRAG agent |
 | [`supervisor-request-flow.svg`](docs/images/supervisor-request-flow.svg) | One request through the supervisor and the Gateway |
 | [`memory-lifecycle.svg`](docs/images/memory-lifecycle.svg) | How both agents open, use, and close conversation memory |
+| [`data-model.svg`](docs/images/data-model.svg) | The operational node labels and relationship types |
+| [`generator-flow.svg`](docs/images/generator-flow.svg) | The six data generator stages, atomic publish, and the output checks |
+| [`supervisor-routing-auth.svg`](docs/images/supervisor-routing-auth.svg) | Supervisor routing and the two Gateway token paths |
+| [`end-to-end-sequence.svg`](docs/images/end-to-end-sequence.svg) | One supervisor question through a specialist and the Gateway |
+| [`deployment-topology.svg`](docs/images/deployment-topology.svg) | The deploy steps, the three stacks, and the two databases |
 
 ## More detail
 
+- **Architecture:** The [fleet architecture document](./docs/ARCHITECTURE.md) explains how the parts fit together. Each part has its own document: [pipeline](./docs/architecture/pipeline.md), [GraphRAG agent](./docs/architecture/graphrag-agent.md), [supervisor agent](./docs/architecture/supervisor-agent.md), [memory](./docs/architecture/memory.md), and [deployment](./docs/architecture/deployment.md).
 - **Pipeline:** The [pipeline README](./pipeline/README.md) covers the stages, Bedrock structured output, and dataset sizes.
 - **GraphRAG agent:** The [GraphRAG agent README](./graphrag-agent/README.md) covers the tools, memory, local and cloud runs, and troubleshooting.
 - **Supervisor agent:** The [supervisor agent README](./supervisor-agent/README.md) covers routing, Gateway recovery, and cloud deployment.

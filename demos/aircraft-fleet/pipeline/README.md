@@ -210,3 +210,7 @@ cd neo4j-mcp-server
 
 `./deploy.py redeploy` updates only the container image. It does not apply new
 Neo4j settings.
+
+## See also
+
+- **Architecture:** The [pipeline architecture document](../docs/architecture/pipeline.md) explains the design. The [fleet architecture document](../docs/ARCHITECTURE.md) shows how it fits with the rest of the demo.

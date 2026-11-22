@@ -278,3 +278,4 @@ See `fleet_supervisor/client/queries.txt` for all 20 questions.
 
 - **Fleet demo:** The [fleet README](../README.md) shows how the pipeline and both agents fit together.
 - **Single agent:** The [GraphRAG agent](../graphrag-agent/) answers the same questions with a direct Neo4j driver.
+- **Architecture:** The [supervisor architecture document](../docs/architecture/supervisor-agent.md) explains routing, Gateway reconnects, and the token paths. The [deployment document](../docs/architecture/deployment.md) covers the `fleet-gateway` provider.

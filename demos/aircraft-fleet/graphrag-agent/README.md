@@ -253,3 +253,7 @@ exports them with the rest.
 | `NoCredentialsError` | AWS credentials are missing. Run `aws configure` or set them in the environment. |
 | `AccessDeniedException` on the model | Enable Bedrock model access for Claude and the Titan embedding model. |
 | A 404 JSON response with `timestamp` on port 7070 | Another service holds port 7070. Run `lsof -ti :7070 \| xargs kill`, then restart. |
+
+## See also
+
+- **Architecture:** The [GraphRAG agent architecture document](../docs/architecture/graphrag-agent.md) explains the design. The [fleet architecture document](../docs/ARCHITECTURE.md) shows how it fits with the rest of the demo.

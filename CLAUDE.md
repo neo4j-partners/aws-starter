@@ -293,7 +293,7 @@ The script extracts DataZone IDs from Bedrock IDE exports (`amazon-bedrock-ide-a
 
 - [AgentCore Documentation](https://docs.aws.amazon.com/bedrock-agentcore/)
 - [AgentCore Samples](https://github.com/awslabs/amazon-bedrock-agentcore-samples)
-- [Neo4j MCP Server](https://github.com/neo4j/mcp)
+- [Neo4j MCP Server](https://github.com/neo4j-partners/mcp-neo4j)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [LangGraph Multi-Agent](https://langchain-ai.github.io/langgraph/concepts/multi_agent/)
 - [uv Package Manager](https://docs.astral.sh/uv/)

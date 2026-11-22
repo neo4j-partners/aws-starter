@@ -1078,7 +1078,8 @@ Runtimes, credential providers, Gateways, Cognito pools, IAM roles, log
 groups, ECR repositories, and secrets. `.env` and `.env.fleet` match their
 pre-run copies. The fleet credentials copies are removed. The run also removed
 `neo4j-mcp-server/.env.fleet.readonly`, which held the dropped
-`fleet_reader` login. `create_reader.py` writes it again at the next setup. The fraud agent's
+`fleet_reader` login. `create_reader.py` reads that file as input. The next
+setup must write it again before it runs `create_reader.py`. The fraud agent's
 `.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
 on, and the fleet graph is unchanged.
 
@@ -1188,6 +1189,8 @@ fraud deploy check also ran before the new runtime was READY.
    request. The fraud graph Aura instances in `graph-loader/.env` and
    `.env.finance.admin` no longer resolve in DNS. `.env.finance` points at
    the fleet instance. This is environment setup, not a code bug.
+   Decision 2026-11-22: left blocked. Unblocking needs a new Aura instance
+   for the fraud graph and a NAMS workspace pointed at a working database.
 3. `./agent.sh invoke-cloud` in the fraud agent exits 0 when the response
    is an error event. `./agent.sh logs --errors` also finds no failed
    traces after that error. A script that checks the exit code reads this

@@ -19,7 +19,6 @@ from typing import Any
 from dotenv import load_dotenv
 from neo4j import Driver, GraphDatabase
 
-
 # The fraud CSVs live in fraud-amazon-quick/data/, shared with fraud-iceberg/.
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
@@ -48,9 +47,7 @@ def _connection_settings() -> tuple[str, str, str, str]:
     missing = [name for name in required if not os.environ.get(name)]
     if missing:
         joined = ", ".join(missing)
-        raise SystemExit(
-            f"Missing {joined}. Set them in {ENV_FILE} or the environment."
-        )
+        raise SystemExit(f"Missing {joined}. Set them in {ENV_FILE} or the environment.")
     return (
         os.environ["NEO4J_URI"],
         os.environ["NEO4J_USERNAME"],
@@ -59,7 +56,9 @@ def _connection_settings() -> tuple[str, str, str, str]:
     )
 
 
-def _rows(filename: str, convert: Callable[[dict[str, str]], dict[str, Any]]) -> Iterator[dict[str, Any]]:
+def _rows(
+    filename: str, convert: Callable[[dict[str, str]], dict[str, Any]]
+) -> Iterator[dict[str, Any]]:
     with (DATA_DIR / filename).open(newline="", encoding="utf-8") as handle:
         yield from (convert(row) for row in csv.DictReader(handle))
 
@@ -116,11 +115,18 @@ def _transfer(row: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def _write_batches(driver: Driver, database: str, cypher: str, rows: Iterator[dict[str, Any]], batch_size: int, label: str) -> None:
+def _write_batches(
+    driver: Driver,
+    database: str,
+    cypher: str,
+    rows: Iterator[dict[str, Any]],
+    batch_size: int,
+    label: str,
+) -> None:
     total = 0
     with driver.session(database=database) as session:
         for batch in _batches(rows, batch_size):
-            session.execute_write(lambda tx: tx.run(cypher, rows=batch).consume())
+            session.execute_write(lambda tx, batch=batch: tx.run(cypher, rows=batch).consume())
             total += len(batch)
             if total % 25_000 == 0 or len(batch) < batch_size:
                 print(f"{label}: {total:,} rows")

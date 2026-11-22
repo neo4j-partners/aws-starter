@@ -11,6 +11,7 @@ Before running:
 2. Fill in your Neo4j Aura API credentials
 3. Run: uv run python examples/async_usage.py
 """
+
 import asyncio
 import logging
 import sys
@@ -66,7 +67,7 @@ async def main() -> None:
         print(f"\nCompleted in {elapsed:.2f} seconds")
         print("=" * 60)
 
-        for question, result in zip(questions, results):
+        for question, result in zip(questions, results, strict=True):
             print(f"\nQ: {question}")
             if isinstance(result, Exception):
                 print(f"A: Error - {result}")

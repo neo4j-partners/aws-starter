@@ -6,22 +6,41 @@ Run with: uv run python tests/test_fastmcp.py
 
 import asyncio
 import json
+import sys
 from pathlib import Path
 
-from fastmcp import Client
-from fastmcp.client.transports import StreamableHttpTransport
+CREDENTIALS_FILE = Path(__file__).parent.parent / ".mcp-credentials.json"
+
+# Under pytest, skip this live Gateway check when the optional FastMCP client
+# or the credentials from a deployed MCP server are missing.
+if "pytest" in sys.modules:
+    import pytest
+
+    pytest.importorskip("fastmcp")
+    if not CREDENTIALS_FILE.exists():
+        pytest.skip(
+            "needs .mcp-credentials.json from a deployed MCP server",
+            allow_module_level=True,
+        )
+
+from fastmcp import Client  # noqa: E402
+from fastmcp.client.transports import StreamableHttpTransport  # noqa: E402
 
 
 def load_credentials() -> dict:
     """Load credentials from .mcp-credentials.json"""
-    creds_file = Path(__file__).parent.parent / ".mcp-credentials.json"
-    if not creds_file.exists():
-        raise FileNotFoundError(f"Credentials file not found: {creds_file}")
-    with open(creds_file) as f:
+    if not CREDENTIALS_FILE.exists():
+        raise FileNotFoundError(f"Credentials file not found: {CREDENTIALS_FILE}")
+    with open(CREDENTIALS_FILE) as f:
         return json.load(f)
 
 
-async def test_connection():
+def test_connection():
+    """Run the live Gateway check. pytest calls this without an async plugin."""
+    asyncio.run(check_connection())
+
+
+async def check_connection():
     """Test MCP connection using FastMCP client."""
     creds = load_credentials()
     gateway_url = creds["gateway_url"]
@@ -83,4 +102,4 @@ async def test_connection():
 
 
 if __name__ == "__main__":
-    asyncio.run(test_connection())
+    test_connection()

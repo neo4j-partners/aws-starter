@@ -15,8 +15,9 @@ Usage:
     response = client.invoke("What contracts mention Motorola?")
     print(response.text)
 """
+
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
 
@@ -97,10 +98,7 @@ class AuraAgentClient:
         if not parsed.scheme or not parsed.netloc:
             raise ValueError(f"Invalid endpoint URL: {self.endpoint_url}")
         if not self.endpoint_url.endswith("/invoke"):
-            logger.warning(
-                "Endpoint URL should end with '/invoke'. "
-                f"Got: {self.endpoint_url}"
-            )
+            logger.warning(f"Endpoint URL should end with '/invoke'. Got: {self.endpoint_url}")
 
     def _get_auth_header(self) -> tuple[str, str]:
         """Get HTTP Basic auth credentials for token request."""
@@ -109,7 +107,7 @@ class AuraAgentClient:
     def _parse_token_response(self, data: dict[str, Any]) -> CachedToken:
         """Parse OAuth2 token response and create cached token."""
         token = TokenResponse(**data)
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=token.expires_in)
+        expires_at = datetime.now(UTC) + timedelta(seconds=token.expires_in)
         return CachedToken(access_token=token.access_token, expires_at=expires_at)
 
     def _get_token_sync(self, client: httpx.Client) -> str:

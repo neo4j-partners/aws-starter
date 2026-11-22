@@ -1,5 +1,6 @@
 """Pydantic models for Neo4j Aura Agents API responses."""
-from datetime import datetime
+
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -33,9 +34,7 @@ class AgentResponse(BaseModel):
     """Response from invoking an Aura Agent."""
 
     text: str | None = Field(default=None, description="Formatted response text")
-    thinking: str | list[str] | None = Field(
-        default=None, description="Agent reasoning steps"
-    )
+    thinking: str | list[str] | None = Field(default=None, description="Agent reasoning steps")
     tool_uses: list[ToolUse] | None = Field(
         default=None, description="Tools used during invocation"
     )
@@ -117,8 +116,7 @@ class CachedToken(BaseModel):
 
     def is_expired(self, buffer_seconds: int = 60) -> bool:
         """Check if token is expired or about to expire."""
-        from datetime import timezone
 
-        return datetime.now(timezone.utc) >= self.expires_at.replace(
-            tzinfo=timezone.utc
-        ) - __import__("datetime").timedelta(seconds=buffer_seconds)
+        return datetime.now(UTC) >= self.expires_at.replace(tzinfo=UTC) - __import__(
+            "datetime"
+        ).timedelta(seconds=buffer_seconds)

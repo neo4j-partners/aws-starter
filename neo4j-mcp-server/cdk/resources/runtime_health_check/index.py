@@ -8,10 +8,11 @@ It is used as a CloudFormation Custom Resource to ensure the Runtime
 container is fully warmed up and able to accept connections.
 """
 
-import boto3
 import json
 import logging
 import time
+
+import boto3
 import urllib3
 
 logger = logging.getLogger()
@@ -110,7 +111,7 @@ def handler(event: dict, context) -> dict:
         - RuntimeArn: ARN of the Runtime to check
         - Region: AWS region
     """
-    logger.info(f'Received {event["RequestType"]} request')
+    logger.info(f"Received {event['RequestType']} request")
 
     try:
         # Handle Delete - nothing to clean up

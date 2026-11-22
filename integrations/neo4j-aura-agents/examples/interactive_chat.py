@@ -11,6 +11,7 @@ Before running:
 2. Fill in your Neo4j Aura API credentials
 3. Run: uv run python examples/interactive_chat.py
 """
+
 import logging
 import sys
 

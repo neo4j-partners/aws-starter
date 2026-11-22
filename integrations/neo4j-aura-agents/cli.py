@@ -25,8 +25,6 @@ Examples:
     uv run python cli.py -v "Explain the schema"
 """
 
-DEFAULT_QUERY = "What information can you tell me about the data in your graph?"
-TOOLS_QUERY = "What tools do you have available? List each tool and what it does."
 import argparse
 import json
 import logging
@@ -34,6 +32,9 @@ import sys
 
 from src import AuraAgentClient
 from src.client import AuraAgentError
+
+DEFAULT_QUERY = "What information can you tell me about the data in your graph?"
+TOOLS_QUERY = "What tools do you have available? List each tool and what it does."
 
 
 def main() -> int:
@@ -52,15 +53,9 @@ def main() -> int:
     parser.add_argument(
         "--tools", action="store_true", help="Ask the agent what tools it has available"
     )
-    parser.add_argument(
-        "--json", "-j", action="store_true", help="Output response as JSON"
-    )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true", help="Enable verbose/debug output"
-    )
-    parser.add_argument(
-        "--raw", "-r", action="store_true", help="Output raw API response"
-    )
+    parser.add_argument("--json", "-j", action="store_true", help="Output response as JSON")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose/debug output")
+    parser.add_argument("--raw", "-r", action="store_true", help="Output raw API response")
     parser.add_argument(
         "--timeout",
         "-t",
@@ -96,9 +91,7 @@ def main() -> int:
         client = AuraAgentClient.from_env()
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
-        print(
-            "\nSet environment variables or create a .env file:", file=sys.stderr
-        )
+        print("\nSet environment variables or create a .env file:", file=sys.stderr)
         print("  NEO4J_CLIENT_ID=...", file=sys.stderr)
         print("  NEO4J_CLIENT_SECRET=...", file=sys.stderr)
         print("  NEO4J_AGENT_ENDPOINT=...", file=sys.stderr)
@@ -117,9 +110,7 @@ def main() -> int:
                 "status": response.status,
                 "thinking": response.thinking,
                 "tool_uses": (
-                    [tu.model_dump() for tu in response.tool_uses]
-                    if response.tool_uses
-                    else None
+                    [tu.model_dump() for tu in response.tool_uses] if response.tool_uses else None
                 ),
                 "usage": response.usage.model_dump() if response.usage else None,
             }

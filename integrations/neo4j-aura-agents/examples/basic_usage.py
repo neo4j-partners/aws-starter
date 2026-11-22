@@ -11,6 +11,7 @@ Before running:
 2. Fill in your Neo4j Aura API credentials
 3. Run: uv run python examples/basic_usage.py
 """
+
 import logging
 import sys
 
@@ -69,7 +70,7 @@ def main() -> None:
 
         # Show token usage if available
         if response.usage:
-            print(f"\nToken Usage:")
+            print("\nToken Usage:")
             if response.usage.request_tokens:
                 print(f"  Request: {response.usage.request_tokens}")
             if response.usage.response_tokens:

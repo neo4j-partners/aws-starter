@@ -81,9 +81,7 @@ DERIVED_NAMES: tuple[DerivedName, ...] = (
         suffix="-mcp",
         lowercase=True,
     ),
-    DerivedName(
-        "Cognito machine client name", _COGNITO_NAME, 128, suffix="-machine-client"
-    ),
+    DerivedName("Cognito machine client name", _COGNITO_NAME, 128, suffix="-machine-client"),
     DerivedName(
         "IAM custom resource role name",
         _IAM_ROLE_NAME,

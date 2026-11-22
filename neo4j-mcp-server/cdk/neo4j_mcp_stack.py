@@ -8,22 +8,31 @@ This stack creates:
 5. OAuth2 Credential Provider for Gateway -> Runtime authentication
 """
 
+import os
+
 from aws_cdk import (
-    Stack,
-    CfnParameter,
     CfnOutput,
-    Duration,
-    RemovalPolicy,
+    CfnParameter,
     CustomResource,
+    Duration,
     Fn,
+    RemovalPolicy,
+    Stack,
     Tags,
-    aws_cognito as cognito,
-    aws_iam as iam,
-    aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_bedrockagentcore as bedrockagentcore,
 )
+from aws_cdk import (
+    aws_cognito as cognito,
+)
+from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
+    aws_lambda as lambda_,
+)
 from constructs import Construct
-import os
 
 # Every name in this stack derives from the stack name, and the whole set is
 # validated in __init__ before any construct is created. The table and its
@@ -180,7 +189,9 @@ class Neo4jMcpStack(Stack):
         self.machine_client.add_dependency(self.resource_server)
 
         # Construct OAuth URLs
-        self.cognito_domain_url = f"https://{self.stack_name.lower()}-{self.account}.auth.{self.region}.amazoncognito.com"
+        self.cognito_domain_url = (
+            f"https://{self.stack_name.lower()}-{self.account}.auth.{self.region}.amazoncognito.com"
+        )
         self.discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{self.user_pool.user_pool_id}/.well-known/openid-configuration"
 
     def _create_iam_roles(self):
@@ -309,7 +320,9 @@ class Neo4jMcpStack(Stack):
                             sid="ECRTokenAccess",
                             effect=iam.Effect.ALLOW,
                             actions=["ecr:GetAuthorizationToken"],
-                            resources=["*"],  # Required - GetAuthorizationToken does not support resource-level permissions
+                            resources=[
+                                "*"
+                            ],  # Required - GetAuthorizationToken does not support resource-level permissions
                         ),
                         iam.PolicyStatement(
                             sid="CloudWatchLogs",
@@ -341,7 +354,9 @@ class Neo4jMcpStack(Stack):
                             sid="CloudWatchMetrics",
                             effect=iam.Effect.ALLOW,
                             actions=["cloudwatch:PutMetricData"],
-                            resources=["*"],  # PutMetricData does not support resource-level permissions
+                            resources=[
+                                "*"
+                            ],  # PutMetricData does not support resource-level permissions
                             conditions={
                                 "StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}
                             },
@@ -506,9 +521,7 @@ class Neo4jMcpStack(Stack):
         current_dir = os.path.dirname(os.path.realpath(__file__))
 
         # OAuth Provider Lambda - creates OAuth2 Credential Provider for Gateway
-        oauth_provider_lambda_path = os.path.join(
-            current_dir, "resources", "oauth_provider"
-        )
+        oauth_provider_lambda_path = os.path.join(current_dir, "resources", "oauth_provider")
         self.oauth_provider_function = lambda_.Function(
             self,
             "OAuthProviderFunction",

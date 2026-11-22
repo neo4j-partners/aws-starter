@@ -23,3 +23,18 @@ minimal = [
 test = [
     "fastmcp>=2.14.3",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["."]
+# Leave the Python blocks in Markdown docs as written.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebooks import in the cell that first needs a module.
+"*.ipynb" = ["E402"]

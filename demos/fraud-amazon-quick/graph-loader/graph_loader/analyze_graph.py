@@ -21,7 +21,6 @@ from neo4j import GraphDatabase
 
 from graph_loader.load_neo4j import _connection_settings
 
-
 Analysis = tuple[str, str]
 ANALYSES: dict[str, Analysis] = {
     "circular-flows": (
@@ -142,7 +141,9 @@ def run_analysis(session: Any, name: str, limit: int) -> None:
     if records:
         print(json.dumps(records, default=str, indent=2))
     else:
-        print("No matching records. Run fraud-graph-enrich first when this analysis needs GDS data.")
+        print(
+            "No matching records. Run fraud-graph-enrich first when this analysis needs GDS data."
+        )
 
 
 def main() -> None:

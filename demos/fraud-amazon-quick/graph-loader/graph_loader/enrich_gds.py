@@ -19,9 +19,7 @@ from graph_loader.load_neo4j import _connection_settings
 def _drop_graph(session, name: str) -> None:
     # failIfMissing=false makes an absent projection a no-op. Yielding only
     # graphName avoids the deprecated `schema` column and its DBMS notification.
-    session.run(
-        "CALL gds.graph.drop($name, false) YIELD graphName", name=name
-    ).consume()
+    session.run("CALL gds.graph.drop($name, false) YIELD graphName", name=name).consume()
 
 
 def _project_graph(
@@ -43,8 +41,7 @@ def _project_graph(
         configuration["undirectedRelationshipTypes"] = undirected_relationship_types
     print(f"Projecting {name} (the first projection may start a GDS session)...")
     session.run(
-        "CALL gds.graph.project($name, $node_labels, $relationship_types, "
-        "$configuration)",
+        "CALL gds.graph.project($name, $node_labels, $relationship_types, $configuration)",
         name=name,
         node_labels=node_labels,
         relationship_types=relationship_types,
@@ -103,21 +100,21 @@ def main() -> None:
                 "WITH a, max(s.similarity_score) AS score SET a.similarity_score = score"
             ).consume()
             session.run(
-                "MATCH (a:Account) WHERE NOT (a)-[:SIMILAR_TO]-() "
-                "SET a.similarity_score = 0.0"
+                "MATCH (a:Account) WHERE NOT (a)-[:SIMILAR_TO]-() SET a.similarity_score = 0.0"
             ).consume()
             session.run(
                 "CREATE INDEX account_community_id IF NOT EXISTS "
                 "FOR (a:Account) ON (a.community_id)"
             ).consume()
             session.run(
-                "CREATE INDEX account_risk_score IF NOT EXISTS "
-                "FOR (a:Account) ON (a.risk_score)"
+                "CREATE INDEX account_risk_score IF NOT EXISTS FOR (a:Account) ON (a.risk_score)"
             ).consume()
     finally:
         driver.close()
-    print("GDS enrichment complete: risk_score, community_id, "
-          "betweenness_centrality, and SIMILAR_TO are ready.")
+    print(
+        "GDS enrichment complete: risk_score, community_id, "
+        "betweenness_centrality, and SIMILAR_TO are ready."
+    )
 
 
 if __name__ == "__main__":

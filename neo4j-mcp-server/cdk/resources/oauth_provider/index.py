@@ -10,9 +10,10 @@ The provider enables the Gateway to authenticate with the MCP Runtime
 using OAuth2 client credentials flow.
 """
 
-import boto3
 import json
 import logging
+
+import boto3
 import urllib3
 
 logger = logging.getLogger()
@@ -30,8 +31,7 @@ def send_cfn_response(
     response_body = {
         "Status": status,
         "Reason": reason or f"{status}: See CloudWatch logs",
-        "PhysicalResourceId": physical_resource_id
-        or event.get("PhysicalResourceId", "NONE"),
+        "PhysicalResourceId": physical_resource_id or event.get("PhysicalResourceId", "NONE"),
         "StackId": event["StackId"],
         "RequestId": event["RequestId"],
         "LogicalResourceId": event["LogicalResourceId"],
@@ -39,7 +39,7 @@ def send_cfn_response(
     }
 
     logger.info(
-        f'Sending CFN response: Status={status}, PhysicalResourceId={response_body["PhysicalResourceId"]}'
+        f"Sending CFN response: Status={status}, PhysicalResourceId={response_body['PhysicalResourceId']}"
     )
 
     http = urllib3.PoolManager()
@@ -54,9 +54,7 @@ def send_cfn_response(
 
 def get_client_secret(cognito_client, user_pool_id: str, client_id: str) -> str:
     """Retrieve the client secret from Cognito."""
-    response = cognito_client.describe_user_pool_client(
-        UserPoolId=user_pool_id, ClientId=client_id
-    )
+    response = cognito_client.describe_user_pool_client(UserPoolId=user_pool_id, ClientId=client_id)
     return response["UserPoolClient"]["ClientSecret"]
 
 
@@ -94,9 +92,7 @@ def create_oauth_provider(
     response = agentcore_client.create_oauth2_credential_provider(
         name=provider_name,
         credentialProviderVendor="CustomOauth2",
-        oauth2ProviderConfigInput=_oauth2_config(
-            discovery_url, client_id, client_secret
-        ),
+        oauth2ProviderConfigInput=_oauth2_config(discovery_url, client_id, client_secret),
     )
     provider_arn = response["credentialProviderArn"]
     logger.info(f"Created OAuth provider: {provider_arn}")
@@ -121,9 +117,7 @@ def update_oauth_provider(
     agentcore_client.update_oauth2_credential_provider(
         name=provider_name,
         credentialProviderVendor="CustomOauth2",
-        oauth2ProviderConfigInput=_oauth2_config(
-            discovery_url, client_id, client_secret
-        ),
+        oauth2ProviderConfigInput=_oauth2_config(discovery_url, client_id, client_secret),
     )
     logger.info(f"Updated OAuth provider: {provider_arn}")
     return provider_arn
@@ -149,8 +143,8 @@ def handler(event: dict, context) -> dict:
         - DiscoveryUrl: OIDC discovery URL
         - Region: AWS region
     """
-    logger.info(f'Received {event["RequestType"]} request')
-    logger.info(f'ResourceProperties: {json.dumps(event.get("ResourceProperties", {}))}')
+    logger.info(f"Received {event['RequestType']} request")
+    logger.info(f"ResourceProperties: {json.dumps(event.get('ResourceProperties', {}))}")
 
     try:
         props = event["ResourceProperties"]

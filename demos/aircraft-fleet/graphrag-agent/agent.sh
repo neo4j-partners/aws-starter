@@ -85,6 +85,10 @@ PROJECT_SPEC="agentcore/agentcore.json"
 TARGETS_FILE="agentcore/aws-targets.json"
 # The CDK app that agentcore deploy synthesizes.
 CDK_DIR="agentcore/cdk"
+# The CLI records each deployed Runtime's ID here. Git ignores it.
+DEPLOYED_STATE="agentcore/.cli/deployed-state.json"
+# AgentCore writes each Runtime's logs to <prefix><runtime-id>-<endpoint>.
+RUNTIME_LOG_PREFIX="/aws/bedrock-agentcore/runtimes/"
 
 ensure_deps() {
     if [ ! -d ".venv" ]; then
@@ -331,6 +335,75 @@ stack_absent() {
     echo -e "${YELLOW}Stack $stack does not exist in $region, so there is nothing to remove.${NC}"
 }
 
+# Print the ID of $RUNTIME_NAME in $TARGET from the CLI's deployed state, or
+# fail. The deploy that destroy runs drops the Runtime from that file, so
+# destroy reads it first. The ID must match the AgentCore pattern, so the
+# log group prefix built from it can only match this Runtime.
+runtime_id() {
+    uv run --quiet python -c '
+import json
+import re
+import sys
+from pathlib import Path
+
+path, target, name = sys.argv[1:4]
+try:
+    state = json.loads(Path(path).read_text())
+    runtime_id = state["targets"][target]["resources"]["runtimes"][name]["runtimeId"]
+except (OSError, ValueError, TypeError, KeyError) as error:
+    sys.exit(f"{path} has no runtimeId for {name} in target {target}: {error!r}")
+if not isinstance(runtime_id, str) or not re.fullmatch(
+    r"[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}", runtime_id
+):
+    sys.exit(f"{path} has an invalid runtimeId for {name}: {runtime_id!r}")
+print(runtime_id)
+' "$DEPLOYED_STATE" "$TARGET" "$RUNTIME_NAME"
+}
+
+# Delete the CloudWatch log groups of Runtime $1 in region $2. Neither the
+# CLI nor the stack deletes them. The prefix ends with the dash after the
+# full ID, so it cannot match another Runtime's group. A missing group is
+# not an error. A failed delete does not stop the others. The function
+# names each group it could not delete and returns 1. It writes its stderr
+# file to $REPORT_TMP, which report_remaining removes.
+delete_runtime_logs() {
+    local prefix="$RUNTIME_LOG_PREFIX$1-" region="$2" names name
+    local err_file="$REPORT_TMP/logs.err" failed="" found=""
+    if ! names=$(aws logs describe-log-groups --log-group-name-prefix "$prefix" \
+            --region "$region" --query 'logGroups[].[logGroupName]' --output text \
+            2>"$err_file"); then
+        cat "$err_file" >&2
+        echo -e "${RED}Could not list the log groups under $prefix in $region.${NC}"
+        return 1
+    fi
+    while IFS= read -r name; do
+        if [ -z "$name" ] || [[ "$name" != "$prefix"* ]]; then
+            continue
+        fi
+        found=yes
+        if aws logs delete-log-group --log-group-name "$name" --region "$region" \
+                2>"$err_file" </dev/null; then
+            echo "Removed: log group $name"
+        elif grep -q "ResourceNotFoundException" "$err_file"; then
+            echo "Not found: log group $name"
+        else
+            cat "$err_file" >&2
+            failed="${failed:+$failed
+}  $name"
+        fi
+    done <<<"$names"
+    if [ -z "$found" ]; then
+        echo "Not found: log groups under $prefix in $region"
+    fi
+    if [ -n "$failed" ]; then
+        echo -e "${RED}Could not delete these log groups in $region:${NC}"
+        echo "$failed"
+        return 1
+    fi
+}
+
+# Report what remains deployed, and fail if anything does. When $1 holds a
+# Runtime ID and nothing remains, delete that Runtime's log groups too.
 report_remaining() {
     local status parsed region remaining status_err parse_err stack cfn_status
     # The stderr files below go in one folder that the EXIT trap removes, so
@@ -411,6 +484,9 @@ walk(resources)
     if [ -n "$remaining" ]; then
         echo -e "${RED}Still deployed in target '$TARGET':${NC}"
         echo "$remaining"
+        exit 1
+    fi
+    if [ -n "${1:-}" ] && ! delete_runtime_logs "$1" "$region"; then
         exit 1
     fi
     echo -e "${GREEN}Cleanup complete. Stack $stack does not exist in $region.${NC}"
@@ -538,6 +614,13 @@ case "${1:-help}" in
         # destroy runs agentcore deploy too. Install before the spec changes,
         # so a failed install stops with nothing changed.
         ensure_cdk_deps
+        # The Runtime's log groups outlive the stack. Read its ID now, while
+        # the deployed state still records it, and delete them once the
+        # report confirms the stack is gone.
+        if ! RUNTIME_ID=$(runtime_id); then
+            RUNTIME_ID=""
+            echo -e "${YELLOW}No Runtime ID is recorded, so destroy will not remove the Runtime's log groups.${NC}"
+        fi
         # CLI 1.2.0 has no destroy command. A deploy of a project that
         # declares nothing removes the target's stack, so remove the Runtime
         # from the spec, deploy, and put the spec back. That deploy fails
@@ -555,7 +638,7 @@ case "${1:-help}" in
         trap - EXIT
         restore_spec || exit 1
         echo ""
-        report_remaining
+        report_remaining "$RUNTIME_ID"
         ;;
 
     help|--help|-h)

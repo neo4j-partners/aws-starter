@@ -163,12 +163,13 @@ The deployed agent has the same `/invocations` modes as the local server.
 
 ### Remove the deployment
 
-`./agent.sh destroy` removes the Runtime.
+`./agent.sh destroy` removes the Runtime and its CloudWatch log groups.
 
 - **Confirmation:** It asks first and cancels unless you answer `y`. Pass `--yes` to skip the question.
 - **Account check:** It confirms that the active AWS credentials belong to the account recorded in `agentcore/aws-targets.json`.
 - **No stack:** When CloudFormation shows no stack, there is nothing to remove. It skips the question and the deploy and goes straight to the final check.
 - **Final check:** It asks CloudFormation whether the stack `AgentCore-AircraftFleet-default` is gone. It fails while the stack exists in any state other than `DELETE_COMPLETE`.
+- **Log groups:** The stack delete keeps the Runtime's log group, `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`. Destroy reads the Runtime ID from `agentcore/.cli/deployed-state.json` before it removes anything. After the final check passes, it deletes each log group that starts with `<runtime-id>-` and prints `Removed` or `Not found` for each. A failed delete does not stop the others, but destroy then exits 1 and names the group. When no ID is recorded, or the stack was already gone, destroy leaves the log groups alone.
 
 ## Conversation memory
 

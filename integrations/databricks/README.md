@@ -165,29 +165,24 @@ This setup gives you these benefits:
 
 ## Why the server runs outside Databricks
 
-The official Neo4j MCP server ([github.com/neo4j/mcp](https://github.com/neo4j/mcp))
-is written in Go. It ships as a compiled binary or a Docker container.
-Databricks Apps cannot run it.
+The server is `mcp-neo4j-cypher`, a Python FastMCP server from
+[github.com/neo4j-partners/mcp-neo4j](https://github.com/neo4j-partners/mcp-neo4j).
+Databricks Apps can host a Python MCP server, so running it outside
+Databricks is a choice, not a limit.
 
-| Capability | Databricks Apps | Neo4j MCP Server |
-|------------|-----------------|------------------|
-| **Runtime** | Python, Node.js only | Go (compiled binary) |
-| **Containers** | Not supported | Requires Docker |
-| **Frameworks** | Streamlit, Dash, Gradio, React | Native HTTP server |
-| **File size** | Max 10 MB | Binary exceeds limit |
-| **Dependencies** | pip/npm packages only | System-level binary |
+This integration reuses the server that
+[`neo4j-mcp-server/`](../../neo4j-mcp-server/) deploys to AgentCore. The
+AWS agents in this repository call the same server, so Databricks needs no
+second deployment. That server stack provides these pieces:
 
-Databricks recommends external hosting for MCP servers that cannot run in
-Databricks Apps. You can host the server on AWS AgentCore or Azure Container
-Apps. This gives you:
-
-- **Full compatibility:** You can run any MCP server, in any language or runtime.
+- **One server:** Databricks and the AWS agents share one deployment and one set of tools.
 - **Managed infrastructure:** AgentCore handles scaling, security, and availability.
+- **Password handling:** The container reads the Neo4j password from AWS Secrets Manager at startup.
 - **Secure integration:** Unity Catalog HTTP connections add governance.
 - **Automatic auth:** Databricks manages the OAuth2 token lifecycle.
 
-The same pattern works for any MCP server built in Go, Rust, C++, or another
-compiled language.
+The same pattern works for any MCP server that serves streamable HTTP behind
+an OAuth2 client credentials flow.
 
 ## Architecture
 

@@ -160,6 +160,18 @@ uv run python script.py              # Run in venv
 uv run cdk deploy                    # Run CDK commands
 ```
 
+**Release-age policy:** New or upgraded dependencies must be versions released at least one week ago. New releases can carry CVEs that are not yet reported. Existing locked versions stay as they are. The policy applies only when a version changes.
+
+```bash
+uv lock --upgrade --exclude-newer "1 week"            # relock a project
+uv lock --upgrade-package <pkg> --exclude-newer "1 week"
+uv add <package> --exclude-newer "1 week"
+npm install <package> --min-release-age=7             # npm projects and global CLIs
+npm update --min-release-age=7
+```
+
+Don't add `exclude-newer` to a pyproject or `min-release-age` to an `.npmrc`. Either one would re-resolve the current locks.
+
 ## Architecture
 
 ### Core Components

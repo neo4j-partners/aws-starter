@@ -24,9 +24,11 @@ from core.credentials import get_active_credentials
 @asynccontextmanager
 async def _authenticated_transport(url: str, access_token: str):
     """Yield an MCP transport with an HTTP client that is closed on exit."""
-    async with httpx.AsyncClient(headers={"Authorization": f"Bearer {access_token}"}) as http_client:
-        async with streamable_http_client(url, http_client=http_client) as transport:
-            yield transport
+    async with (
+        httpx.AsyncClient(headers={"Authorization": f"Bearer {access_token}"}) as http_client,
+        streamable_http_client(url, http_client=http_client) as transport,
+    ):
+        yield transport
 
 
 def create_transport():

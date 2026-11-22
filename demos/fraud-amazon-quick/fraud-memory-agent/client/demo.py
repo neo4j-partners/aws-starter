@@ -40,9 +40,7 @@ def main() -> None:
     if args.number is not None and not 1 <= args.number <= len(DEMO_QUESTIONS):
         parser.error(f"-n must be between 1 and {len(DEMO_QUESTIONS)}")
 
-    questions = (
-        [DEMO_QUESTIONS[args.number - 1]] if args.number else DEMO_QUESTIONS
-    )
+    questions = [DEMO_QUESTIONS[args.number - 1]] if args.number else DEMO_QUESTIONS
     target: Target = "deployed" if args.remote else "local"
     try:
         for index, question in enumerate(questions, 1):

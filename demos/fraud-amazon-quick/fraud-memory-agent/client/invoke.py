@@ -10,9 +10,7 @@ import time
 
 from client.transport import Target, invoke
 
-DEFAULT_PROMPT = (
-    "Which accounts have the highest risk scores, and who do they transfer money to?"
-)
+DEFAULT_PROMPT = "Which accounts have the highest risk scores, and who do they transfer money to?"
 DEFAULT_USER_ID = "demo-user"
 LOAD_PROMPTS = (
     DEFAULT_PROMPT,

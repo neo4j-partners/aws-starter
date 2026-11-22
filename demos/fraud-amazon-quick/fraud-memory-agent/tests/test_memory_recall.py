@@ -49,9 +49,7 @@ class SessionLookupTests(unittest.TestCase):
     def test_list_failure_returns_empty(self) -> None:
         memory = _memory(list_conversations=AsyncMock(side_effect=TransportError("x")))
 
-        self.assertEqual(
-            asyncio.run(memory_recall.list_user_conversations(memory, "u1")), []
-        )
+        self.assertEqual(asyncio.run(memory_recall.list_user_conversations(memory, "u1")), [])
 
 
 class RecallTests(unittest.TestCase):
@@ -63,9 +61,7 @@ class RecallTests(unittest.TestCase):
         )
 
         recalled = asyncio.run(
-            memory_recall.recall_context(
-                memory, "ACC-9?", [current, earlier], current=current
-            )
+            memory_recall.recall_context(memory, "ACC-9?", [current, earlier], current=current)
         )
 
         self.assertIn("## This session so far\n## Recent Messages", recalled)
@@ -76,9 +72,7 @@ class RecallTests(unittest.TestCase):
             session_id=str(earlier.id),
             limit=memory_recall.HITS_PER_CONVERSATION,
         )
-        memory.short_term.get_context.assert_awaited_once_with(
-            "ACC-9?", session_id=str(current.id)
-        )
+        memory.short_term.get_context.assert_awaited_once_with("ACC-9?", session_id=str(current.id))
 
     def test_new_session_skips_session_context(self) -> None:
         earlier = _conversation("s0", 1)
@@ -87,9 +81,7 @@ class RecallTests(unittest.TestCase):
             search_messages=AsyncMock(return_value=[_message("user", "hello")]),
         )
 
-        recalled = asyncio.run(
-            memory_recall.recall_context(memory, "q", [earlier], current=None)
-        )
+        recalled = asyncio.run(memory_recall.recall_context(memory, "q", [earlier], current=None))
 
         memory.short_term.get_context.assert_not_awaited()
         self.assertEqual(recalled, "## Earlier sessions\n[user] hello")
@@ -102,9 +94,7 @@ class RecallTests(unittest.TestCase):
         )
 
         recalled = asyncio.run(
-            memory_recall.recall_context(
-                memory, "q", [current, earlier], current=current
-            )
+            memory_recall.recall_context(memory, "q", [current, earlier], current=current)
         )
 
         self.assertEqual(recalled, "")
@@ -112,18 +102,14 @@ class RecallTests(unittest.TestCase):
     def test_long_messages_and_total_are_clipped(self) -> None:
         conversations = [_conversation(f"s{i}", i + 1) for i in range(10)]
         memory = _memory(
-            search_messages=AsyncMock(
-                return_value=[_message("user", "x" * 5000)] * 3
-            ),
+            search_messages=AsyncMock(return_value=[_message("user", "x" * 5000)] * 3),
         )
 
         recalled = asyncio.run(
             memory_recall.recall_context(memory, "q", conversations, current=None)
         )
 
-        self.assertLessEqual(
-            len(recalled), memory_recall.MAX_RECALL_CHARS + len("...")
-        )
+        self.assertLessEqual(len(recalled), memory_recall.MAX_RECALL_CHARS + len("..."))
         self.assertNotIn("x" * (memory_recall.MAX_MESSAGE_CHARS + 10), recalled)
 
 

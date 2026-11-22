@@ -123,9 +123,7 @@ def main() -> int:
             "user_id": f"agentcore-smoke-{session_suffix}",
             "session_id": f"agentcore-smoke-{int(time.time())}-{session_suffix}",
         }
-        runtime_client = boto3.client(
-            "bedrock-agentcore", region_name=region, config=client_config
-        )
+        runtime_client = boto3.client("bedrock-agentcore", region_name=region, config=client_config)
         response = runtime_client.invoke_agent_runtime(
             agentRuntimeArn=runtime_arn,
             runtimeSessionId=str(uuid.uuid4()),

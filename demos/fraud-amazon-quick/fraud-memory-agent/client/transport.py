@@ -85,16 +85,12 @@ def _deployed_settings(
     resolved_read_timeout = (
         read_timeout
         if read_timeout is not None
-        else _positive_setting(
-            "FRAUD_AGENTCORE_READ_TIMEOUT", DEFAULT_DEPLOYED_READ_TIMEOUT
-        )
+        else _positive_setting("FRAUD_AGENTCORE_READ_TIMEOUT", DEFAULT_DEPLOYED_READ_TIMEOUT)
     )
     resolved_connect_timeout = (
         connect_timeout
         if connect_timeout is not None
-        else _positive_setting(
-            "FRAUD_AGENTCORE_CONNECT_TIMEOUT", DEFAULT_DEPLOYED_CONNECT_TIMEOUT
-        )
+        else _positive_setting("FRAUD_AGENTCORE_CONNECT_TIMEOUT", DEFAULT_DEPLOYED_CONNECT_TIMEOUT)
     )
     resolved_max_attempts = (
         max_attempts
@@ -175,9 +171,7 @@ def get_agent_config() -> tuple[str, str]:
     region = agent_config.get("aws", {}).get("region", "us-west-2")
 
     if not arn:
-        raise ValueError(
-            f"agent_arn not found for agent '{default_agent}' in {config_file}"
-        )
+        raise ValueError(f"agent_arn not found for agent '{default_agent}' in {config_file}")
     return arn, region
 
 
@@ -217,9 +211,7 @@ def _handle_sse_event(
         errors.append(data.get("error", "Unknown error"))
 
 
-def _consume_sse(
-    chunks: Iterable[bytes], stream: bool
-) -> tuple[list[str], list[str]]:
+def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list[str]]:
     """Parse ``data: {...}\\n\\n`` events off a byte iterator as they arrive."""
     content_parts: list[str] = []
     errors: list[str] = []
@@ -295,23 +287,19 @@ def invoke_local(
     """Invoke a locally running ``runtime_app.py`` over HTTP+SSE (port 7020)."""
     logger.info("Local URL: %s | payload: %s", url, payload)
     try:
-        with httpx.Client(timeout=timeout) as c:
-            with c.stream("POST", url, json=payload) as r:
-                if r.status_code != 200:
-                    r.read()
-                    return {
-                        "status": "error",
-                        "errors": [f"HTTP {r.status_code}: {r.text}"],
-                    }
-                content_parts, errors = _consume_sse(r.iter_bytes(), stream)
+        with httpx.Client(timeout=timeout) as c, c.stream("POST", url, json=payload) as r:
+            if r.status_code != 200:
+                r.read()
+                return {
+                    "status": "error",
+                    "errors": [f"HTTP {r.status_code}: {r.text}"],
+                }
+            content_parts, errors = _consume_sse(r.iter_bytes(), stream)
         return _result(content_parts, errors)
     except httpx.ConnectError:
         return {
             "status": "error",
-            "errors": [
-                f"Could not connect to {url}. Start the agent first: "
-                f"uv run fraud-server"
-            ],
+            "errors": [f"Could not connect to {url}. Start the agent first: uv run fraud-server"],
         }
 
 

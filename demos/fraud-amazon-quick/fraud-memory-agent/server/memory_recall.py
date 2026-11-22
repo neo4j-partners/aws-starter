@@ -29,9 +29,7 @@ def _clip(text: str, limit: int) -> str:
     return text if len(text) <= limit else f"{text[:limit]}..."
 
 
-async def list_user_conversations(
-    memory: MemoryClient, user_id: str
-) -> list[Conversation]:
+async def list_user_conversations(memory: MemoryClient, user_id: str) -> list[Conversation]:
     """Return the user's conversations, newest first. Empty if NAMS fails."""
     try:
         conversations = await memory.short_term.list_conversations(
@@ -40,40 +38,26 @@ async def list_user_conversations(
     except NamsError as error:
         logger.warning("NAMS conversation listing failed: %s", error)
         return []
-    return sorted(
-        conversations, key=lambda c: c.updated_at or c.created_at, reverse=True
-    )
+    return sorted(conversations, key=lambda c: c.updated_at or c.created_at, reverse=True)
 
 
-def find_session(
-    conversations: list[Conversation], session_id: str
-) -> Conversation | None:
+def find_session(conversations: list[Conversation], session_id: str) -> Conversation | None:
     """Return the newest conversation tagged with this client session ID."""
     return next(
-        (
-            c
-            for c in conversations
-            if c.metadata.get("client_session_id") == session_id
-        ),
+        (c for c in conversations if c.metadata.get("client_session_id") == session_id),
         None,
     )
 
 
-async def _session_text(
-    memory: MemoryClient, conversation: Conversation, prompt: str
-) -> str:
+async def _session_text(memory: MemoryClient, conversation: Conversation, prompt: str) -> str:
     try:
-        return await memory.short_term.get_context(
-            prompt, session_id=str(conversation.id)
-        )
+        return await memory.short_term.get_context(prompt, session_id=str(conversation.id))
     except NamsError as error:
         logger.warning("NAMS session context failed: %s", error)
         return ""
 
 
-async def _earlier_hits(
-    memory: MemoryClient, conversation: Conversation, prompt: str
-) -> list[str]:
+async def _earlier_hits(memory: MemoryClient, conversation: Conversation, prompt: str) -> list[str]:
     try:
         messages = await memory.short_term.search_messages(
             prompt, session_id=str(conversation.id), limit=HITS_PER_CONVERSATION
@@ -101,9 +85,7 @@ async def recall_context(
     others = [c for c in conversations if current is None or c.id != current.id]
     async with asyncio.TaskGroup() as group:
         session_task = (
-            group.create_task(_session_text(memory, current, prompt))
-            if current
-            else None
+            group.create_task(_session_text(memory, current, prompt)) if current else None
         )
         hit_tasks = [
             group.create_task(_earlier_hits(memory, conversation, prompt))

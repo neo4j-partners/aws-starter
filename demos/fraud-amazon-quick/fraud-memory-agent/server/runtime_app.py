@@ -151,9 +151,7 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
         async with MemoryClient() as memory:
             # Anonymous callers share one NAMS user, so they get no recall.
             conversations = (
-                await list_user_conversations(memory, user_id)
-                if user_id != _ANONYMOUS_USER
-                else []
+                await list_user_conversations(memory, user_id) if user_id != _ANONYMOUS_USER else []
             )
             # Continue the caller's session only when it named one. Otherwise
             # every call starts a conversation, as before.
@@ -190,9 +188,7 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
                 agent = Agent(
                     model=model,
                     tools=tools,
-                    system_prompt=_memory_system_prompt(
-                        user_id, session_id, recalled
-                    ),
+                    system_prompt=_memory_system_prompt(user_id, session_id, recalled),
                 )
                 last_tool_id: str | None = None
                 async for event in agent.stream_async(prompt_text):
@@ -219,9 +215,7 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
 
             answer = "".join(answer_parts)
             await memory.short_term.add_message(conversation_id, "assistant", answer)
-            await memory.reasoning.complete_trace(
-                trace.id, outcome=answer[:1000], success=True
-            )
+            await memory.reasoning.complete_trace(trace.id, outcome=answer[:1000], success=True)
 
         yield {"type": "complete"}
     except FileNotFoundError as error:

@@ -81,7 +81,11 @@ def main() -> int:
     region = aws_config.get("region")
     arn_region = runtime_arn_region(deployment.get("agent_arn"))
     if region and arn_region and region != arn_region:
-        if clear_binding(config, args.agent, f"runtime ARN region {arn_region} differs from configured region {region}"):
+        if clear_binding(
+            config,
+            args.agent,
+            f"runtime ARN region {arn_region} differs from configured region {region}",
+        ):
             save_config(args.config, config)
         return 0
 
@@ -90,7 +94,9 @@ def main() -> int:
         return 0
 
     try:
-        boto3.client("bedrock-agentcore-control", region_name=region).get_agent_runtime(agentRuntimeId=runtime_id)
+        boto3.client("bedrock-agentcore-control", region_name=region).get_agent_runtime(
+            agentRuntimeId=runtime_id
+        )
     except ClientError as error:
         if error.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
             print(
@@ -99,7 +105,9 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 0
-        if clear_binding(config, args.agent, f"runtime '{runtime_id}' no longer exists in {region}"):
+        if clear_binding(
+            config, args.agent, f"runtime '{runtime_id}' no longer exists in {region}"
+        ):
             save_config(args.config, config)
     except BotoCoreError as error:
         print(

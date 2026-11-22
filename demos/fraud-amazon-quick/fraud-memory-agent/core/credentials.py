@@ -64,10 +64,7 @@ def refresh_token(credentials: dict) -> dict:
     scope = credentials.get("scope")
 
     if not all([token_url, client_id, client_secret]):
-        raise ValueError(
-            "Missing token refresh credentials "
-            "(token_url, client_id, client_secret)"
-        )
+        raise ValueError("Missing token refresh credentials (token_url, client_id, client_secret)")
 
     logger.info("Refreshing OAuth2 token...")
     response = httpx.post(

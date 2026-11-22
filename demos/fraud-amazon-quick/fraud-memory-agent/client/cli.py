@@ -33,18 +33,14 @@ def ask(question: str, target: Target, user_id: str) -> None:
     print(f"User ID:  {user_id}")
     print(f"Question: {question}")
     print("-" * 70)
-    result = invoke(
-        {"prompt": question, "user_id": user_id}, target=target, stream=True
-    )
+    result = invoke({"prompt": question, "user_id": user_id}, target=target, stream=True)
     if result.get("status") != "success":
         print(f"ERROR: {result.get('errors', ['Unknown error'])}")
     print()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Terminal client for the Fraud Memory Agent."
-    )
+    parser = argparse.ArgumentParser(description="Terminal client for the Fraud Memory Agent.")
     parser.add_argument(
         "--remote",
         action="store_true",

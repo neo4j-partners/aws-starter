@@ -258,7 +258,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if min(args.users, args.sessions_per_user, args.turns_per_session, args.concurrency) < 1:
-        parser.error("users, sessions-per-user, turns-per-session, and concurrency must be positive")
+        parser.error(
+            "users, sessions-per-user, turns-per-session, and concurrency must be positive"
+        )
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
     if args.retry_attempts < 1:
@@ -348,7 +350,7 @@ def main() -> None:
                     failures += 1
                     print(f"Session ERROR {error}")
                 else:
-                    for request, result, duration in outcomes:
+                    for _request, result, duration in outcomes:
                         elapsed.append(duration)
                         if result.get("status") == "success":
                             successes += 1

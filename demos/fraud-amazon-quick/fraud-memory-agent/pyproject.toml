@@ -11,8 +11,9 @@ dependencies = [
     # explicitly rather than rely on it arriving transitively via the toolkit.
     "pyyaml>=6.0",
     # MCP 2 uses the streamable HTTP client configured in core/transport.py.
-    # Pin the tested release so cloud and local dependency resolution match.
-    "mcp==2.1.1",
+    # 2.2.0 fixes the advisories in 2.1.1. uv.lock pins the tested release,
+    # and the Dockerfile installs from it, so cloud and local runs match.
+    "mcp>=2.2.0,<3",
     "bedrock-agentcore>=1.9.1",
     "bedrock-agentcore-starter-toolkit>=0.3.9",
     # Observability — ADOT auto-instrumentation for AgentCore CloudWatch traces
@@ -21,17 +22,11 @@ dependencies = [
     # NAMS-backed memory capture for the Strands runtime. NAMS captures
     # every agent turn without a direct Neo4j driver or embedding setup.
     "strands-agents>=1.52,<2",
-    "neo4j-agent-memory[nams,strands]>=0.5.0",
+    # 0.5 is the tested line. Later releases change the NAMS short-term
+    # memory API this agent uses, so move the cap only after retesting.
+    "neo4j-agent-memory[nams,strands]>=0.5.0,<0.6",
     # server/runtime_app.py loads the local .env for development runs.
     "python-dotenv>=1.2.2",
-]
-
-# Supply-chain caution: hold these transitive deps below releases published
-# within the last 48h (click 8.4.0 / python-multipart 0.0.29, 2026-05-17).
-[tool.uv]
-constraint-dependencies = [
-    "click<=8.3.3",
-    "python-multipart<=0.0.28",
 ]
 
 # Console entry points. The server runs in the foreground of its own
@@ -54,3 +49,14 @@ build-backend = "hatchling.build"
 # works without any sys.path manipulation.
 [tool.hatch.build.targets.wheel]
 packages = ["core", "client", "server"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["."]
+# Leave the Python blocks in Markdown docs as written.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]

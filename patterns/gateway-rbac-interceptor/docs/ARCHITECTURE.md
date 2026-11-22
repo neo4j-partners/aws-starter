@@ -355,20 +355,20 @@ auth_response = cognito.initiate_auth(
 
 The server in `mcp-server/server.py` reads the identity headers the interceptor injected.
 
-**Header capture:** FastMCP tools run outside the HTTP request scope. `IdentityHeaderMiddleware` (`server.py:49-62`) copies each request's headers into a `ContextVar`. The `__main__` block installs it on the streamable HTTP app before it starts uvicorn:
+**Header capture:** MCP tools run outside the HTTP request scope. `IdentityHeaderMiddleware` (`server.py:52-65`) copies each request's headers into a `ContextVar`. The `__main__` block installs it on the streamable HTTP app before it starts uvicorn:
 
 ```python
-app = mcp.streamable_http_app()
+app = mcp.streamable_http_app(stateless_http=True, host=HOST)
 app.add_middleware(IdentityHeaderMiddleware)
-uvicorn.run(app, host=mcp.settings.host, port=mcp.settings.port)
+uvicorn.run(app, host=HOST, port=PORT)
 ```
 
 Without the middleware the tools never see the headers, and the server check never runs.
 
-**Header extraction** (`server.py:65-92`):
+**Header extraction** (`server.py:68-95`):
 ```python
 def _get_user_context() -> dict:
-    headers = _request_headers.get()
+    headers = _request_headers.get({})
     user_id = headers.get("x-user-id", "unknown")
     groups_str = headers.get("x-user-groups", "")
     client_id = headers.get("x-client-id", "unknown")
@@ -377,11 +377,11 @@ def _get_user_context() -> dict:
         "user_id": user_id,
         "groups": groups,
         "client_id": client_id,
-        "authenticated": user_id != "unknown"
+        "authenticated": user_id != "unknown",
     }
 ```
 
-**Admin tool with defense in depth** (`server.py:154-193`):
+**Admin tool with defense in depth** (`server.py:157-200`):
 ```python
 @mcp.tool()
 def admin_action(action: str) -> dict:

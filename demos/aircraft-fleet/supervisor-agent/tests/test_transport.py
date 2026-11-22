@@ -2,8 +2,9 @@
 
 import json
 
+from fleet_supervisor.client import transport
 from fleet_supervisor.client.invoke import load_queries
-from fleet_supervisor.client.transport import collect, iter_events
+from fleet_supervisor.client.transport import collect, invoke_deployed, iter_events
 
 
 def sse(*events: dict) -> bytes:
@@ -49,3 +50,32 @@ def test_queries_file_sets_expected_agent_from_headers():
     by_number = {q.number: q.expected_agent for q in queries}
     assert by_number[1] == "Maintenance Agent"
     assert by_number[11] == "Operations Agent"
+
+
+class _FakeStream:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def iter_chunks(self):
+        yield self._body
+
+
+class _FakeRuntimeClient:
+    def __init__(self) -> None:
+        self.kwargs: dict = {}
+
+    def invoke_agent_runtime(self, **kwargs):
+        self.kwargs = kwargs
+        return {"response": _FakeStream(sse({"type": "chunk", "data": "ok"}))}
+
+
+def test_invoke_deployed_sends_runtime_user_id(monkeypatch):
+    """Without runtimeUserId the Runtime issues no workload access token."""
+    fake = _FakeRuntimeClient()
+    monkeypatch.setattr(transport.boto3, "client", lambda *args, **kwargs: fake)
+
+    result = invoke_deployed("hi", "arn:aws:bedrock-agentcore:us-east-1:0:runtime/x", "us-east-1")
+
+    assert fake.kwargs["runtimeUserId"] == transport.RUNTIME_USER_ID == "default"
+    assert len(fake.kwargs["runtimeSessionId"]) >= 33
+    assert result.text == "ok"

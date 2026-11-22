@@ -15,7 +15,7 @@ import json
 import sys
 import time
 import uuid
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import boto3
@@ -27,6 +27,11 @@ DEFAULT_PROMPT = (
     "Use the Neo4j graph tools to identify one account with a high risk score. "
     "Give a one-sentence answer."
 )
+# A new runtime stays CREATING for a while after `agentcore deploy` returns.
+DEFAULT_READY_TIMEOUT_SECONDS = 600
+DEFAULT_POLL_INTERVAL_SECONDS = 15
+# Statuses from which a runtime cannot become READY without a new deploy.
+TERMINAL_STATUSES = frozenset({"CREATE_FAILED", "UPDATE_FAILED", "DELETING"})
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,6 +44,21 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=180,
         help="Maximum read time for the graph invocation (default: 180).",
+    )
+    parser.add_argument(
+        "--ready-timeout-seconds",
+        type=int,
+        default=DEFAULT_READY_TIMEOUT_SECONDS,
+        help=(
+            "Maximum time to wait for the runtime to reach READY "
+            f"(default: {DEFAULT_READY_TIMEOUT_SECONDS})."
+        ),
+    )
+    parser.add_argument(
+        "--poll-interval-seconds",
+        type=int,
+        default=DEFAULT_POLL_INTERVAL_SECONDS,
+        help=f"Time between runtime status checks (default: {DEFAULT_POLL_INTERVAL_SECONDS}).",
     )
     return parser.parse_args()
 
@@ -59,6 +79,42 @@ def configured_runtime(config_path: Path, agent_name: str) -> tuple[str, str, st
             "'./agent.sh deploy' first."
         )
     return runtime_id, runtime_arn, region
+
+
+def wait_for_ready(
+    control,
+    runtime_id: str,
+    *,
+    timeout_seconds: int,
+    interval_seconds: int,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> str | None:
+    """Poll the runtime until it is READY.
+
+    Returns None when the runtime is READY, or an error message when it
+    reaches a terminal status or the timeout passes first.
+    """
+    deadline = clock() + timeout_seconds
+    last_status = None
+    while True:
+        runtime = control.get_agent_runtime(agentRuntimeId=runtime_id)
+        status = runtime.get("status")
+        if status == "READY":
+            return None
+        if status in TERMINAL_STATUSES:
+            reason = runtime.get("failureReason") or "no failure reason supplied"
+            return f"Runtime is not ready: status={status!r}; reason={reason}"
+        if status != last_status:
+            print(f"Runtime status is {status!r}; waiting for READY...")
+            last_status = status
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return (
+                f"Runtime did not reach READY within {timeout_seconds} seconds: "
+                f"last status={status!r}"
+            )
+        sleep(min(interval_seconds, remaining))
 
 
 def consume_sse(chunks: Iterable[bytes]) -> tuple[str, list[str], bool]:
@@ -92,6 +148,12 @@ def main() -> int:
     if args.timeout_seconds < 1:
         print("--timeout-seconds must be positive.", file=sys.stderr)
         return 2
+    if args.ready_timeout_seconds < 0:
+        print("--ready-timeout-seconds must not be negative.", file=sys.stderr)
+        return 2
+    if args.poll_interval_seconds < 1:
+        print("--poll-interval-seconds must be positive.", file=sys.stderr)
+        return 2
     if not args.config.exists():
         print(f"Configuration file not found: {args.config}", file=sys.stderr)
         return 2
@@ -106,14 +168,14 @@ def main() -> int:
         control = boto3.client(
             "bedrock-agentcore-control", region_name=region, config=client_config
         )
-        runtime = control.get_agent_runtime(agentRuntimeId=runtime_id)
-        status = runtime.get("status")
-        if status != "READY":
-            reason = runtime.get("failureReason") or "no failure reason supplied"
-            print(
-                f"Runtime is not ready: status={status!r}; reason={reason}",
-                file=sys.stderr,
-            )
+        not_ready = wait_for_ready(
+            control,
+            runtime_id,
+            timeout_seconds=args.ready_timeout_seconds,
+            interval_seconds=args.poll_interval_seconds,
+        )
+        if not_ready:
+            print(not_ready, file=sys.stderr)
             return 1
         print(f"Runtime READY: {runtime_arn}")
 

@@ -18,7 +18,7 @@ Examples (Aircraft Maintenance Database):
 
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -36,7 +36,7 @@ def _token_is_valid(credentials: dict) -> bool:
     except (ValueError, TypeError):
         return False
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now < (expires_at - timedelta(minutes=5))
 
 
@@ -77,7 +77,7 @@ def _refresh_token(credentials: dict) -> dict:
         sys.exit(1)
 
     expires_in = token_data.get("expires_in", 3600)
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
     credentials["access_token"] = token_data["access_token"]
     credentials["token_expires_at"] = expires_at.isoformat()

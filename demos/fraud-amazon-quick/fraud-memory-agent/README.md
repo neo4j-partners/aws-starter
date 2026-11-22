@@ -165,6 +165,34 @@ Recovery and diagnostics commands:
 ./agent.sh destroy                # remove the agent from AgentCore Runtime
 ```
 
+### Tear down
+
+`agentcore destroy` leaves three things behind:
+
+- **Source bucket:** The empty S3 bucket `bedrock-agentcore-codebuild-sources-<account>-<region>` stays. Every toolkit agent in that account and Region shares it, so delete it only when it is empty.
+- **Memory log group:** The log group `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` stays.
+- **Dependency cache:** The local `.bedrock_agentcore/` folder in the agent root stays. It can hold about 50 MB.
+
+`destroy` deletes `.bedrock_agentcore.yaml`, so note the memory ID and Region first. Then remove the leftovers by hand:
+
+```bash
+grep -E "memory_id|region" .bedrock_agentcore.yaml   # before destroy
+./agent.sh destroy
+
+REGION=us-east-1
+MEMORY_ID=<memory-id>
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+BUCKET=bedrock-agentcore-codebuild-sources-$ACCOUNT-$REGION
+
+# Delete the bucket only when this lists no versions and no delete markers.
+aws s3api list-object-versions --bucket "$BUCKET" --max-items 1
+aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
+
+aws logs delete-log-group --region "$REGION" \
+    --log-group-name "/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/$MEMORY_ID"
+rm -rf .bedrock_agentcore/
+```
+
 ## Generate NAMS traffic
 
 The load generator calls the real agent with synthetic analyst profiles.

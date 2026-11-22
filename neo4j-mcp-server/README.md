@@ -96,6 +96,39 @@ AWS_REGION=us-east-1
 You do not need an agent username or password. The stack creates the client
 ID and secret for you.
 
+### Use a read-only database user (recommended)
+
+The server runs with `NEO4J_READ_ONLY=true`, so it rejects write queries. A
+read-only database user adds a second layer. Even if the server check is
+bypassed, Neo4j itself refuses the write. Set `NEO4J_USERNAME` and
+`NEO4J_PASSWORD` in `.env` to this user instead of `neo4j`.
+
+On Neo4j Aura, create the user from the Query console, `cypher-shell`, or
+`neo4j-cli`. Run these statements as the admin user:
+
+```cypher
+CREATE USER mcp_reader SET PASSWORD '<new-password>' CHANGE NOT REQUIRED;
+GRANT ROLE reader TO mcp_reader;
+GRANT ROLE graphql_app_read_only_<instance-id> TO mcp_reader;
+```
+
+Notes:
+
+- **Second role:** On Aura Professional, the built-in `reader` role cannot run
+  procedures, so `get_neo4j_schema` fails with `reader` alone. The Aura-managed
+  `graphql_app_read_only_<instance-id>` role allows procedures and still denies
+  writes. Run `SHOW ROLES` to find its exact name. The suffix is your 8-character
+  instance ID.
+- **Custom roles:** Aura Professional supports granting built-in roles only.
+  Custom roles and privilege grants need Business Critical.
+- **Password:** Do not start the password with `-`. The deploy connectivity
+  check passes it to `cypher-shell -p`, which reads a leading `-` as a flag.
+- **Existing deployment:** Run a full `./deploy.py`, not `./deploy.py redeploy`.
+  A redeploy updates only the image and keeps the old username and password.
+
+To confirm the setup, run `./cloud.sh tools` and then a read query. Then send a
+`CREATE` statement through `read_neo4j_cypher`. The server should reject it.
+
 ## Step 3: Deploy
 
 Run this from `neo4j-mcp-server/`:

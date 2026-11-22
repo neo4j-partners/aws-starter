@@ -44,7 +44,7 @@ cp ../.env.sample ../.env    # skip if it already exists; set the NEO4J_* and ME
 uv sync
 
 uv run fleet-server          # terminal 1: serves http://localhost:7070
-uv run fleet-cli "How many aircraft are in the fleet?"   # terminal 2
+uv run fleet-cli "How many aircraft are in the database?"   # terminal 2
 uv run fleet-demo            # terminal 2: full showcase
 ```
 
@@ -66,7 +66,7 @@ uv run opentelemetry-instrument fleet-server        # the same server, with trac
 
 - **Config:** The server loads the shared `.env` in `demos/aircraft-fleet/` before it imports the agent. Values already set in the environment win.
 - **Startup checks:** A missing `MEM_NEO4J_URI` or memory password stops startup.
-- **Port:** Local runs use 7070. The deployed runtime uses 8080. Set `AGENT_PORT` to use another port.
+- **Port:** Local runs use 7070. The deployed runtime uses 8080. Set `AGENT_PORT` to use another port. `fleet-cli` and `fleet-demo` read the same `AGENT_PORT`, so set it for both terminals.
 - **Stopping:** Press Ctrl+C or run `./agent.sh stop`.
 - **Clients:** The clients talk to the server over HTTP. They hold no Neo4j credentials.
 
@@ -86,7 +86,8 @@ takes a few minutes of Bedrock usage.
 
 Deployment uses the AgentCore CLI. Install it with `npm install -g @aws/agentcore`.
 The project lives in `agentcore/`, and `agentcore/agentcore.json` declares the
-`graphrag_agent` Runtime.
+`graphrag_agent` Runtime. Run the
+[local start check](#check-the-runtime-start-locally) before each deploy.
 
 ```bash
 aws sso login --sso-session <your-sso-session>     # only if you use AWS SSO
@@ -95,9 +96,29 @@ aws sso login --sso-session <your-sso-session>     # only if you use AWS SSO
 ./agent.sh logs --tail       # follows the Runtime logs
 ```
 
+### Check the Runtime start locally
+
+AgentCore Runtime starts the agent under `opentelemetry-instrument`. That
+wrapper imports botocore and urllib3 before the agent code runs. Code that
+starts cleanly under plain `uv run` can still crash in the Runtime because of
+that import order. The deploy then reports only "The runtime process exited
+unexpectedly" and rolls back after several minutes.
+
+Run this from `graphrag-agent/` before you deploy. It takes a few seconds and makes
+no AWS API calls:
+
+```bash
+OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
+  uv run opentelemetry-instrument python -c "import fleet_graphrag.server; import boto3; boto3.client('sts', region_name='us-east-1')"
+```
+
+- **Exporters:** The three `OTEL_*_EXPORTER=none` settings stop the wrapper from exporting to `localhost:4317`. Without them, it prints connection errors.
+- **Tests:** `uv run pytest tests/test_truststore.py` runs the same check automatically.
+- **Full server:** `uv run opentelemetry-instrument fleet-server` starts the whole server the same way the Runtime does.
+
 ### Create the secrets
 
-Create the two password secrets once, in the region you deploy to:
+Create the two password secrets once. These commands use us-east-1. Change `--region` if you deploy elsewhere.
 
 ```bash
 aws secretsmanager create-secret --region us-east-1 --name fleet/neo4j-reader \
@@ -107,7 +128,7 @@ aws secretsmanager create-secret --region us-east-1 --name fleet/memory-neo4j \
 ```
 
 - **ARNs:** Each command prints the complete secret ARN. Copy them into `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` in `../.env`.
-- **Read-only user:** The `username` key is optional. The [MCP server README](../../../neo4j-mcp-server/README.md#use-a-read-only-database-user-recommended) shows how to create a read-only Neo4j user on Aura.
+- **Read-only user:** The `username` key is optional. Use the read-only user you created for the MCP server. These docs call it `fleet_reader`. The [MCP server README](../../../neo4j-mcp-server/README.md#use-a-read-only-database-user) shows how to create it on Aura, including the extra role Aura Professional needs. Its example names the user `mcp_reader`.
 - **Supervisor:** The supervisor agent reuses the memory secret.
 
 ### Deploy settings
@@ -226,13 +247,13 @@ These numbers were measured on a local Neo4j.
 | `NEO4J_URI` | Required |
 | `NEO4J_USERNAME` | `neo4j`. The secret's `username` key wins when it has one. |
 | `NEO4J_PASSWORD` | Local runs only. Required when `NEO4J_PASSWORD_SECRET_ARN` is unset. |
-| `NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. |
+| `NEO4J_PASSWORD_SECRET_ARN` | Unset. Required for `./agent.sh deploy`. When set, local runs read the password from this secret too. |
 | `NEO4J_DATABASE` | `neo4j` |
 | `MEM_NEO4J_URI` | Required. The memory database. |
 | `MEM_NEO4J_USERNAME` | `neo4j`. The secret's `username` key wins when it has one. |
 | `MEM_NEO4J_DATABASE` | `neo4j` |
 | `MEM_NEO4J_PASSWORD` | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
-| `MEM_NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | Unset. Required for `./agent.sh deploy`. When set, local runs read the password from this secret too. |
 | `MODEL_ID` | `global.anthropic.claude-sonnet-5-5` |
 | `MAX_TOKENS` | `64000`. The output cap for each agent model call. |
 | `MODEL_EFFORT` | `medium`. One of `low`, `medium`, `high`, `xhigh`, or `max`. |
@@ -261,14 +282,15 @@ exports them with the rest.
 | Symptom | Cause and fix |
 |---------|---------------|
 | `MEM_NEO4J_URI is not set` at startup | Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD` in the shared `.env`. They point at the memory database. |
-| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env`. A deployed Runtime reads the password from its secret instead, so set `NEO4J_URI` and run `./agent.sh deploy` again. |
+| `The runtime process exited unexpectedly` during a deploy | Run the [local start check](#check-the-runtime-start-locally) first. Then read the traceback in the Runtime log group. |
+| `NEO4J_URI is not set` | Set `NEO4J_URI` and `NEO4J_PASSWORD` in the shared `.env`. A deployed Runtime reads the password from its secret instead. Set `NEO4J_URI` and run `./agent.sh deploy` again. |
 | `Missing or invalid deploy settings for runtime "graphrag_agent"` | A deploy setting is unset, a Neo4j URI lacks TLS, or a secret ARN is incomplete. Fix the listed names. |
 | `Could not read the secret in NEO4J_PASSWORD_SECRET_ARN` | The secret is missing in that region, or the Runtime role cannot read it. Check the ARN and the KMS key. |
 | `vector_search` returns poor results or nothing | Align `EMBED_MODEL_ID` and `EMBED_DIMENSIONS` with the pipeline, and confirm the vector index exists. |
 | `ServiceUnavailable` or an auth error from Neo4j | The URI scheme or the credentials are wrong, or the database is unreachable. |
 | `NoCredentialsError` | AWS credentials are missing. Run `aws configure` or set them in the environment. |
 | `AccessDeniedException` on the model | Enable Bedrock model access for Claude and the Titan embedding model. |
-| A 404 JSON response with `timestamp` on port 7070 | Another service holds port 7070. Run `lsof -ti :7070 \| xargs kill`, then restart. |
+| A 404 JSON response with `timestamp` on port 7070 | Another service holds port 7070. Run `lsof -i :7070` to see which process holds the port. Stop it if it is an old `fleet-server`. Otherwise set `AGENT_PORT` to another port. |
 
 ## See also
 

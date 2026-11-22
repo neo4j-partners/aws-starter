@@ -46,6 +46,10 @@ The [`supervisor-agent/`](./supervisor-agent/) project is a Strands supervisor w
 
 ## Quick start
 
+Check the [prerequisites](#prerequisites) first. `./setup.sh` needs AWS
+credentials with Bedrock access, and the default dataset needs a paid Aura tier
+or a local Neo4j.
+
 Run these commands from `demos/aircraft-fleet/`:
 
 ```bash
@@ -65,6 +69,7 @@ uv run fleet-cli "How many aircraft are in the database?"   # terminal 2
 
 - **Neo4j:** You need a Neo4j 5.23 or later database for the fleet graph. Neo4j Aura works well. The default dataset is past the Aura Free limits, so use a paid tier or a local Neo4j.
 - **Memory database:** You need a second Neo4j database or instance for agent memory. It can start empty.
+- **Read-only user:** The cloud deploys read the fleet graph as a read-only Neo4j user. The [MCP server README](../../neo4j-mcp-server/README.md#use-a-read-only-database-user) shows how to create it, including the extra role Aura Professional needs.
 - **AWS:** You need AWS credentials with Bedrock access to Claude and the Titan embedding model.
 - **Tools:** You need the [`uv`](https://docs.astral.sh/uv/) package manager and Python 3.12 or later.
 - **Deploy tools:** Cloud deploys need the AgentCore CLI, installed with `npm install -g @aws/agentcore`. The agents are tested with version 1.2.0.
@@ -95,7 +100,7 @@ uv sync
 
 - **Default size:** The default loads 30 aircraft over 90 days, about 800,000 nodes.
 - **Full size:** Set `LOAD_FULL_DATASET=true` in `.env` to load 100 aircraft.
-- **No model calls:** Run `./setup.sh load-operational` to build only the operational graph.
+- **No model calls:** Run `./setup.sh load-operational` to build only the operational graph. Its final check fails, because that graph has no manual enrichment.
 
 See the [pipeline README](./pipeline/README.md) for each stage and the dual graph.
 

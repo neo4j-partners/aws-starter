@@ -360,7 +360,7 @@ The CDK dependencies are git-ignored. Install them once in a fresh clone, or
 the deploy stops with "CDK dependencies are missing":
 
 ```bash
-(cd graphrag-agent/agentcore/cdk && npm install)
+(cd graphrag-agent/agentcore/cdk && npm ci)
 ```
 
 The project lives in `graphrag-agent/agentcore/`. Set the deploy settings in
@@ -686,6 +686,8 @@ history.
      Python verifies TLS against the macOS keychain. Local runs no longer
      need `SSL_CERT_FILE`. `populate-aircraft-db verify` and a `fleet-cli`
      query both passed against the fleet Aura with `SSL_CERT_FILE` unset.
+     The 2026-11-22 cloud retest found that this change stops both agent
+     Runtimes at startup. See that run below.
   2. Pass a longer `request_timeout` to `SharedMemory.open` in the
      agents' `memory.py`, or speed up the open upstream in
      neo4j-agent-memory.
@@ -694,19 +696,23 @@ history.
      admin user for the pipeline, and no shell export is needed.
   4. Done: the Step 0 text now names `global.anthropic.claude-sonnet-5-5`.
   5. Done: both agents now pin `@aws/agentcore-cdk` 1.2.0 for the
-     AgentCore CLI 1.2.0. That CLI syncs the CDK dependencies on every
-     build and deploy, so the committed pins match what a deploy installs.
+     AgentCore CLI 1.2.0. That CLI syncs the pinned CDK dependencies on
+     every build and deploy. It leaves the `aws-cdk-lib` and `aws-cdk`
+     ranges from item 8 unchanged and prints a warning for each.
      `agentcore build` synthesized both stacks, and `agent.sh help` and
-     `agent.sh status` work in both agents. A cloud deploy has not tested
-     it yet.
+     `agent.sh status` work in both agents. The 2026-11-22 cloud retest
+     ran both deploys with CLI 1.2.0. Both stacks synthesized and reached
+     CloudFormation, and `package.json` and `package-lock.json` stayed
+     unchanged.
   6. The AgentCore CLI and CDK print the full account ID in deploy logs.
   7. Done: the MCP runtime now gets only `NEO4J_PASSWORD_SECRET_ARN`. An
-     image entrypoint reads the password at startup. A cloud deploy has not
-     tested it yet.
+     image entrypoint reads the password at startup. The 2026-11-22 cloud
+     retest passed it.
   8. Done: `npm audit` reports 0 vulnerabilities in both agents' CDK
      folders. It had reported 3, in the `minimatch` and `brace-expansion`
-     copies that `aws-cdk-lib` bundles (GHSA-g3hv-75wg-m249,
-     GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).
+     copies that `aws-cdk-lib` bundles. The advisories are
+     GHSA-g3hv-75wg-m249, GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, and
+     GHSA-6j4f-fj2g-mc7p.
      - **The fix:** `package.json` declares `aws-cdk-lib` as
        `>=2.278.0 <3` and `aws-cdk` as `>=2.1149.0 <3`, and
        `package-lock.json` locks 2.278.0 and 2.1149.0. `aws-cdk-lib`
@@ -714,7 +720,7 @@ history.
        or later to synthesize.
      - **Why a range:** The AgentCore CLI 1.2.0 rewrites a single pinned
        version to the one it vends, `~2.269.0`, and refuses a newer pin.
-       It leaves a range unchanged and prints a warning, so no global
+       It leaves a range unchanged and prints a warning. No global
        `disableDependencyManagement` setting is needed. The CLI still
        manages `@aws/agentcore-cdk`, `constructs`, and the TypeScript
        packages.
@@ -727,3 +733,117 @@ history.
   The run kept the `fleet_reader` user, the secrets `fleet/neo4j-reader`
   and `fleet/memory-neo4j`, the shared ECR repository, the two runtime log
   groups, and the loaded graph.
+
+---
+
+## Cloud Retest: 2026-11-22
+
+This run retested the cloud path at main `98064f6`. It covered the changes
+made after the 2026-11-21 run: the MCP secret entrypoint, the non-root
+image, the user name read from the secret, the AgentCore CLI 1.2.0, and the
+`aws-cdk-lib` 2.278.0 and `aws-cdk` 2.1149.0 ranges. It followed the demo
+README and the agent READMEs. The graph from the 2026-11-21 run was reused,
+so the pipeline did not run again.
+
+**Overall status:** FAIL. The MCP server passed. Both agent Runtimes failed
+to start, so the agent cloud steps did not run.
+
+- **Setup:** The run created `fleet_reader` with the `reader` and
+  `graphql_app_read_only_<AURA_ID>` roles. It created the secrets
+  `fleet/neo4j-reader` and `fleet/memory-neo4j` with the AWS managed key.
+  Each holds a JSON `username` and `password`. `.env` got both secret ARNs,
+  and `.env.fleet` named `fleet_reader`.
+- **Local quick start:** PASS. `uv run fleet-server` started on port 7070
+  with the secret ARNs unset. `uv run fleet-cli "How many aircraft are in
+  the database?"` answered "The database has **30 aircraft**." in 19
+  seconds with one `graph_query_tool` call.
+- **MCP deploy:** PASS. `./deploy.py --env fleet` exited 0 after about 5
+  minutes. It built image tag `f1b33d3`, created the ECR repository, and
+  stored the password in `neo4j-mcp-server-fleet/neo4j-password`. The
+  stack reached `CREATE_COMPLETE`.
+- **MCP image:** PASS. The image runs as user `app`. Its command is
+  `python /app/secret_entrypoint.py`.
+- **MCP Runtime settings:** PASS. `get-agent-runtime` showed
+  `NEO4J_PASSWORD_SECRET_ARN`, `NEO4J_USERNAME=fleet_reader`, and
+  `NEO4J_READ_ONLY=true`. It showed no `NEO4J_PASSWORD`.
+- **MCP startup log:** PASS. The container logged "Read NEO4J_PASSWORD
+  from the secret in NEO4J_PASSWORD_SECRET_ARN." and then "Uvicorn running
+  on http://0.0.0.0:8000".
+- **MCP Gateway tests:** PASS. `./cloud.sh --env fleet` listed
+  `get_neo4j_schema` and `read_neo4j_cypher`, and all four tool tests
+  passed. The schema call worked as `fleet_reader`. `MATCH (a:Aircraft)
+  RETURN count(a)` returned 30. A `CREATE` and a `SET` through
+  `read_neo4j_cypher` were both refused with "Only MATCH queries are
+  allowed for read-query". No probe property was written.
+- **MCP log noise:** The Runtime log holds 428 `anyio.ClosedResourceError`
+  tracebacks from `mcp.server.streamable_http` "Error in message router".
+  Every request still returned 200. The tracebacks come from the upstream
+  `mcp-neo4j-cypher` server that the deploy builds from `NEO4J_MCP_REPO`.
+  This run records them as known log noise. They are not fixed here.
+- **Supervisor local:** PASS. `./agent.sh start` read the memory password
+  from `MEM_NEO4J_PASSWORD_SECRET_ARN`. `./agent.sh test-maintenance`
+  routed to the Maintenance Agent and reported 227 maintenance events in
+  39.4 seconds. `./agent.sh test-operations` routed to the Operations
+  Agent and reported 5,145 delays in 23.4 seconds.
+- **GraphRAG deploy:** FAIL. `./agent.sh deploy` exited 1 after 7 minutes
+  40 seconds. CloudFormation reported "The runtime process exited
+  unexpectedly." and the stack rolled back.
+- **Supervisor deploy:** FAIL. `./agent.sh deploy` exited 1 after 7
+  minutes 25 seconds with the same Runtime error and rollback.
+- **CDK dependencies:** PASS. Both deploys printed the CLI warning that it
+  leaves the `aws-cdk-lib` and `aws-cdk` ranges unchanged. Synth worked.
+  After the deploys, `npm audit` reported 0 vulnerabilities in both CDK
+  folders, and git showed no change to `package.json` or
+  `package-lock.json`.
+- **Not run:** The GraphRAG cloud queries, the supervisor cloud invokes,
+  the load test, and the cloud check of the user name read from the
+  secret did not run.
+
+### Root cause
+
+Both Runtimes stop at import with `RecursionError: maximum recursion depth
+exceeded`. The stack trace ends in `ssl.py` at
+`super(SSLContext, SSLContext).options.__set__`. It starts at the
+`BedrockModel` client in `fleet_graphrag/server.py`, inside the botocore
+credential resolver.
+
+- **The trigger:** AgentCore Runtime starts the code zip under
+  OpenTelemetry auto-instrumentation from `aws-opentelemetry-distro`. The
+  distro imports botocore and urllib3 before `main.py` runs.
+- **The conflict:** Each agent's `__init__.py` then calls
+  `truststore.inject_into_ssl()`. Truststore must run before those
+  libraries load. Injecting after them causes this recursion on the first
+  boto3 client.
+- **Local reproduction:** `uv run opentelemetry-instrument python -c
+  "import fleet_graphrag.server"` fails with the same `RecursionError`.
+  Plain `uv run python` imports it cleanly. The README's local tracing
+  command, `uv run opentelemetry-instrument fleet-server`, is affected
+  too.
+- **Why the 2026-11-21 run passed:** That run deployed before follow-up 1
+  added `truststore`.
+
+### Follow-ups from this run
+
+1. Fixed in commit 37c97c4. Each agent now skips the truststore injection
+   when the HTTP stack is already imported, and logs one line. In the
+   Runtime, TLS then uses the Linux system CA store.
+   `tests/test_truststore.py` checks the start under
+   `opentelemetry-instrument`. Rerun this retest to confirm it in the cloud.
+2. The `ClosedResourceError` tracebacks come from the MCP Python SDK's
+   stateless HTTP transport. They fill the MCP Runtime log.
+3. `scripts/sync-credentials.sh` also copied the old
+   `.mcp-credentials.finance.json` into `fraud-memory-agent/`. No finance
+   stack is deployed.
+4. `./deploy.py --env fleet cleanup` already deletes the stack's password
+   secret with no recovery window. CloudTrail shows `force=True` on both
+   deletes, so no change is needed.
+
+**Cloud resources confirmed destroyed:** Both `agent.sh destroy --yes`
+runs exited 0. `./deploy.py --env fleet cleanup` deleted the MCP Runtime,
+the stack, the ECR repository, and the password secret. The run then
+deleted `fleet/neo4j-reader`, `fleet/memory-neo4j`, the `fleet_reader`
+user, and the three Runtime log groups it created. List calls match the
+pre-run snapshot for stacks, Runtimes, credential providers, Gateways,
+Cognito pools, IAM roles, log groups, ECR repositories, and secrets.
+`.env` and `.env.fleet` are back to the admin user without the secret
+ARNs. CloudWatch Transaction Search stays on.

@@ -127,11 +127,35 @@ The environment picks one of two paths.
 
 ## Deploy
 
+Run the [local start check](#check-the-runtime-start-locally) before each
+deploy.
+
 ```bash
 ./agent.sh deploy                  # takes several minutes
 ./agent.sh invoke-cloud "What are the most common maintenance faults?"
 ./agent.sh invoke-cloud "Which routes have the most delays?"
 ```
+
+### Check the Runtime start locally
+
+AgentCore Runtime starts the agent under `opentelemetry-instrument`. That
+wrapper imports botocore and urllib3 before the agent code runs. Code that
+starts cleanly under plain `uv run` can still crash in the Runtime because of
+that import order. The deploy then reports only "The runtime process exited
+unexpectedly" and rolls back after several minutes.
+
+Run this from `supervisor-agent/` before you deploy. It takes a few seconds and makes
+no AWS API calls:
+
+```bash
+OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
+  uv run opentelemetry-instrument python -c "import fleet_supervisor.server; import boto3; boto3.client('sts', region_name='us-east-1')"
+```
+
+- **Exporters:** The three `OTEL_*_EXPORTER=none` settings stop the wrapper from exporting to `localhost:4317`. Without them, it prints connection errors.
+- **Tests:** `uv run pytest tests/test_truststore.py` runs the same check automatically.
+- **Full server:** `uv run opentelemetry-instrument fleet-supervisor-server` starts the whole server the same way the Runtime does.
+- **Failed deploy:** If a deploy fails with "The runtime process exited unexpectedly", run this check first. Then read the traceback in the Runtime log group.
 
 ### Deploy settings
 
@@ -249,7 +273,7 @@ to:
 | `MEM_NEO4J_USERNAME` | `neo4j` | The memory database user. The secret's `username` key wins when it has one. |
 | `MEM_NEO4J_DATABASE` | `neo4j` | The memory database name |
 | `MEM_NEO4J_PASSWORD` | unset | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
-| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Set by the deploy. The secret holds a JSON object with a `password` key and an optional `username` key. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Required for `./agent.sh deploy`. When set, local runs read the password from this secret too. The secret holds a JSON object with a `password` key and an optional `username` key. |
 | `FLEET_ENV_FILE` | `../.env` | The shared env file the server loads at startup |
 
 ## Tests

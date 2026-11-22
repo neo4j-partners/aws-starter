@@ -75,6 +75,7 @@ npm run build:pptx                                     # export decks to PowerPo
 - **Gallery build:** The gallery commands write to `docs/slides/build/`. Each run deletes that folder first. A single-deck build accepts any gallery or archive deck filename.
 - **Exports:** The export commands write to `docs/slides/dist/`. Each run deletes that folder first.
 - **Git:** Git ignores both output folders.
+- **zod override:** `package.json` overrides the `zod` under `chromium-bidi` to 4.6.7, although `chromium-bidi` asks for `^3.24.1`. Every zod release before 4.6.6 has the high-severity advisory GHSA-mrhx-c7xc-m3w5, and no 3.x release clears it. The publish workflow's audit step fails on a high finding.
 
 ## Publishing
 

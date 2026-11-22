@@ -43,7 +43,7 @@ itself.
 `NEO4J_USERNAME` in `.env.fleet` should name a read-only Neo4j user, such as
 `fleet_reader`, not the admin user. The MCP server already refuses writes,
 so the read-only user is a second guard. The
-[MCP server README](../../../../neo4j-mcp-server/README.md#use-a-read-only-database-user-recommended)
+[MCP server README](../../../../neo4j-mcp-server/README.md#use-a-read-only-database-user)
 shows how to create one. `./deploy.py redeploy` replaces
 only the image. A change to the Neo4j settings needs a full `./deploy.py
 --env fleet`.
@@ -83,6 +83,18 @@ handles this for each deploy.
 
 A bare `agentcore deploy` from the supervisor folder skips step 2 and deletes
 the provider. Always deploy through `agent.sh`.
+
+## Runtime start and TLS
+
+Both agent Runtimes start Python under `opentelemetry-instrument`, which
+imports botocore and urllib3 before `main.py` runs. Each agent injects
+`truststore` only when urllib3, botocore, requests, httpx, and neo4j are not
+yet imported. In the Runtime they are, so the agent logs "Skipping
+truststore" and TLS uses the Linux system CA store. To catch an import-order
+failure before a deploy, run the local start check in the
+[GraphRAG agent README](../../graphrag-agent/README.md#check-the-runtime-start-locally)
+or the
+[supervisor README](../../supervisor-agent/README.md#check-the-runtime-start-locally).
 
 ## Teardown
 

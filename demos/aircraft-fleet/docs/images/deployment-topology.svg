@@ -67,7 +67,7 @@
   <rect x="960" y="370" width="230" height="120" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
   <text x="1075.0" y="402" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Secrets Manager</text>
   <text x="1075.0" y="428" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">&lt;stack&gt;/neo4j-password</text>
-  <text x="1075.0" y="450" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">resolved by CloudFormation</text>
+  <text x="1075.0" y="450" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read at startup by the entrypoint</text>
   <path d="M575,370 V339" fill="none" stroke="#D97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
   <path d="M1075,370 V339" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
   <rect x="440" y="530" width="770" height="160" rx="14" fill="#FAFCFF" stroke="#2E6DB4" stroke-width="1.5" stroke-dasharray="7 5"/>

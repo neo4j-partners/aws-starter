@@ -89,8 +89,8 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 | `./setup.sh` | Install dependencies, generate, clean, load, enrich, fuse, and `verify --strict` |
 | `./setup.sh generate` | Stage 1 only |
 | `./setup.sh load` | Regenerate if stale, clean, then stages 2 to 5. This needs Bedrock or LLM access. |
-| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. |
-| `./setup.sh verify` | Stage 5 only, with `--strict`. This is read-only. |
+| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. The clean removes any enrichment, so the final `verify --strict` fails. |
+| `./setup.sh verify` | Stage 5 only, with `--strict`. It is read-only. It needs the CSVs in `generated/`, so run `./setup.sh generate` first in a fresh clone. |
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |
 
@@ -165,7 +165,7 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 
 | Setting | Fleet | Size |
 |---------|-------|------|
-| `LOAD_FULL_DATASET=false` | 30 aircraft over 90 days | About 800,000 nodes, 827,000 relationships, a 52 MB readings file, and 227 maintenance events |
+| `LOAD_FULL_DATASET=false` | 30 aircraft over 90 days | About 800,000 nodes, 830,000 relationships, a 54 MB readings file, and 227 maintenance events |
 | `LOAD_FULL_DATASET=true` | 100 aircraft over 90 days | About 2.7 million nodes and 180 MB of readings |
 
 - **Aura Free:** Both sizes are past the Aura Free limits. Use a paid Aura tier or a local Neo4j.
@@ -200,12 +200,13 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 ## Connect the agents
 
 - **GraphRAG agent:** The agent reads the live schema when it starts, so it sees the new graph with no changes. Its embedder must match this pipeline's. Try the queries in [`queries.txt`](../graphrag-agent/queries.txt).
-- **MCP server:** In `neo4j-mcp-server/.env.fleet`, set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` to the values used here. Then run the full deploy from the repo root:
+- **MCP server:** In `neo4j-mcp-server/.env.fleet`, set `NEO4J_URI` to the value used here. Set `NEO4J_USERNAME` and `NEO4J_PASSWORD` to a read-only user. The [MCP server README](../../../neo4j-mcp-server/README.md#use-a-read-only-database-user) shows how to create one. Then run the full deploy from the repo root:
 
 ```bash
 cd neo4j-mcp-server
 ./deploy.py --env fleet                  # apply the new Neo4j settings
 ./deploy.py --env fleet credentials      # refresh .mcp-credentials.fleet.json
+../scripts/sync-credentials.sh           # copy the credentials to demos/aircraft-fleet/
 ```
 
 `./deploy.py redeploy` updates only the container image. It does not apply new

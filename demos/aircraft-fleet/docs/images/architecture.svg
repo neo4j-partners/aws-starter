@@ -83,8 +83,8 @@
   <rect x="1050" y="300" width="250" height="160" rx="16" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="1175" y="334" text-anchor="middle" class="t" fill="#00594A">GraphRAG agent</text>
   <text x="1175" y="356" text-anchor="middle" class="m">graphrag-agent/ · :7070</text>
-  <text x="1070" y="388" class="s">graph_query: Text2Cypher</text>
-  <text x="1070" y="410" class="s">vector_search: hybrid search</text>
+  <text x="1070" y="388" class="s">graph_query_tool: Text2Cypher</text>
+  <text x="1070" y="410" class="s">vector_search_tool: hybrid search</text>
   <text x="1070" y="438" class="s">One Strands agent</text>
 
   <!-- Supervisor agent -->

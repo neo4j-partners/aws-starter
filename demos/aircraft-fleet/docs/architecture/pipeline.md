@@ -17,9 +17,12 @@ link the two.
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The chunk vector and fulltext indexes, and the links between the two graphs |
 | 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
 
-`./setup.sh` runs all five. Only stage 3 calls a model, so
+`./setup.sh` runs all five. Only stage 3 calls a model.
 `./setup.sh load-operational` builds the operational graph with no Bedrock
-access.
+access. It clears the database first, so there is no enrichment to relink.
+Its final strict check then fails, because the graph has no documents,
+chunks, or limits. `uv run populate-aircraft-db load-operational` skips the
+clear and relinks the enrichment an earlier full run left in the database.
 
 ## Generator
 
@@ -61,8 +64,9 @@ The stamp is how later steps tell a current dataset from a stale one.
 ![Fleet operational data model: eleven node labels and thirteen relationship types](../images/data-model.svg)
 
 The loader reads the CSVs in batches and writes the operational graph with
-batched `UNWIND` queries. The fleet structure runs from `Aircraft` through
-`HAS_SYSTEM`, `HAS_COMPONENT`, and `HAS_SENSOR` to hourly `Reading` nodes.
+batched `UNWIND` queries. Each `Aircraft` has systems through `HAS_SYSTEM`.
+Each system has components through `HAS_COMPONENT` and sensors through
+`HAS_SENSOR`. Each sensor has hourly `Reading` nodes.
 Maintenance events hang off the component they affect, and each one also
 points at its system and aircraft through `AFFECTS_SYSTEM` and
 `AFFECTS_AIRCRAFT`. Those two shortcuts let a query count faults per aircraft
@@ -87,8 +91,9 @@ extracted entities with `neo4j-graphrag`'s `SimpleKGPipeline`.
 The `neo4j-graphrag` extractor asks its LLM for JSON that matches a schema
 through `response_format`. `StructuredBedrockLLM` in `bedrock_structured.py`
 answers that request through Bedrock Converse tool use. It declares the target
-schema as a tool, forces `toolChoice` to that tool, and returns the tool input
-as the structured result. The class is a small `BedrockLLM` subclass that
+schema as a tool and offers it with `toolChoice` set to `auto`. Sonnet 5.5
+rejects a forced tool choice. If the reply has no tool call, the call is
+retried once. The tool input is the structured result. The class is a small `BedrockLLM` subclass that
 works in any Bedrock and `neo4j-graphrag` pipeline.
 
 ## Fusion and indexes

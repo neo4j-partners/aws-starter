@@ -13,7 +13,7 @@ in the design. All agent traffic must go through it.
 - **Machine login:** Agents log in with a Cognito client ID and secret. There are no user accounts or passwords to manage.
 - **Token exchange:** The Gateway gets its own token to call the Runtime. Agents do not handle that step.
 - **Tools:** The Gateway exposes two read-only tools, `neo4j-mcp-server-target___get_neo4j_schema` and `neo4j-mcp-server-target___read_neo4j_cypher`.
-- **Tool prefix:** The Gateway adds the target name to each tool name. [ARCHITECTURE.md](./ARCHITECTURE.md#gateway-tool-name-mapping) explains the prefix.
+- **Tool prefix:** The Gateway adds the target name to each tool name. [ARCHITECTURE.md](./ARCHITECTURE.md#gateway-tool-names) explains the prefix.
 - **Named deployments:** You can run several deployments side by side. Each one uses its own `.env.NAME` file.
 
 ## Quick start
@@ -96,9 +96,9 @@ AWS_REGION=us-east-1
 You do not need an agent username or password. The stack creates the client
 ID and secret for you.
 
-### Use a read-only database user (recommended)
+### Use a read-only database user
 
-The server runs with `NEO4J_READ_ONLY=true`, so it rejects write queries. A
+A read-only database user is recommended. The server runs with `NEO4J_READ_ONLY=true`, so it rejects write queries. A
 read-only database user adds a second layer. Even if the server check is
 bypassed, Neo4j itself refuses the write. Set `NEO4J_USERNAME` and
 `NEO4J_PASSWORD` in `.env` to this user instead of `neo4j`.
@@ -115,7 +115,7 @@ GRANT ROLE graphql_app_read_only_<instance-id> TO mcp_reader;
 Notes:
 
 - **Second role:** On Aura Professional, the built-in `reader` role cannot run
-  procedures, so `get_neo4j_schema` fails with `reader` alone. The Aura-managed
+  procedures. With `reader` alone, `get_neo4j_schema` fails. The Aura-managed
   `graphql_app_read_only_<instance-id>` role allows procedures and still denies
   writes. Run `SHOW ROLES` to find its exact name. The suffix is your 8-character
   instance ID.
@@ -125,6 +125,8 @@ Notes:
   check passes it to `cypher-shell -p`, which reads a leading `-` as a flag.
 - **Existing deployment:** Run a full `./deploy.py`, not `./deploy.py redeploy`.
   A redeploy updates only the image and keeps the old username and password.
+  A stack deployed before the secret entrypoint also needs one full
+  `./deploy.py`, because a redeploy keeps its plaintext `NEO4J_PASSWORD`.
 
 To confirm the setup, run `./cloud.sh tools` and then a read query. Then send a
 `CREATE` statement through `read_neo4j_cypher`. The server should reject it.
@@ -283,7 +285,7 @@ All commands run from `neo4j-mcp-server/`.
 | `./deploy.py status` | Show the stack status and outputs |
 | `./deploy.py credentials` | Write `.mcp-credentials.json` with the Gateway URL and a JWT token |
 | `./deploy.py stack-name` | Print the resolved stack name. The shell scripts use this. |
-| `./deploy.py cleanup` | Delete the stack, the ECR repository, and the password secret |
+| `./deploy.py cleanup` | Delete the stack and the password secret, with no recovery window. Ask before deleting the shared ECR repository. |
 | `./deploy.py help` | Show the full help text |
 | `./deploy.py --env NAME ...` | Run any command against the `.env.NAME` deployment |
 

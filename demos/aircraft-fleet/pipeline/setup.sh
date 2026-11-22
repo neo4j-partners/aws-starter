@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate the Aircraft Digital Twin dataset locally and load it into Neo4j Aura.
+# Generate the Aircraft Digital Twin dataset locally and load it into Neo4j.
 #
 # Usage:
 #   ./setup.sh                 # full pipeline: sync, generate, clean, setup (enrich), verify

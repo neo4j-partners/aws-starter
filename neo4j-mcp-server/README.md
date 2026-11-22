@@ -285,7 +285,7 @@ All commands run from `neo4j-mcp-server/`.
 | `./deploy.py status` | Show the stack status and outputs |
 | `./deploy.py credentials` | Write `.mcp-credentials.json` with the Gateway URL and a JWT token |
 | `./deploy.py stack-name` | Print the resolved stack name. The shell scripts use this. |
-| `./deploy.py cleanup` | Delete the stack and the password secret, with no recovery window. Ask before deleting the shared ECR repository. |
+| `./deploy.py cleanup` | Delete the stack and the password secret, with no recovery window. It asks separately before deleting the shared ECR repository. |
 | `./deploy.py help` | Show the full help text |
 | `./deploy.py --env NAME ...` | Run any command against the `.env.NAME` deployment |
 

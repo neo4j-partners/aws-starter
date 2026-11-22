@@ -9,4 +9,9 @@ RUN pip install --no-cache-dir "boto3==1.42.42"
 
 COPY secret_entrypoint.py /app/secret_entrypoint.py
 
+# The base image runs as root. The server needs no root access, and port
+# 8000 needs no privilege, so the container runs as an unprivileged user.
+RUN useradd --create-home --uid 1000 app
+USER app
+
 CMD ["python", "/app/secret_entrypoint.py"]

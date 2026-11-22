@@ -46,7 +46,6 @@ RETIRED_NAMES=(
     "(?<![-\\w])aura-agents\\b"
     "simple-oauth-(gateway|mcp-server)"
     "neo4j-agentcore-"
-    "orchestrator"
     "finance[-_ ]agent"
     "finance-graph-(load|enrich|analyze)"
     "simple-neo4j-mcp-server"
@@ -72,7 +71,7 @@ GATEWAY_PATTERN_PATHS=(
 # Retired everywhere except the end-to-end test plan, whose run history
 # records the old fleet_agent Runtime and the old fleet-agent/ folder.
 RETIRED_OUTSIDE_E2E_HISTORY=(
-    "fleet[-_ ]agent"
+    "fleet[-_]agent"
 )
 E2E_HISTORY_PATHS=(
     "demos/aircraft-fleet/docs/e2e-test-plan.md"

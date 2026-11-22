@@ -992,3 +992,83 @@ repositories, and secrets. `.env` and `.env.fleet` match their pre-run
 copies. The fleet credentials copies are removed. The fraud agent's
 `.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
 on, and the fleet graph is unchanged.
+
+## Cloud Retest 4: 2026-11-22
+
+This run retested the cloud path at main `9674a00`. Both agent CDK apps are
+back on TypeScript 5.9.3 and `@types/node` 24.13.3. The supervisor client
+sends `runtimeUserId` from commit 00222c9. The run built the fleet MCP stack
+from scratch and reused the graph from the 2026-11-21 run. Account IDs are
+masked.
+
+**Overall status:** PASS. The MCP server, both agent deploys, the GraphRAG
+queries, supervisor routing, the invoke client, and the load test all
+passed. The Runtime logs show no errors.
+
+- **Setup:** The run created `fleet_reader` again with the `reader` and
+  `graphql_app_read_only_709ad5c7` roles. It created the secrets
+  `fleet/neo4j-reader` and `fleet/memory-neo4j`. `.env` got both secret
+  ARNs, and `.env.fleet` named `fleet_reader`.
+- **Local Runtime start:** PASS. The check under
+  `opentelemetry-instrument` exited 0 in both agent folders. With logging
+  on, each agent printed the "Skipping truststore" line. The injection was
+  skipped in both.
+- **MCP deploy:** PASS. `./deploy.py --env fleet` exited 0. It built image
+  tag `f1b33d3`, and the stack reached `CREATE_COMPLETE`. CloudFormation
+  created the stack in 4 minutes 33 seconds. The whole command took 45
+  minutes because the Mac went into idle sleep during the CDK wait.
+- **MCP Gateway tests:** PASS. All four `./cloud.sh --env fleet` tool tests
+  passed. `MATCH (a:Aircraft) RETURN count(a)` returned 30. A `CREATE` and
+  a `SET` were both refused with "Only MATCH queries are allowed for
+  read-query". No probe node or property was written.
+- **CDK build:** PASS. Both CDK folders ran TypeScript 5.9.3 with
+  `@types/node` 24.13.6. `npm run build` exited 0 in both folders.
+- **GraphRAG deploy:** PASS. `./agent.sh deploy` exited 0 after 5 minutes
+  28 seconds.
+- **GraphRAG cloud queries:** PASS. "How many aircraft are in the
+  database?" returned HTTP 200 with "**30 aircraft**". The agent used
+  `graph_query_tool`. A question about troubleshooting high EGT returned
+  HTTP 200. The agent used `vector_search_tool` and cited the A220 and B737
+  maintenance manuals.
+- **Supervisor deploy:** PASS. `./agent.sh deploy` exited 0 after 5 minutes
+  8 seconds.
+- **Supervisor routing:** PASS through `./agent.sh invoke-cloud`. "What are
+  the most common maintenance faults?" went to the Maintenance Agent. "What
+  are the most common delay causes?" went to the Operations Agent. Both
+  agents called the Gateway tools `get_neo4j_schema` and
+  `read_neo4j_cypher`.
+- **Supervisor invoke client:** PASS. "Which aircraft had the most
+  maintenance events?" went to the Maintenance Agent in 18.1 seconds.
+  "Which routes have the most flight delays?" went to the Operations Agent
+  in 32.3 seconds. The `runtimeUserId` fix from commit 00222c9 works in the
+  cloud.
+- **Load test:** PASS. `./agent.sh load-test` ran for about 3 minutes and
+  sent 6 requests. The first 5 finished in 31 to 44 seconds each. Each one
+  went to the expected agent. The final totals showed 0 unexpected routes
+  and 0 errors. The sixth request was still running when the test was
+  stopped.
+- **Runtime logs:** PASS. Each agent's log has 2 "Skipping truststore"
+  lines. Neither log has a `RecursionError`, a `CERTIFICATE_VERIFY_FAILED`,
+  a traceback, or "No workload access token". The supervisor log shows 10
+  handled requests and 11 Gateway token fetches.
+
+### Follow-ups from this run
+
+1. A SIGINT to the `load-test` process did not stop it between requests.
+   The loop kept sending requests until a SIGTERM stopped it.
+2. A long `./deploy.py` run stalls while the Mac sleeps. Running it under
+   `caffeinate -i` keeps the CDK wait alive.
+
+**Cloud resources confirmed destroyed:** Both `agent.sh destroy --yes` runs
+exited 0. `./deploy.py --env fleet cleanup` exited 0 after 4 minutes 15
+seconds. It deleted the MCP Runtime, the stack, the ECR repository, and the
+password secret. The run then force-deleted `fleet/neo4j-reader` and
+`fleet/memory-neo4j`. It dropped `fleet_reader` and deleted the three new
+Runtime log groups. List calls match the pre-run snapshot for stacks,
+Runtimes, credential providers, Gateways, Cognito pools, IAM roles, log
+groups, ECR repositories, and secrets. `.env` and `.env.fleet` match their
+pre-run copies. The fleet credentials copies are removed. The run also removed
+`neo4j-mcp-server/.env.fleet.readonly`, which held the dropped
+`fleet_reader` login. `create_reader.py` writes it again at the next setup. The fraud agent's
+`.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
+on, and the fleet graph is unchanged.

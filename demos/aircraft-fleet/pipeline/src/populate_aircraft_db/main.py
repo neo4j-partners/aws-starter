@@ -371,6 +371,14 @@ def verify_cmd(
         "--strict",
         help="Exit with a nonzero status when verification warnings are found.",
     ),
+    skip_enrichment: bool = typer.Option(
+        False,
+        "--skip-enrichment",
+        help=(
+            "With --strict, report the enrichment checks as warnings. Use it for a "
+            "graph with only operational data."
+        ),
+    ),
 ) -> None:
     """Run comprehensive graph verification (read-only)."""
     settings = Settings()  # type: ignore[call-arg]
@@ -397,6 +405,7 @@ def verify_cmd(
             settings.neo4j_database,
             expected_embedding_dimensions=_expected_embedding_dims(settings),
             strict=strict,
+            skip_enrichment=skip_enrichment,
             data_dir=settings.data_dir,
         )
 

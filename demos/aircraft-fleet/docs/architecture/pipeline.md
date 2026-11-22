@@ -20,8 +20,9 @@ link the two.
 `./setup.sh` runs all five. Only stage 3 calls a model.
 `./setup.sh load-operational` builds the operational graph with no Bedrock
 access. It clears the database first, so there is no enrichment to relink.
-Its final check runs without `--strict` and prints the missing documents,
-chunks, and limits as warnings. `uv run populate-aircraft-db load-operational` skips the
+Its final check is `verify --strict --skip-enrichment`. The missing documents,
+chunks, and limits print as warnings, and an operational problem still fails
+the run. `uv run populate-aircraft-db load-operational` skips the
 clear and relinks the enrichment an earlier full run left in the database.
 
 ## Generator
@@ -132,3 +133,9 @@ Stage 5 reads the graph and prints a report of warnings and failures.
 
 `./setup.sh` runs `verify --strict`, which exits nonzero on any warning, so the
 same check works in CI.
+
+`verify --strict --skip-enrichment` keeps the counts, stamp, CSV comparison,
+operational constraints, and operational orphans as failures. It reports the
+embeddings, chunk indexes, search test, extracted-entity constraints, cross
+links, and documents without chunks as warnings. `./setup.sh load-operational`
+uses it, because that graph has no enrichment.

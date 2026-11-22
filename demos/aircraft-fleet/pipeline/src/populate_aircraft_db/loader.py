@@ -657,16 +657,21 @@ def _has_constraint(constraint_rows: list[dict[str, Any]], label: str, property_
 
 @dataclass
 class _VerifyResult:
-    """Failed checks, collected as failures in strict mode and warnings otherwise."""
+    """Failed checks, collected as failures in strict mode and warnings otherwise.
+
+    With skip_enrichment, a failed enrichment check stays a warning even in
+    strict mode. Operational and consistency checks still fail.
+    """
 
     strict: bool
+    skip_enrichment: bool = False
     failures: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
-    def check(self, condition: bool, message: str) -> None:
+    def check(self, condition: bool, message: str, *, enrichment: bool = False) -> None:
         if condition:
             return
-        if self.strict:
+        if self.strict and not (enrichment and self.skip_enrichment):
             self.failures.append(message)
         else:
             self.warnings.append(message)
@@ -711,38 +716,44 @@ def _verify_vector_search(
     return True, f"{count} result(s), best score={score:.4f}"
 
 
-# (name, query, labels it needs, relationship types it needs). A check whose
-# labels or relationship types are absent counts 0 without running.
+# (name, query, labels it needs, relationship types it needs, whether it checks
+# enrichment). A check whose labels or relationship types are absent counts 0
+# without running.
 _ORPHAN_CHECKS = [
     (
         "Readings without Sensor",
         "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) RETURN count(r) AS count",
         {"Reading", "Sensor"},
         {"HAS_READING"},
+        False,
     ),
     (
         "Flights without Aircraft",
         "MATCH (f:Flight) WHERE NOT (f)<-[:OPERATES_FLIGHT]-(:Aircraft) RETURN count(f) AS count",
         {"Flight", "Aircraft"},
         {"OPERATES_FLIGHT"},
+        False,
     ),
     (
         "Components without System",
         "MATCH (c:Component) WHERE NOT (c)<-[:HAS_COMPONENT]-(:System) RETURN count(c) AS count",
         {"Component", "System"},
         {"HAS_COMPONENT"},
+        False,
     ),
     (
         "Sensors without Readings",
         "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) RETURN count(s) AS count",
         {"Sensor", "Reading"},
         {"HAS_READING"},
+        False,
     ),
     (
         "Documents without Chunks",
         "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) RETURN count(d) AS count",
         {"Document", "Chunk"},
         {"FROM_DOCUMENT"},
+        True,
     ),
 ]
 
@@ -761,7 +772,9 @@ def _check_counts(
     for rel_type in OPERATIONAL_RELATIONSHIP_TYPES:
         result.check(rel_counts[rel_type] > 0, f"{rel_type} has no relationships")
     for label in ("Document", "Chunk", "AircraftModel", "OperatingLimit"):
-        result.check(enrichment_counts[label] > 0, f"{label} has no enrichment nodes")
+        result.check(
+            enrichment_counts[label] > 0, f"{label} has no enrichment nodes", enrichment=True
+        )
 
 
 def _csv_row_count(path: Path) -> int:
@@ -852,17 +865,25 @@ def _check_embeddings(
     print(f"  Dimensions found: {dimensions}")
     print(f"  Wrong-dimension embeddings: {bad_dimensions:,}")
 
-    result.check(embedding_row["with_embedding"] > 0, "no chunk embeddings found")
-    result.check(embedding_row["missing_embedding"] == 0, "some chunks are missing embeddings")
+    result.check(embedding_row["with_embedding"] > 0, "no chunk embeddings found", enrichment=True)
+    result.check(
+        embedding_row["missing_embedding"] == 0,
+        "some chunks are missing embeddings",
+        enrichment=True,
+    )
     result.check(
         bad_dimensions == 0,
         f"some embeddings do not have {expected_dimensions} dimensions",
+        enrichment=True,
     )
     return embedding_row["with_embedding"]
 
 
 def _check_indexes(driver: Driver, database: str, result: _VerifyResult) -> set[str]:
-    """Check the required indexes and return the names of all indexes."""
+    """Check the chunk indexes and return the names of all indexes.
+
+    Both required indexes are built in the enrichment stage.
+    """
     index_rows, _, _ = driver.execute_query(
         """
         SHOW INDEXES
@@ -878,10 +899,10 @@ def _check_indexes(driver: Driver, database: str, result: _VerifyResult) -> set[
         row = index_by_name.get(name)
         if row is None:
             print(f"  [MISSING] {name}")
-            result.check(False, f"missing index {name}")
+            result.check(False, f"missing index {name}", enrichment=True)
             continue
         print(f"  [OK] {name}: {row['type']} {row['state']}")
-        result.check(row["state"] == "ONLINE", f"index {name} is {row['state']}")
+        result.check(row["state"] == "ONLINE", f"index {name} is {row['state']}", enrichment=True)
     return set(index_by_name)
 
 
@@ -901,7 +922,11 @@ def _check_constraints(driver: Driver, database: str, result: _VerifyResult) -> 
         exists = _has_constraint(constraint_dicts, label, property_name)
         status = "[OK]" if exists else "[MISSING]"
         print(f"  {status} {label}.{property_name}")
-        result.check(exists, f"missing uniqueness constraint {label}.{property_name}")
+        result.check(
+            exists,
+            f"missing uniqueness constraint {label}.{property_name}",
+            enrichment=(label, property_name) in EXTRACTION_CONSTRAINTS,
+        )
 
 
 def _check_vector_search(
@@ -920,7 +945,7 @@ def _check_vector_search(
     )
     print("\nVector Search Smoke Test:")
     print(f"  {'[OK]' if vector_ok else '[FAIL]'} {vector_detail}")
-    result.check(vector_ok, f"vector search smoke test failed: {vector_detail}")
+    result.check(vector_ok, f"vector search smoke test failed: {vector_detail}", enrichment=True)
 
 
 def _check_cross_links(rel_counts: dict[str, int], result: _VerifyResult) -> None:
@@ -933,7 +958,7 @@ def _check_cross_links(rel_counts: dict[str, int], result: _VerifyResult) -> Non
     print("\nCross-Link Checks:")
     for label, count in cross_link_checks:
         print(f"  {label}: {count:,}")
-        result.check(count > 0, f"{label} has no links")
+        result.check(count > 0, f"{label} has no links", enrichment=True)
 
 
 def _check_data_quality(
@@ -944,14 +969,14 @@ def _check_data_quality(
     result: _VerifyResult,
 ) -> None:
     print("\nData Quality Checks:")
-    for label, query, required_labels, required_relationships in _ORPHAN_CHECKS:
+    for label, query, required_labels, required_relationships, enrichment in _ORPHAN_CHECKS:
         if required_labels <= existing_labels and required_relationships <= existing_relationships:
             records, _, _ = driver.execute_query(query, database_=database)
             count = records[0]["count"]
         else:
             count = 0
         print(f"  {label}: {count:,}")
-        result.check(count == 0, f"{label}: {count:,}")
+        result.check(count == 0, f"{label}: {count:,}", enrichment=enrichment)
 
 
 def _print_summary(result: _VerifyResult) -> bool:
@@ -982,14 +1007,16 @@ def verify(
     *,
     expected_embedding_dimensions: int = 1536,
     strict: bool = False,
+    skip_enrichment: bool = False,
     data_dir: Path | None = None,
 ) -> bool:
     """Print comprehensive graph verification and return whether it passed.
 
     With data_dir, it also compares each operational label's node count
-    with the row count of its CSV there.
+    with the row count of its CSV there. With skip_enrichment, failed
+    enrichment checks are warnings even in strict mode.
     """
-    result = _VerifyResult(strict=strict)
+    result = _VerifyResult(strict=strict, skip_enrichment=skip_enrichment)
 
     label_counts = _get_label_counts(driver, database)
     relationship_counts = _get_relationship_counts(driver, database)

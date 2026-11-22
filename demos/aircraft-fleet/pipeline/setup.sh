@@ -130,9 +130,9 @@ case "$CMD" in
     do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db load-operational
-    # Not --strict: this graph has no documents, chunks, or limits, so the
-    # enrichment checks would always fail. They print as warnings instead.
-    uv run populate-aircraft-db verify
+    # This graph has no documents, chunks, or limits. --skip-enrichment turns
+    # those checks into warnings. The operational checks still fail the run.
+    uv run populate-aircraft-db verify --strict --skip-enrichment
     ;;
   verify)
     require_generated

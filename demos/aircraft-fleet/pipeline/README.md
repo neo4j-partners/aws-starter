@@ -89,7 +89,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 | `./setup.sh` | Install dependencies, generate, clean, load, enrich, fuse, and `verify --strict` |
 | `./setup.sh generate` | Stage 1 only |
 | `./setup.sh load` | Regenerate if stale, clean, then stages 2 to 5. This needs Bedrock or LLM access. |
-| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. It ends with a plain `verify`, which prints the missing enrichment as warnings. |
+| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. It ends with `verify --strict --skip-enrichment`. Missing enrichment prints as warnings, and an operational problem fails the run. |
 | `./setup.sh verify` | Stage 5 only, with `--strict`. It is read-only. It needs the CSVs in `generated/`, so run `./setup.sh generate` first in a fresh clone. |
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |
@@ -123,6 +123,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **Your files:** Files you add to `generated/` are kept.
 - **Graph check:** `verify` compares the graph's `Dataset` node with the stamp, and the stamp with the current code. It also compares each operational label's node count with its CSV row count.
 - **Strict mode:** `verify --strict` fails on any mismatch, or when the stamp is missing.
+- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, and the cross links. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
 
 ## Structured output on Bedrock
 

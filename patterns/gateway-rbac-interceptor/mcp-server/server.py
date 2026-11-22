@@ -23,7 +23,7 @@ import logging
 from contextvars import ContextVar
 
 import uvicorn
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -31,19 +31,22 @@ from starlette.requests import Request
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastMCP server for AgentCore Runtime
-# host="0.0.0.0" - Listen on all interfaces (required by AgentCore)
+# MCP server for AgentCore Runtime. In mcp 2.x the HTTP settings are passed
+# when the app is built (see __main__), not to the constructor.
+mcp = MCPServer("Simple OAuth Demo Server")
+
+# host="0.0.0.0" - Listen on all interfaces (required by AgentCore). Passing it
+#   to the app builder also keeps mcp's localhost-only Host check off, since the
+#   Gateway calls this server with its own Host header.
+# PORT 8000 - The AgentCore Runtime port for MCP servers.
 # stateless_http=True - Enable stateless mode for enterprise security
-mcp = FastMCP(
-    "Simple OAuth Demo Server",
-    host="0.0.0.0",
-    stateless_http=True
-)
+HOST = "0.0.0.0"
+PORT = 8000
 
 # Context variable for storing request headers, populated per request by
 # IdentityHeaderMiddleware below. Tools run outside the HTTP request scope,
 # so the middleware stashes the headers here for _get_user_context() to read.
-_request_headers: ContextVar[dict] = ContextVar("request_headers", default={})
+_request_headers: ContextVar[dict] = ContextVar("request_headers")
 
 
 class IdentityHeaderMiddleware(BaseHTTPMiddleware):
@@ -75,7 +78,7 @@ def _get_user_context() -> dict:
     Returns default values if headers are not available (e.g., direct
     access without going through Gateway).
     """
-    headers = _request_headers.get()
+    headers = _request_headers.get({})
 
     user_id = headers.get("x-user-id", "unknown")
     groups_str = headers.get("x-user-groups", "")
@@ -88,7 +91,7 @@ def _get_user_context() -> dict:
         "user_id": user_id,
         "groups": groups,
         "client_id": client_id,
-        "authenticated": user_id != "unknown"
+        "authenticated": user_id != "unknown",
     }
 
 
@@ -147,7 +150,7 @@ def get_user_info() -> dict:
         "client_id": ctx["client_id"],
         "authenticated": ctx["authenticated"],
         "auth_type": auth_type,
-        "message": "Identity extracted from Gateway interceptor headers"
+        "message": "Identity extracted from Gateway interceptor headers",
     }
 
 
@@ -171,17 +174,21 @@ def admin_action(action: str) -> dict:
         dict with action result or error if unauthorized
     """
     ctx = _get_user_context()
-    logger.info(f"admin_action called by user={ctx['user_id']}, groups={ctx['groups']}, action={action}")
+    logger.info(
+        f"admin_action called by user={ctx['user_id']}, groups={ctx['groups']}, action={action}"
+    )
 
     # Defense-in-depth: verify admin group membership
     # The Gateway interceptor should have already blocked non-admins
     if ctx["authenticated"] and "admin" not in ctx["groups"]:
-        logger.warning(f"admin_action: user {ctx['user_id']} not in admin group (should have been blocked by interceptor)")
+        logger.warning(
+            f"admin_action: user {ctx['user_id']} not in admin group (should have been blocked by interceptor)"
+        )
         return {
             "success": False,
             "error": "Unauthorized: admin group membership required",
             "user": ctx["user_id"],
-            "groups": ctx["groups"]
+            "groups": ctx["groups"],
         }
 
     return {
@@ -189,7 +196,7 @@ def admin_action(action: str) -> dict:
         "action": action,
         "performed_by": ctx["user_id"],
         "user_groups": ctx["groups"],
-        "message": f"Admin action '{action}' completed successfully"
+        "message": f"Admin action '{action}' completed successfully",
     }
 
 
@@ -212,19 +219,19 @@ def server_info() -> dict:
             "echo": "Public - available to all authenticated users",
             "get_user_info": "Public - returns caller identity",
             "admin_action": "Protected - requires 'admin' group",
-            "server_info": "Public - this information"
+            "server_info": "Public - this information",
         },
         "features": [
             "OAuth2 M2M (client_credentials) authentication",
             "OAuth2 User (password) authentication with groups",
             "Group-based access control (RBAC)",
             "Gateway interceptor for JWT claim extraction",
-            "Header-based identity propagation"
+            "Header-based identity propagation",
         ],
         "groups": {
             "users": "Basic access to public tools",
-            "admin": "Full access including admin_action tool"
-        }
+            "admin": "Full access including admin_action tool",
+        },
     }
 
 
@@ -233,6 +240,6 @@ if __name__ == "__main__":
     # Serve the streamable-http app directly so the identity-header middleware
     # is installed. This is what mcp.run(transport="streamable-http") does
     # internally, plus the middleware.
-    app = mcp.streamable_http_app()
+    app = mcp.streamable_http_app(stateless_http=True, host=HOST)
     app.add_middleware(IdentityHeaderMiddleware)
-    uvicorn.run(app, host=mcp.settings.host, port=mcp.settings.port)
+    uvicorn.run(app, host=HOST, port=PORT)

@@ -7,6 +7,7 @@ credentials (M2M) authentication with AgentGateway and Cognito.
 """
 
 import aws_cdk as cdk
+
 from simple_oauth_stack import SimpleOAuthStack
 
 app = cdk.App()

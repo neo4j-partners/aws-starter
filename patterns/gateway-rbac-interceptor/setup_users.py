@@ -33,13 +33,13 @@ TEST_USERS = [
     {
         "username": "admin@example.com",
         "groups": ["admin", "users"],
-        "description": "Admin user with full access"
+        "description": "Admin user with full access",
     },
     {
         "username": "user@example.com",
         "groups": ["users"],
-        "description": "Regular user (no admin access)"
-    }
+        "description": "Regular user (no admin access)",
+    },
 ]
 
 
@@ -90,9 +90,9 @@ def create_user(cognito, user_pool_id: str, username: str, password: str) -> boo
             Username=username,
             UserAttributes=[
                 {"Name": "email", "Value": username},
-                {"Name": "email_verified", "Value": "true"}
+                {"Name": "email_verified", "Value": "true"},
             ],
-            MessageAction="SUPPRESS"  # Don't send welcome email
+            MessageAction="SUPPRESS",  # Don't send welcome email
         )
         print(f"    Created user: {username}")
     except cognito.exceptions.UsernameExistsException:
@@ -104,10 +104,7 @@ def create_user(cognito, user_pool_id: str, username: str, password: str) -> boo
     # Set permanent password (skip forced password change)
     try:
         cognito.admin_set_user_password(
-            UserPoolId=user_pool_id,
-            Username=username,
-            Password=password,
-            Permanent=True
+            UserPoolId=user_pool_id, Username=username, Password=password, Permanent=True
         )
         print(f"    Set password for: {username}")
     except ClientError as e:
@@ -121,15 +118,13 @@ def add_user_to_group(cognito, user_pool_id: str, username: str, group_name: str
     """Add a user to a Cognito group."""
     try:
         cognito.admin_add_user_to_group(
-            UserPoolId=user_pool_id,
-            Username=username,
-            GroupName=group_name
+            UserPoolId=user_pool_id, Username=username, GroupName=group_name
         )
         print(f"    Added {username} to group: {group_name}")
         return True
     except cognito.exceptions.ResourceNotFoundException:
         print(f"    Group not found: {group_name}")
-        print(f"    Make sure the stack is deployed with the latest version.")
+        print("    Make sure the stack is deployed with the latest version.")
         return False
     except ClientError as e:
         print(f"    Error adding {username} to {group_name}: {e}")
@@ -148,19 +143,15 @@ Test Users Created (shared password generated at deploy, in Secrets Manager):
 After running this script, test with:
   uv run python client/demo.py --mode user --username admin@example.com
   uv run python client/demo.py --mode user --username user@example.com
-        """
+        """,
     )
 
     parser.add_argument(
         "--stack",
         default=DEFAULT_STACK_NAME,
-        help=f"CloudFormation stack name (default: {DEFAULT_STACK_NAME})"
+        help=f"CloudFormation stack name (default: {DEFAULT_STACK_NAME})",
     )
-    parser.add_argument(
-        "--region",
-        default=None,
-        help="AWS region (default: from AWS config)"
-    )
+    parser.add_argument("--region", default=None, help="AWS region (default: from AWS config)")
 
     args = parser.parse_args()
     region = args.region or get_default_region()
@@ -174,10 +165,10 @@ After running this script, test with:
         user_pool_id = outputs.get("CognitoUserPoolId")
         secret_name = outputs.get("TestUserSecretName")
         if not user_pool_id:
-            print(f"\nError: Could not find CognitoUserPoolId in stack outputs")
+            print("\nError: Could not find CognitoUserPoolId in stack outputs")
             sys.exit(1)
         if not secret_name:
-            print(f"\nError: Could not find TestUserSecretName in stack outputs")
+            print("\nError: Could not find TestUserSecretName in stack outputs")
             print(f"Redeploy '{args.stack}' with the updated stack. Run: ./deploy.sh")
             sys.exit(1)
         print(f"User Pool ID: {user_pool_id}")

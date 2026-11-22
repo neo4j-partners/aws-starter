@@ -31,10 +31,10 @@ import sys
 from datetime import datetime, timedelta
 
 import boto3
+import httpx2
 import requests
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
-
+from mcp.client.streamable_http import streamable_http_client
 
 # =============================================================================
 # DEFAULTS
@@ -78,12 +78,8 @@ def _clear_token_cache():
 # M2M AUTHENTICATION (client_credentials flow)
 # =============================================================================
 
-def get_m2m_token(
-    user_pool_id: str,
-    client_id: str,
-    scope: str,
-    region: str
-) -> str:
+
+def get_m2m_token(user_pool_id: str, client_id: str, scope: str, region: str) -> str:
     """
     Get OAuth2 access token using client credentials flow (M2M).
 
@@ -113,10 +109,7 @@ def get_m2m_token(
     cognito = boto3.client("cognito-idp", region_name=region)
 
     # Get client secret
-    response = cognito.describe_user_pool_client(
-        UserPoolId=user_pool_id,
-        ClientId=client_id
-    )
+    response = cognito.describe_user_pool_client(UserPoolId=user_pool_id, ClientId=client_id)
     client_secret = response["UserPoolClient"]["ClientSecret"]
 
     # Get domain
@@ -138,7 +131,7 @@ def get_m2m_token(
             "client_secret": client_secret,
             "scope": scope,
         },
-        timeout=30
+        timeout=30,
     )
 
     if not token_response.ok:
@@ -159,12 +152,9 @@ def get_m2m_token(
 # USER AUTHENTICATION (password flow)
 # =============================================================================
 
+
 def get_user_token(
-    user_pool_id: str,
-    client_id: str,
-    username: str,
-    password: str,
-    region: str
+    user_pool_id: str, client_id: str, username: str, password: str, region: str
 ) -> str:
     """
     Get OAuth2 access token using USER_PASSWORD_AUTH flow.
@@ -196,19 +186,12 @@ def get_user_token(
     cognito = boto3.client("cognito-idp", region_name=region)
 
     # Get client secret
-    response = cognito.describe_user_pool_client(
-        UserPoolId=user_pool_id,
-        ClientId=client_id
-    )
+    response = cognito.describe_user_pool_client(UserPoolId=user_pool_id, ClientId=client_id)
     client_secret = response["UserPoolClient"]["ClientSecret"]
 
     # Calculate SECRET_HASH (required for clients with secrets)
     message = username + client_id
-    dig = hmac.new(
-        client_secret.encode("utf-8"),
-        message.encode("utf-8"),
-        hashlib.sha256
-    ).digest()
+    dig = hmac.new(client_secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
     secret_hash = base64.b64encode(dig).decode()
 
     # Authenticate
@@ -216,15 +199,11 @@ def get_user_token(
         auth_response = cognito.initiate_auth(
             ClientId=client_id,
             AuthFlow="USER_PASSWORD_AUTH",
-            AuthParameters={
-                "USERNAME": username,
-                "PASSWORD": password,
-                "SECRET_HASH": secret_hash
-            }
+            AuthParameters={"USERNAME": username, "PASSWORD": password, "SECRET_HASH": secret_hash},
         )
     except cognito.exceptions.NotAuthorizedException as e:
         raise Exception(f"Authentication failed: {e}")
-    except cognito.exceptions.UserNotFoundException as e:
+    except cognito.exceptions.UserNotFoundException:
         raise Exception(f"User not found: {username}")
 
     result = auth_response.get("AuthenticationResult", {})
@@ -269,11 +248,9 @@ def _extract_groups_from_token(token: str) -> list:
 # MCP CLIENT
 # =============================================================================
 
+
 async def call_mcp_tools(
-    gateway_url: str,
-    token: str,
-    test_admin: bool = False,
-    is_admin: bool = False
+    gateway_url: str, token: str, test_admin: bool = False, is_admin: bool = False
 ) -> bool:
     """
     Connect to Gateway and call MCP tools.
@@ -287,7 +264,7 @@ async def call_mcp_tools(
     Returns:
         True if successful
     """
-    print(f"\n[MCP] Connecting to Gateway...")
+    print("\n[MCP] Connecting to Gateway...")
     print(f"    URL: {gateway_url}")
 
     headers = {
@@ -295,70 +272,76 @@ async def call_mcp_tools(
         "Content-Type": "application/json",
     }
 
+    # mcp 2.x takes headers and timeouts on the HTTP client: 60s for each
+    # request and 300s to read a held-open response stream.
+    http_client = httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(60, read=300))
+
     try:
-        async with streamablehttp_client(
-            gateway_url,
-            headers,
-            timeout=timedelta(seconds=60),
-            terminate_on_close=False
-        ) as (read_stream, write_stream, _):
-            async with ClientSession(read_stream, write_stream) as session:
-                await session.initialize()
-                print("    Session initialized!")
+        async with (
+            http_client,
+            streamable_http_client(
+                gateway_url, http_client=http_client, terminate_on_close=False
+            ) as (read_stream, write_stream),
+            ClientSession(read_stream, write_stream) as session,
+        ):
+            await session.initialize()
+            print("    Session initialized!")
 
-                # List tools
-                tools = await session.list_tools()
-                tool_names = {}
-                print("\n    Available Tools:")
-                print("    " + "-" * 50)
-                for tool in tools.tools:
-                    base_name = tool.name.split("___")[-1] if "___" in tool.name else tool.name
-                    tool_names[base_name] = tool.name
-                    # Truncate description for display
-                    desc = tool.description[:50] + "..." if len(tool.description) > 50 else tool.description
-                    print(f"    - {base_name}: {desc}")
-
-                # Test echo (public tool)
-                print("\n[Test] Calling echo tool (public)...")
-                echo_tool = tool_names.get("echo", "echo")
-                result = await session.call_tool(
-                    name=echo_tool,
-                    arguments={"message": "Hello from RBAC demo!"}
+            # List tools
+            tools = await session.list_tools()
+            tool_names = {}
+            print("\n    Available Tools:")
+            print("    " + "-" * 50)
+            for tool in tools.tools:
+                base_name = tool.name.split("___")[-1] if "___" in tool.name else tool.name
+                tool_names[base_name] = tool.name
+                # Truncate description for display
+                desc = (
+                    tool.description[:50] + "..."
+                    if len(tool.description) > 50
+                    else tool.description
                 )
-                print(f"    Result: {result.content[0].text}")
+                print(f"    - {base_name}: {desc}")
 
-                # Test get_user_info
-                print("\n[Test] Calling get_user_info tool...")
-                user_info_tool = tool_names.get("get_user_info", "get_user_info")
-                result = await session.call_tool(name=user_info_tool, arguments={})
-                print(f"    Result: {result.content[0].text}")
+            # Test echo (public tool)
+            print("\n[Test] Calling echo tool (public)...")
+            echo_tool = tool_names.get("echo", "echo")
+            result = await session.call_tool(
+                name=echo_tool, arguments={"message": "Hello from RBAC demo!"}
+            )
+            print(f"    Result: {result.content[0].text}")
 
-                # Test admin_action (protected tool)
-                if test_admin:
-                    print("\n[Test] Calling admin_action tool (requires admin group)...")
-                    admin_tool = tool_names.get("admin_action", "admin_action")
-                    try:
-                        result = await session.call_tool(
-                            name=admin_tool,
-                            arguments={"action": "test_admin_operation"}
-                        )
-                        response_text = result.content[0].text
-                        print(f"    Result: {response_text}")
+            # Test get_user_info
+            print("\n[Test] Calling get_user_info tool...")
+            user_info_tool = tool_names.get("get_user_info", "get_user_info")
+            result = await session.call_tool(name=user_info_tool, arguments={})
+            print(f"    Result: {result.content[0].text}")
 
-                        if not is_admin and "success" in response_text.lower():
-                            print("    WARNING: Non-admin user should have been blocked!")
-                    except Exception as e:
-                        error_msg = str(e)
-                        if "admin" in error_msg.lower() or "access denied" in error_msg.lower():
-                            print(f"    Access denied (expected for non-admin): {error_msg}")
-                        else:
-                            print(f"    Error: {error_msg}")
+            # Test admin_action (protected tool)
+            if test_admin:
+                print("\n[Test] Calling admin_action tool (requires admin group)...")
+                admin_tool = tool_names.get("admin_action", "admin_action")
+                try:
+                    result = await session.call_tool(
+                        name=admin_tool, arguments={"action": "test_admin_operation"}
+                    )
+                    response_text = result.content[0].text
+                    print(f"    Result: {response_text}")
 
-                return True
+                    if not is_admin and "success" in response_text.lower():
+                        print("    WARNING: Non-admin user should have been blocked!")
+                except Exception as e:
+                    error_msg = str(e)
+                    if "admin" in error_msg.lower() or "access denied" in error_msg.lower():
+                        print(f"    Access denied (expected for non-admin): {error_msg}")
+                    else:
+                        print(f"    Error: {error_msg}")
+
+            return True
 
     except ExceptionGroup as eg:
         # Handle asyncio ExceptionGroup to show actual errors
-        print(f"    Connection error:")
+        print("    Connection error:")
         for exc in eg.exceptions:
             print(f"      - {type(exc).__name__}: {exc}")
         return False
@@ -371,22 +354,19 @@ async def call_mcp_tools(
 # DEMO RUNNERS
 # =============================================================================
 
+
 async def run_m2m_demo(
-    user_pool_id: str,
-    client_id: str,
-    gateway_url: str,
-    scope: str,
-    region: str
+    user_pool_id: str, client_id: str, gateway_url: str, scope: str, region: str
 ):
     """Run the M2M authentication demo."""
     print("=" * 60)
     print("OAuth2 Demo - M2M Mode (client_credentials)")
     print("=" * 60)
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  User Pool ID: {user_pool_id}")
     print(f"  Client ID: {client_id}")
     print(f"  Gateway URL: {gateway_url}")
-    print(f"  Mode: M2M (client_credentials)")
+    print("  Mode: M2M (client_credentials)")
 
     token = get_m2m_token(user_pool_id, client_id, scope, region)
     await call_mcp_tools(gateway_url, token, test_admin=True, is_admin=False)
@@ -401,23 +381,18 @@ async def run_m2m_demo(
 
 
 async def run_user_demo(
-    user_pool_id: str,
-    client_id: str,
-    gateway_url: str,
-    username: str,
-    password: str,
-    region: str
+    user_pool_id: str, client_id: str, gateway_url: str, username: str, password: str, region: str
 ):
     """Run the user authentication demo."""
     print("=" * 60)
     print("OAuth2 Demo - User Mode (password)")
     print("=" * 60)
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  User Pool ID: {user_pool_id}")
     print(f"  Client ID: {client_id}")
     print(f"  Gateway URL: {gateway_url}")
     print(f"  Username: {username}")
-    print(f"  Mode: User (password)")
+    print("  Mode: User (password)")
 
     token = get_user_token(user_pool_id, client_id, username, password, region)
 
@@ -430,7 +405,7 @@ async def run_user_demo(
     print("\n" + "=" * 60)
     print("User Demo Complete")
     print("=" * 60)
-    print(f"\nKey Points:")
+    print("\nKey Points:")
     print(f"  - User: {username}")
     print(f"  - Groups: {groups or '(none)'}")
     if is_admin:
@@ -464,7 +439,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="OAuth2 Demo with RBAC",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"""
+        epilog="""
 Authentication Modes:
   m2m   - Machine-to-machine (client_credentials flow)
           No user context, no groups, admin tools blocked
@@ -482,38 +457,29 @@ Test Users (after running setup_users.py):
   user@example.com   -> groups: users
   Password: generated at deploy, stored in Secrets Manager
             (read automatically from the stack's TestUserSecretName output)
-        """
+        """,
     )
 
     parser.add_argument(
         "--stack",
         default=DEFAULT_STACK_NAME,
-        help=f"CloudFormation stack name (default: {DEFAULT_STACK_NAME})"
+        help=f"CloudFormation stack name (default: {DEFAULT_STACK_NAME})",
     )
-    parser.add_argument(
-        "--region",
-        default=None,
-        help="AWS region (default: from AWS config)"
-    )
+    parser.add_argument("--region", default=None, help="AWS region (default: from AWS config)")
     parser.add_argument(
         "--mode",
         choices=["m2m", "user"],
         default="m2m",
-        help="Authentication mode: m2m or user (default: m2m)"
+        help="Authentication mode: m2m or user (default: m2m)",
     )
-    parser.add_argument(
-        "--username",
-        help="Username for user mode authentication"
-    )
+    parser.add_argument("--username", help="Username for user mode authentication")
     parser.add_argument(
         "--password",
         help="Test user password (default: read from Secrets Manager via "
-             "the stack's TestUserSecretName output)"
+        "the stack's TestUserSecretName output)",
     )
     parser.add_argument(
-        "--scope",
-        default=DEFAULT_SCOPE,
-        help=f"OAuth scope (default: {DEFAULT_SCOPE})"
+        "--scope", default=DEFAULT_SCOPE, help=f"OAuth scope (default: {DEFAULT_SCOPE})"
     )
 
     args = parser.parse_args()
@@ -542,13 +508,15 @@ Test Users (after running setup_users.py):
             print("\nError: Missing CognitoMachineClientId output")
             sys.exit(1)
 
-        asyncio.run(run_m2m_demo(
-            user_pool_id=user_pool_id,
-            client_id=client_id,
-            gateway_url=gateway_url,
-            scope=args.scope,
-            region=region
-        ))
+        asyncio.run(
+            run_m2m_demo(
+                user_pool_id=user_pool_id,
+                client_id=client_id,
+                gateway_url=gateway_url,
+                scope=args.scope,
+                region=region,
+            )
+        )
 
     else:  # user mode
         client_id = outputs.get("CognitoUserClientId")
@@ -572,14 +540,16 @@ Test Users (after running setup_users.py):
             else:
                 password = getpass.getpass("Password: ")
 
-        asyncio.run(run_user_demo(
-            user_pool_id=user_pool_id,
-            client_id=client_id,
-            gateway_url=gateway_url,
-            username=username,
-            password=password,
-            region=region
-        ))
+        asyncio.run(
+            run_user_demo(
+                user_pool_id=user_pool_id,
+                client_id=client_id,
+                gateway_url=gateway_url,
+                username=username,
+                password=password,
+                region=region,
+            )
+        )
 
 
 if __name__ == "__main__":

@@ -68,7 +68,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 return _deny_request(
                     rpc_id,
                     f"Access denied: Tool '{base_tool_name}' requires 'admin' group. "
-                    f"Your groups: {groups or 'none'}"
+                    f"Your groups: {groups or 'none'}",
                 )
 
         # Allow request with identity headers

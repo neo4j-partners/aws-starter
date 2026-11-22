@@ -703,8 +703,24 @@ history.
   7. Done: the MCP runtime now gets only `NEO4J_PASSWORD_SECRET_ARN`. An
      image entrypoint reads the password at startup. A cloud deploy has not
      tested it yet.
-  8. `npm` reports 3 vulnerabilities in the supervisor's CDK
-     dependencies, 2 moderate and 1 high.
+  8. Explained, not fixed: `npm audit` reports 3 vulnerabilities in the
+     CDK dependencies of both agents, 2 moderate and 1 high. They are
+     denial-of-service bugs in glob matching, in `minimatch`
+     (GHSA-g3hv-75wg-m249) and `brace-expansion` (GHSA-q2hr-2g5m-vwhr,
+     GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).
+     - **Where they run:** Both packages run only during `cdk synth` on
+       the developer machine, on patterns from this repository. Neither
+       reaches a Runtime.
+     - **Why no override:** `aws-cdk-lib` bundles both packages, so an npm
+       override cannot replace them.
+     - **The fix:** `aws-cdk-lib` 2.278.0 clears all three, and `npm audit`
+       then reports 0. The AgentCore CLI 1.2.0 manages these dependencies
+       and vends `aws-cdk-lib ~2.269.0`. With 2.278.0 pinned,
+       `agentcore build` and `agentcore deploy` stop with an error.
+     - **The options:** Wait for a CLI release that vends 2.278.0 or later,
+       or turn off the CLI's dependency management with
+       `agentcore config disableDependencyManagement true` and pin 2.278.0.
+       That setting is global to the machine.
   9. AgentCore keeps the runtime log groups after a destroy, and they have
      no retention. This run left two of them. The deploys also turned on
      CloudWatch Transaction Search for the account.

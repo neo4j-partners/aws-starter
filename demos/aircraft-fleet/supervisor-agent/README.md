@@ -99,7 +99,7 @@ The environment picks one of two paths.
 
 ![Conversation memory lifecycle](../docs/images/memory-lifecycle.svg)
 
-- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.7, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
+- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.8, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
 - **Extraction model:** The extractor runs on Claude Sonnet 5.5. It sends no temperature and lets the model choose the tool, because Sonnet 5.5 rejects both.
 - **What it stores:** Memory keeps the user and assistant text of each turn. It does not store specialist calls.
 - **One client per process:** The client opens on the first request and closes at shutdown. Each request gets its own session manager on it.

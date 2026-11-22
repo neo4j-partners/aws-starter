@@ -37,7 +37,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.127" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "mcp", specifier = ">=1.28,<2" },
-    { name = "neo4j-agent-memory", extras = ["strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.7/neo4j_agent_memory-0.8.0%2Bfleet.7-py3-none-any.whl" },
+    { name = "neo4j-agent-memory", extras = ["strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.8/neo4j_agent_memory-0.8.0%2Bfleet.8-py3-none-any.whl" },
     { name = "strands-agents", specifier = ">=1.65" },
     { name = "truststore", specifier = ">=0.10" },
 ]
@@ -743,8 +743,8 @@ wheels = [
 
 [[package]]
 name = "neo4j-agent-memory"
-version = "0.8.0+fleet.7"
-source = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.7/neo4j_agent_memory-0.8.0%2Bfleet.7-py3-none-any.whl" }
+version = "0.8.0+fleet.8"
+source = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.8/neo4j_agent_memory-0.8.0%2Bfleet.8-py3-none-any.whl" }
 dependencies = [
     { name = "neo4j" },
     { name = "pydantic" },
@@ -752,7 +752,7 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.7/neo4j_agent_memory-0.8.0%2Bfleet.7-py3-none-any.whl", hash = "sha256:48fa614c7ab5a90209cdd59d89ec570c1d5ed9b0f5e7684a3cdb0c0847d04a6e" },
+    { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.8/neo4j_agent_memory-0.8.0%2Bfleet.8-py3-none-any.whl", hash = "sha256:0fd0e6368bf52b976ea9acaa5ab05bddbac90d1e5d7872a83951f15140edcaa4" },
 ]
 
 [package.optional-dependencies]

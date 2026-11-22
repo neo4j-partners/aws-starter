@@ -19,7 +19,7 @@ dependencies = [
     # Held below 2.x until bedrock-agentcore[strands-agents] allows mcp 2.
     "mcp>=1.28,<2",
     # The fleet fork of 0.8.0. [tool.uv.sources] says where the wheel is.
-    "neo4j-agent-memory[strands]==0.8.0+fleet.7",
+    "neo4j-agent-memory[strands]==0.8.0+fleet.8",
     "truststore>=0.10",
 ]
 
@@ -41,7 +41,7 @@ fleet-demo = "fleet_graphrag.client.demo:main"
 fleet-invoke = "fleet_graphrag.client.invoke:main"
 
 [tool.uv.sources]
-neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.7/neo4j_agent_memory-0.8.0%2Bfleet.7-py3-none-any.whl" }
+neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.8/neo4j_agent_memory-0.8.0%2Bfleet.8-py3-none-any.whl" }
 
 [build-system]
 requires = ["hatchling"]

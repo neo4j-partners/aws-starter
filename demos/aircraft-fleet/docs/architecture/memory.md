@@ -102,7 +102,7 @@ extractions, so the last answers still get their entities.
 
 ## The library pin
 
-Both agents pin `neo4j-agent-memory[strands]==0.8.0+fleet.7`. It is a wheel
+Both agents pin `neo4j-agent-memory[strands]==0.8.0+fleet.8`. It is a wheel
 from the `neo4j-partners/agent-memory` releases, and `uv.lock` records its
 sha256. The agents use `SharedMemory`, deferred extraction, the background
 hook, and the per-turn discard from that build. Changing the pin means

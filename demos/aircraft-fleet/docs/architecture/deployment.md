@@ -90,7 +90,9 @@ Both agent Runtimes start Python under `opentelemetry-instrument`, which
 imports botocore and urllib3 before `main.py` runs. Each agent injects
 `truststore` only when urllib3, botocore, requests, httpx, and neo4j are not
 yet imported. In the Runtime they are, so the agent logs "Skipping
-truststore" and TLS uses the Linux system CA store. To catch an import-order
+truststore". TLS then falls back to each library's default CA store.
+Botocore and httpx use the certifi bundle, and the neo4j driver loads the
+system CAs. To catch an import-order
 failure before a deploy, run the local start check in the
 [GraphRAG agent README](../../graphrag-agent/README.md#check-the-runtime-start-locally)
 or the

@@ -1081,3 +1081,144 @@ pre-run copies. The fleet credentials copies are removed. The run also removed
 `fleet_reader` login. `create_reader.py` writes it again at the next setup. The fraud agent's
 `.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
 on, and the fleet graph is unchanged.
+
+## Cloud Retest 5: 2026-11-22
+
+This run retested the cloud path at main `85965ef`. It covered the fleet
+demo and the fraud memory agent. The run built the fleet MCP stack and the
+finance MCP stack from scratch. It reused the fleet graph from the
+2026-11-21 run. Account IDs are masked.
+
+**Overall status:** FAIL. Every fleet step passed. The fraud agent deployed
+and was destroyed cleanly, but it could not answer a query. Its NAMS memory
+workspace points at an external database that fails every request. The
+fraud deploy check also ran before the new runtime was READY.
+
+### Fleet
+
+- **Setup:** The run created `fleet_reader` again with the `reader` and
+  `graphql_app_read_only_709ad5c7` roles. It created the secrets
+  `fleet/neo4j-reader` and `fleet/memory-neo4j`. `.env` got both secret
+  ARNs, and `.env.fleet` named `fleet_reader`.
+- **Local Runtime start:** PASS. The check under
+  `opentelemetry-instrument` exited 0 in both agent folders. Each agent
+  printed the "Skipping truststore" line, and the injection was skipped.
+- **MCP deploy:** PASS. `./deploy.py --env fleet` exited 0 after 5
+  minutes 20 seconds under `caffeinate -i`. It built image tag `f1b33d3`,
+  and the stack reached `CREATE_COMPLETE`.
+- **MCP Gateway tests:** PASS. All four `./cloud.sh --env fleet` tool tests
+  passed. `MATCH (a:Aircraft) RETURN count(a)` returned 30. A `CREATE` and
+  a `SET` were both refused with "Only MATCH queries are allowed for
+  read-query". No probe node or property was written.
+- **Agent deploys:** PASS. The two deploys ran in parallel. The GraphRAG
+  `./agent.sh deploy` exited 0 after 5 minutes 33 seconds. The supervisor
+  `./agent.sh configure` exited 0. Its `./agent.sh deploy` exited 0 after
+  5 minutes 25 seconds.
+- **GraphRAG cloud queries:** PASS. "How many aircraft are in the
+  database?" returned HTTP 200 with "**30 aircraft**". The agent used
+  `graph_query_tool`. A question about troubleshooting high EGT returned
+  HTTP 200. The agent used `vector_search_tool` and cited the A220 and B737
+  maintenance manuals.
+- **Supervisor routing in the cloud:** PASS. "What are the most common
+  maintenance faults?" went to the Maintenance Agent through
+  `./agent.sh invoke-cloud`. "What are the most common delay causes?" went
+  to the Operations Agent. Both agents called the Gateway tools
+  `get_neo4j_schema` and `read_neo4j_cypher`.
+- **Supervisor routing tests:** PASS. `./agent.sh test-maintenance` and
+  `./agent.sh test-operations` both exited 0 against a local
+  `./agent.sh start` server. The first went to the Maintenance Agent in
+  36.6 seconds. The second went to the Operations Agent in 22.9 seconds.
+- **Supervisor invoke client:** PASS. "Which aircraft had the most
+  maintenance events?" went to the Maintenance Agent in 22.5 seconds.
+  "Which routes have the most flight delays?" went to the Operations Agent
+  in 29.5 seconds.
+- **Load test:** PASS. `./agent.sh load-test` ran for 2 minutes 40
+  seconds. Three requests finished in 19 to 53 seconds each. Two went to
+  the Maintenance Agent and one went to the Operations Agent. Each went to
+  the expected agent. The final totals showed 0 unexpected routes and 0
+  errors. A fourth request was still running when a SIGTERM stopped the
+  test.
+- **Runtime logs:** PASS. Each agent's log has 4 "Skipping truststore"
+  lines. Neither log has a `RecursionError`, a `CERTIFICATE_VERIFY_FAILED`,
+  a traceback, or "No workload access token".
+
+### Fraud
+
+- **Finance MCP deploy:** PASS. `./deploy.py --env finance` exited 0
+  after 5 minutes 17 seconds. The stack reached `CREATE_COMPLETE`. All four
+  `./cloud.sh --env finance` tool tests passed. `.env.finance` points at
+  the fleet Aura instance `709ad5c7`, so the finance tools read the fleet
+  graph.
+- **Configure:** PASS. `./agent.sh configure` ran through `expect`. It
+  wrote `.bedrock_agentcore.yaml` for `us-east-1` with short-term memory
+  and a direct code deploy. The memory prompt ignored an `s` to skip
+  memory, so the run kept the default short-term memory.
+- **Deploy:** FAIL. `./agent.sh deploy` uploaded the code package and
+  created the runtime, memory, and execution role. It exited 1 after 4
+  minutes 59 seconds. The smoke test reported "Runtime is not ready:
+  status='CREATING'". `verify_agentcore_runtime.py` reads the status once
+  and does not wait for READY.
+- **Verify:** FAIL. `./agent.sh verify` found the runtime READY. The graph
+  smoke call failed with "NAMS GET
+  https://memory.neo4jlabs.com/v1/conversations → 424:
+  external_database_error". A direct call to the NAMS API returned the
+  same 424. Its message says the workspace's external database failed the
+  request.
+- **Cloud invoke:** FAIL. `./agent.sh invoke-cloud "Find circular transfer
+  chains"` exited 0. The response was a single error event with the same
+  NAMS 424.
+- **Runtime logs:** The fraud log has 118 events. Its 4 traceback lines
+  come from the two NAMS failures in `neo4j_agent_memory.connect`. The log
+  has no `RecursionError`, no `CERTIFICATE_VERIFY_FAILED`, and no "No
+  workload access token". `./agent.sh logs --errors` reported "No failed
+  traces found in session".
+- **Destroy:** PASS. `./agent.sh destroy` ran through `expect` to answer
+  its confirmation. It exited 0 after 6 seconds. It removed 7 resources,
+  including the runtime, the memory, and `.bedrock_agentcore.yaml`.
+
+### Follow-ups from this run
+
+1. `./agent.sh deploy` in `fraud-memory-agent` fails on a first deploy.
+   `verify_agentcore_runtime.py` checks the runtime status once. A new
+   runtime is still `CREATING` when `agentcore deploy` returns. A fix would
+   poll `get_agent_runtime` until READY or a timeout. The fix needs
+   approval first.
+2. The fraud agent cannot answer any query until its NAMS workspace has a
+   working database. The workspace's external database fails every
+   request. The fraud graph Aura instances in `graph-loader/.env` and
+   `.env.finance.admin` no longer resolve in DNS. `.env.finance` points at
+   the fleet instance. This is environment setup, not a code bug.
+3. `./agent.sh invoke-cloud` in the fraud agent exits 0 when the response
+   is an error event. `./agent.sh logs --errors` also finds no failed
+   traces after that error. A script that checks the exit code reads this
+   as a pass.
+4. `agentcore destroy` leaves three things behind. It keeps the empty
+   `bedrock-agentcore-codebuild-sources-X-us-east-1` S3 bucket and the
+   memory log group under `/aws/vendedlogs/bedrock-agentcore/memory/`. It
+   also keeps the 52 MB `.bedrock_agentcore/` dependency cache in the
+   agent folder. The run deleted all three by hand.
+5. Retest 4 says `create_reader.py` writes
+   `neo4j-mcp-server/.env.fleet.readonly` again at the next setup. That is
+   wrong. `create_reader.py` reads that file as input, so the run
+   recreated it before setup.
+6. The AWS SSO token expired during the run. `agent.sh` and the AgentCore
+   CLI then failed with "Token is expired". The AWS CLI still had cached
+   role credentials, so the run exported them and repeated the calls. This
+   is a test environment issue, not a code bug.
+
+**Cloud resources confirmed destroyed:** Both fleet `agent.sh destroy
+--yes` runs exited 0. `./deploy.py --env fleet cleanup` exited 0 after 4
+minutes 11 seconds. It deleted the MCP Runtime, the stack, and the
+password secret. It kept the shared `neo4j-mcp-server` ECR repository,
+because the finance stack still used it. `./deploy.py --env finance
+cleanup` exited 0 after 4 minutes 11 seconds. It deleted the finance
+Runtime, the stack, the secret, and the ECR repository. The run then
+force-deleted `fleet/neo4j-reader` and `fleet/memory-neo4j`. It dropped
+`fleet_reader` and deleted the six new log groups. List calls in
+`us-east-1` and `us-west-2` match the pre-run snapshot for stacks,
+Runtimes, memories, workload identities, credential providers, Gateways,
+Cognito pools, CodeBuild projects, IAM roles, S3 buckets, log groups, ECR
+repositories, and secrets. `.env`, `.env.fleet`, the fraud agent's
+`.mcp-credentials.json`, and `.mcp-credentials.finance.json` match their
+pre-run copies. The fleet credentials copies, `.env.fleet.readonly`, and
+the fraud agent's toolkit files are removed. The fleet graph is unchanged.

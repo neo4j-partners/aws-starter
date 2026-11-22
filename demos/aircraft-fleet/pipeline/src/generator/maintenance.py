@@ -1,9 +1,12 @@
 """
 Correlated maintenance event generation.
 
-Events are triggered probabilistically when sensor readings exceed model-specific
-warning and critical thresholds. The fault type is determined by which sensor
-crossed its threshold, and severity follows from how far above the threshold it went.
+Every sensor on every system is scanned hour by hour. A reading that enters a
+higher band than the hour before may raise an event, with a probability that
+rises with the band. A reading that stays in its band does not roll again.
+The event's severity is the band of that reading: advisory is MINOR, caution
+is MAJOR, and warning is CRITICAL. The side of the crossing picks the sensor's
+fault routes, and the route picks the fault and the component it hits.
 
 This produces the causal signal the GDS algorithms need: aircraft with steeper
 degradation slopes accumulate more events and form distinct kNN/Louvain clusters.
@@ -12,132 +15,125 @@ degradation slopes accumulate more events and form distinct kNN/Louvain clusters
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import timedelta
 
 import numpy as np
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode, ComponentNode, SystemNode
-from .sensors import DegradationProfile, egt_values_for_system, vib_values_for_system
-from .specs import (
-    CORRECTIVE_ACTIONS,
-    ENGINE_SPECS,
-    SENSOR_FAULT_MAP,
-    EngineSpec,
-)
+from .specs import CORRECTIVE_ACTIONS, Direction, FaultRoute, SensorSpec, sensors_for
 
-# Per-reading probability of generating a maintenance event when above threshold
-_WARN_EVENT_PROB = 0.015
-_CRIT_EVENT_PROB = 0.060
+# Probability that entering the advisory, caution, or warning band raises an event.
+# Tuned once, with the spike rates in sensors.py, so the default run lands near
+# the manuals' historic 52/31/17 MINOR/MAJOR/CRITICAL mix.
+_EVENT_PROB: dict[int, float] = {1: 0.012, 2: 0.030, 3: 0.05}
+SEVERITY_BY_LEVEL: dict[int, str] = {1: "MINOR", 2: "MAJOR", 3: "CRITICAL"}
 
-# Minimum hours between events on the same engine (prevents unrealistic clusters)
+# Minimum hours between events of one fault on one system, unless the new
+# event is more severe than the last one. An escalation is always reported.
 _MIN_EVENT_SPACING_HOURS = 72
 
 
-def _fault_and_severity(
-    sensor_type: str,
-    value: float,
-    warning: float,
-    critical: float,
-    rng: random.Random,
-) -> tuple[str, str]:
-    options = SENSOR_FAULT_MAP[sensor_type]
-    if value >= critical:
-        # Highest severity option for this sensor type
-        for fault, sev in options:
-            if sev == "CRITICAL":
-                return fault, sev
-    # Warning level — pick MAJOR or MINOR randomly, weighted toward MAJOR
-    above_warn = [o for o in options if o[1] in ("MAJOR", "MINOR")]
-    weights = [2 if sev == "MAJOR" else 1 for _, sev in above_warn]
-    return rng.choices(above_warn, weights=weights)[0]
+@dataclass(frozen=True)
+class MaintenanceEvent:
+    """One event's CSV row, plus the sensor whose reading raised it."""
+
+    row: dict[str, str]
+    sensor_id: str
 
 
-def _pick_component(system: SystemNode, rng: random.Random) -> ComponentNode:
-    return rng.choice(system.components)
+def _band_levels(spec: SensorSpec, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Band level of each reading (0 to 3) and the side it sits on (+1 high, -1 low)."""
+    match spec.direction:
+        case Direction.HIGH:
+            sides = np.ones(len(values))
+        case Direction.LOW:
+            sides = -np.ones(len(values))
+        case Direction.DEVIATION:
+            sides = np.where(values >= spec.baseline, 1.0, -1.0)
+    distance = (values - spec.baseline) * sides
+    levels = sum((distance >= offset).astype(int) for offset in spec.offsets())
+    return levels, sides
+
+
+def _entries(levels: np.ndarray, sides: np.ndarray) -> np.ndarray:
+    """Keep each hour's level only where the reading enters a band.
+
+    A reading enters a band when its level is higher than the hour before,
+    or when it is in a band on the other side of the baseline from the
+    hour before.
+    """
+    previous = np.concatenate(([0], levels[:-1]))
+    previous_sides = np.concatenate((sides[:1], sides[:-1]))
+    entered = (levels > previous) | ((sides != previous_sides) & (levels > 0))
+    return np.where(entered, levels, 0)
+
+
+def _pick_route(routes: list[FaultRoute], rng: random.Random) -> FaultRoute:
+    return rng.choices(routes, weights=[r.weight for r in routes])[0]
+
+
+def _pick_component(
+    system: SystemNode, route: FaultRoute, rng: random.Random
+) -> ComponentNode | None:
+    candidates = [c for c in system.components if c.type in route.components]
+    return rng.choice(candidates) if candidates else None
 
 
 def generate_maintenance_events(
     aircraft: AircraftNode,
-    engine_profiles: dict[str, DegradationProfile],  # system_id -> profile
+    system_series: dict[str, dict[str, np.ndarray]],  # system_id -> type -> written values
     config: GeneratorConfig,
     event_counter: list[int],  # mutable counter for global event IDs
-    rng_np: np.random.Generator,
     rng: random.Random,
-) -> list[dict]:
+) -> list[MaintenanceEvent]:
     """
-    Scan each engine's sensor series for threshold exceedances and emit
-    maintenance events with realistic fault types and corrective actions.
+    Scan every system's written sensor series, spikes included, for band
+    entries and emit maintenance events with routed faults and components.
     """
-    spec: EngineSpec = ENGINE_SPECS[aircraft.model]
-    events: list[dict] = []
+    events: list[MaintenanceEvent] = []
 
     for system in aircraft.systems:
-        if system.type != "Engine":
+        series = system_series.get(system.system_id)
+        if series is None:
             continue
+        specs = {spec.type: spec for spec in sensors_for(system.type, aircraft.model)}
+        scans = []
+        for sensor in system.sensors:
+            levels, sides = _band_levels(specs[sensor.type], series[sensor.type])
+            scans.append((sensor, specs[sensor.type], _entries(levels, sides), sides))
 
-        profile = engine_profiles.get(system.system_id)
-        if profile is None:
-            continue
-
-        egt_vals = egt_values_for_system(aircraft, system, profile, config, rng_np)
-        vib_vals = vib_values_for_system(aircraft, system, profile, config, rng_np)
-
-        last_event_hour: dict[str, int] = {}  # sensor_type -> last event hour
-
+        last_event: dict[str, tuple[int, int]] = {}  # fault -> (hour, level) on this system
         for h in range(config.n_hours):
-            # Check EGT threshold
-            egt = egt_vals[h]
-            if egt >= spec.egt_warning:
-                p = _CRIT_EVENT_PROB if egt >= spec.egt_critical else _WARN_EVENT_PROB
-                last_h = last_event_hour.get("EGT", -_MIN_EVENT_SPACING_HOURS)
-                if h - last_h >= _MIN_EVENT_SPACING_HOURS and rng.random() < p:
-                    fault, severity = _fault_and_severity(
-                        "EGT", egt, spec.egt_warning, spec.egt_critical, rng
-                    )
-                    events.append(
-                        _make_event(aircraft, system, fault, severity, h, config, event_counter, rng)
-                    )
-                    last_event_hour["EGT"] = h
-
-            # Check Vibration threshold
-            vib = vib_vals[h]
-            if vib >= spec.vib_warning:
-                p = _CRIT_EVENT_PROB if vib >= spec.vib_critical else _WARN_EVENT_PROB
-                last_h = last_event_hour.get("Vibration", -_MIN_EVENT_SPACING_HOURS)
-                if h - last_h >= _MIN_EVENT_SPACING_HOURS and rng.random() < p:
-                    fault, severity = _fault_and_severity(
-                        "Vibration", vib, spec.vib_warning, spec.vib_critical, rng
-                    )
-                    events.append(
-                        _make_event(aircraft, system, fault, severity, h, config, event_counter, rng)
-                    )
-                    last_event_hour["Vibration"] = h
+            for sensor, spec, levels, sides in scans:
+                level = int(levels[h])
+                if level == 0 or rng.random() >= _EVENT_PROB[level]:
+                    continue
+                side = Direction.HIGH if sides[h] > 0 else Direction.LOW
+                routes = [r for r in spec.faults if r.side is side]
+                if not routes:
+                    continue
+                route = _pick_route(routes, rng)
+                last_hour, last_level = last_event.get(route.fault, (-_MIN_EVENT_SPACING_HOURS, 0))
+                if h - last_hour < _MIN_EVENT_SPACING_HOURS and level <= last_level:
+                    continue
+                component = _pick_component(system, route, rng)
+                if component is None:
+                    continue
+                event_counter[0] += 1
+                reported_at = config.start_date + timedelta(hours=h)
+                row = {
+                    ":ID(MaintenanceEvent)": f"ME{event_counter[0]:04d}",
+                    "component_id": component.component_id,
+                    "system_id": system.system_id,
+                    "aircraft_id": aircraft.aircraft_id,
+                    "fault": route.fault,
+                    "severity": SEVERITY_BY_LEVEL[level],
+                    "reported_at": reported_at.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "corrective_action": CORRECTIVE_ACTIONS[route.fault],
+                }
+                events.append(MaintenanceEvent(row=row, sensor_id=sensor.sensor_id))
+                last_event[route.fault] = (h, level)
 
     return events
-
-
-def _make_event(
-    aircraft: AircraftNode,
-    system: SystemNode,
-    fault: str,
-    severity: str,
-    hour_offset: int,
-    config: GeneratorConfig,
-    event_counter: list[int],
-    rng: random.Random,
-) -> dict:
-    event_counter[0] += 1
-    event_id = f"ME{event_counter[0]:04d}"
-    component = _pick_component(system, rng)
-    reported_at = config.start_date + timedelta(hours=hour_offset)
-    return {
-        ":ID(MaintenanceEvent)": event_id,
-        "component_id": component.component_id,
-        "system_id": system.system_id,
-        "aircraft_id": aircraft.aircraft_id,
-        "fault": fault,
-        "severity": severity,
-        "reported_at": reported_at.strftime("%Y-%m-%dT%H:%M:%S"),
-        "corrective_action": CORRECTIVE_ACTIONS.get(fault, "Inspected and cleared"),
-    }

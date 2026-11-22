@@ -64,6 +64,7 @@ from botocore.exceptions import ClientError, WaiterError
 SCRIPT_DIR = Path(__file__).resolve().parent
 # NEO4J_MCP_REPO is read from .env (path to the local Neo4j MCP server repo).
 CDK_DIR = SCRIPT_DIR / "cdk"
+IMAGE_DIR = SCRIPT_DIR / "image"
 
 # An optional --env suffix selects which deployment to act on, so several
 # Neo4j instances can be deployed side by side from this directory. The
@@ -460,8 +461,9 @@ def ensure_password_secret(aws: Aws, cfg: Config) -> None:
     """Store the Neo4j password in Secrets Manager and set the ARN on cfg.
 
     The password is never passed as a CloudFormation parameter or on the
-    cdk CLI; the stack receives only the secret ARN and resolves the value
-    via a CloudFormation {{resolve:secretsmanager}} dynamic reference.
+    cdk CLI. The stack receives only the secret ARN and hands it to the
+    Runtime as NEO4J_PASSWORD_SECRET_ARN. The image entrypoint reads the
+    password at startup with the Runtime role.
     """
     sm = aws.client("secretsmanager")
     name = secret_name(cfg)
@@ -518,19 +520,35 @@ def cmd_build(cfg: Config) -> None:
         log_error(f"Dockerfile not found in {cfg.neo4j_mcp_repo}")
         raise DeployError("Dockerfile not found")
 
+    base_image = f"{cfg.ecr_repo_name}-base:{cfg.image_tag}"
     log_info(f"Repository: {cfg.neo4j_mcp_repo}")
+    log_info(f"Base image: {base_image}")
     log_info(f"Image: {cfg.ecr_repo_name}:{cfg.image_tag} + latest")
     log_info("Platform: linux/arm64")
     print()
 
+    # The server image from NEO4J_MCP_REPO, unchanged.
     subprocess.run(
         [
             "docker", "buildx", "build",
             "--platform", "linux/arm64",
+            "--tag", base_image,
+            "--load",
+            cfg.neo4j_mcp_repo,
+        ],
+        check=True,
+    )
+    # A thin layer on top that adds the Secrets Manager entrypoint. It builds
+    # FROM the base image loaded above, so it runs on the same local builder.
+    subprocess.run(
+        [
+            "docker", "buildx", "build",
+            "--platform", "linux/arm64",
+            "--build-arg", f"BASE_IMAGE={base_image}",
             "--tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
             "--tag", f"{cfg.ecr_repo_name}:latest",
             "--load",
-            cfg.neo4j_mcp_repo,
+            str(IMAGE_DIR),
         ],
         check=True,
     )

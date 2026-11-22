@@ -96,9 +96,9 @@ digital twin fleet. Point every project at the same Neo4j instance with the
 same embedder. The projects then work together with no code changes.
 
 - **[`demos/aircraft-fleet/pipeline/`](./demos/aircraft-fleet/pipeline/):** The pipeline builds an operational graph in Neo4j from synthetic fleet data. It then reads maintenance manuals with `neo4j-graphrag`, using Bedrock Titan embeddings and Bedrock Claude entity extraction. The structured and extracted data end up in one Neo4j knowledge graph.
-- **[`demos/aircraft-fleet/graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/):** This Strands ReAct agent answers questions over that graph. It connects to Neo4j directly with the driver. It combines Text2Cypher with vector search over the maintenance text chunks.
-- **[`demos/aircraft-fleet/supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/):** This supervisor classifies each question and routes it to a Maintenance or Operations specialist agent. It then combines their answers. It reaches Neo4j through the MCP server and the Gateway with OAuth2.
-- **Key features:** The command `pipeline/setup.sh` runs a five-stage Neo4j ingest. Entity extraction gets structured output from Bedrock by forcing `toolChoice`. The GraphRAG agent caches the live schema and deploys to AgentCore Runtime with `graphrag-agent/agent.sh`. The supervisor reports to CloudWatch.
+- **[`demos/aircraft-fleet/graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/):** This Strands ReAct agent answers questions over that graph. It connects to Neo4j directly with the driver. It combines Text2Cypher with hybrid vector and fulltext search over the maintenance text chunks.
+- **[`demos/aircraft-fleet/supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/):** This Strands supervisor agent calls a Maintenance specialist agent and an Operations specialist agent as tools. The supervisor model picks one or both specialists for each question. It then writes the final answer from their results. The specialists reach Neo4j through the MCP server and the Gateway with OAuth2.
+- **Key features:** The command `pipeline/setup.sh` runs a five-stage Neo4j ingest. Entity extraction offers Bedrock one tool with `auto` tool choice and asks the model to call it. The GraphRAG agent caches the live schema and deploys to AgentCore Runtime with `graphrag-agent/agent.sh`. The supervisor reports to CloudWatch.
 - **Use case:** Use it as a reference for GraphRAG ingest on Bedrock and an agent over the result. One walkthrough runs it from start to finish.
 - **Docs:** Start with the [`demos/aircraft-fleet/README.md`](./demos/aircraft-fleet/README.md) quick start. Then read the [`pipeline/`](./demos/aircraft-fleet/pipeline/README.md), [`graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/README.md), and [`supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/README.md) READMEs.
 
@@ -135,7 +135,7 @@ Folder: [`integrations/databricks/`](./integrations/databricks/)
 
 - **What it does:** This integration connects Databricks workspaces to the Neo4j MCP server on AgentCore. A Unity Catalog HTTP connection forwards MCP requests from Databricks notebooks and LangGraph agents to the AgentCore Gateway.
 - **Authentication:** The connection uses OAuth2 machine-to-machine auth through Cognito. Databricks refreshes the token for you.
-- **Why AgentCore:** The official Neo4j MCP server is a compiled Go binary. Databricks Apps cannot host it, so the recommended pattern is to run it on AgentCore.
+- **Why AgentCore:** Databricks reuses the MCP server that `neo4j-mcp-server/` deploys to AgentCore. The AWS agents call the same server, so Databricks needs no second deployment.
 - **Key features:** The sample includes a LangGraph agent deployed with MLflow. Neo4j access is read-only.
 - **Use case:** Use it when Databricks teams want to query Neo4j in plain language, or deploy agents that combine Spark processing with the graph.
 

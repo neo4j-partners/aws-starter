@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>CDK Stack Components</title>
+  <desc>The stack in cdk/neo4j_mcp_stack.py builds three rows of resources. Cognito: a user pool, its domain, a resource server with the invoke scope, and a machine client. AgentCore: the Gateway, the Gateway Target, the MCP server Runtime, and the OAuth2 credential provider. IAM roles and Lambda custom resources sit below. The Gateway and the Runtime feed the Target. The provider gives the Target its ARN. The health check gates the Target.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="960" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">CDK Stack Components</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Every resource name carries the stack name, so each deployment stands alone.</text>
+  <text x="70" y="146" font-size="15" font-weight="700" fill="#5C6470" text-anchor="start">COGNITO</text>
+  <rect x="70" y="160" width="320" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="192" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">User pool</text>
+  <text x="230.0" y="218" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">cognito.UserPool</text>
+  <text x="230.0" y="240" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">no sign-up, M2M only</text>
+  <rect x="450" y="160" width="320" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="610.0" y="192" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">User pool domain</text>
+  <text x="610.0" y="218" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">cognito.UserPoolDomain</text>
+  <text x="610.0" y="240" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">OAuth2 token endpoint</text>
+  <rect x="830" y="160" width="320" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="990.0" y="192" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Resource server</text>
+  <text x="990.0" y="218" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">CfnUserPoolResourceServer</text>
+  <text x="990.0" y="240" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">{stack}-mcp with scope invoke</text>
+  <rect x="1210" y="160" width="320" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1370.0" y="192" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Machine client</text>
+  <text x="1370.0" y="218" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">CfnUserPoolClient</text>
+  <text x="1370.0" y="240" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client_credentials, 24 h tokens</text>
+  <path d="M390,220 H446" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M1150,220 H1206" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <text x="70" y="388" font-size="15" font-weight="700" fill="#5C6470" text-anchor="start">AGENTCORE</text>
+  <rect x="70" y="400" width="320" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="432" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Gateway</text>
+  <text x="230.0" y="458" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">CfnGateway</text>
+  <text x="230.0" y="480" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CUSTOM_JWT authorizer</text>
+  <text x="230.0" y="502" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MCP 2025-03-26</text>
+  <rect x="450" y="400" width="320" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="610.0" y="432" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Gateway Target</text>
+  <text x="610.0" y="458" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">CfnGatewayTarget</text>
+  <text x="610.0" y="480" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j-mcp-server-target</text>
+  <text x="610.0" y="502" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">OAuth2 scope {stack}-mcp/invoke</text>
+  <rect x="830" y="400" width="320" height="130" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="990.0" y="432" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">MCP server Runtime</text>
+  <text x="990.0" y="458" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">CfnRuntime</text>
+  <text x="990.0" y="480" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MCP protocol, JWT authorizer</text>
+  <text x="990.0" y="502" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">NEO4J_READ_ONLY=true</text>
+  <rect x="1210" y="400" width="320" height="130" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1370.0" y="432" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">OAuth2 provider</text>
+  <text x="1370.0" y="458" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">CustomResource</text>
+  <text x="1370.0" y="480" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AgentCore Identity</text>
+  <text x="1370.0" y="502" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">holds the client secret</text>
+  <path d="M390,465 H446" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M830,465 H774" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="784" y="437" width="36" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="802" y="452" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">URL</text>
+  <path d="M1290,400 V370 H690 V396" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="940" y="360" width="100" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="990" y="375" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">provider ARN</text>
+  <path d="M1430,280 V396" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="1351" y="330" width="158" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1430" y="345" font-size="12" font-weight="600" fill="#8A4B08" text-anchor="middle">client ID and secret</text>
+  <text x="70" y="628" font-size="15" font-weight="700" fill="#5C6470" text-anchor="start">IAM AND LAMBDA</text>
+  <rect x="70" y="640" width="320" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="672" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Gateway execution role</text>
+  <text x="230.0" y="698" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">iam.Role</text>
+  <text x="230.0" y="720" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">invokes this Runtime only</text>
+  <text x="230.0" y="742" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">gets the OAuth2 token</text>
+  <rect x="450" y="640" width="320" height="130" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="610.0" y="672" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Runtime health check</text>
+  <text x="610.0" y="698" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">lambda_.Function</text>
+  <text x="610.0" y="720" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">waits for the Runtime</text>
+  <text x="610.0" y="742" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">to reach READY</text>
+  <rect x="830" y="640" width="320" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="990.0" y="672" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Agent execution role</text>
+  <text x="990.0" y="698" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">iam.Role</text>
+  <text x="990.0" y="720" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">ECR, logs, X-Ray, metrics</text>
+  <text x="990.0" y="742" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">workload access token</text>
+  <rect x="1210" y="640" width="320" height="130" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1370.0" y="672" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">OAuth provider function</text>
+  <text x="1370.0" y="698" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">lambda_.Function</text>
+  <text x="1370.0" y="720" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">creates the provider</text>
+  <text x="1370.0" y="742" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">runs as CustomResourceRole</text>
+  <path d="M230,640 V534" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="209" y="579" width="43" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="230" y="594" font-size="12" font-weight="600" fill="#1E3A5F" text-anchor="middle">role</text>
+  <path d="M610,640 V534" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <rect x="545" y="579" width="129" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="610" y="594" font-size="12" font-weight="600" fill="#344054" text-anchor="middle">gates the Target</text>
+  <path d="M990,640 V534" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="969" y="579" width="43" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="990" y="594" font-size="12" font-weight="600" fill="#1E3A5F" text-anchor="middle">role</text>
+  <path d="M1370,640 V534" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <rect x="1338" y="579" width="64" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1370" y="594" font-size="12" font-weight="600" fill="#344054" text-anchor="middle">creates</text>
+  <rect x="40" y="810" width="1520" height="120" rx="16" fill="#FFFFFF" stroke="#667085" stroke-width="1"/>
+  <text x="64" y="844" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Stack parameters and Runtime environment</text>
+  <text x="64" y="874" font-size="14" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">Parameters: ECRImageUri, Neo4jUri, Neo4jDatabase, Neo4jUsername, Neo4jPasswordSecretArn, NetworkMode</text>
+  <text x="64" y="902" font-size="14" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">Environment: NEO4J_TRANSPORT=http, port 8000, path /mcp, NEO4J_READ_ONLY=true, NEO4J_PASSWORD from {{resolve:secretsmanager}}</text>
+</svg>

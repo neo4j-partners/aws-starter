@@ -1,0 +1,14 @@
+# AgentCore CLI local state. deployed-state.json holds the deployed stack and
+# credential ARNs, and aws-targets.json holds the AWS account ID. Both are
+# account-specific, so they stay out of git. `agentcore deploy` recreates the
+# default target from the current AWS credentials.
+agentcore/.env.local
+agentcore/.cli/
+agentcore/aws-targets.json
+agentcore/.cache/
+agentcore/cdk/cdk.out/
+agentcore/cdk/node_modules/
+agentcore/cdk/dist/
+
+# The repo root ignores lib/ for Python packaging; the CDK app needs its lib/.
+!agentcore/cdk/lib/

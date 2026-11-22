@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="760" viewBox="0 0 1600 760" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>MCP Server Deploy Flow</title>
+  <desc>deploy.py reads the .env file for the chosen deployment, builds the Neo4j MCP server image for arm64, pushes it to ECR with a git SHA tag and latest, stores the Neo4j password in Secrets Manager, and deploys the CDK stack with the image URI and the secret ARN as parameters. The credentials command then writes the Gateway URL and a token to a credentials file. A side panel shows which steps each command runs.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="760" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">MCP Server Deploy Flow</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">deploy.py runs each step in order. The password never enters the template.</text>
+  <rect x="40" y="128" width="1000" height="64" rx="12" fill="#FFFFFF" stroke="#667085" stroke-width="1.5"/>
+  <circle cx="70" cy="160.0" r="15" fill="#667085"/>
+  <text x="70" y="165.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <text x="98" y="152" font-size="16" font-weight="700" fill="#344054" text-anchor="start">Read the config</text>
+  <text x="98" y="172" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">.env.NAME picks the deployment, and its suffix names the stack</text>
+  <rect x="930" y="147.0" width="96" height="26" rx="13" fill="#F2F4F7" stroke="#667085" stroke-width="1.5"/>
+  <text x="978.0" y="165.0" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">--env NAME</text>
+  <rect x="833" y="147.0" width="89" height="26" rx="13" fill="#F2F4F7" stroke="#667085" stroke-width="1.5"/>
+  <text x="877.6999999999999" y="165.0" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">.env.NAME</text>
+  <path d="M70,192 V210" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <rect x="40" y="214" width="1000" height="64" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="70" cy="246.0" r="15" fill="#2E6DB4"/>
+  <text x="70" y="251.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <text x="98" y="238" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Build the image</text>
+  <text x="98" y="258" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Docker buildx builds the server from NEO4J_MCP_REPO for linux/arm64</text>
+  <rect x="967" y="233.0" width="59" height="26" rx="13" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="996.5" y="251.0" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">arm64</text>
+  <rect x="893" y="233.0" width="66" height="26" rx="13" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="925.8000000000001" y="251.0" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">buildx</text>
+  <path d="M70,278 V296" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <rect x="40" y="300" width="1000" height="64" rx="12" fill="#FFFFFF" stroke="#D97706" stroke-width="1.5"/>
+  <circle cx="70" cy="332.0" r="15" fill="#D97706"/>
+  <text x="70" y="337.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <text x="98" y="324" font-size="16" font-weight="700" fill="#8A4B08" text-anchor="start">Push to ECR</text>
+  <text x="98" y="344" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">The image gets a git SHA tag and the latest tag</text>
+  <rect x="930" y="319.0" width="96" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="978.0" y="337.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Amazon ECR</text>
+  <path d="M70,364 V382" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <rect x="40" y="386" width="1000" height="64" rx="12" fill="#FFFFFF" stroke="#D97706" stroke-width="1.5"/>
+  <circle cx="70" cy="418.0" r="15" fill="#D97706"/>
+  <text x="70" y="423.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <text x="98" y="410" font-size="16" font-weight="700" fill="#8A4B08" text-anchor="start">Store the password</text>
+  <text x="98" y="430" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">The Neo4j password goes to Secrets Manager, and only the ARN moves on</text>
+  <rect x="893" y="405.0" width="133" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="959.5" y="423.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Secrets Manager</text>
+  <path d="M70,450 V468" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <rect x="40" y="472" width="1000" height="64" rx="12" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="1.5"/>
+  <circle cx="70" cy="504.0" r="15" fill="#7A5AF8"/>
+  <text x="70" y="509.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+  <text x="98" y="496" font-size="16" font-weight="700" fill="#4A2EB0" text-anchor="start">Deploy the stack</text>
+  <text x="98" y="516" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">CDK deploys the stack with the image URI and the secret ARN</text>
+  <rect x="900" y="491.0" width="126" height="26" rx="13" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="1.5"/>
+  <text x="963.1999999999999" y="509.0" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">CloudFormation</text>
+  <rect x="848" y="491.0" width="44" height="26" rx="13" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="1.5"/>
+  <text x="870.3" y="509.0" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">CDK</text>
+  <path d="M70,536 V554" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <rect x="40" y="558" width="1000" height="64" rx="12" fill="#FFFFFF" stroke="#008C72" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <circle cx="70" cy="590.0" r="15" fill="#008C72"/>
+  <text x="70" y="595.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+  <text x="98" y="582" font-size="16" font-weight="700" fill="#00594A" text-anchor="start">Write credentials</text>
+  <text x="98" y="602" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">./deploy.py credentials writes the Gateway URL and a fresh token</text>
+  <rect x="812" y="577.0" width="214" height="26" rx="13" fill="#E8F6F2" stroke="#008C72" stroke-width="1.5"/>
+  <text x="918.8000000000001" y="595.0" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">.mcp-credentials.NAME.json</text>
+  <rect x="40" y="650" width="1000" height="80" rx="16" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="1"/>
+  <text x="64" y="682" font-size="16" font-weight="700" fill="#16233A" text-anchor="start">Stack parameters from step 5</text>
+  <text x="64" y="708" font-size="13.5" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">ECRImageUri  Neo4jUri  Neo4jDatabase  Neo4jUsername  Neo4jPasswordSecretArn  NetworkMode</text>
+  <rect x="1080" y="128" width="480" height="470" rx="16" fill="#FFFFFF" stroke="#667085" stroke-width="1"/>
+  <text x="1104" y="162" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Which steps each command runs</text>
+  <text x="1104" y="200" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py</text>
+  <text x="1104" y="221" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">steps 1 to 5</text>
+  <text x="1104" y="250" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py --skip-build</text>
+  <text x="1104" y="271" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">steps 1, 3, 4, and 5</text>
+  <text x="1104" y="300" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py stack</text>
+  <text x="1104" y="321" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">steps 1, 4, and 5</text>
+  <text x="1104" y="350" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py redeploy</text>
+  <text x="1104" y="371" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">steps 1 to 3, then a new image on the Runtime</text>
+  <text x="1104" y="400" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py credentials</text>
+  <text x="1104" y="421" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">steps 1 and 6</text>
+  <text x="1104" y="450" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py synth</text>
+  <text x="1104" y="471" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a dry run of step 5</text>
+  <text x="1104" y="500" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py status</text>
+  <text x="1104" y="521" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">prints the stack status and outputs</text>
+  <text x="1104" y="550" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">./deploy.py cleanup</text>
+  <text x="1104" y="571" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">deletes the stack and the ECR repository</text>
+  <rect x="1080" y="620" width="480" height="110" rx="16" fill="#FFFFFF" stroke="#008C72" stroke-width="1"/>
+  <text x="1104" y="654" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Named deployments</text>
+  <text x="1104" y="682" font-size="13.5" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">.env.fleet  -&gt;  neo4j-mcp-server-fleet</text>
+  <text x="1104" y="706" font-size="13.5" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">.env.finance  -&gt;  neo4j-mcp-server-finance</text>
+</svg>

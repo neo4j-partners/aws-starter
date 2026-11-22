@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1110" viewBox="0 0 1600 1110" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Fleet Deployment Topology</title>
+  <desc>Three stacks in one AWS account. neo4j-mcp-server-fleet holds the AgentCore Gateway, the Cognito M2M client, the MCP server Runtime, its ECR image, and its password secret. AgentCore-AircraftFleet-default holds the GraphRAG agent Runtime, which reads the fleet graph and the memory database with direct drivers. AgentCore-fleetsupervisor-default holds the supervisor Runtime and its fleet-gateway credential provider; it reaches the fleet graph through the Gateway. Both agents use Bedrock and read their Neo4j passwords from Secrets Manager. Two Neo4j Aura databases hold the fleet graph and agent memory.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="1110" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Fleet Deployment Topology</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Three stacks, two Neo4j databases. Every runtime reads its Neo4j password from Secrets Manager.</text>
+  <rect x="30" y="120" width="360" height="960" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="50" y="152" font-size="17" font-weight="700" fill="#344054" text-anchor="start">Developer machine, in order</text>
+  <rect x="50" y="175" width="320" height="128" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="207" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">1  Load the graph</text>
+  <text x="210.0" y="233" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">pipeline/setup.sh</text>
+  <text x="210.0" y="255" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet graph, manual chunks,</text>
+  <text x="210.0" y="277" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">vector + fulltext indexes</text>
+  <rect x="50" y="323" width="320" height="128" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="355" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">2  MCP server</text>
+  <text x="210.0" y="381" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">./deploy.py --env fleet</text>
+  <text x="210.0" y="403" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">./deploy.py --env fleet credentials</text>
+  <text x="210.0" y="425" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">writes .mcp-credentials.fleet.json</text>
+  <rect x="50" y="471" width="320" height="128" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="503" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">3  Copy credentials</text>
+  <text x="210.0" y="529" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">scripts/sync-credentials.sh</text>
+  <text x="210.0" y="551" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">to demos/aircraft-fleet/</text>
+  <text x="210.0" y="573" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">.mcp-credentials.json</text>
+  <rect x="50" y="619" width="320" height="128" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="651" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">4  GraphRAG agent</text>
+  <text x="210.0" y="677" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">graphrag-agent/agent.sh deploy</text>
+  <text x="210.0" y="699" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">secret ARNs from ../.env</text>
+  <rect x="50" y="767" width="320" height="128" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="799" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">5  Supervisor agent</text>
+  <text x="210.0" y="825" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">supervisor-agent/agent.sh deploy</text>
+  <text x="210.0" y="847" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">declares fleet-gateway</text>
+  <text x="210.0" y="869" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">for this one deploy</text>
+  <rect x="50" y="915" width="320" height="128" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" filter="url(#shadow)"/>
+  <text x="210.0" y="947" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Teardown</text>
+  <text x="210.0" y="973" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">agent.sh destroy in each agent</text>
+  <text x="210.0" y="995" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">./deploy.py --env fleet cleanup</text>
+  <rect x="410" y="120" width="830" height="960" rx="14" fill="#FFFFFF" stroke="#D97706" stroke-width="1.5"/>
+  <text x="430" y="152" font-size="17" font-weight="700" fill="#8A4B08" text-anchor="start">AWS account, us-east-1</text>
+  <rect x="440" y="170" width="770" height="340" rx="14" fill="#FBFAFF" stroke="#7A5AF8" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="460" y="198" font-size="15" font-weight="700" fill="#4A2EB0" text-anchor="start">neo4j-mcp-server-fleet (CDK, deploy.py)</text>
+  <rect x="460" y="215" width="230" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="575.0" y="247" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">AgentCore Gateway</text>
+  <text x="575.0" y="273" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">JWT authorizer</text>
+  <text x="575.0" y="295" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j-mcp-server-target___</text>
+  <rect x="960" y="215" width="230" height="120" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1075.0" y="247" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">MCP server Runtime</text>
+  <text x="1075.0" y="273" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">mcp-neo4j-cypher</text>
+  <text x="1075.0" y="295" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">port 8000, /mcp</text>
+  <text x="1075.0" y="317" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">NEO4J_READ_ONLY=true</text>
+  <path d="M690,275 H956" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="750" y="247" width="151" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="825" y="262" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">MCP + Runtime token</text>
+  <text x="825" y="294" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">from the OAuth2 provider</text>
+  <rect x="460" y="370" width="230" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="575.0" y="402" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Cognito</text>
+  <text x="575.0" y="428" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">M2M app client</text>
+  <text x="575.0" y="450" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">scope ...-mcp/invoke</text>
+  <text x="575.0" y="472" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">24 h access tokens</text>
+  <rect x="710" y="370" width="230" height="120" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="825.0" y="402" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Amazon ECR</text>
+  <text x="825.0" y="428" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MCP server image</text>
+  <text x="825.0" y="450" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">git SHA tag and latest</text>
+  <rect x="960" y="370" width="230" height="120" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1075.0" y="402" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Secrets Manager</text>
+  <text x="1075.0" y="428" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">&lt;stack&gt;/neo4j-password</text>
+  <text x="1075.0" y="450" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">resolved by CloudFormation</text>
+  <path d="M575,370 V339" fill="none" stroke="#D97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
+  <path d="M1075,370 V339" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <rect x="440" y="530" width="770" height="160" rx="14" fill="#FAFCFF" stroke="#2E6DB4" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="460" y="558" font-size="15" font-weight="700" fill="#1E3A5F" text-anchor="start">AgentCore-AircraftFleet-default</text>
+  <text x="470" y="600" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">reads NEO4J_PASSWORD_SECRET_ARN</text>
+  <text x="470" y="622" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">and MEM_NEO4J_PASSWORD_SECRET_ARN</text>
+  <text x="470" y="644" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">once at startup</text>
+  <rect x="860" y="548" width="330" height="120" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1025.0" y="580" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">graphrag_agent Runtime</text>
+  <text x="1025.0" y="606" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CodeZip, Python 3.12, arm64</text>
+  <text x="1025.0" y="628" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">direct Neo4j drivers</text>
+  <text x="1025.0" y="650" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">port 8080</text>
+  <rect x="440" y="710" width="770" height="190" rx="14" fill="#FAFCFF" stroke="#2E6DB4" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="460" y="738" font-size="15" font-weight="700" fill="#1E3A5F" text-anchor="start">AgentCore-fleetsupervisor-default</text>
+  <rect x="460" y="755" width="330" height="125" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="625.0" y="787" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">supervisor Runtime</text>
+  <text x="625.0" y="813" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CodeZip, Python 3.12, arm64</text>
+  <text x="625.0" y="835" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MCP through the Gateway</text>
+  <text x="625.0" y="857" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">port 8080</text>
+  <rect x="860" y="755" width="330" height="125" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1025.0" y="787" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">fleet-gateway provider</text>
+  <text x="1025.0" y="813" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AgentCore Identity</text>
+  <text x="1025.0" y="835" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">holds the Gateway client secret</text>
+  <text x="1025.0" y="857" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">M2M tokens from Cognito</text>
+  <path d="M790,817 H856" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M460,790 H425 V275 H456" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="431" y="509" width="79" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="470" y="524" font-size="12" font-weight="600" fill="#8A4B08" text-anchor="middle">MCP + JWT</text>
+  <rect x="460" y="930" width="360" height="125" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="640.0" y="962" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Secrets Manager (agents)</text>
+  <text x="640.0" y="988" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet and memory passwords</text>
+  <text x="640.0" y="1010" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">JSON with a password key</text>
+  <text x="640.0" y="1032" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">GetSecretValue on those ARNs only</text>
+  <rect x="840" y="930" width="350" height="125" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1015.0" y="962" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Amazon Bedrock</text>
+  <text x="1015.0" y="988" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Claude Sonnet 5.5</text>
+  <text x="1015.0" y="1010" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Titan Text Embeddings v2</text>
+  <text x="1015.0" y="1032" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">1024 dimensions</text>
+  <rect x="1270" y="120" width="300" height="960" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="1290" y="152" font-size="17" font-weight="700" fill="#00594A" text-anchor="start">Neo4j Aura</text>
+  <rect x="1290" y="200" width="260" height="220" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1420.0" y="232" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fleet graph</text>
+  <text x="1420.0" y="258" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">operational graph</text>
+  <text x="1420.0" y="280" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">knowledge graph</text>
+  <text x="1420.0" y="302" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loaded by the pipeline</text>
+  <text x="1420.0" y="324" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">agents only read it</text>
+  <rect x="1290" y="600" width="260" height="300" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1420.0" y="632" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Memory database</text>
+  <text x="1420.0" y="658" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j-agent-memory</text>
+  <text x="1420.0" y="680" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sessions, messages,</text>
+  <text x="1420.0" y="702" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">entities, preferences</text>
+  <text x="1420.0" y="724" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">shared by both agents</text>
+  <text x="1420.0" y="746" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">kept apart from</text>
+  <text x="1420.0" y="768" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the fleet graph</text>
+  <path d="M1190,275 H1286" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1217" y="247" width="43" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1238" y="262" font-size="12" font-weight="600" fill="#00594A" text-anchor="middle">read</text>
+  <path d="M1190,580 H1240 V390 H1286" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1219" y="455" width="43" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1240" y="470" font-size="12" font-weight="600" fill="#00594A" text-anchor="middle">Bolt</text>
+  <path d="M1190,640 H1286" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <path d="M625,880 V915 H1250 V860 H1286" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+</svg>

@@ -1,0 +1,174 @@
+{
+  "config": {
+    "aircraft": 30,
+    "days": 90,
+    "seed": 42
+  },
+  "models": {
+    "A220-300": {
+      "aircraft": 5,
+      "events": 30,
+      "by_severity": {
+        "CRITICAL": 5,
+        "MAJOR": 5,
+        "MINOR": 20
+      },
+      "by_system": {
+        "Engine": 22,
+        "Avionics": 5,
+        "Hydraulics": 3
+      },
+      "by_fault": {
+        "Engine": {
+          "Bearing wear": 5,
+          "Contamination": 0,
+          "Fuel starvation": 0,
+          "Leak": 1,
+          "Overheat": 7,
+          "Sensor drift": 5,
+          "Vibration exceedance": 4
+        },
+        "Avionics": {
+          "Electrical fault": 1,
+          "Sensor drift": 4
+        },
+        "Hydraulics": {
+          "Contamination": 0,
+          "Leak": 3
+        }
+      }
+    },
+    "A320-200": {
+      "aircraft": 5,
+      "events": 36,
+      "by_severity": {
+        "CRITICAL": 7,
+        "MAJOR": 7,
+        "MINOR": 22
+      },
+      "by_system": {
+        "Engine": 21,
+        "Avionics": 6,
+        "Hydraulics": 9
+      },
+      "by_fault": {
+        "Engine": {
+          "Bearing wear": 3,
+          "Contamination": 0,
+          "Fuel starvation": 0,
+          "Leak": 0,
+          "Overheat": 7,
+          "Sensor drift": 4,
+          "Vibration exceedance": 7
+        },
+        "Avionics": {
+          "Electrical fault": 2,
+          "Sensor drift": 4
+        },
+        "Hydraulics": {
+          "Contamination": 2,
+          "Leak": 7
+        }
+      }
+    },
+    "A321neo": {
+      "aircraft": 5,
+      "events": 36,
+      "by_severity": {
+        "CRITICAL": 7,
+        "MAJOR": 9,
+        "MINOR": 20
+      },
+      "by_system": {
+        "Engine": 21,
+        "Avionics": 3,
+        "Hydraulics": 12
+      },
+      "by_fault": {
+        "Engine": {
+          "Bearing wear": 3,
+          "Contamination": 0,
+          "Fuel starvation": 0,
+          "Leak": 1,
+          "Overheat": 5,
+          "Sensor drift": 6,
+          "Vibration exceedance": 6
+        },
+        "Avionics": {
+          "Electrical fault": 0,
+          "Sensor drift": 3
+        },
+        "Hydraulics": {
+          "Contamination": 5,
+          "Leak": 7
+        }
+      }
+    },
+    "B737-800": {
+      "aircraft": 5,
+      "events": 51,
+      "by_severity": {
+        "CRITICAL": 11,
+        "MAJOR": 18,
+        "MINOR": 22
+      },
+      "by_system": {
+        "Engine": 37,
+        "Avionics": 7,
+        "Hydraulics": 7
+      },
+      "by_fault": {
+        "Engine": {
+          "Bearing wear": 4,
+          "Contamination": 2,
+          "Fuel starvation": 3,
+          "Leak": 5,
+          "Overheat": 11,
+          "Sensor drift": 6,
+          "Vibration exceedance": 6
+        },
+        "Avionics": {
+          "Electrical fault": 2,
+          "Sensor drift": 5
+        },
+        "Hydraulics": {
+          "Contamination": 1,
+          "Leak": 6
+        }
+      }
+    },
+    "E190": {
+      "aircraft": 10,
+      "events": 74,
+      "by_severity": {
+        "CRITICAL": 16,
+        "MAJOR": 23,
+        "MINOR": 35
+      },
+      "by_system": {
+        "Engine": 48,
+        "Avionics": 15,
+        "Hydraulics": 11
+      },
+      "by_fault": {
+        "Engine": {
+          "Bearing wear": 12,
+          "Contamination": 3,
+          "Fuel starvation": 0,
+          "Leak": 4,
+          "Overheat": 15,
+          "Sensor drift": 10,
+          "Vibration exceedance": 4
+        },
+        "Avionics": {
+          "Electrical fault": 10,
+          "Sensor drift": 5
+        },
+        "Hydraulics": {
+          "Contamination": 2,
+          "Leak": 9
+        }
+      }
+    }
+  }
+}

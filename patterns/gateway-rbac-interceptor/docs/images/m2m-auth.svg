@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="978" viewBox="0 0 1600 978" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>M2M Authentication</title>
+  <desc>The client reads the MachineClient secret and requests a token with the client_credentials grant. The token has no cognito:groups claim. The interceptor labels the caller m2m:client_id and denies admin_action.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="978" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">M2M Authentication</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">The client_credentials grant has no user, so the token carries no groups.</text>
+  <path d="M230,200 V838" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M610,200 V838" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M990,200 V838" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M1370,200 V838" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <rect x="80.0" y="120" width="300" height="80" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="152" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Cognito user pool</text>
+  <text x="230.0" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MachineClient, UserClient</text>
+  <rect x="460.0" y="120" width="300" height="80" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="610.0" y="152" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Client</text>
+  <text x="610.0" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">demo.py --mode m2m</text>
+  <rect x="840.0" y="120" width="300" height="80" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="990.0" y="152" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Gateway</text>
+  <text x="990.0" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CUSTOM_JWT inbound</text>
+  <rect x="1220.0" y="120" width="300" height="80" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1370.0" y="152" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">Interceptor</text>
+  <text x="1370.0" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AuthInterceptorLambda</text>
+  <rect x="460.0" y="230" width="300" height="62" rx="10" fill="#F2F4F7" stroke="#667085" stroke-width="1.5"/>
+  <text x="610.0" y="256" font-size="14" font-weight="600" fill="#344054" text-anchor="middle">reads the client secret with</text>
+  <text x="610.0" y="278" font-size="14" font-weight="600" fill="#344054" text-anchor="middle">DescribeUserPoolClient</text>
+  <path d="M610,384 H234" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <circle cx="586" cy="384" r="13" fill="#2E6DB4"/>
+  <text x="586.0" y="389" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <rect x="330" y="311" width="144" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="401.5" y="326" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">POST /oauth2/token</text>
+  <rect x="290" y="333" width="223" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="401.5" y="348" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">grant_type=client_credentials</text>
+  <rect x="304" y="355" width="194" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="401.5" y="370" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">scope=simple-oauth/invoke</text>
+  <path d="M230,462 H606" fill="none" stroke="#2E6DB4" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
+  <circle cx="254" cy="462" r="13" fill="#2E6DB4"/>
+  <text x="254.0" y="467" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <rect x="388" y="411" width="100" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="438.5" y="426" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">access_token</text>
+  <rect x="309" y="433" width="259" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="438.5" y="448" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">client_id claim, no cognito:groups</text>
+  <path d="M610,540 H986" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <circle cx="634" cy="540" r="13" fill="#667085"/>
+  <text x="634.0" y="545" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <rect x="772" y="489" width="93" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="818.5" y="504" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">MCP request</text>
+  <rect x="714" y="511" width="208" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="818.5" y="526" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">Authorization: Bearer token</text>
+  <rect x="880.0" y="566" width="220" height="40" rx="10" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="990.0" y="592" font-size="14" font-weight="600" fill="#8A4B08" text-anchor="middle">validates the JWT</text>
+  <path d="M990,654 H1366" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <circle cx="1014" cy="654" r="13" fill="#7A5AF8"/>
+  <text x="1014.0" y="659" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <rect x="1145" y="625" width="108" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1198.5" y="640" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">REQUEST event</text>
+  <rect x="1220.0" y="680" width="300" height="62" rx="10" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="1.5"/>
+  <text x="1370.0" y="706" font-size="14" font-weight="600" fill="#4A2EB0" text-anchor="middle">user_id = m2m:{client_id}</text>
+  <text x="1370.0" y="728" font-size="14" font-weight="600" fill="#4A2EB0" text-anchor="middle">groups = []</text>
+  <path d="M1370,812 H994" fill="none" stroke="#7A5AF8" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-purple)"/>
+  <circle cx="1346" cy="812" r="13" fill="#7A5AF8"/>
+  <text x="1346.0" y="817" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+  <rect x="1054" y="761" width="216" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1161.5" y="776" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">echo, get_user_info: allowed</text>
+  <rect x="1082" y="783" width="158" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1161.5" y="798" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">admin_action: denied</text>
+  <rect x="40" y="858" width="1520" height="90" rx="16" fill="#FFFFFF" stroke="#667085" stroke-width="1"/>
+  <text x="64" y="890" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">When to use it</text>
+  <text x="64" y="916" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">Use M2M for service calls that do not need group-based access.</text>
+  <text x="64" y="938" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">Every admin-only tool is denied for an M2M token.</text>
+</svg>

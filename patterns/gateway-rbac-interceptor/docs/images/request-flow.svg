@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1170" viewBox="0 0 1600 1170" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Request Flow</title>
+  <desc>The client gets a JWT from Cognito and sends an MCP request to the Gateway. The Gateway validates the JWT and calls the interceptor Lambda. The interceptor adds identity headers or denies the call. The Gateway gets a Runtime token from the OAuth2 credential provider and forwards the request to the MCP server.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="1170" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Request Flow</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Every MCP request passes the Gateway JWT check and the interceptor before it reaches the Runtime.</text>
+  <path d="M167,200 V1030" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M420,200 V1030" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M673,200 V1030" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M927,200 V1030" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M1180,200 V1030" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <path d="M1433,200 V1030" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6" fill="none"/>
+  <rect x="55.000000000000014" y="120" width="223.33333333333334" height="80" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="166.66666666666669" y="152" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Cognito user pool</text>
+  <text x="166.66666666666669" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">token endpoint</text>
+  <rect x="308.3333333333333" y="120" width="223.33333333333334" height="80" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="420.0" y="152" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Client</text>
+  <text x="420.0" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client/demo.py</text>
+  <rect x="561.6666666666667" y="120" width="223.33333333333334" height="80" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="673.3333333333334" y="152" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Gateway</text>
+  <text x="673.3333333333334" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CUSTOM_JWT inbound</text>
+  <rect x="815.0000000000001" y="120" width="223.33333333333334" height="80" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="926.6666666666667" y="152" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">Interceptor</text>
+  <text x="926.6666666666667" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AuthInterceptorLambda</text>
+  <rect x="1068.3333333333333" y="120" width="223.33333333333334" height="80" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1180.0" y="152" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Credential provider</text>
+  <text x="1180.0" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">OAuth2 outbound</text>
+  <rect x="1321.6666666666667" y="120" width="223.33333333333334" height="80" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1433.3333333333335" y="152" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Runtime</text>
+  <text x="1433.3333333333335" y="178" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MCP server</text>
+  <path d="M420,260 H171" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <circle cx="396" cy="260" r="13" fill="#2E6DB4"/>
+  <text x="396.0" y="265" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <rect x="221" y="231" width="108" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="274.83333333333337" y="246" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">token request</text>
+  <path d="M167,316 H416" fill="none" stroke="#2E6DB4" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
+  <circle cx="191" cy="316" r="13" fill="#2E6DB4"/>
+  <text x="190.66666666666669" y="321" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <rect x="247" y="287" width="129" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="311.83333333333337" y="302" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">JWT access token</text>
+  <path d="M420,394 H669" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <circle cx="444" cy="394" r="13" fill="#667085"/>
+  <text x="444.0" y="399" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <rect x="519" y="343" width="93" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="565.1666666666667" y="358" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">MCP request</text>
+  <rect x="522" y="365" width="86" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="565.1666666666667" y="380" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">Bearer JWT</text>
+  <rect x="563.3333333333334" y="420" width="220" height="40" rx="10" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="673.3333333333334" y="446" font-size="14" font-weight="600" fill="#8A4B08" text-anchor="middle">validates the JWT</text>
+  <path d="M673,508 H923" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <circle cx="697" cy="508" r="13" fill="#7A5AF8"/>
+  <text x="697.3333333333334" y="513" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <rect x="765" y="479" width="108" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="818.5" y="494" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">REQUEST event</text>
+  <rect x="811.6666666666667" y="534" width="230" height="40" rx="10" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="1.5"/>
+  <text x="926.6666666666667" y="560" font-size="14" font-weight="600" fill="#4A2EB0" text-anchor="middle">reads groups, checks RBAC</text>
+  <path d="M927,644 H677" fill="none" stroke="#7A5AF8" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-purple)"/>
+  <circle cx="903" cy="644" r="13" fill="#7A5AF8"/>
+  <text x="902.6666666666667" y="649" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+  <rect x="717" y="593" width="129" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="781.5" y="608" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">identity headers</text>
+  <rect x="717" y="615" width="129" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="781.5" y="630" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">or a deny result</text>
+  <path d="M673,700 H1176" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <circle cx="697" cy="700" r="13" fill="#008C72"/>
+  <text x="697.3333333333334" y="705" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+  <rect x="978" y="671" width="151" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1053.3333333333335" y="686" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">get a Runtime token</text>
+  <path d="M1180,756 H677" fill="none" stroke="#008C72" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-teal)"/>
+  <circle cx="1156" cy="756" r="13" fill="#008C72"/>
+  <text x="1156.0" y="761" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">7</text>
+  <rect x="725" y="727" width="151" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="800.0" y="742" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">OAuth2 access token</text>
+  <path d="M673,834 H1429" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <circle cx="697" cy="834" r="13" fill="#C11574"/>
+  <text x="697.3333333333334" y="839" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">8</text>
+  <rect x="1235" y="783" width="144" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1306.6666666666667" y="798" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">forward with token</text>
+  <rect x="1228" y="805" width="158" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1306.6666666666667" y="820" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">and identity headers</text>
+  <rect x="1318.3333333333335" y="860" width="230" height="40" rx="10" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="1433.3333333333335" y="886" font-size="14" font-weight="600" fill="#851651" text-anchor="middle">JWT authorizer, then tool</text>
+  <path d="M1433,948 H677" fill="none" stroke="#C11574" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-pink)"/>
+  <circle cx="1409" cy="948" r="13" fill="#C11574"/>
+  <text x="1409.3333333333335" y="953" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">9</text>
+  <rect x="750" y="919" width="100" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="800.0" y="934" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">MCP response</text>
+  <path d="M673,1004 H424" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <circle cx="649" cy="1004" r="13" fill="#667085"/>
+  <text x="649.3333333333334" y="1009" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">10</text>
+  <rect x="482" y="975" width="93" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="528.1666666666667" y="990" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">tool result</text>
+  <rect x="40" y="1050" width="1520" height="90" rx="16" fill="#FFFFFF" stroke="#667085" stroke-width="1"/>
+  <text x="64" y="1082" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Deny path</text>
+  <text x="64" y="1108" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">If step 5 is a deny result, the Gateway returns it to the client as a tool result with isError set to true.</text>
+  <text x="64" y="1130" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">Steps 6 to 9 do not run, so the Runtime never sees the call.</text>
+</svg>

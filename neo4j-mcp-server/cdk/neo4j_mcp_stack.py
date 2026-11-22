@@ -92,10 +92,10 @@ class Neo4jMcpStack(Stack):
             description="Neo4j database username",
         )
 
-        # The password itself never enters the template, CFN parameters, or the
-        # deploy CLI. deploy.py stores it in Secrets Manager and passes only the
-        # secret ARN here; the runtime env var below resolves it via a
-        # CloudFormation {{resolve:secretsmanager}} dynamic reference.
+        # The password itself never enters the template, CFN parameters, the
+        # deploy CLI, or the Runtime configuration. deploy.py stores it in
+        # Secrets Manager and passes only the secret ARN here. The Runtime gets
+        # the ARN, and the image entrypoint reads the password at startup.
         self.neo4j_password_secret_arn = CfnParameter(
             self,
             "Neo4jPasswordSecretArn",
@@ -286,6 +286,15 @@ class Neo4jMcpStack(Stack):
                                 f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:workload-identity-directory/default/workload-identity/*",
                             ],
                         ),
+                        # The image entrypoint reads the Neo4j password from
+                        # this one secret at startup. deploy.py creates it
+                        # with the AWS managed key, so no kms:Decrypt is needed.
+                        iam.PolicyStatement(
+                            sid="Neo4jPasswordSecret",
+                            effect=iam.Effect.ALLOW,
+                            actions=["secretsmanager:GetSecretValue"],
+                            resources=[self.neo4j_password_secret_arn.value_as_string],
+                        ),
                         iam.PolicyStatement(
                             sid="ECRImageAccess",
                             effect=iam.Effect.ALLOW,
@@ -443,14 +452,15 @@ class Neo4jMcpStack(Stack):
                 "NEO4J_URI": self.neo4j_uri.value_as_string,
                 "NEO4J_DATABASE": self.neo4j_database.value_as_string,
                 "NEO4J_USERNAME": self.neo4j_username.value_as_string,
-                # CloudFormation resolves this dynamic reference at deploy time
-                # using the deploying principal's credentials, so the execution
-                # role needs no Secrets Manager permission.
-                "NEO4J_PASSWORD": f"{{{{resolve:secretsmanager:{self.neo4j_password_secret_arn.value_as_string}:SecretString}}}}",
+                # The image entrypoint reads the password from this secret with
+                # the execution role and sets NEO4J_PASSWORD in its own process,
+                # so the password never appears in the Runtime configuration.
+                "NEO4J_PASSWORD_SECRET_ARN": self.neo4j_password_secret_arn.value_as_string,
                 # mcp-neo4j-cypher (Python/FastMCP) env contract. This server
-                # uses the env-credential model: it connects to Neo4j with the
-                # NEO4J_USERNAME/NEO4J_PASSWORD above (unlike the canary, which
-                # rejects them in HTTP mode and expects per-request Basic Auth).
+                # uses the env-credential model: it connects to Neo4j with
+                # NEO4J_USERNAME and the password the entrypoint sets (unlike the
+                # canary, which rejects them in HTTP mode and expects
+                # per-request Basic Auth).
                 "NEO4J_TRANSPORT": "http",
                 "NEO4J_MCP_SERVER_HOST": "0.0.0.0",
                 "NEO4J_MCP_SERVER_PORT": "8000",

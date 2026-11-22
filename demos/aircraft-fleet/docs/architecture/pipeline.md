@@ -1,0 +1,129 @@
+# Pipeline Architecture
+
+The pipeline builds the fleet graph that both agents read. It joins two kinds
+of data that never share a table: generated fleet records with tail numbers,
+and maintenance manuals that describe each aircraft model in prose. The graph
+is useful only when an agent can move from a sensor on one aircraft to the
+limit the manual sets for that sensor, so the pipeline's last real job is to
+link the two.
+
+![Pipeline flow: generate, load, enrich, index and fuse, verify, with what each stage writes](../images/pipeline-flow.svg)
+
+| Stage | Code | Writes |
+|-------|------|--------|
+| 1. Generate | `src/generator/` | CSVs and `.stamp.json` in `generated/` |
+| 2. Load | `loader.py`, `schema.py` | The operational graph, one `Dataset` node, constraints, and indexes |
+| 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings, and the extracted entities |
+| 4. Index and fuse | `schema.py`, `pipeline.py` | The chunk vector and fulltext indexes, and the links between the two graphs |
+| 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
+
+`./setup.sh` runs all five. Only stage 3 calls a model, so
+`./setup.sh load-operational` builds the operational graph with no Bedrock
+access.
+
+## Generator
+
+![Fleet data generator: one config and seed drive six stages from fleet topology to the stamp, with atomic publish and the checks on the output](../images/generator-flow.svg)
+
+`generate-data generate` builds the whole fleet from one `GeneratorConfig`.
+The config holds the aircraft count, the airport count, the day count, and the
+seed. The command defaults are 100 aircraft, 40 airports, 90 days, and seed
+42. `setup.sh` uses 30 aircraft unless `LOAD_FULL_DATASET=true`. The seed
+feeds one `random.Random` and one NumPy `default_rng`, so the same seed,
+config, and code give the same CSVs.
+
+The stages run in order, and each reads what the earlier stages produced.
+
+1. **Fleet topology:** The generator creates aircraft with Engine, Avionics, and Hydraulics systems, then their components and sensors.
+2. **Sensor readings:** Each sensor gets hourly values. A value is a baseline plus a drift toward the bad side, scaled by the operator, plus noise and occasional spikes.
+3. **Maintenance events:** A reading that enters a higher band may raise an event. The side of the band it crossed picks the fault and the part. Severity is MINOR, MAJOR, or CRITICAL.
+4. **Flight operations:** The generator schedules hub-and-spoke legs between airports, with delays. A CRITICAL event grounds its aircraft from the report hour to the end of that day, so those legs never appear.
+5. **Component removals:** The removal rate rises with CRITICAL events. Each removal names a reason. The reason is the fault of the event that caused it, or a fault that can hit the part's type when the removal comes from an inspection.
+6. **Stamp:** The stamp records the config, a hash of the generator code, and the Python, Faker, and NumPy versions.
+
+### Atomic output and staleness
+
+The generator writes into a `generated/.generating-*` temp directory under an
+exclusive `.generate.lock`. Publish clears the old stamp, moves the CSVs, and
+moves the new stamp last. A run that stops before the move keeps the previous
+CSVs and stamp. A run that stops during the move leaves no stamp, so the next
+load regenerates.
+
+The stamp is how later steps tell a current dataset from a stale one.
+
+- **Skip when current:** `generate --if-stale` skips the run when the stamp matches the config, the code hash, and the runtime versions. `./setup.sh load` uses it.
+- **Recorded in the graph:** The loader copies the stamp onto `Dataset {id: 'current'}`.
+- **Checked by verify:** `verify` reports a stamp that no longer matches the code, and a `Dataset` node that no longer matches the CSVs. `verify --strict` exits 1 on either.
+- **Reference checks:** `generate-data validate` checks every `rels_*` reference column and each reading's `sensor_id` against the node files. It also reports duplicate IDs, missing files, and missing columns, and exits 1 on any of them.
+
+## Operational data model
+
+![Fleet operational data model: eleven node labels and thirteen relationship types](../images/data-model.svg)
+
+The loader reads the CSVs in batches and writes the operational graph with
+batched `UNWIND` queries. The fleet structure runs from `Aircraft` through
+`HAS_SYSTEM`, `HAS_COMPONENT`, and `HAS_SENSOR` to hourly `Reading` nodes.
+Maintenance events hang off the component they affect, and each one also
+points at its system and aircraft through `AFFECTS_SYSTEM` and
+`AFFECTS_AIRCRAFT`. Those two shortcuts let a query count faults per aircraft
+or per system without walking the whole structure. Flights connect aircraft to
+airports and carry delays. Removals connect an aircraft to the component that
+came off.
+
+The pipeline also creates the uniqueness constraints and lookup indexes for
+these labels. One `Dataset` node holds the stamp for verify.
+
+## Manual enrichment
+
+Stage 3 turns each maintenance manual into a lexical graph and a set of
+extracted entities with `neo4j-graphrag`'s `SimpleKGPipeline`.
+
+- **Chunks:** `ContextPrependingSplitter` wraps `FixedSizeSplitter` with 800-character chunks and a 100-character overlap. It puts a `[DOCUMENT CONTEXT]` header with the aircraft type and title in front of every chunk. `SimpleKGPipeline` passes document metadata only to the lexical graph builder, so the header is the only place the extractor sees the airframe model. Chunks deep in an engine section often name only the engine.
+- **Embeddings:** Titan Text Embeddings v2 embeds each chunk at 1024 dimensions.
+- **Extraction:** Claude Sonnet 5.5 extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. Entity names include the aircraft type, so entity resolution stays inside one model and each model keeps its own limits.
+
+### Structured output on Bedrock
+
+The `neo4j-graphrag` extractor asks its LLM for JSON that matches a schema
+through `response_format`. `StructuredBedrockLLM` in `bedrock_structured.py`
+answers that request through Bedrock Converse tool use. It declares the target
+schema as a tool, forces `toolChoice` to that tool, and returns the tool input
+as the structured result. The class is a small `BedrockLLM` subclass that
+works in any Bedrock and `neo4j-graphrag` pipeline.
+
+## Fusion and indexes
+
+![The dual graph: the operational graph, the knowledge graph, and the five link types between them](../images/dual-graph.svg)
+
+Stage 4 creates the chunk indexes and then links the knowledge graph to the
+operational graph with `link_to_existing_graph()`.
+
+| Relationship | Meaning |
+|--------------|---------|
+| `Document -[:APPLIES_TO]-> Aircraft` | A manual covers every aircraft of its model. |
+| `AircraftModel -[:DESCRIBES_MODEL]-> Aircraft` | A model entity links to each aircraft of that model. |
+| `SystemReference -[:DESCRIBES_SYSTEM]-> System` | A system in the manual links to the real system. |
+| `ComponentReference -[:DESCRIBES_COMPONENT]-> Component` | A component in the manual links to the installed component. |
+| `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to the limit the manual defines. |
+
+- **Vector index:** `maintenanceChunkEmbeddings` covers `Chunk` embeddings with cosine similarity at the configured dimension.
+- **Fulltext index:** `maintenanceChunkText` covers `Chunk` text. The GraphRAG agent's hybrid search uses both indexes.
+
+With the links in place, one query can start at a reading on one aircraft,
+step to its sensor, follow `HAS_LIMIT` to the manual's operating limit, and
+reach the chunks that describe the repair.
+
+## Verify
+
+Stage 5 reads the graph and prints a report of warnings and failures.
+
+- **Counts:** Each operational label's node count must match its CSV row count.
+- **Stamp:** The `Dataset` node must match the CSVs, and the stamp must match the current code.
+- **Schema:** The constraints and the two chunk indexes must exist.
+- **Embeddings:** Every chunk must have an embedding of the configured dimension.
+- **Search:** A vector search smoke test must succeed.
+- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, and `HAS_LIMIT` links must each exist.
+- **Orphans:** Readings without a sensor, flights without an aircraft, components without a system, sensors without readings, and documents without chunks must all be zero.
+
+`./setup.sh` runs `verify --strict`, which exits nonzero on any warning, so the
+same check works in CI.

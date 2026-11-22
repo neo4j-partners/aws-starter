@@ -4,59 +4,77 @@ Flight operations and delay generation.
 Hub airports receive disproportionately more routes, producing a realistic
 hub-and-spoke network where PageRank and Betweenness centrality produce
 non-trivial rankings.
+
+A CRITICAL maintenance event grounds its aircraft from the hour it is
+reported to the end of that day. Every leg that would depart in that time is
+cancelled, so it has no Flight row. The aircraft flies again the next morning
+from the airport where it last landed.
 """
 
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta
+from collections.abc import Iterable, Mapping
+from datetime import date, datetime, timedelta
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
-from .specs import AIRPORTS, AirportSpec
+from .specs import AIRPORTS, DELAY_CAUSE_SPECS
 
-# Flights per aircraft per day — drawn uniformly from this range
-_FLIGHTS_PER_DAY_RANGE = (3, 6)
+# Each leg's block time is first drawn in this range of the aircraft's hours
+# per cycle. The day's legs are then scaled to sum to its hours per day.
+_BLOCK_SPREAD = (0.75, 1.25)
 
-# Minimum block time (hours) and range for variation
-_MIN_BLOCK_HOURS = 1.0
-_MAX_BLOCK_HOURS = 5.5
+_DELAY_WEIGHTS = [spec.weight for spec in DELAY_CAUSE_SPECS]
 
-# Delay causes with realistic weights
-_DELAY_CAUSES = ["Weather", "Maintenance", "NAS", "Carrier"]
-_DELAY_WEIGHTS = [0.30, 0.25, 0.25, 0.20]
+# Minutes on the ground between legs.
+_TURNAROUND_MINUTES = (45, 90)
 
-# Delay duration ranges (minutes) by cause
-_DELAY_MINUTES: dict[str, tuple[int, int]] = {
-    "Weather":     (20, 180),
-    "Maintenance": (30, 240),
-    "NAS":         (15,  90),
-    "Carrier":     (10,  60),
-}
+# The first departure of a day falls between these hours. At most 10 hours
+# of flying and 6 turnarounds of 90 minutes fit between 05:00 and midnight.
+_FIRST_DEPARTURE = 5.0
+_LATEST_FIRST_DEPARTURE = 9.0
 
-# Hub airports get this weight multiplier in route selection
+# Hub airports get this weight multiplier in route selection.
 _HUB_WEIGHT = 4.0
 
+# Events of this severity ground the aircraft for the rest of their day.
+_GROUNDING_SEVERITY = "CRITICAL"
 
-def _build_route_weights(airports: list[AirportSpec]) -> list[float]:
-    return [_HUB_WEIGHT if ap.is_hub else 1.0 for ap in airports]
+
+def _grounding_starts(
+    maintenance_events: Iterable[Mapping[str, str]],
+) -> dict[tuple[str, date], datetime]:
+    """When each aircraft is grounded on each day, keyed by (aircraft_id, day).
+
+    The value is the day's earliest grounding event. The aircraft stays on
+    the ground from then until midnight.
+    """
+    starts: dict[tuple[str, date], datetime] = {}
+    for evt in maintenance_events:
+        if evt["severity"] != _GROUNDING_SEVERITY:
+            continue
+        reported = datetime.fromisoformat(evt["reported_at"])
+        key = (evt["aircraft_id"], reported.date())
+        starts[key] = min(starts.get(key, reported), reported)
+    return starts
 
 
 def generate_operations(
     fleet: list[AircraftNode],
     config: GeneratorConfig,
     rng: random.Random,
-) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
-    """
-    Returns (airport_nodes, flight_nodes, delay_nodes,
-             rels_aircraft_flight, rels_flight_departure, rels_flight_arrival,
-             rels_flight_delay)
+    maintenance_events: Iterable[Mapping[str, str]] = (),
+) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
+    """Generate airports, flights, and delays, with no flights while a CRITICAL event grounds.
 
-    Actually returns six lists — see return statement.
+    Returns:
+        Seven lists: (airport_nodes, flight_nodes, delay_nodes,
+        rels_aircraft_flight, rels_flight_departure, rels_flight_arrival,
+        rels_flight_delay).
     """
     airports = AIRPORTS[: config.n_airports]
-    airport_weights = _build_route_weights(airports)
-    iata_to_id = {ap.iata: ap.airport_id for ap in airports}
+    grounding_starts = _grounding_starts(maintenance_events)
 
     airport_nodes = [
         {
@@ -85,26 +103,46 @@ def generate_operations(
     for aircraft in fleet:
         delay_rate = aircraft.operator_profile.delay_rate
         # Each aircraft starts at a random hub airport
-        current_airport = rng.choices(
-            [ap for ap in airports if ap.is_hub]
-        )[0]
+        current_airport = rng.choices([ap for ap in airports if ap.is_hub])[0]
+
+        # One leg is one cycle, so the legs flown match the cycles counted.
+        n_flights = aircraft.legs_per_day
 
         for day in range(config.n_days):
-            n_flights = rng.randint(*_FLIGHTS_PER_DAY_RANGE)
-            # Stagger first departure between 06:00 and 09:00
+            raw_blocks = [
+                rng.uniform(*_BLOCK_SPREAD) * aircraft.hours_per_cycle for _ in range(n_flights)
+            ]
+            scale = aircraft.hours_per_day / sum(raw_blocks)
+            turnarounds = [rng.randint(*_TURNAROUND_MINUTES) for _ in range(n_flights - 1)]
+            # The day's flying, from first departure to last arrival.
+            span = aircraft.hours_per_day + sum(turnarounds) / 60
+            # First departure from 05:00, late enough in the morning that the
+            # last leg lands by midnight. So no leg flies into the next day.
+            latest = min(_LATEST_FIRST_DEPARTURE, 24.0 - span)
+            # This fires only if the UTILIZATION or turnaround specs change:
+            # the current worst case starts at exactly 05:00.
+            if latest < _FIRST_DEPARTURE:
+                raise ValueError(
+                    f"{aircraft.aircraft_id}: {span:.1f} hours of flying a day "
+                    f"does not fit between 05:00 and midnight"
+                )
             current_time = config.start_date + timedelta(
-                days=day, hours=rng.uniform(6.0, 9.0)
+                days=day, hours=rng.uniform(_FIRST_DEPARTURE, latest)
             )
+            grounded_from = grounding_starts.get((aircraft.aircraft_id, current_time.date()))
 
-            for _ in range(n_flights):
-                # Weighted destination selection — hubs attract more traffic
+            for leg, raw_block in enumerate(raw_blocks):
+                # A grounded aircraft cancels this leg and the rest of the day's.
+                if grounded_from is not None and current_time >= grounded_from:
+                    break
+                # Weighted destination selection: hubs attract more traffic.
                 candidates = [ap for ap in airports if ap.airport_id != current_airport.airport_id]
                 candidate_weights = [_HUB_WEIGHT if ap.is_hub else 1.0 for ap in candidates]
                 destination = rng.choices(candidates, weights=candidate_weights)[0]
 
                 flight_counter += 1
                 flight_id = f"FL{flight_counter:05d}"
-                block_hours = rng.uniform(_MIN_BLOCK_HOURS, _MAX_BLOCK_HOURS)
+                block_hours = raw_block * scale
                 departure = current_time
                 arrival = departure + timedelta(hours=block_hours)
 
@@ -132,23 +170,20 @@ def generate_operations(
                     {":START_ID(Flight)": flight_id, ":END_ID(Airport)": destination.airport_id}
                 )
 
-                # Delays — probability scaled by operator quality
+                # The operator's quality scales the delay probability.
                 if rng.random() < delay_rate:
                     delay_counter += 1
-                    cause = rng.choices(_DELAY_CAUSES, weights=_DELAY_WEIGHTS)[0]
-                    lo, hi = _DELAY_MINUTES[cause]
-                    minutes = rng.randint(lo, hi)
+                    spec = rng.choices(DELAY_CAUSE_SPECS, weights=_DELAY_WEIGHTS)[0]
+                    minutes = rng.randint(spec.min_minutes, spec.max_minutes)
                     delay_id = f"DLY{delay_counter:05d}"
                     delay_nodes.append(
-                        {":ID(Delay)": delay_id, "cause": cause, "minutes": minutes}
+                        {":ID(Delay)": delay_id, "cause": spec.cause, "minutes": minutes}
                     )
-                    rels_delay.append(
-                        {":START_ID(Flight)": flight_id, ":END_ID(Delay)": delay_id}
-                    )
+                    rels_delay.append({":START_ID(Flight)": flight_id, ":END_ID(Delay)": delay_id})
 
                 current_airport = destination
-                # Turnaround time: 45–90 minutes on ground
-                current_time = arrival + timedelta(minutes=rng.randint(45, 90))
+                if leg < len(turnarounds):
+                    current_time = arrival + timedelta(minutes=turnarounds[leg])
 
     return (
         airport_nodes,

@@ -6,68 +6,282 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from neo4j import Driver
+from neo4j import (
+    READ_ACCESS,
+    Driver,
+    ManagedTransaction,
+    NotificationDisabledClassification,
+    Query,
+    Record,
+    RoutingControl,
+)
+from neo4j.exceptions import DriverError, Neo4jError
 
-_W = 70
+from generator.specs import (
+    COMPONENT_TYPES_BY_SYSTEM,
+    DELAY_CAUSES,
+    EVENT_SEVERITIES,
+    MANUAL_FLEET_TAILS,
+    SENSOR_TYPES,
+)
+
+from .display import WIDTH, header, records_table, show_cypher
+from .query_errors import report_query_error
+from .schema import _quote_identifier
 
 # ---------------------------------------------------------------------------
 # Graph schema description fed to the LLM for Cypher generation
 # ---------------------------------------------------------------------------
 
-GRAPH_SCHEMA = """\
-Node labels and properties:
-- Aircraft {aircraft_id, tail_number, icao24, model, manufacturer, operator}
-- System {system_id, aircraft_id, type, name}  (type: Engine, Avionics, Hydraulics)
-- Component {component_id, system_id, type, name}
-- Sensor {sensor_id, system_id, type, name, unit}  (type: EGT, Vibration, N1Speed, FuelFlow)
-- Reading {reading_id, sensor_id, timestamp, value}
-- Airport {airport_id, name, city, country, iata, icao, lat, lon}
-- Flight {flight_id, flight_number, aircraft_id, operator, origin, destination, scheduled_departure, scheduled_arrival}
-- Delay {delay_id, cause, minutes}  (cause: Weather, Maintenance, Carrier, NAS)
-- MaintenanceEvent {event_id, component_id, system_id, aircraft_id, fault, severity, reported_at, corrective_action}  (severity: MINOR, MAJOR, CRITICAL)
-- Removal {removal_id, tracking_number, component_id, aircraft_id, removal_date, reason, work_order_number, technician_id, part_number, serial_number, tsn, flight_hours_at_removal, csn, replacement_required, shop_visit_required, warranty_status, removal_priority, cost_estimate, installation_date}
-- Document {documentId, aircraftType, title, type}
-- Chunk {text, index, embedding}
-- AircraftModel {name, manufacturer}
-- SystemReference {name, systemType, aircraftType}
-- ComponentReference {name, componentType, partNumber, aircraftType}
-- Fault {name, faultCode, severity, aircraftType}
-- MaintenanceProcedure {name, procedureType, interval, aircraftType}
-- OperatingLimit {name, parameterName, unit, regime, minValue, maxValue, aircraftType}
+# Tails for the sample questions. The first manual tail of each model is in
+# every fleet of five or more aircraft, because the registry tails come
+# first in round-robin order.
+_FIRST_TAIL: dict[str, str] = {model: tails[0] for model, tails in MANUAL_FLEET_TAILS.items()}
+# The shared-faults question needs two tails of one model, because manual
+# Fault nodes are per aircraft model. The second B737 tail is the sixth
+# registry aircraft, so these are in every fleet of six or more.
+_SHARED_FAULT_TAILS: list[str] = MANUAL_FLEET_TAILS["B737-800"][:2]
 
-Relationships:
-- (Aircraft)-[:HAS_SYSTEM]->(System)
-- (System)-[:HAS_COMPONENT]->(Component)
-- (System)-[:HAS_SENSOR]->(Sensor)
-- (Sensor)-[:HAS_READING]->(Reading)
-- (Component)-[:HAS_EVENT]->(MaintenanceEvent)
-- (MaintenanceEvent)-[:AFFECTS_SYSTEM]->(System)
-- (MaintenanceEvent)-[:AFFECTS_AIRCRAFT]->(Aircraft)
-- (Aircraft)-[:OPERATES_FLIGHT]->(Flight)
-- (Flight)-[:DEPARTS_FROM]->(Airport)
-- (Flight)-[:ARRIVES_AT]->(Airport)
-- (Flight)-[:HAS_DELAY]->(Delay)
-- (Aircraft)-[:HAS_REMOVAL]->(Removal)
-- (Removal)-[:REMOVED_COMPONENT]->(Component)
-- (Document)-[:APPLIES_TO]->(Aircraft)
-- (Chunk)-[:FROM_DOCUMENT]->(Document)
-- (Chunk)-[:NEXT_CHUNK]->(Chunk)
-- (AircraftModel)-[:DESCRIBES_MODEL]->(Aircraft)
-- (SystemReference)-[:DESCRIBES_SYSTEM]->(System)
-- (ComponentReference)-[:DESCRIBES_COMPONENT]->(Component)
-- (AircraftModel)-[:HAS_SYSTEM]->(SystemReference)
-- (SystemReference)-[:HAS_COMPONENT]->(ComponentReference)
-- (ComponentReference)-[:HAS_FAULT]->(Fault)
-- (Fault)-[:CORRECTED_BY]->(MaintenanceProcedure)
-- (OperatingLimit)-[:FROM_CHUNK]->(Chunk)
-- (Sensor)-[:HAS_LIMIT]->(OperatingLimit)
+# Value hints and notes the schema procedures cannot show, by label.
+_LABEL_NOTES: dict[str, str] = {
+    "System": f"type: {', '.join(COMPONENT_TYPES_BY_SYSTEM)}",
+    "Sensor": f"type: {', '.join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)}",
+    "Delay": f"cause: {', '.join(DELAY_CAUSES)}",
+    "MaintenanceEvent": f"severity: {', '.join(EVENT_SEVERITIES)}",
+    "Removal": "hours_since_install and flight_hours_at_removal are flight hours",
+    "Chunk": 'chunkId: "{documentId}:{index}"',
+}
 
-Sample tail numbers: N95040A (B737-800), N30268B (A320-200), N54980C (A321neo).
-Operators: ExampleAir, SkyWays, RegionalCo, NorthernJet.
-Airport IATA codes: JFK, LAX, ORD, ATL, DFW, DEN, SFO, SEA, MIA, BOS, MSP, DTW.
-"""
+_NODE_PROPERTIES_Q = """\
+CALL db.schema.nodeTypeProperties() YIELD nodeLabels, propertyName
+RETURN nodeLabels, propertyName"""
 
-SYSTEM_PROMPT = """\
+# The count store pairs every label that starts a relationship type with
+# every label that ends it, without reading any relationships. Some pairs
+# may never be linked, so each one is checked against the data.
+_SCHEMA_VISUALIZATION_Q = "CALL db.schema.visualization() YIELD nodes, relationships"
+
+_MODELS_Q = """\
+MATCH (a:Aircraft)
+WHERE a.model IS NOT NULL
+RETURN DISTINCT a.model AS model
+ORDER BY model"""
+
+# The tail of each model's lowest aircraft_id number, which is its first
+# registry tail in a generated fleet. An aircraft_id is "AC" and a number.
+# As text AC10000 sorts before AC1001, so the query sorts by the number.
+# The text breaks ties, such as AC100 and AC0100. The tail number and the
+# model break any left, such as aircraft with no aircraft_id, so the result
+# is stable.
+# toIntegerOrNull gives null for a number too large for an integer, and
+# nulls sort last, so one odd id cannot fail the whole read.
+_SAMPLE_TAILS_Q = """\
+MATCH (a:Aircraft)
+WHERE a.model IS NOT NULL AND a.tail_number IS NOT NULL
+WITH a ORDER BY toIntegerOrNull(substring(a.aircraft_id, 2)), a.aircraft_id, a.tail_number
+WITH a.model AS model, collect(a)[0] AS first
+RETURN model, first.tail_number AS tail
+ORDER BY toIntegerOrNull(substring(first.aircraft_id, 2)), first.aircraft_id, model"""
+
+_OPERATORS_Q = """\
+MATCH (a:Aircraft)
+WHERE a.operator IS NOT NULL
+RETURN DISTINCT a.operator AS operator
+ORDER BY operator"""
+
+_AIRPORTS_Q = """\
+MATCH (ap:Airport)
+WHERE ap.iata IS NOT NULL
+RETURN DISTINCT ap.iata AS iata
+ORDER BY iata"""
+
+
+# Labels that describe the load rather than the fleet. The loader records the
+# generator stamp on a Dataset node. The prompt leaves these out.
+METADATA_LABELS = frozenset({"Dataset"})
+
+
+def _domain_label(labels: list[str]) -> str | None:
+    """Join a node's labels, leaving out internal ones such as __KGBuilder__."""
+    domain = sorted(label for label in labels if not label.startswith("__"))
+    return ":".join(domain) or None
+
+
+def _printable(name: str) -> str:
+    r"""Escape each character the terminal would not print, such as NUL or a newline.
+
+    A literal backslash is doubled too, so a name with the text \x00 cannot
+    print like one with a real NUL.
+    """
+    return "".join(c if c.isprintable() and c != "\\" else repr(c)[1:-1] for c in name)
+
+
+def _warn_skipped(triples: set[tuple[str, str, str]], reason: str) -> None:
+    if triples:
+        shown = ", ".join(
+            f"({_printable(start)})-[:{_printable(rel_type)}]->({_printable(end)})"
+            for start, rel_type, end in sorted(triples)
+        )
+        print(f"  [WARN] skipped {len(triples)} relationship pattern(s) with {reason}: {shown}")
+
+
+def _candidate_patterns(visualization: Record) -> list[tuple[str, str, str]]:
+    """Return the (start label, type, end label) triples the count store allows.
+
+    Triples with an internal label, such as __KGBuilder__, or a metadata
+    label, such as Dataset, are left out.
+    So are triples with a backslash in any name. Inside backticks Cypher
+    decodes an escape such as \\u0060 to a backtick, so doubling backticks
+    cannot keep such a name inside its quotes. Triples with a character
+    that str.isprintable() rejects are left out too. That covers NUL, a
+    newline, the U+2028 and U+2029 separators that str.splitlines() breaks
+    on, and bidi overrides. A space is printable. Each skipped triple is
+    reported, since the schema then omits a real relationship.
+    """
+    names = {node.element_id: node["name"] for node in visualization["nodes"]}
+    candidates = set()
+    with_backslash = set()
+    with_unprintable = set()
+    for rel in visualization["relationships"]:
+        triple = (names[rel.start_node.element_id], rel.type, names[rel.end_node.element_id])
+        if any(
+            label.startswith("__") or label in METADATA_LABELS for label in (triple[0], triple[2])
+        ):
+            continue
+        if any("\\" in name for name in triple):
+            with_backslash.add(triple)
+        elif not all(name.isprintable() for name in triple):
+            with_unprintable.add(triple)
+        else:
+            candidates.add(triple)
+    _warn_skipped(with_backslash, "a backslash")
+    _warn_skipped(with_unprintable, "an unprintable character")
+    return sorted(candidates)
+
+
+# Branches per pattern check query. Candidates grow with start labels times
+# end labels, so the check runs in chunks to bound each query's size.
+_CHECK_CHUNK = 150
+
+
+def _pattern_check_queries(candidates: list[tuple[str, str, str]]) -> list[str]:
+    """Return queries that yield the index of each candidate the data has.
+
+    Each branch stops at the first matching relationship. Fixed labels let
+    the planner start from a label scan. Neo4j 5.26 plans dynamic labels
+    as a scan of every relationship, so the names are quoted into the text.
+    """
+    branches = [
+        f"MATCH (:{_quote_identifier(start)})-[:{_quote_identifier(rel_type)}]->"
+        f"(:{_quote_identifier(end)}) RETURN {index} AS candidate LIMIT 1"
+        for index, (start, rel_type, end) in enumerate(candidates)
+    ]
+    return [
+        "\nUNION ALL\n".join(branches[first : first + _CHECK_CHUNK])
+        for first in range(0, len(branches), _CHECK_CHUNK)
+    ]
+
+
+def _read_node_properties(tx: ManagedTransaction) -> list[dict[str, Any]]:
+    return tx.run(_NODE_PROPERTIES_Q).data()
+
+
+def _read_visualization(tx: ManagedTransaction) -> Record:
+    return tx.run(_SCHEMA_VISUALIZATION_Q).single(strict=True)
+
+
+def _read_facts(
+    tx: ManagedTransaction, check_queries: list[str]
+) -> tuple[list[int], list[list[dict[str, Any]]]]:
+    """Return the candidate indexes the data has, then the model, tail, operator, and airport rows."""
+    found = [row["candidate"] for query in check_queries for row in tx.run(query).data()]
+    facts = [
+        tx.run(query).data() for query in (_MODELS_Q, _SAMPLE_TAILS_Q, _OPERATORS_Q, _AIRPORTS_Q)
+    ]
+    return found, facts
+
+
+def graph_schema(driver: Driver, database: str) -> str:
+    """Describe the graph's labels, properties, and relationships for the LLM.
+
+    Labels and properties come from db.schema.nodeTypeProperties. The
+    relationship patterns come from db.schema.visualization, each checked
+    against the data, so the description matches the database. A pattern
+    names one label at each end, so a node with two labels gives a pattern
+    for each. The models, sample tails, operators, and airport codes come
+    from the data too. Value hints come from the generator specs.
+    """
+    # db.schema.nodeTypeProperties warns that its propertyTypes field will
+    # change. The query does not use that field, so the warning is noise.
+    # Notifications are filtered per session, so this query gets its own.
+    with driver.session(
+        database=database,
+        default_access_mode=READ_ACCESS,
+        notifications_disabled_classifications=[NotificationDisabledClassification.GENERIC],
+    ) as session:
+        property_rows = session.execute_read(_read_node_properties)
+        bookmarks = session.last_bookmarks()
+    # On a partial database the fact queries can name a label or property
+    # key that does not exist yet. The empty result is expected, so the
+    # UNRECOGNIZED warning is noise. The filter is per session, so it is off
+    # for every query here, the pattern checks included. That hides nothing
+    # real: the pattern checks only name labels and types that
+    # db.schema.visualization just returned, so they always exist. The first
+    # session's bookmarks make this one read at least the state that one saw.
+    with driver.session(
+        database=database,
+        default_access_mode=READ_ACCESS,
+        notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
+        bookmarks=bookmarks,
+    ) as session:
+        # _candidate_patterns prints any skipped patterns, so it runs outside
+        # the transaction functions, which the driver may retry.
+        candidates = _candidate_patterns(session.execute_read(_read_visualization))
+        found, facts = session.execute_read(_read_facts, _pattern_check_queries(candidates))
+        model_rows, tail_rows, operator_rows, airport_rows = facts
+
+    # A label whose nodes have no properties comes back once with a null
+    # propertyName. It is listed with an empty property set.
+    properties: dict[str, set[str]] = {}
+    for row in property_rows:
+        if METADATA_LABELS.intersection(row["nodeLabels"]):
+            continue
+        if label := _domain_label(row["nodeLabels"]):
+            names = properties.setdefault(label, set())
+            if row["propertyName"] is not None:
+                names.add(row["propertyName"])
+    if not properties:
+        print(f"  [WARN] No node labels in database {database!r}; run 'setup' first.\n")
+
+    # Only an index the queries hold names a candidate.
+    relationships = [candidates[index] for index in found if 0 <= index < len(candidates)]
+
+    lines = ["Node labels and properties:"]
+    for label in sorted(properties):
+        line = f"- {label} {{{', '.join(sorted(properties[label]))}}}"
+        # A node with several labels, such as Calibrated:Sensor, gets the
+        # notes of each one.
+        notes = [_LABEL_NOTES[name] for name in label.split(":") if name in _LABEL_NOTES]
+        if notes:
+            line += f"  ({'; '.join(notes)})"
+        lines.append(line)
+    lines += ["", "Relationships:"]
+    lines += [f"- ({a})-[:{rel}]->({b})" for a, rel, b in sorted(relationships)]
+
+    # A fact the database has no values for is left out.
+    facts = {
+        "Aircraft models": [row["model"] for row in model_rows],
+        "Sample tail numbers": [f"{row['tail']} ({row['model']})" for row in tail_rows],
+        "Operators": [row["operator"] for row in operator_rows],
+        "Airport IATA codes": [row["iata"] for row in airport_rows],
+    }
+    fact_lines = [f"{name}: {', '.join(values)}." for name, values in facts.items() if values]
+    if fact_lines:
+        lines += ["", *fact_lines]
+    return "\n".join(lines) + "\n"
+
+
+_SYSTEM_PROMPT_RULES = """\
 You are an expert Neo4j Cypher query generator for an aircraft digital twin \
 knowledge graph. Given a natural language question, generate a single Cypher \
 query that answers it.
@@ -85,7 +299,13 @@ Rules:
 - Do not use deprecated Cypher syntax. Use modern CALL subqueries where needed.
 
 Graph schema:
-""" + GRAPH_SCHEMA
+"""
+
+
+def system_prompt(schema: str) -> str:
+    """Return the text2cypher system prompt for a graph schema description."""
+    return _SYSTEM_PROMPT_RULES + schema
+
 
 VECTOR_SEARCH_PROMPT = """\
 You are a query rewriter. Given a natural language question about aircraft \
@@ -108,27 +328,27 @@ class SampleQuestion:
 SAMPLE_QUESTIONS: list[SampleQuestion] = [
     # -- Cypher Template style (answered via text2cypher) --
     SampleQuestion(
-        "Tell me about aircraft N95040A",
+        f"Tell me about aircraft {_FIRST_TAIL['B737-800']}",
         "Aircraft Overview",
         "text2cypher",
     ),
     SampleQuestion(
-        "What are the sensor operating limits for N30268B?",
+        f"What are the sensor operating limits for {_FIRST_TAIL['A320-200']}?",
         "Sensor Operating Limits",
         "text2cypher",
     ),
     SampleQuestion(
-        "Show the maintenance summary for N54980C",
+        f"Show the maintenance summary for {_FIRST_TAIL['A321neo']}",
         "Maintenance Summary",
         "text2cypher",
     ),
     SampleQuestion(
-        "What faults do aircraft N95040A and N26760M share?",
+        "What faults do aircraft {} and {} share?".format(*_SHARED_FAULT_TAILS),
         "Shared Faults",
         "text2cypher",
     ),
     SampleQuestion(
-        "What maintenance manual applies to N30268B?",
+        f"What maintenance manual applies to {_FIRST_TAIL['A320-200']}?",
         "Manual Lookup",
         "text2cypher",
     ),
@@ -183,54 +403,15 @@ SAMPLE_QUESTIONS: list[SampleQuestion] = [
 
 
 # ---------------------------------------------------------------------------
-# Formatting helpers (matching samples.py style)
-# ---------------------------------------------------------------------------
-
-
-def _header(title: str, description: str) -> None:
-    print(f"\n{'=' * _W}")
-    print(f"  {title}")
-    print(f"{'=' * _W}")
-    print(f"\n  {description}\n")
-
-
-def _cypher_block(query: str) -> None:
-    lines = query.strip().splitlines()
-    indents = [len(ln) - len(ln.lstrip()) for ln in lines if ln.strip()]
-    base = min(indents) if indents else 0
-    print("  Generated Cypher:")
-    for ln in lines:
-        print(f"    {ln[base:]}")
-    print()
-
-
-def _result_table(records: list[dict[str, Any]], max_rows: int = 10) -> None:
-    if not records:
-        print("  (no results)\n")
-        return
-    keys = list(records[0].keys())
-    widths = []
-    for k in keys:
-        col_max = len(k)
-        for row in records[:max_rows]:
-            col_max = max(col_max, len(str(row.get(k, ""))))
-        widths.append(min(col_max + 1, 50))
-    print("  " + "  ".join(k.ljust(w) for k, w in zip(keys, widths, strict=False)))
-    print("  " + "  ".join("\u2500" * w for w in widths))
-    for row in records[:max_rows]:
-        cells = []
-        for k, w in zip(keys, widths, strict=False):
-            s = str(row.get(k, "")) if row.get(k) is not None else "\u2014"
-            if len(s) > w:
-                s = s[: w - 1] + "\u2026"
-            cells.append(s.ljust(w))
-        print("  " + "  ".join(cells))
-    print()
-
-
-# ---------------------------------------------------------------------------
 # LLM client abstraction
 # ---------------------------------------------------------------------------
+
+
+# Claude counts adaptive thinking toward max_tokens, so leave room for the
+# Cypher after it. "low" effort matches the extraction pipeline.
+_CHAT_MAX_TOKENS = 4000
+_CLAUDE_THINKING = {"type": "adaptive"}
+_CLAUDE_OUTPUT_CONFIG = {"effort": "low"}
 
 
 def _create_llm_client(
@@ -246,37 +427,32 @@ def _create_llm_client(
     """Return an LLM callable and an embed callable based on the provider."""
 
     if provider == "bedrock":
-        import json
-
         import boto3
+        from neo4j_graphrag.embeddings.bedrock import BedrockEmbeddings
 
-        client = boto3.client(
-            "bedrock-runtime", **({"region_name": region} if region else {})
-        )
+        client = boto3.client("bedrock-runtime", **({"region_name": region} if region else {}))
 
         def chat(system: str, user: str) -> str:
             resp = client.converse(
                 modelId=llm_model,
                 system=[{"text": system}],
                 messages=[{"role": "user", "content": [{"text": user}]}],
-                inferenceConfig={"maxTokens": 1000},
+                inferenceConfig={"maxTokens": _CHAT_MAX_TOKENS},
+                additionalModelRequestFields={
+                    "thinking": _CLAUDE_THINKING,
+                    "output_config": _CLAUDE_OUTPUT_CONFIG,
+                },
             )
-            return resp["output"]["message"]["content"][0]["text"]
+            # With thinking on, a reasoningContent block comes before the text.
+            content = resp["output"]["message"]["content"]
+            return next((block["text"] for block in content if "text" in block), "")
 
-        def embed(text: str) -> list[float]:
-            resp = client.invoke_model(
-                modelId=embedding_model,
-                accept="application/json",
-                contentType="application/json",
-                body=json.dumps(
-                    {
-                        "inputText": text,
-                        "dimensions": embedding_dimensions,
-                        "normalize": True,
-                    }
-                ),
-            )
-            return list(json.loads(resp["body"].read())["embedding"])
+        # The same embedder the pipeline uses for the chunk embeddings.
+        embed = BedrockEmbeddings(
+            model_id=embedding_model,
+            dimensions=embedding_dimensions,
+            region_name=region,
+        ).embed_query
 
     elif provider == "openai":
         from openai import OpenAI
@@ -312,11 +488,14 @@ def _create_llm_client(
         def chat(system: str, user: str) -> str:
             resp = anth_client.messages.create(
                 model=llm_model,
-                max_tokens=1000,
+                max_tokens=_CHAT_MAX_TOKENS,
+                thinking=_CLAUDE_THINKING,
+                output_config=_CLAUDE_OUTPUT_CONFIG,
                 system=system,
                 messages=[{"role": "user", "content": user}],
             )
-            return resp.content[0].text
+            # With thinking on, a thinking block comes before the text.
+            return next((block.text for block in resp.content if block.type == "text"), "")
 
         def embed(text: str) -> list[float]:
             resp = oai_client.embeddings.create(
@@ -359,25 +538,29 @@ def _extract_cypher(raw: str) -> str:
     # If no fencing, find the first line that looks like Cypher
     for i, ln in enumerate(text.splitlines()):
         upper = ln.strip().upper()
-        if upper.startswith(("MATCH", "OPTIONAL", "WITH", "CALL", "UNWIND", "RETURN", "CREATE", "MERGE")):
+        if upper.startswith(("MATCH", "OPTIONAL", "WITH", "CALL", "UNWIND", "RETURN")):
             return "\n".join(text.splitlines()[i:]).strip()
     return text
 
 
 _MAX_RETRIES = 2
+# Seconds the server lets one LLM-generated query run before it stops it.
+_GENERATED_QUERY_TIMEOUT = 30
 
 
 def _run_text2cypher(
     driver: Driver,
+    database: str,
     chat_fn,
+    prompt: str,
     question: str,
 ) -> None:
-    """Send a question to the LLM, generate Cypher, and execute it."""
-    print(f"  Question: \"{question}\"\n")
+    """Send a question with the system prompt to the LLM, then run the Cypher it returns."""
+    print(f'  Question: "{question}"\n')
 
     cypher = ""
     for attempt in range(_MAX_RETRIES):
-        raw = chat_fn(SYSTEM_PROMPT, question).strip()
+        raw = chat_fn(prompt, question).strip()
         cypher = _extract_cypher(raw)
         if cypher:
             break
@@ -388,29 +571,40 @@ def _run_text2cypher(
         print("  [SKIP] LLM returned empty Cypher after retries.\n")
         return
 
-    _cypher_block(cypher)
+    show_cypher(cypher, label="Generated Cypher")
 
+    # LLM-generated Cypher runs in a read transaction, so the server rejects
+    # any write it contains. The timeout stops a runaway query.
     try:
-        records, _, _ = driver.execute_query(cypher)
+        records, _, _ = driver.execute_query(
+            Query(cypher, timeout=_GENERATED_QUERY_TIMEOUT),
+            database_=database,
+            routing_=RoutingControl.READ,
+        )
         rows = [dict(r) for r in records]
-        _result_table(rows)
-    except Exception as exc:
-        print(f"  [ERROR] Cypher execution failed: {exc}\n")
+        records_table(rows)
+    except Neo4jError as exc:
+        print(f"  [ERROR] Cypher execution failed: {exc.code}: {exc.message}\n")
 
 
 def _run_similarity_search(
     driver: Driver,
+    database: str,
     chat_fn,
     embed_fn,
     question: str,
     top_k: int = 5,
 ) -> None:
     """Embed the question and run a vector similarity search over chunks."""
-    print(f"  Question: \"{question}\"\n")
+    print(f'  Question: "{question}"\n')
 
-    # Rewrite question into a search phrase
+    # Rewrite question into a search phrase. An empty rewrite would embed
+    # an empty string, so fall back to the original question.
     search_phrase = chat_fn(VECTOR_SEARCH_PROMPT, question).strip()
-    print(f"  Search phrase: \"{search_phrase}\"\n")
+    if not search_phrase:
+        print("  [WARN] Empty search phrase from the LLM. Using the question.")
+        search_phrase = question
+    print(f'  Search phrase: "{search_phrase}"\n')
 
     embedding = embed_fn(search_phrase)
 
@@ -434,16 +628,33 @@ LIMIT $top_k"""
 
     try:
         records, _, _ = driver.execute_query(
-            query, embedding=embedding, top_k=top_k,
+            query,
+            embedding=embedding,
+            top_k=top_k,
+            database_=database,
         )
         rows = [dict(r) for r in records]
         if rows:
             for r in rows:
                 r["score"] = f"{r['score']:.4f}"
-        _result_table(rows)
-    except Exception as exc:
-        print(f"  [ERROR] Vector search failed: {exc}\n")
-        print("  (vector index may not be available \u2014 run 'setup' first)\n")
+        records_table(rows)
+    except Neo4jError as exc:
+        report_query_error(driver, database, exc, "maintenanceChunkEmbeddings")
+
+
+def _text2cypher_prompt(driver: Driver, database: str) -> str | None:
+    """Return the text2cypher system prompt, or None if the schema read fails."""
+    try:
+        return system_prompt(graph_schema(driver, database))
+    except Neo4jError as exc:
+        print(f"  [ERROR] Schema read failed: {exc.code}: {exc.message}")
+        print("  (the text2cypher questions are skipped)\n")
+        return None
+    except DriverError as exc:
+        # A dropped connection, such as ServiceUnavailable, has no code.
+        print(f"  [ERROR] Schema read failed: {exc}")
+        print("  (the text2cypher questions are skipped)\n")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +664,7 @@ LIMIT $top_k"""
 
 def run_agent_samples(
     driver: Driver,
+    database: str,
     *,
     provider: str,
     openai_key: str | None = None,
@@ -478,23 +690,33 @@ def run_agent_samples(
     if sample_size > 0:
         questions = questions[:sample_size]
 
-    print(f"\n{'#' * _W}")
+    print(f"\n{'#' * WIDTH}")
     print("  Aircraft Digital Twin \u2014 Agent Simulation")
-    print(f"{'#' * _W}")
+    print(f"{'#' * WIDTH}")
     print(f"\n  LLM: {provider}/{llm_model}")
     print(f"  Questions: {len(questions)}\n")
+
+    # The schema is read only for text2cypher questions. If the read fails,
+    # those questions are skipped and the rest still run.
+    prompt = None
+    if any(sq.tool == "text2cypher" for sq in questions):
+        prompt = _text2cypher_prompt(driver, database)
 
     current_category = ""
     for i, sq in enumerate(questions, 1):
         if sq.category != current_category:
             current_category = sq.category
-            _header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
+            header(f"{i}. [{sq.tool}] {sq.category}", f"Tool: {sq.tool}")
 
         if sq.tool == "text2cypher":
-            _run_text2cypher(driver, chat_fn, sq.question)
+            if prompt is None:
+                print(f'  Question: "{sq.question}"\n')
+                print("  [SKIP] No graph schema; see the error above.\n")
+            else:
+                _run_text2cypher(driver, database, chat_fn, prompt, sq.question)
         elif sq.tool == "similarity_search":
-            _run_similarity_search(driver, chat_fn, embed_fn, sq.question)
+            _run_similarity_search(driver, database, chat_fn, embed_fn, sq.question)
 
-    print(f"{'#' * _W}")
+    print(f"{'#' * WIDTH}")
     print("  Agent simulation complete.")
-    print(f"{'#' * _W}\n")
+    print(f"{'#' * WIDTH}\n")

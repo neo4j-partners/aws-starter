@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Machine-to-Machine Auth</title>
+  <desc>Step 1: the agent posts the client credentials grant to Cognito and gets a JWT. Step 2: the agent sends an MCP request with the JWT to the Gateway, which validates it. Step 3: the Gateway gets a Runtime token from the OAuth2 credential provider and forwards the request. Step 4: the Runtime validates that token, the MCP server runs read-only Cypher on Neo4j, and the response returns through the Runtime and the Gateway.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="900" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Machine-to-Machine Auth</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Two tokens from one machine client. No user ever logs in.</text>
+  <line x1="120" y1="168" x2="120" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <line x1="346" y1="168" x2="346" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <line x1="572" y1="168" x2="572" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <line x1="798" y1="168" x2="798" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <line x1="1024" y1="168" x2="1024" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <line x1="1250" y1="168" x2="1250" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <line x1="1476" y1="168" x2="1476" y2="870" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="5 6"/>
+  <rect x="25.0" y="110" width="190" height="58" rx="12" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="120" y="145" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="middle">Agent</text>
+  <rect x="251.0" y="110" width="190" height="58" rx="12" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="346" y="145" font-size="16" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Cognito</text>
+  <rect x="477.0" y="110" width="190" height="58" rx="12" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="572" y="145" font-size="16" font-weight="700" fill="#8A4B08" text-anchor="middle">AgentCore Gateway</text>
+  <rect x="703.0" y="110" width="190" height="58" rx="12" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="798" y="145" font-size="16" font-weight="700" fill="#4A2EB0" text-anchor="middle">OAuth2 provider</text>
+  <rect x="929.0" y="110" width="190" height="58" rx="12" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1024" y="145" font-size="16" font-weight="700" fill="#4A2EB0" text-anchor="middle">AgentCore Runtime</text>
+  <rect x="1155.0" y="110" width="190" height="58" rx="12" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1250" y="145" font-size="16" font-weight="700" fill="#4A2EB0" text-anchor="middle">Neo4j MCP server</text>
+  <rect x="1381.0" y="110" width="190" height="58" rx="12" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1476" y="145" font-size="16" font-weight="700" fill="#00594A" text-anchor="middle">Neo4j</text>
+  <rect x="40" y="190" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <text x="54" y="209" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">1. Get a token</text>
+  <path d="M120,252 H340" fill="none" stroke="#D97706" stroke-width="2" marker-end="url(#a-orange)"/>
+  <rect x="89" y="228" width="288" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="233.0" y="243" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">POST /oauth2/token, client_credentials</text>
+  <path d="M346,296 H126" fill="none" stroke="#D97706" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
+  <rect x="158" y="272" width="151" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="233.0" y="287" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">access token, a JWT</text>
+  <rect x="40" y="320" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <text x="54" y="339" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">2. Call the Gateway</text>
+  <path d="M120,382 H566" fill="none" stroke="#2E6DB4" stroke-width="2" marker-end="url(#a-blue)"/>
+  <rect x="256" y="358" width="180" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="346.0" y="373" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">MCP request, Bearer JWT</text>
+  <path d="M572,412 H612 V436 H578" fill="none" stroke="#D97706" stroke-width="2" marker-end="url(#a-orange)"/>
+  <rect x="615" y="414" width="237" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="622" y="429" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="start">check issuer and allowed client</text>
+  <rect x="40" y="458" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <text x="54" y="477" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">3. Gateway to Runtime</text>
+  <path d="M572,520 H792" fill="none" stroke="#7A5AF8" stroke-width="2" marker-end="url(#a-purple)"/>
+  <rect x="610" y="496" width="151" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="685.0" y="511" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">get a Runtime token</text>
+  <path d="M798,564 H578" fill="none" stroke="#7A5AF8" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-purple)"/>
+  <rect x="635" y="540" width="100" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="685.0" y="555" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">access token</text>
+  <path d="M572,608 H1018" fill="none" stroke="#7A5AF8" stroke-width="2" marker-end="url(#a-purple)"/>
+  <rect x="672" y="584" width="252" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="798.0" y="599" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">forward the request, Bearer token</text>
+  <rect x="40" y="632" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <text x="54" y="651" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">4. Run the tool</text>
+  <path d="M1024,668 H1064 V692 H1030" fill="none" stroke="#7A5AF8" stroke-width="2" marker-end="url(#a-purple)"/>
+  <rect x="1067" y="670" width="158" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1074" y="685" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="start">check allowed client</text>
+  <path d="M1024,726 H1244" fill="none" stroke="#7A5AF8" stroke-width="2" marker-end="url(#a-purple)"/>
+  <rect x="1083" y="702" width="108" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1137.0" y="717" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">MCP tool call</text>
+  <path d="M1250,770 H1470" fill="none" stroke="#008C72" stroke-width="2" marker-end="url(#a-teal)"/>
+  <rect x="1298" y="746" width="129" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1363.0" y="761" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">read-only Cypher</text>
+  <path d="M1476,812 H1256" fill="none" stroke="#008C72" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-teal)"/>
+  <rect x="1331" y="788" width="64" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1363.0" y="803" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">records</text>
+  <path d="M1250,856 H126" fill="none" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <rect x="484" y="832" width="403" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="685.0" y="847" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">MCP response, back through the Runtime and the Gateway</text>
+</svg>

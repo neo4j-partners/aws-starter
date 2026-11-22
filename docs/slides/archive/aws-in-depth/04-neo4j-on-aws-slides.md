@@ -56,11 +56,10 @@ Amazon Bedrock AgentCore is purpose-built to run AI agents and their tools:
 
 ## The Neo4j MCP Server
 
-- Open-source server from Neo4j: [github.com/neo4j/mcp](https://github.com/neo4j/mcp)
+- Open-source `mcp-neo4j-cypher` server: [github.com/neo4j-partners/mcp-neo4j](https://github.com/neo4j-partners/mcp-neo4j)
 - Exposes a Neo4j database to any MCP-capable agent
 - Speaks the streamable HTTP MCP transport
-- Verifies database connectivity on startup and exits immediately if it cannot connect
-- Database credentials are passed to the container as environment variables, never to the agent
+- Reads the Neo4j password from Secrets Manager at startup, never from the agent
 
 ---
 

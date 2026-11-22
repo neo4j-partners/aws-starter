@@ -3,11 +3,31 @@
 from __future__ import annotations
 
 import csv
+import errno
+import fcntl
+import json
+import logging
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass, field
+from itertools import batched
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
-from neo4j import Driver
+from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
+
+from generator.stamp import (
+    LOCK_NAME,
+    STAMP_NAME,
+    GenerateRunningError,
+    read_stamp,
+    stamp_differences,
+)
+
+from .schema import CONSTRAINTS, EXTRACTION_CONSTRAINTS, UNIQUENESS_CONSTRAINT_TYPES
+
+logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 1000
 OPERATIONAL_LABELS = [
@@ -32,7 +52,7 @@ ENRICHMENT_LABELS = [
     "MaintenanceProcedure",
     "OperatingLimit",
 ]
-RELATIONSHIP_TYPES = [
+OPERATIONAL_RELATIONSHIP_TYPES = [
     "HAS_SYSTEM",
     "HAS_COMPONENT",
     "HAS_SENSOR",
@@ -46,6 +66,8 @@ RELATIONSHIP_TYPES = [
     "AFFECTS_AIRCRAFT",
     "HAS_REMOVAL",
     "REMOVED_COMPONENT",
+]
+ENRICHMENT_RELATIONSHIP_TYPES = [
     "FROM_DOCUMENT",
     "APPLIES_TO",
     "DESCRIBES_MODEL",
@@ -53,55 +75,51 @@ RELATIONSHIP_TYPES = [
     "DESCRIBES_COMPONENT",
     "HAS_LIMIT",
 ]
+RELATIONSHIP_TYPES = [*OPERATIONAL_RELATIONSHIP_TYPES, *ENRICHMENT_RELATIONSHIP_TYPES]
 REQUIRED_INDEXES = [
     "maintenanceChunkEmbeddings",
     "maintenanceChunkText",
 ]
-REQUIRED_CONSTRAINTS = [
-    ("Aircraft", "aircraft_id"),
-    ("System", "system_id"),
-    ("Component", "component_id"),
-    ("Sensor", "sensor_id"),
-    ("Reading", "reading_id"),
-    ("Airport", "airport_id"),
-    ("Flight", "flight_id"),
-    ("Delay", "delay_id"),
-    ("MaintenanceEvent", "event_id"),
-    ("Removal", "removal_id"),
-    ("Document", "documentId"),
-    ("AircraftModel", "name"),
-    ("SystemReference", "name"),
-    ("ComponentReference", "name"),
-    ("Fault", "name"),
-    ("MaintenanceProcedure", "name"),
-    ("OperatingLimit", "name"),
-]
+REQUIRED_CONSTRAINTS = [*CONSTRAINTS, *EXTRACTION_CONSTRAINTS]
 
 # ---------------------------------------------------------------------------
 # CSV helpers
 # ---------------------------------------------------------------------------
 
 
-def read_csv(data_dir: Path, filename: str) -> list[dict[str, Any]]:
-    """Read a CSV file and return a list of row dicts."""
-    path = data_dir / filename
-    with open(path, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def iter_csv_batches(data_dir: Path, filename: str) -> Iterator[list[dict[str, str]]]:
+    """Stream a CSV file as lists of at most BATCH_SIZE row dicts.
+
+    Only one batch is held in memory at a time. Full-mode readings reach
+    about 1.7M rows, so reading the whole file at once is too costly.
+    """
+    with (data_dir / filename).open(newline="", encoding="utf-8") as f:
+        for batch in batched(csv.DictReader(f), BATCH_SIZE):
+            yield list(batch)
 
 
-def _run_in_batches(driver: Driver, records: list[dict], query: str) -> None:
-    """Execute a Cypher query over records in batches of BATCH_SIZE."""
-    total = len(records)
-    for i in range(0, total, BATCH_SIZE):
-        batch = records[i : i + BATCH_SIZE]
-        driver.execute_query(query, batch=batch)
-        progress = min(i + BATCH_SIZE, total)
-        print(f"  Progress: {progress}/{total} ({100 * progress // total}%)", end="\r")
+def _run_in_batches(
+    driver: Driver, database: str, batches: Iterator[list[dict[str, str]]], query: str
+) -> tuple[int, int]:
+    """Execute a Cypher query once per batch.
+
+    Returns the total row count and the number of skipped rows. A query
+    reports skipped rows by returning a ``skipped`` column.
+    """
+    total = skipped = 0
+    for batch in batches:
+        records, _, _ = driver.execute_query(query, batch=batch, database_=database)
+        skipped += sum(record.get("skipped", 0) for record in records)
+        total += len(batch)
+        print(f"  Progress: {total:,} rows", end="\r")
     print()
+    return total, skipped
 
 
 # ---------------------------------------------------------------------------
-# Node loading — matches notebook 02 Cypher exactly
+# Node loading. Reading rows also create their HAS_READING relationship,
+# so the large readings CSV is read only once. A reading whose sensor_id
+# matches no Sensor is skipped and counted.
 # ---------------------------------------------------------------------------
 
 _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
@@ -157,10 +175,17 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
         "nodes_readings.csv",
         """
         UNWIND $batch AS row
-        MERGE (r:Reading {reading_id: row['reading_id']})
-        SET r.sensor_id = row['sensor_id'],
-            r.timestamp = row['ts'],
-            r.value = toFloat(row['value'])
+        OPTIONAL MATCH (s:Sensor {sensor_id: row['sensor_id']})
+        CALL (row, s) {
+            WITH row, s
+            WHERE s IS NOT NULL
+            MERGE (r:Reading {reading_id: row['reading_id']})
+            SET r.sensor_id = row['sensor_id'],
+                r.timestamp = row['ts'],
+                r.value = toFloat(row['value'])
+            MERGE (s)-[:HAS_READING]->(r)
+        }
+        RETURN count(*) - count(s) AS skipped
         """,
     ),
     (
@@ -223,7 +248,7 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
         "nodes_removals.csv",
         """
         UNWIND $batch AS row
-        MERGE (r:Removal {removal_id: row[':ID(RemovalEvent)']})
+        MERGE (r:Removal {removal_id: row[':ID(Removal)']})
         SET r.tracking_number = row['RMV_TRK_NO'],
             r.component_id = row['component_id'],
             r.aircraft_id = row['aircraft_id'],
@@ -233,9 +258,9 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
             r.technician_id = row['technician_id'],
             r.part_number = row['part_number'],
             r.serial_number = row['serial_number'],
-            r.tsn = toFloat(row['time_since_install']),
+            r.hours_since_install = toFloat(row['time_since_install']),
             r.flight_hours_at_removal = toFloat(row['flight_hours_at_removal']),
-            r.csn = toInteger(row['flight_cycles_at_removal']),
+            r.flight_cycles_at_removal = toInteger(row['flight_cycles_at_removal']),
             r.replacement_required = toBoolean(row['replacement_required']),
             r.shop_visit_required = toBoolean(row['shop_visit_required']),
             r.warranty_status = row['warranty_status'],
@@ -247,7 +272,7 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Relationship loading — matches notebook 02 Cypher exactly
+# Relationship loading. The Cypher matches notebook 02 exactly.
 # ---------------------------------------------------------------------------
 
 _REL_DEFINITIONS: list[tuple[str, str, str]] = [
@@ -289,16 +314,6 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         MATCH (c:Component {component_id: row[':START_ID(Component)']})
         MATCH (m:MaintenanceEvent {event_id: row[':END_ID(MaintenanceEvent)']})
         MERGE (c)-[:HAS_EVENT]->(m)
-        """,
-    ),
-    (
-        "HAS_READING",
-        "nodes_readings.csv",
-        """
-        UNWIND $batch AS row
-        MATCH (s:Sensor {sensor_id: row['sensor_id']})
-        MATCH (r:Reading {reading_id: row['reading_id']})
-        MERGE (s)-[:HAS_READING]->(r)
         """,
     ),
     (
@@ -367,7 +382,7 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         """
         UNWIND $batch AS row
         MATCH (a:Aircraft {aircraft_id: row[':START_ID(Aircraft)']})
-        MATCH (r:Removal {removal_id: row[':END_ID(RemovalEvent)']})
+        MATCH (r:Removal {removal_id: row[':END_ID(Removal)']})
         MERGE (a)-[:HAS_REMOVAL]->(r)
         """,
     ),
@@ -376,8 +391,8 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
         "rels_component_removal.csv",
         """
         UNWIND $batch AS row
-        MATCH (r:Removal {removal_id: row[':END_ID(RemovalEvent)']})
-        MATCH (c:Component {component_id: row[':START_ID(Component)']})
+        MATCH (r:Removal {removal_id: row[':START_ID(Removal)']})
+        MATCH (c:Component {component_id: row[':END_ID(Component)']})
         MERGE (r)-[:REMOVED_COMPONENT]->(c)
         """,
     ),
@@ -388,58 +403,237 @@ _REL_DEFINITIONS: list[tuple[str, str, str]] = [
 # ---------------------------------------------------------------------------
 
 
-def load_nodes(driver: Driver, data_dir: Path) -> None:
-    """Load all 10 node types from CSV files."""
+def load_nodes(driver: Driver, database: str, data_dir: Path) -> int:
+    """Load every operational node type from its CSV file.
+
+    Returns the number of skipped rows, which are readings with an unknown
+    sensor_id.
+    """
+    skipped_total = 0
     for label, filename, query in _NODE_DEFINITIONS:
-        print(f"Loading {label} nodes...")
-        records = read_csv(data_dir, filename)
-        _run_in_batches(driver, records, query)
-        print(f"  [OK] Loaded {len(records)} {label} nodes.")
-
-
-def load_relationships(driver: Driver, data_dir: Path) -> None:
-    """Load all 13 relationship types from CSV files."""
-    for rel_type, filename, query in _REL_DEFINITIONS:
-        print(f"Loading {rel_type} relationships...")
-        records = read_csv(data_dir, filename)
-        _run_in_batches(driver, records, query)
-        print(f"  [OK] Loaded {len(records)} {rel_type} relationships.")
-
-
-def clear_database(driver: Driver) -> None:
-    """Delete all nodes and relationships in batches."""
-    print("Clearing database...")
-    deleted_total = 0
-    while True:
-        records, _, _ = driver.execute_query(
-            "MATCH (n) WITH n LIMIT 500 DETACH DELETE n RETURN count(*) AS deleted"
+        logger.info("Loading %s nodes...", label)
+        count, skipped = _run_in_batches(
+            driver, database, iter_csv_batches(data_dir, filename), query
         )
-        count = records[0]["deleted"]
-        deleted_total += count
-        if count > 0:
-            print(f"  Deleted {deleted_total} nodes so far...", end="\r")
-        if count == 0:
-            break
-    print(f"\n  [OK] Database cleared ({deleted_total} nodes deleted).")
+        skipped_total += skipped
+        logger.info("  [OK] Loaded %d %s nodes.", count - skipped, label)
+    return skipped_total
 
 
-def _get_label_counts(driver: Driver) -> dict[str, int]:
+def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
+    """Load every operational relationship type from its CSV file."""
+    for index, (rel_type, filename, query) in enumerate(_REL_DEFINITIONS):
+        # The CLI starts the relationship phase with a blank line.
+        logger.info("Loading %s relationships...", rel_type, extra={"blank_before": index == 0})
+        count, _ = _run_in_batches(driver, database, iter_csv_batches(data_dir, filename), query)
+        logger.info("  [OK] Loaded %d %s relationships.", count, rel_type)
+
+
+def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
+    """Load all operational nodes, then all relationships, then report skips.
+
+    The generator stamp is recorded last on a Dataset node, so verify can
+    tell which generated run the graph holds. The old node is removed first,
+    so a load that fails partway leaves none.
+
+    Raises:
+        GenerateRunningError: If a generate is running in data_dir.
+    """
+    with _shared_lock(data_dir):
+        _load_operational_graph(driver, database, data_dir)
+
+
+@contextmanager
+def _shared_lock(data_dir: Path) -> Iterator[None]:
+    """Hold data_dir's generate lock shared, or fail at once if a generate holds it.
+
+    A generate publishes its CSVs one at a time under the exclusive lock, so
+    a load without this lock could read a mix of old and new files.
+
+    When the lock file is missing and data_dir is read-only, the load runs
+    without the lock. A generate cannot publish into that directory either.
+
+    Raises:
+        GenerateRunningError: If a generate holds the lock.
+    """
+    path = data_dir / LOCK_NAME
+    if (handle := _open_lock_file(path)) is None:
+        logger.warning("[WARN] Cannot create %s, so the load runs without the generate lock.", path)
+        yield
+        return
+    with handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise GenerateRunningError(f"a generate is running in {data_dir}") from exc
+        yield
+
+
+def _open_lock_file(path: Path) -> TextIO | None:
+    """Open the lock file read-only, creating it only when it is missing.
+
+    flock works on a read-only file, so a load never needs write access to
+    an existing lock. Returns None when the file is missing and its
+    directory refuses new files with EACCES or EROFS.
+    """
+    with suppress(FileNotFoundError):
+        return path.open("r")
+    try:
+        return path.open("a")
+    except OSError as exc:
+        if exc.errno in (errno.EACCES, errno.EROFS):
+            return None
+        raise
+
+
+def _load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
+    """Do the load for load_operational_graph, with the lock already held."""
+    stamp = read_stamp(data_dir)
+    driver.execute_query("MATCH (d:Dataset) DETACH DELETE d", database_=database)
+    skipped = load_nodes(driver, database, data_dir)
+    load_relationships(driver, database, data_dir)
+    if skipped:
+        logger.warning(
+            "[WARN] Skipped %s readings whose sensor_id matches no Sensor.",
+            f"{skipped:,}",
+            extra={"blank_before": True},
+        )
+    else:
+        logger.info("[OK] No readings skipped.", extra={"blank_before": True})
+    if stamp is None:
+        logger.warning(
+            "[WARN] %s has no %s, so the graph gets no Dataset node.", data_dir, STAMP_NAME
+        )
+        return
+    driver.execute_query(
+        """
+        MERGE (d:Dataset {id: 'current'})
+        SET d += {generator_hash: $hash, stamp: $stamp, loaded_at: datetime()}
+        """,
+        hash=stamp.get("generator_hash"),
+        stamp=json.dumps(stamp, sort_keys=True),
+        database_=database,
+    )
+    logger.info("[OK] Recorded the generator stamp on a Dataset node.")
+
+
+def dataset_mismatch(driver: Driver, database: str, data_dir: Path) -> str | None:
+    """Return why the graph's Dataset node does not match data_dir's stamp.
+
+    Returns None when they match, or when data_dir has no stamp, since
+    stale_reason already reports that.
+    """
+    # The label or property may not exist yet, so the UNRECOGNIZED notice
+    # is expected noise.
+    with driver.session(
+        database=database,
+        default_access_mode=READ_ACCESS,
+        notifications_disabled_classifications=[NotificationDisabledClassification.UNRECOGNIZED],
+    ) as session:
+        stored = session.execute_read(
+            lambda tx: [r["stamp"] for r in tx.run("MATCH (d:Dataset) RETURN d.stamp AS stamp")]
+        )
+    if not stored:
+        return (
+            "the graph has no Dataset node (loaded before stamps, from unstamped CSVs,"
+            " or a load did not finish)"
+        )
+    if len(stored) > 1:
+        return f"the graph has {len(stored)} Dataset nodes, where a load writes one"
+    local = read_stamp(data_dir)
+    if local is None:
+        return None
+    try:
+        graph = json.loads(stored[0])
+    except (TypeError, ValueError):
+        graph = None
+    if not isinstance(graph, dict):
+        return "the graph's Dataset node has no readable stamp"
+    if differs := stamp_differences(graph, local):
+        return (
+            f"the graph was loaded from a run with a different {', '.join(differs)} than {data_dir}"
+        )
+    return None
+
+
+# Rows deleted per inner transaction when clearing nodes. DETACH DELETE also
+# removes every relationship on each node, so a larger batch can exceed the
+# transaction memory limit on small Aura tiers.
+_DELETE_BATCH_SIZE = 1000
+# Relationships deleted per inner transaction. Each row is one relationship,
+# so the transaction size stays bounded however dense the nodes are.
+_RELATIONSHIP_DELETE_BATCH_SIZE = 10_000
+
+
+def detach_delete_nodes(driver: Driver, database: str, label: str | None = None) -> int:
+    """Detach-delete every node, or every node with ``label``, in batches.
+
+    ``CALL ... IN TRANSACTIONS`` must run in an auto-commit transaction, so
+    this uses ``session.run`` rather than ``execute_query``.
+
+    Returns:
+        The number of nodes deleted.
+    """
+    pattern = f"(n:{label})" if label else "(n)"
+    query = (
+        f"MATCH {pattern} "
+        "CALL (n) { DETACH DELETE n } "
+        f"IN TRANSACTIONS OF {_DELETE_BATCH_SIZE} ROWS"
+    )
+    with driver.session(database=database) as session:
+        summary = session.run(query).consume()
+    return summary.counters.nodes_deleted
+
+
+def delete_all_relationships(driver: Driver, database: str) -> int:
+    """Delete every relationship in batches and return how many were deleted.
+
+    Like ``detach_delete_nodes``, this needs an auto-commit transaction.
+    """
+    query = (
+        "MATCH ()-[r]->() "
+        "CALL (r) { DELETE r } "
+        f"IN TRANSACTIONS OF {_RELATIONSHIP_DELETE_BATCH_SIZE} ROWS"
+    )
+    with driver.session(database=database) as session:
+        summary = session.run(query).consume()
+    return summary.counters.relationships_deleted
+
+
+def clear_database(driver: Driver, database: str) -> None:
+    """Delete all relationships, then all nodes, in batches.
+
+    Deleting relationships first bounds each transaction. A detach-delete
+    batch of dense nodes, such as Sensors with thousands of readings, can
+    otherwise exceed the heap.
+    """
+    logger.info("Clearing database...")
+    relationships = delete_all_relationships(driver, database)
+    nodes = detach_delete_nodes(driver, database)
+    logger.info(
+        "  [OK] Database cleared (%d relationships, %d nodes deleted).", relationships, nodes
+    )
+
+
+def _get_label_counts(driver: Driver, database: str) -> dict[str, int]:
     records, _, _ = driver.execute_query(
         """
         MATCH (n)
         UNWIND labels(n) AS label
         RETURN label, count(n) AS count
-        """
+        """,
+        database_=database,
     )
     return {record["label"]: record["count"] for record in records}
 
 
-def _get_relationship_counts(driver: Driver) -> dict[str, int]:
+def _get_relationship_counts(driver: Driver, database: str) -> dict[str, int]:
     records, _, _ = driver.execute_query(
         """
         MATCH ()-[r]->()
         RETURN type(r) AS rel_type, count(r) AS count
-        """
+        """,
+        database_=database,
     )
     return {record["rel_type"]: record["count"] for record in records}
 
@@ -452,35 +646,35 @@ def _print_count_section(title: str, counts: dict[str, int]) -> None:
     print(f"  Total: {sum(counts.values()):,}")
 
 
-def _has_constraint(
-    constraint_rows: list[dict[str, Any]], label: str, property_name: str
-) -> bool:
+def _has_constraint(constraint_rows: list[dict[str, Any]], label: str, property_name: str) -> bool:
     return any(
-        row["type"] == "UNIQUENESS"
+        row["type"] in UNIQUENESS_CONSTRAINT_TYPES
         and row["labelsOrTypes"] == [label]
         and row["properties"] == [property_name]
         for row in constraint_rows
     )
 
 
-def _warn_or_fail(
-    failures: list[str],
-    warnings: list[str],
-    condition: bool,
-    message: str,
-    *,
-    strict: bool,
-) -> None:
-    if condition:
-        return
-    if strict:
-        failures.append(message)
-    else:
-        warnings.append(message)
+@dataclass
+class _VerifyResult:
+    """Failed checks, collected as failures in strict mode and warnings otherwise."""
+
+    strict: bool
+    failures: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    def check(self, condition: bool, message: str) -> None:
+        if condition:
+            return
+        if self.strict:
+            self.failures.append(message)
+        else:
+            self.warnings.append(message)
 
 
 def _verify_vector_search(
     driver: Driver,
+    database: str,
     *,
     has_chunk_embeddings: bool,
     has_vector_index: bool,
@@ -491,7 +685,8 @@ def _verify_vector_search(
         return False, "missing maintenanceChunkEmbeddings index"
 
     try:
-        records, _, _ = driver.execute_query("""
+        records, _, _ = driver.execute_query(
+            """
             MATCH (c:Chunk)
             WHERE c.embedding IS NOT NULL
             WITH c.embedding AS embedding
@@ -503,7 +698,9 @@ def _verify_vector_search(
             )
             YIELD node, score
             RETURN count(node) AS count, max(score) AS score
-        """)
+        """,
+            database_=database,
+        )
     except Neo4jError as exc:
         return False, str(exc)
 
@@ -514,65 +711,108 @@ def _verify_vector_search(
     return True, f"{count} result(s), best score={score:.4f}"
 
 
-def verify(
-    driver: Driver,
-    *,
-    expected_embedding_dimensions: int = 1536,
-    strict: bool = False,
-) -> bool:
-    """Print comprehensive graph verification and return whether it passed."""
-    failures: list[str] = []
-    warnings: list[str] = []
+# (name, query, labels it needs, relationship types it needs). A check whose
+# labels or relationship types are absent counts 0 without running.
+_ORPHAN_CHECKS = [
+    (
+        "Readings without Sensor",
+        "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) RETURN count(r) AS count",
+        {"Reading", "Sensor"},
+        {"HAS_READING"},
+    ),
+    (
+        "Flights without Aircraft",
+        "MATCH (f:Flight) WHERE NOT (f)<-[:OPERATES_FLIGHT]-(:Aircraft) RETURN count(f) AS count",
+        {"Flight", "Aircraft"},
+        {"OPERATES_FLIGHT"},
+    ),
+    (
+        "Components without System",
+        "MATCH (c:Component) WHERE NOT (c)<-[:HAS_COMPONENT]-(:System) RETURN count(c) AS count",
+        {"Component", "System"},
+        {"HAS_COMPONENT"},
+    ),
+    (
+        "Sensors without Readings",
+        "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) RETURN count(s) AS count",
+        {"Sensor", "Reading"},
+        {"HAS_READING"},
+    ),
+    (
+        "Documents without Chunks",
+        "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) RETURN count(d) AS count",
+        {"Document", "Chunk"},
+        {"FROM_DOCUMENT"},
+    ),
+]
 
-    label_counts = _get_label_counts(driver)
-    relationship_counts = _get_relationship_counts(driver)
-    operational_counts = {
-        label: label_counts.get(label, 0) for label in OPERATIONAL_LABELS
-    }
-    enrichment_counts = {
-        label: label_counts.get(label, 0) for label in ENRICHMENT_LABELS
-    }
-    rel_counts = {
-        rel_type: relationship_counts.get(rel_type, 0)
-        for rel_type in RELATIONSHIP_TYPES
-    }
 
-    print()
-    print("=" * 60)
-    print("Verification")
-    print("=" * 60)
+def _check_counts(
+    label_counts: dict[str, int], rel_counts: dict[str, int], result: _VerifyResult
+) -> None:
+    operational_counts = {label: label_counts.get(label, 0) for label in OPERATIONAL_LABELS}
+    enrichment_counts = {label: label_counts.get(label, 0) for label in ENRICHMENT_LABELS}
     _print_count_section("Operational Node Counts", operational_counts)
     _print_count_section("Enrichment Node Counts", enrichment_counts)
     _print_count_section("Relationship Counts", rel_counts)
 
     for label in OPERATIONAL_LABELS:
-        _warn_or_fail(
-            failures,
-            warnings,
-            operational_counts[label] > 0,
-            f"{label} has no nodes",
-            strict=strict,
-        )
-
-    for rel_type in RELATIONSHIP_TYPES[:13]:
-        _warn_or_fail(
-            failures,
-            warnings,
-            rel_counts[rel_type] > 0,
-            f"{rel_type} has no relationships",
-            strict=strict,
-        )
-
+        result.check(operational_counts[label] > 0, f"{label} has no nodes")
+    for rel_type in OPERATIONAL_RELATIONSHIP_TYPES:
+        result.check(rel_counts[rel_type] > 0, f"{rel_type} has no relationships")
     for label in ("Document", "Chunk", "AircraftModel", "OperatingLimit"):
-        _warn_or_fail(
-            failures,
-            warnings,
-            enrichment_counts[label] > 0,
-            f"{label} has no enrichment nodes",
-            strict=strict,
-        )
+        result.check(enrichment_counts[label] > 0, f"{label} has no enrichment nodes")
 
-    if enrichment_counts["Chunk"] > 0:
+
+def _csv_row_count(path: Path) -> int:
+    """Count a CSV's records the way the loader reads them."""
+    with path.open(newline="", encoding="utf-8") as f:
+        return sum(1 for _ in csv.DictReader(f))
+
+
+def _check_csv_counts(label_counts: dict[str, int], data_dir: Path, result: _VerifyResult) -> None:
+    """Compare each operational label's node count with its CSV's row count.
+
+    The load MERGEs into whatever the graph holds, so a direct load over an
+    earlier, larger dataset leaves extra nodes. They show up here.
+    """
+    files = [(label, filename) for label, filename, _ in _NODE_DEFINITIONS]
+    if not any((data_dir / filename).is_file() for _, filename in files):
+        result.check(
+            False, f"{data_dir} has no node CSVs, so node counts were not compared with them"
+        )
+        return
+    matched = True
+    for label, filename in files:
+        path = data_dir / filename
+        if not path.is_file():
+            matched = False
+            result.check(
+                False,
+                f"{filename} is missing from {data_dir}, so the {label} count was not compared",
+            )
+            continue
+        rows = _csv_row_count(path)
+        nodes = label_counts.get(label, 0)
+        if nodes != rows:
+            matched = False
+            result.check(
+                False,
+                f"{label} has {nodes:,} nodes, but {filename} in {data_dir} has {rows:,} rows",
+            )
+    if matched:
+        print(f"\n[OK] Node counts match the CSVs in {data_dir}.")
+
+
+def _check_embeddings(
+    driver: Driver,
+    database: str,
+    chunk_count: int,
+    expected_dimensions: int,
+    result: _VerifyResult,
+) -> int:
+    """Check chunk embeddings and return how many chunks have one."""
+    if chunk_count > 0:
         embedding_records, _, _ = driver.execute_query(
             """
             MATCH (c:Chunk)
@@ -580,7 +820,8 @@ def verify(
                    count(c.embedding) AS with_embedding,
                    count(CASE WHEN c.embedding IS NULL THEN 1 END) AS missing_embedding,
                    collect(DISTINCT size(c.embedding)) AS dimensions
-            """
+            """,
+            database_=database,
         )
         embedding_row = embedding_records[0]
         bad_dim_records, _, _ = driver.execute_query(
@@ -590,7 +831,8 @@ def verify(
               AND size(c.embedding) <> $expected_dimensions
             RETURN count(c) AS count
             """,
-            expected_dimensions=expected_embedding_dimensions,
+            expected_dimensions=expected_dimensions,
+            database_=database,
         )
         bad_dimensions = bad_dim_records[0]["count"]
     else:
@@ -610,33 +852,25 @@ def verify(
     print(f"  Dimensions found: {dimensions}")
     print(f"  Wrong-dimension embeddings: {bad_dimensions:,}")
 
-    _warn_or_fail(
-        failures,
-        warnings,
-        embedding_row["with_embedding"] > 0,
-        "no chunk embeddings found",
-        strict=strict,
-    )
-    _warn_or_fail(
-        failures,
-        warnings,
-        embedding_row["missing_embedding"] == 0,
-        "some chunks are missing embeddings",
-        strict=strict,
-    )
-    _warn_or_fail(
-        failures,
-        warnings,
+    result.check(embedding_row["with_embedding"] > 0, "no chunk embeddings found")
+    result.check(embedding_row["missing_embedding"] == 0, "some chunks are missing embeddings")
+    result.check(
         bad_dimensions == 0,
-        f"some embeddings do not have {expected_embedding_dimensions} dimensions",
-        strict=strict,
+        f"some embeddings do not have {expected_dimensions} dimensions",
     )
+    return embedding_row["with_embedding"]
 
-    index_rows, _, _ = driver.execute_query("""
+
+def _check_indexes(driver: Driver, database: str, result: _VerifyResult) -> set[str]:
+    """Check the required indexes and return the names of all indexes."""
+    index_rows, _, _ = driver.execute_query(
+        """
         SHOW INDEXES
         YIELD name, type, state, labelsOrTypes, properties
         RETURN name, type, state, labelsOrTypes, properties
-    """)
+    """,
+        database_=database,
+    )
     index_by_name = {row["name"]: row for row in index_rows}
 
     print("\nRequired Indexes:")
@@ -644,28 +878,22 @@ def verify(
         row = index_by_name.get(name)
         if row is None:
             print(f"  [MISSING] {name}")
-            _warn_or_fail(
-                failures,
-                warnings,
-                False,
-                f"missing index {name}",
-                strict=strict,
-            )
+            result.check(False, f"missing index {name}")
             continue
         print(f"  [OK] {name}: {row['type']} {row['state']}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            row["state"] == "ONLINE",
-            f"index {name} is {row['state']}",
-            strict=strict,
-        )
+        result.check(row["state"] == "ONLINE", f"index {name} is {row['state']}")
+    return set(index_by_name)
 
-    constraint_rows, _, _ = driver.execute_query("""
+
+def _check_constraints(driver: Driver, database: str, result: _VerifyResult) -> None:
+    constraint_rows, _, _ = driver.execute_query(
+        """
         SHOW CONSTRAINTS
         YIELD name, type, labelsOrTypes, properties
         RETURN name, type, labelsOrTypes, properties
-    """)
+    """,
+        database_=database,
+    )
     constraint_dicts = [dict(row) for row in constraint_rows]
 
     print("\nRequired Constraints:")
@@ -673,29 +901,29 @@ def verify(
         exists = _has_constraint(constraint_dicts, label, property_name)
         status = "[OK]" if exists else "[MISSING]"
         print(f"  {status} {label}.{property_name}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            exists,
-            f"missing uniqueness constraint {label}.{property_name}",
-            strict=strict,
-        )
+        result.check(exists, f"missing uniqueness constraint {label}.{property_name}")
 
+
+def _check_vector_search(
+    driver: Driver,
+    database: str,
+    *,
+    has_chunk_embeddings: bool,
+    has_vector_index: bool,
+    result: _VerifyResult,
+) -> None:
     vector_ok, vector_detail = _verify_vector_search(
         driver,
-        has_chunk_embeddings=embedding_row["with_embedding"] > 0,
-        has_vector_index="maintenanceChunkEmbeddings" in index_by_name,
+        database,
+        has_chunk_embeddings=has_chunk_embeddings,
+        has_vector_index=has_vector_index,
     )
     print("\nVector Search Smoke Test:")
     print(f"  {'[OK]' if vector_ok else '[FAIL]'} {vector_detail}")
-    _warn_or_fail(
-        failures,
-        warnings,
-        vector_ok,
-        f"vector search smoke test failed: {vector_detail}",
-        strict=strict,
-    )
+    result.check(vector_ok, f"vector search smoke test failed: {vector_detail}")
 
+
+def _check_cross_links(rel_counts: dict[str, int], result: _VerifyResult) -> None:
     cross_link_checks = [
         ("Document -> Aircraft", rel_counts["APPLIES_TO"]),
         ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"]),
@@ -705,86 +933,87 @@ def verify(
     print("\nCross-Link Checks:")
     for label, count in cross_link_checks:
         print(f"  {label}: {count:,}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            count > 0,
-            f"{label} has no links",
-            strict=strict,
-        )
+        result.check(count > 0, f"{label} has no links")
 
-    orphan_queries = [
-        (
-            "Readings without Sensor",
-            "MATCH (r:Reading) WHERE NOT (r)<-[:HAS_READING]-(:Sensor) "
-            "RETURN count(r) AS count",
-            {"Reading", "Sensor"},
-            {"HAS_READING"},
-        ),
-        (
-            "Flights without Aircraft",
-            "MATCH (f:Flight) WHERE NOT (f)<-[:OPERATES_FLIGHT]-(:Aircraft) "
-            "RETURN count(f) AS count",
-            {"Flight", "Aircraft"},
-            {"OPERATES_FLIGHT"},
-        ),
-        (
-            "Components without System",
-            "MATCH (c:Component) WHERE NOT (c)<-[:HAS_COMPONENT]-(:System) "
-            "RETURN count(c) AS count",
-            {"Component", "System"},
-            {"HAS_COMPONENT"},
-        ),
-        (
-            "Sensors without Readings",
-            "MATCH (s:Sensor) WHERE NOT (s)-[:HAS_READING]->(:Reading) "
-            "RETURN count(s) AS count",
-            {"Sensor", "Reading"},
-            {"HAS_READING"},
-        ),
-        (
-            "Documents without Chunks",
-            "MATCH (d:Document) WHERE NOT (:Chunk)-[:FROM_DOCUMENT]->(d) "
-            "RETURN count(d) AS count",
-            {"Document", "Chunk"},
-            {"FROM_DOCUMENT"},
-        ),
-    ]
+
+def _check_data_quality(
+    driver: Driver,
+    database: str,
+    existing_labels: set[str],
+    existing_relationships: set[str],
+    result: _VerifyResult,
+) -> None:
     print("\nData Quality Checks:")
-    existing_labels = set(label_counts)
-    existing_relationships = set(relationship_counts)
-    for label, query, required_labels, required_relationships in orphan_queries:
-        if required_labels.issubset(existing_labels) and required_relationships.issubset(
-            existing_relationships
-        ):
-            records, _, _ = driver.execute_query(query)
+    for label, query, required_labels, required_relationships in _ORPHAN_CHECKS:
+        if required_labels <= existing_labels and required_relationships <= existing_relationships:
+            records, _, _ = driver.execute_query(query, database_=database)
             count = records[0]["count"]
         else:
             count = 0
         print(f"  {label}: {count:,}")
-        _warn_or_fail(
-            failures,
-            warnings,
-            count == 0,
-            f"{label}: {count:,}",
-            strict=strict,
-        )
+        result.check(count == 0, f"{label}: {count:,}")
 
-    if warnings:
+
+def _print_summary(result: _VerifyResult) -> bool:
+    """Print warnings and failures and return whether verification passed."""
+    if result.warnings:
         print("\nWarnings:")
-        for warning in warnings:
+        for warning in result.warnings:
             print(f"  [WARN] {warning}")
 
-    if failures:
+    if result.failures:
         print("\nFailures:")
-        for failure in failures:
+        for failure in result.failures:
             print(f"  [FAIL] {failure}")
         print("=" * 60)
         return False
 
-    if warnings:
+    if result.warnings:
         print("\n[OK] Verification completed with warnings.")
     else:
         print("\n[OK] Verification passed.")
     print("=" * 60)
     return True
+
+
+def verify(
+    driver: Driver,
+    database: str,
+    *,
+    expected_embedding_dimensions: int = 1536,
+    strict: bool = False,
+    data_dir: Path | None = None,
+) -> bool:
+    """Print comprehensive graph verification and return whether it passed.
+
+    With data_dir, it also compares each operational label's node count
+    with the row count of its CSV there.
+    """
+    result = _VerifyResult(strict=strict)
+
+    label_counts = _get_label_counts(driver, database)
+    relationship_counts = _get_relationship_counts(driver, database)
+    rel_counts = {rel_type: relationship_counts.get(rel_type, 0) for rel_type in RELATIONSHIP_TYPES}
+
+    print()
+    print("=" * 60)
+    print("Verification")
+    print("=" * 60)
+    _check_counts(label_counts, rel_counts, result)
+    if data_dir is not None:
+        _check_csv_counts(label_counts, data_dir, result)
+    with_embedding = _check_embeddings(
+        driver, database, label_counts.get("Chunk", 0), expected_embedding_dimensions, result
+    )
+    index_names = _check_indexes(driver, database, result)
+    _check_constraints(driver, database, result)
+    _check_vector_search(
+        driver,
+        database,
+        has_chunk_embeddings=with_embedding > 0,
+        has_vector_index="maintenanceChunkEmbeddings" in index_names,
+        result=result,
+    )
+    _check_cross_links(rel_counts, result)
+    _check_data_quality(driver, database, set(label_counts), set(relationship_counts), result)
+    return _print_summary(result)

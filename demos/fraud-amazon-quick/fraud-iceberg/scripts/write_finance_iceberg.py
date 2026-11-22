@@ -10,8 +10,10 @@
 """Create an S3 bucket and load the bundled finance CSVs as Iceberg tables.
 
 Run with an AWS profile or role that can create the S3 bucket, manage its
-objects, and create Glue databases and tables:
+objects, and create Glue databases and tables. Name the IAM role that may
+write objects with --writer-role-arn or DATA_AGENT_WRITER_ROLE_ARN:
 
+    export DATA_AGENT_WRITER_ROLE_ARN=arn:aws:iam::123456789012:role/writer
     uv run scripts/write_finance_iceberg.py
     uv run scripts/write_finance_iceberg.py my-unique-bucket-name
 
@@ -41,10 +43,6 @@ from finance_iceberg import (
 
 
 DEFAULT_BUCKET = "data-agent-neo4j-euw1"
-DEFAULT_WRITER_ROLE_ARN = (
-    "arn:aws:iam::159878781974:role/aws-reserved/sso.amazonaws.com/us-west-2/"
-    "AWSReservedSSO_AdministratorAccess_3e15a1219bf2da5b"
-)
 
 
 def arguments() -> argparse.Namespace:
@@ -86,11 +84,10 @@ def arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--writer-role-arn",
-        default=os.environ.get("DATA_AGENT_WRITER_ROLE_ARN", DEFAULT_WRITER_ROLE_ARN),
+        default=os.environ.get("DATA_AGENT_WRITER_ROLE_ARN"),
         help=(
-            "IAM role allowed to write objects by the bucket policy. Defaults to "
-            "the default-profile SSO role; override with DATA_AGENT_WRITER_ROLE_ARN "
-            "or this option."
+            "IAM role allowed to write objects by the bucket policy. Required "
+            "unless DATA_AGENT_WRITER_ROLE_ARN is set."
         ),
     )
     parser.add_argument(
@@ -238,6 +235,11 @@ def main() -> None:
         validate_sources(args.tables)
         return
 
+    if not args.writer_role_arn:
+        raise SystemExit(
+            "Set --writer-role-arn or DATA_AGENT_WRITER_ROLE_ARN to the IAM role "
+            "that may write objects."
+        )
     if not DATA_DIR.is_dir():
         raise SystemExit(f"Bundled data directory is missing: {DATA_DIR}")
 

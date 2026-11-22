@@ -530,7 +530,7 @@ The client never holds Neo4j credentials. It only talks to the Gateway.
 - **Cognito:** It trades a client ID and secret for a JWT.
 - **Gateway:** It checks the JWT and sends each tool call to the runtime. It also gets its own OAuth token for the runtime, so callers see one endpoint.
 - **Runtime:** It hosts the read-only Neo4j MCP Server over Streamable HTTP.
-- **Secrets Manager:** It stores the Neo4j password. The runtime receives it at deploy time.
+- **Secrets Manager:** It stores the Neo4j password. The runtime reads it at startup.
 - **Deploy:** ./deploy.py builds the ARM64 image, pushes it to ECR, and deploys the CDK stack. The code is in neo4j-mcp-server/.
 - **Credentials:** ./deploy.py credentials writes the Gateway URL, client ID, client secret, and token URL. The Quick connection slide uses them.
 -->

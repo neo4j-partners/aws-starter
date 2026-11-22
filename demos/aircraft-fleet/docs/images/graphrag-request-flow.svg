@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>GraphRAG Agent Request Flow</title>
+  <desc>A client posts to /invocations. A mode field picks a direct retriever. With no mode, the full Strands agent restores memory, reasons on Claude, queries the fleet graph, streams the answer, saves the turn, and extracts entities in the background.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="920" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">GraphRAG Agent Request Flow</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">One endpoint serves four modes. With no mode set, the full agent runs and streams its answer.</text>
+  <rect x="40" y="330" width="240" height="150" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="160.0" y="362" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Client</text>
+  <text x="160.0" y="388" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet-cli · fleet-demo</text>
+  <text x="160.0" y="410" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet-invoke</text>
+  <text x="160.0" y="432" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">agent.sh invoke-cloud</text>
+  <rect x="340" y="330" width="240" height="150" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="460.0" y="362" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">/invocations</text>
+  <text x="460.0" y="388" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">BedrockAgentCoreApp</text>
+  <text x="460.0" y="410" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">validates the payload</text>
+  <text x="460.0" y="432" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">routes on mode</text>
+  <path d="M280,385 H336" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="287" y="357" width="43" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="308" y="372" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">POST</text>
+  <path d="M340,440 H284" fill="none" stroke="#2E6DB4" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
+  <rect x="292" y="451" width="36" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="310" y="466" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">SSE</text>
+  <rect x="640" y="110" width="920" height="250" rx="18" fill="#EEF0F3" stroke="#667085" stroke-width="1.5"/>
+  <text x="664" y="142" font-size="19" font-weight="700" fill="#344054" text-anchor="start">Direct modes</text>
+  <text x="800" y="142" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">Each one returns a single chunk event, then complete.</text>
+  <rect x="660" y="162" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#667085" stroke-width="1.5"/>
+  <text x="718" y="186" font-size="16" font-weight="700" fill="#344054" text-anchor="start">mode: schema</text>
+  <text x="718" y="206" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Returns the live graph schema</text>
+  <rect x="1423" y="177.0" width="103" height="26" rx="13" fill="#E8F6F2" stroke="#008C72" stroke-width="1.5"/>
+  <text x="1474.3" y="195.0" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">Fleet graph</text>
+  <rect x="660" y="224" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#667085" stroke-width="1.5"/>
+  <text x="718" y="248" font-size="16" font-weight="700" fill="#344054" text-anchor="start">mode: graph_query</text>
+  <text x="718" y="268" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Text2Cypher writes read-only Cypher and runs it</text>
+  <rect x="1423" y="239.0" width="103" height="26" rx="13" fill="#E8F6F2" stroke="#008C72" stroke-width="1.5"/>
+  <text x="1474.3" y="257.0" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">Fleet graph</text>
+  <rect x="1348" y="239.0" width="66" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1381.3999999999999" y="257.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Claude</text>
+  <rect x="660" y="286" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#667085" stroke-width="1.5"/>
+  <text x="718" y="310" font-size="16" font-weight="700" fill="#344054" text-anchor="start">mode: vector_search</text>
+  <text x="718" y="330" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Hybrid vector and fulltext search over manual chunks</text>
+  <rect x="1423" y="301.0" width="103" height="26" rx="13" fill="#E8F6F2" stroke="#008C72" stroke-width="1.5"/>
+  <text x="1474.3" y="319.0" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">Fleet graph</text>
+  <rect x="1356" y="301.0" width="59" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1385.1" y="319.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Titan</text>
+  <rect x="640" y="390" width="920" height="500" rx="18" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="664" y="422" font-size="19" font-weight="700" fill="#1E3A5F" text-anchor="start">Full agent</text>
+  <text x="770" y="422" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">No mode set. The Strands agent picks its own tools.</text>
+  <rect x="660" y="440" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="690" cy="468.0" r="15" fill="#2E6DB4"/>
+  <text x="690" y="473.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <text x="718" y="464" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Check the request</text>
+  <text x="718" y="484" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">The session ID comes from the AgentCore header. user_id defaults to anonymous.</text>
+  <rect x="660" y="502" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="690" cy="530.0" r="15" fill="#2E6DB4"/>
+  <text x="690" y="535.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <text x="718" y="526" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Restore memory</text>
+  <text x="718" y="546" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">A per-request session manager loads the session history</text>
+  <rect x="1437" y="517.0" width="89" height="26" rx="13" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="1481.7" y="535.0" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">Memory DB</text>
+  <rect x="660" y="564" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="690" cy="592.0" r="15" fill="#2E6DB4"/>
+  <text x="690" y="597.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <text x="718" y="588" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Run the Strands agent</text>
+  <text x="718" y="608" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Claude reads the question and picks a tool</text>
+  <rect x="1460" y="579.0" width="66" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1492.8" y="597.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Claude</text>
+  <rect x="660" y="626" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="690" cy="654.0" r="15" fill="#2E6DB4"/>
+  <text x="690" y="659.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <text x="718" y="650" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Query the fleet graph</text>
+  <text x="718" y="670" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">graph_query for exact answers, vector_search for manual text</text>
+  <rect x="1423" y="641.0" width="103" height="26" rx="13" fill="#E8F6F2" stroke="#008C72" stroke-width="1.5"/>
+  <text x="1474.3" y="659.0" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">Fleet graph</text>
+  <rect x="1356" y="641.0" width="59" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1385.1" y="659.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Titan</text>
+  <rect x="1281" y="641.0" width="66" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1314.3999999999999" y="659.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Claude</text>
+  <rect x="660" y="688" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="690" cy="716.0" r="15" fill="#2E6DB4"/>
+  <text x="690" y="721.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+  <text x="718" y="712" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Stream the answer</text>
+  <text x="718" y="732" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">tool and chunk events go out as they arrive</text>
+  <rect x="1482" y="703.0" width="44" height="26" rx="13" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="1503.8999999999999" y="721.0" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">SSE</text>
+  <rect x="660" y="750" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <circle cx="690" cy="778.0" r="15" fill="#2E6DB4"/>
+  <text x="690" y="783.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+  <text x="718" y="774" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="start">Save the turn, then complete</text>
+  <text x="718" y="794" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">The messages are embedded and written before complete</text>
+  <rect x="1437" y="765.0" width="89" height="26" rx="13" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="1481.7" y="783.0" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">Memory DB</text>
+  <rect x="1370" y="765.0" width="59" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1399.9" y="783.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Titan</text>
+  <rect x="660" y="812" width="880" height="56" rx="12" fill="#FFFFFF" stroke="#C11574" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="718" y="836" font-size="16" font-weight="700" fill="#851651" text-anchor="start">In the background</text>
+  <text x="718" y="856" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Entity extraction runs after the reply. /ping reports HealthyBusy until it ends.</text>
+  <rect x="1437" y="827.0" width="89" height="26" rx="13" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="1481.7" y="845.0" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">Memory DB</text>
+  <rect x="1363" y="827.0" width="66" height="26" rx="13" fill="#FFF7ED" stroke="#D97706" stroke-width="1.5"/>
+  <text x="1396.2" y="845.0" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">Claude</text>
+  <path d="M580,370 H610 V235 H636" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="576" y="285" width="72" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="612" y="300" font-size="13" font-weight="600" fill="#344054" text-anchor="middle">mode set</text>
+  <path d="M580,450 H610 V640 H636" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="580" y="545" width="64" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="612" y="560" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">no mode</text>
+  <rect x="40" y="560" width="540" height="220" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="64" y="594" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="start">Events the client receives</text>
+  <text x="64" y="632" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">tool</text>
+  <text x="170" y="632" font-size="14.5" font-weight="400" fill="#344054" text-anchor="start">A retriever tool started</text>
+  <text x="64" y="668" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">chunk</text>
+  <text x="170" y="668" font-size="14.5" font-weight="400" fill="#344054" text-anchor="start">Text of the answer, or a direct mode&#x27;s result</text>
+  <text x="64" y="704" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">complete</text>
+  <text x="170" y="704" font-size="14.5" font-weight="400" fill="#344054" text-anchor="start">The answer is done and the turn is saved</text>
+  <text x="64" y="740" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">error</text>
+  <text x="170" y="740" font-size="14.5" font-weight="400" fill="#344054" text-anchor="start">The request failed. Details stay in the log.</text>
+</svg>

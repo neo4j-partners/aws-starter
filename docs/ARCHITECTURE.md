@@ -1,66 +1,42 @@
 # Architecture Overview
 
-This document provides a comprehensive architecture overview of the Neo4j MCP ecosystem deployed on Amazon Bedrock AgentCore, covering both the MCP server deployment and the AI agents that consume it.
+This repository deploys the Neo4j MCP server `mcp-neo4j-cypher` to Amazon Bedrock AgentCore and builds AI agents that query Neo4j. Some agents reach Neo4j through the AgentCore Gateway and the MCP server. Others connect with a direct Neo4j driver. This document covers the MCP server deployment. The aircraft fleet demo has its own architecture documents.
 
 ## Table of Contents
 
 1. [System Overview](#system-overview)
 2. [Neo4j MCP Server Deployment](#neo4j-mcp-server-deployment)
    - [High-Level Architecture](#high-level-architecture)
+   - [Component Descriptions](#component-descriptions)
    - [Deployment Flow](#deployment-flow)
    - [CDK Stack Components](#cdk-stack-components)
    - [Authentication Architecture](#authentication-architecture)
-3. [AI Agents Architecture](#ai-agents-architecture)
-   - [Aircraft Fleet GraphRAG Agent](#aircraft-fleet-graphrag-agent)
-   - [Supervisor Agent (Multi-Agent)](#supervisor-agent-multi-agent)
-4. [End-to-End Request Flow](#end-to-end-request-flow)
+3. [Aircraft Fleet Demo](#aircraft-fleet-demo)
+4. [Technology Stack Summary](#technology-stack-summary)
+5. [Diagrams](#diagrams)
+6. [References](#references)
 
 ---
 
 ## System Overview
 
-The system consists of three main components:
+![System overview: MCP clients reach Neo4j through Cognito, the AgentCore Gateway, and the AgentCore Runtime, while direct-driver projects connect to Neo4j over Bolt](images/system-overview.svg)
 
-1. **Neo4j MCP Server** ([github.com/neo4j/mcp](https://github.com/neo4j/mcp), a local clone set by `NEO4J_MCP_REPO`) - Official Neo4j Model Context Protocol server written in Go
-2. **MCP Server Deployment** (`neo4j-mcp-server/`) - AWS CDK infrastructure to deploy the MCP server on AgentCore
-3. **AI Agents** (`quickstart/` and `demos/`) - Agents that query Neo4j. Most reach it through the MCP server and Gateway. The fleet GraphRAG agent uses a direct Neo4j driver
+The repository has three parts.
 
-```mermaid
-flowchart TB
-    subgraph External["External Services"]
-        NEO4J[(Neo4j Database<br/>Aura / Self-hosted)]
-    end
+- **Neo4j MCP server:** The MCP server is `mcp-neo4j-cypher`, a Python FastMCP server from the [`neo4j-partners/mcp-neo4j`](https://github.com/neo4j-partners/mcp-neo4j) repository. The build reads the `servers/mcp-neo4j-cypher` folder of a local clone from the path in `NEO4J_MCP_REPO`.
+- **MCP server deployment:** The `neo4j-mcp-server/` project uses AWS CDK to deploy the MCP server on AgentCore Runtime behind an AgentCore Gateway.
+- **AI agents and demos:** The `quickstart/` and `demos/` projects query Neo4j in two ways.
 
-    subgraph MCP["Neo4j MCP Server<br/>(Go Binary)"]
-        direction TB
-        TOOLS[MCP Tools<br/>get_neo4j_schema, read_neo4j_cypher, write_neo4j_cypher]
-        DB_SVC[Database Service<br/>Neo4j Driver]
-        TOOLS --> DB_SVC
-    end
+The two access paths serve different needs.
 
-    subgraph AWS["AWS Cloud"]
-        subgraph AgentCore["Amazon Bedrock AgentCore"]
-            RUNTIME[AgentCore Runtime<br/>MicroVM Container]
-            GATEWAY[AgentCore Gateway<br/>Tool Aggregation]
-        end
+| Path | Projects | How they reach Neo4j |
+|------|----------|----------------------|
+| MCP through the Gateway | Quickstart agent, fleet supervisor agent, fraud memory agent | Cognito token, AgentCore Gateway, AgentCore Runtime, Neo4j MCP server |
+| Direct driver | Fleet pipeline, fleet GraphRAG agent, fraud graph loader, SEC filings notebook | Neo4j Python driver over Bolt |
 
-        subgraph Agents["AI Agents"]
-            FLEET[GraphRAG Agent<br/>Strands, direct driver]
-            ORCH[Supervisor<br/>Multi-Agent Router]
-        end
-
-        subgraph Auth["Authentication"]
-            COGNITO[Amazon Cognito<br/>M2M OAuth2]
-        end
-    end
-
-    RUNTIME --> MCP
-    MCP --> NEO4J
-    GATEWAY --> RUNTIME
-    FLEET --> NEO4J
-    ORCH --> GATEWAY
-    ORCH --> COGNITO
-```
+- **Read-only MCP server:** The deployed MCP server runs with `NEO4J_READ_ONLY=true`. Agents on the MCP path get two tools, `get_neo4j_schema` and `read_neo4j_cypher`.
+- **Writes:** Every write to Neo4j happens on the direct-driver path. The fleet pipeline and the fraud graph loader populate their graphs this way.
 
 ---
 
@@ -68,537 +44,183 @@ flowchart TB
 
 ### High-Level Architecture
 
-The `neo4j-mcp-server` project deploys the official Neo4j MCP server to Amazon Bedrock AgentCore Runtime with Gateway authentication.
+The `neo4j-mcp-server` project deploys one CloudFormation stack per deployment. Agents call the Gateway with a Cognito token. The Gateway calls the Runtime with a token of its own.
 
-```mermaid
-flowchart TB
-    subgraph Client["AI Agent / Client"]
-        APP[LangGraph Agent<br/>or MCP Client]
-    end
+![Neo4j MCP server on AgentCore: the six-step request path from the agent through Cognito, the Gateway, the Gateway Target, the OAuth2 provider, and the Runtime to Neo4j](images/mcp-server-architecture.svg)
 
-    subgraph AWS["AWS Cloud"]
-        subgraph Auth["Authentication Layer"]
-            COGNITO[Amazon Cognito<br/>User Pool + Machine Client]
-            OAUTH[OAuth2 Credential<br/>Provider]
-        end
-
-        subgraph AgentCore["Amazon Bedrock AgentCore"]
-            GATEWAY[AgentCore Gateway<br/>JWT Authorizer]
-            TARGET[Gateway Target<br/>OAuth Credentials]
-            RUNTIME[AgentCore Runtime<br/>MicroVM Isolation]
-            subgraph Container["Container"]
-                MCP[Neo4j MCP Server<br/>Port 8000]
-            end
-        end
-
-        subgraph Supporting["Supporting Services"]
-            ECR[Amazon ECR<br/>Container Registry]
-            CW[Amazon CloudWatch<br/>Logs & Metrics]
-            LAMBDA[Custom Resource<br/>Lambdas]
-        end
-    end
-
-    subgraph External["External"]
-        NEO4J[(Neo4j Database<br/>Aura or Self-hosted)]
-    end
-
-    APP -->|1. Client Credentials| COGNITO
-    COGNITO -->|2. M2M JWT Token| APP
-    APP -->|3. MCP Request + JWT| GATEWAY
-    GATEWAY -->|4. Validate JWT| COGNITO
-    GATEWAY --> TARGET
-    TARGET -->|5. Get OAuth Token| OAUTH
-    TARGET -->|6. Forward + OAuth| RUNTIME
-    RUNTIME --> Container
-    MCP -->|7. Cypher Queries| NEO4J
-    NEO4J -->|8. Results| MCP
-    MCP -->|9. MCP Response| APP
-
-    ECR -.->|Container Image| RUNTIME
-    RUNTIME -.->|Logs & Traces| CW
-    LAMBDA -.->|Create| OAUTH
-```
+1. **Get a token:** The agent posts the `client_credentials` grant to Cognito and gets a JWT.
+2. **Call the Gateway:** The agent sends the MCP request to the Gateway with the JWT as a bearer token.
+3. **Validate:** The Gateway validates the JWT against the Cognito discovery URL. It accepts only tokens issued to the machine client.
+4. **Get a Runtime token:** The Gateway Target gets a Runtime token from the OAuth2 credential provider.
+5. **Forward:** The Gateway Target forwards the request to the Runtime with that token.
+6. **Run the tool:** The Neo4j MCP server runs read-only Cypher on Neo4j and returns the result.
 
 ### Component Descriptions
 
-Understanding what each piece does in plain English:
-
 #### AgentCore Runtime
 
-**What it is:** A secure, serverless compute environment purpose-built for running AI agents and tools. Think of it as a specialized hosting service where your MCP server container runs.
+AgentCore Runtime is a serverless compute environment for agents and tools. The MCP server container runs here.
 
-**Key characteristics:**
-- **MicroVM Isolation** - Each user session runs in its own dedicated micro virtual machine with completely isolated CPU, memory, and filesystem. When a session ends, the entire VM is terminated and memory is wiped clean. This prevents data from one user ever leaking to another.
-- **Long-Running Support** - Unlike Lambda's 15-minute limit, AgentCore Runtime supports workloads up to 8 hours, enabling complex multi-step agent workflows.
-- **Framework Agnostic** - Works with any agent framework (LangGraph, CrewAI, Strands) and any LLM (Claude, GPT, Gemini).
-- **Automatic Scaling** - Dynamically provisions resources based on demand with no pre-allocation required.
+- **MicroVM isolation:** Each session runs in its own microVM with isolated CPU, memory, and filesystem. The microVM is terminated and its memory is wiped when the session ends.
+- **Long-running sessions:** A session can run for up to 8 hours.
+- **Framework agnostic:** The Runtime hosts any agent framework or MCP server that meets its container contract.
+- **Container contract:** The image must be arm64. An MCP server listens on port 8000 at `/mcp`.
 
-**In this deployment:** Hosts the Neo4j MCP server container, receiving requests from Gateway and executing Cypher queries against Neo4j.
+**In this deployment:** The Runtime hosts the Neo4j MCP server with `protocol_configuration` set to `MCP`. It has its own custom JWT authorizer, which accepts only tokens issued to the stack's machine client. The container runs with `NEO4J_READ_ONLY=true`.
 
 #### AgentCore Gateway
 
-**What it is:** A fully-managed service that acts as a front door for AI agents to discover and access tools. It translates requests, handles authentication, and can aggregate multiple tool sources into a single endpoint.
+AgentCore Gateway is a managed front door that gives agents one MCP endpoint for many tool sources.
 
-**Key characteristics:**
-- **Protocol Translation** - Converts Model Context Protocol (MCP) requests into whatever format your backend needs (API calls, Lambda invocations, etc.).
-- **Tool Discovery** - Provides semantic search across thousands of tools, helping agents find the right tool for a task without overwhelming the prompt.
-- **Security Layer** - Manages both inbound authentication (verifying the agent's identity) and outbound credentials (authenticating to backend services).
-- **Composition** - Combines multiple APIs, Lambda functions, and services into a single MCP endpoint.
+- **Protocol translation:** The Gateway turns MCP requests into calls to its targets.
+- **Inbound auth:** The Gateway verifies each agent's identity before it forwards a request.
+- **Outbound auth:** The Gateway attaches credentials when it calls a target.
+- **Composition:** One Gateway can combine MCP servers, Lambda functions, and APIs behind one endpoint.
+- **Semantic tool search:** The Gateway can index tools for semantic search. This stack does not enable it.
 
-**In this deployment:** Receives authenticated requests from agents, validates their JWT tokens, obtains OAuth credentials for the Runtime, and forwards MCP tool calls.
+**In this deployment:** The Gateway is named `{stack}-gateway`. It uses a `CUSTOM_JWT` authorizer that allows only the machine client. It supports MCP protocol version `2025-03-26`.
 
 #### Gateway Target
 
-**What it is:** A configuration that tells Gateway how to reach a specific backend service and what credentials to use. Each target represents one tool source (like an MCP server, Lambda function, or API).
+A Gateway Target tells the Gateway how to reach one backend and which credentials to use.
 
-**Key characteristics:**
-- **Endpoint Configuration** - Specifies the URL where the backend service lives.
-- **Credential Provider** - Attaches OAuth2 or other credentials that Gateway uses when calling the target.
-- **Tool Indexing** - When created, Gateway automatically calls the target's `tools/list` endpoint to discover available tools.
-- **MCP Protocol Support** - For MCP servers, supports protocol versions 2025-03-26 and 2025-06-18.
+- **Endpoint:** The target holds the URL of the backend.
+- **Credential provider:** The target names the OAuth2 provider the Gateway uses for outbound calls.
+- **Tool indexing:** The Gateway calls the target's `tools/list` when the target is created.
+- **Tool names:** Gateway tool names carry the target name as a prefix, as in `neo4j-mcp-server-target___read_neo4j_cypher`.
 
-**In this deployment:** Points to the AgentCore Runtime URL where the Neo4j MCP server runs, with OAuth2 credentials attached for authentication.
+**In this deployment:** The target is named `neo4j-mcp-server-target`. Its endpoint is the Runtime invocation URL. It requests the `{stack}-mcp/invoke` scope from the OAuth2 provider.
 
 #### OAuth2 Credential Provider
 
-**What it is:** An AgentCore Identity resource that stores OAuth2 client credentials and manages token lifecycle. Gateway uses this to authenticate when calling protected backends.
+The OAuth2 credential provider is an AgentCore Identity resource. It stores OAuth2 client credentials and fetches tokens for the Gateway.
 
-**Key characteristics:**
-- **Secure Storage** - Client ID and secret are stored securely in AWS Secrets Manager.
-- **Token Management** - Handles token acquisition and refresh automatically.
-- **Two-Legged OAuth** - Supports machine-to-machine (M2M) client credentials flow.
+- **Secure storage:** AgentCore Identity stores the client secret in AWS Secrets Manager.
+- **Token handling:** The provider gets new tokens when the Gateway needs them.
+- **Two-legged OAuth:** The provider uses the machine-to-machine `client_credentials` flow.
 
-**In this deployment:** Stores the Cognito machine client credentials so Gateway can obtain tokens to authenticate with the Runtime.
+**In this deployment:** The provider is named `{stack}_oauth_provider`. It holds the Cognito machine client ID and secret, so the Gateway can get Runtime tokens.
 
 #### Custom Resource Lambdas
 
-**What they are:** AWS Lambda functions that extend CloudFormation's capabilities to manage resources that don't have native CloudFormation support. They run during stack create/update/delete operations.
+Two Python 3.12 Lambda functions run as CloudFormation custom resources during stack create, update, and delete.
 
-**Key characteristics:**
-- **Lifecycle Hooks** - Triggered automatically by CloudFormation during Create, Update, and Delete operations.
-- **Return Values** - Can return data that other stack resources reference (like ARNs or IDs).
-- **Idempotent** - Must handle being called multiple times safely.
+- **OAuth provider function:** This function creates the OAuth2 credential provider. CloudFormation has no native resource for it, so the function calls the AgentCore Identity API directly.
+- **Runtime health check function:** This function waits for the Runtime to reach `READY`. The Gateway Target depends on it, so the Gateway never indexes a Runtime that is still starting.
 
-**In this deployment, two Custom Resources:**
+#### Amazon Cognito
 
-1. **OAuth Provider Function** - Creates the OAuth2 Credential Provider in AgentCore Identity. This resource isn't natively supported by CloudFormation, so the Lambda calls the AgentCore API directly.
+Cognito issues the OAuth2 tokens. This deployment uses it only for machine-to-machine auth, so the user pool has no users.
 
-2. **Runtime Health Check Function** - Waits for the AgentCore Runtime to reach a "ready" state before allowing the Gateway Target to be created. This prevents race conditions where Gateway tries to connect to a Runtime that isn't running yet.
+- **User pool:** The pool has self sign-up disabled.
+- **Domain:** The domain prefix is `{stack}-{account}`. It provides the `/oauth2/token` endpoint.
+- **Resource server:** The resource server has the identifier `{stack}-mcp` and one scope, `invoke`.
+- **Machine client:** The client has a secret and uses the `client_credentials` grant with the `{stack}-mcp/invoke` scope. Its access tokens are valid for 24 hours.
 
-#### Amazon Cognito User Pool
+#### Amazon ECR
 
-**What it is:** A managed identity service that handles user authentication and issues OAuth2 tokens. In this deployment, it's used purely for machine-to-machine authentication (no human users).
+ECR stores the Neo4j MCP server image. `deploy.py` tags each build with the git SHA and with `latest`. The Runtime pulls the image by the URI in the `ECRImageUri` parameter.
 
-**Key characteristics:**
-- **OAuth2 Token Endpoint** - Provides the `/oauth2/token` URL where clients exchange credentials for JWT tokens.
-- **Machine Client** - A special client configured for `client_credentials` grant (no user login required).
-- **Resource Server** - Defines OAuth2 scopes that control what the token authorizes.
+#### AWS Secrets Manager
 
-**In this deployment:** Issues JWT tokens to agents (using client credentials flow) that Gateway validates before allowing access.
-
-#### Amazon ECR (Elastic Container Registry)
-
-**What it is:** A fully-managed Docker container registry where you store, manage, and deploy container images.
-
-**In this deployment:** Stores the Neo4j MCP server Docker image. AgentCore Runtime pulls this image when starting the container.
+Secrets Manager stores the Neo4j password. `deploy.py` writes the secret and passes only its ARN to the stack. The Runtime gets only that ARN. At startup, the image entrypoint reads the password with the Runtime role and sets it inside its own process, so the password never appears in the template or the Runtime configuration.
 
 #### Amazon CloudWatch
 
-**What it is:** AWS's monitoring and observability service for logs, metrics, and traces.
-
-**In this deployment:** Receives logs from the AgentCore Runtime (container stdout/stderr) and X-Ray traces for distributed tracing across the request flow.
+CloudWatch receives the Runtime logs under `/aws/bedrock-agentcore/`. The agent execution role also allows X-Ray traces and metrics in the `bedrock-agentcore` namespace.
 
 ### Deployment Flow
 
-The `deploy.py` script orchestrates the entire deployment process:
+`deploy.py` runs every deployment step in order. It reads `.env` by default. `--env NAME` reads `.env.NAME` instead, adds the suffix to the stack name, and writes `.mcp-credentials.NAME.json`.
 
-```mermaid
-flowchart LR
-    subgraph Local["Local Machine"]
-        ENV[.env Config<br/>Neo4j Credentials]
-        MCPREPO[Neo4j MCP Repo<br/>path set by NEO4J_MCP_REPO]
-    end
+![MCP server deploy flow: six steps from reading the config to writing credentials, with the steps each deploy.py command runs](images/mcp-deploy-flow.svg)
 
-    subgraph Build["Build Phase"]
-        DOCKER[Docker Buildx<br/>ARM64 Image]
-    end
-
-    subgraph Push["Push Phase"]
-        ECR[Amazon ECR<br/>Container Registry]
-    end
-
-    subgraph Deploy["Deploy Phase"]
-        CDK[AWS CDK<br/>CloudFormation]
-        STACK[Neo4j MCP Stack<br/>All Resources]
-    end
-
-    subgraph Output["Outputs"]
-        GW_URL[Gateway URL]
-        CREDS[Credentials File<br/>.mcp-credentials.json]
-    end
-
-    ENV --> DOCKER
-    MCPREPO --> DOCKER
-    DOCKER -->|neo4j-mcp-server:latest| ECR
-    ECR --> CDK
-    ENV --> CDK
-    CDK --> STACK
-    STACK --> GW_URL
-    STACK --> CREDS
-```
-
-**Deployment Commands:**
+1. **Read the config:** `deploy.py` reads the `.env` file for the chosen deployment.
+2. **Build the image:** Docker buildx builds the server from `NEO4J_MCP_REPO` for `linux/arm64`.
+3. **Push to ECR:** The image gets a git SHA tag and the `latest` tag. The `IMAGE_TAG` environment variable overrides the SHA tag.
+4. **Store the password:** The Neo4j password goes to Secrets Manager.
+5. **Deploy the stack:** CDK deploys the stack with the image URI and the secret ARN as parameters.
+6. **Write credentials:** `./deploy.py credentials` writes the Gateway URL, the client credentials, the token URL, and a fresh token.
 
 | Command | Description |
 |---------|-------------|
-| `./deploy.py` | Full deployment (build, push, stack) |
-| `./deploy.py redeploy` | Fast redeploy (build, push, update runtime) |
-| `./deploy.py stack` | Deploy CDK stack only |
-| `./deploy.py status` | Show stack status and outputs |
-| `./deploy.py credentials` | Generate `.mcp-credentials.json` |
-| `./deploy.py cleanup` | Delete all resources |
+| `./deploy.py` | Runs a full deployment: build, push, and stack |
+| `./deploy.py --skip-build` | Runs a full deployment with the image already in ECR |
+| `./deploy.py redeploy` | Builds and pushes a new image, then points the existing Runtime at it |
+| `./deploy.py stack` | Stores the password and deploys the CDK stack only |
+| `./deploy.py synth` | Synthesizes the CloudFormation template without deploying |
+| `./deploy.py status` | Shows the stack status and outputs |
+| `./deploy.py credentials` | Writes the credentials file |
+| `./deploy.py stack-name` | Prints the stack name for the chosen deployment |
+| `./deploy.py cleanup` | Deletes the stack, the Neo4j password secret, and, after a separate prompt, the ECR repository |
+
+- **Named deployments:** `./deploy.py --env fleet` deploys the stack `neo4j-mcp-server-fleet` for the supervisor agent. `./deploy.py --env finance` deploys `neo4j-mcp-server-finance` for the fraud memory agent.
+- **Credential sync:** `scripts/sync-credentials.sh` copies each deployment's credentials file to the samples that use it.
 
 ### CDK Stack Components
 
-The CDK stack (`cdk/neo4j_mcp_stack.py`) creates these AWS resources:
+The CDK stack in `cdk/neo4j_mcp_stack.py` builds every resource. Each resource name carries the stack name, so deployments do not collide.
 
-```mermaid
-flowchart TB
-    subgraph CDK["CDK Stack: neo4j-mcp-server"]
-        subgraph CognitoModule["Cognito Module"]
-            UP[User Pool<br/>No users - M2M only]
-            DOMAIN[User Pool Domain<br/>OAuth2 Token Endpoint]
-            RS[Resource Server<br/>mcp/invoke scope]
-            MC[Machine Client<br/>client_credentials grant]
-        end
-
-        subgraph IAMModule["IAM Module"]
-            AGENT_ROLE[Agent Execution Role<br/>ECR, CloudWatch, X-Ray]
-            GW_ROLE[Gateway Execution Role<br/>Runtime Invoke, OAuth]
-            CR_ROLE[Custom Resource Role<br/>Cognito, AgentCore APIs]
-        end
-
-        subgraph LambdaModule["Lambda Custom Resources"]
-            OAUTH_FUNC[OAuth Provider Function<br/>Creates OAuth2 Credential Provider]
-            HEALTH_FUNC[Runtime Health Check<br/>Waits for Runtime Ready]
-        end
-
-        subgraph AgentCoreModule["AgentCore Resources"]
-            RUNTIME_RES[MCP Server Runtime<br/>CfnRuntime - Container + JWT Auth]
-            GATEWAY_RES[Gateway<br/>CfnGateway - JWT Authorizer]
-            TARGET_RES[Gateway Target<br/>CfnGatewayTarget - OAuth Credentials]
-        end
-    end
-
-    UP --> DOMAIN
-    UP --> RS
-    RS --> MC
-    MC --> RUNTIME_RES
-    MC --> GATEWAY_RES
-
-    AGENT_ROLE --> RUNTIME_RES
-    GW_ROLE --> GATEWAY_RES
-    CR_ROLE --> OAUTH_FUNC
-    CR_ROLE --> HEALTH_FUNC
-
-    OAUTH_FUNC -->|CustomResource| TARGET_RES
-    HEALTH_FUNC -->|Wait for Ready| TARGET_RES
-    RUNTIME_RES --> TARGET_RES
-    GATEWAY_RES --> TARGET_RES
-```
-
-**Key CDK Constructs:**
+![CDK stack components: Cognito resources, AgentCore resources, and the IAM roles and Lambda custom resources that support them](images/cdk-stack-components.svg)
 
 | Resource | Type | Purpose |
 |----------|------|---------|
-| User Pool | `cognito.UserPool` | OAuth2 identity provider |
-| Machine Client | `cognito.CfnUserPoolClient` | M2M client credentials |
-| Agent Execution Role | `iam.Role` | Runtime permissions |
-| MCP Server Runtime | `bedrockagentcore.CfnRuntime` | Container hosting |
-| Gateway | `bedrockagentcore.CfnGateway` | Entry point with JWT auth |
-| Gateway Target | `bedrockagentcore.CfnGatewayTarget` | Routes to Runtime |
+| User pool | `cognito.UserPool` | OAuth2 identity provider with no users |
+| User pool domain | `cognito.UserPoolDomain` | Hosts the `/oauth2/token` endpoint |
+| Resource server | `cognito.CfnUserPoolResourceServer` | Defines the `{stack}-mcp/invoke` scope |
+| Machine client | `cognito.CfnUserPoolClient` | M2M client with a secret and 24-hour tokens |
+| Custom resource role | `iam.Role` | Lets the Lambdas call Cognito, AgentCore Identity, and Secrets Manager |
+| Agent execution role | `iam.Role` | Gives the Runtime ECR pull, logs, X-Ray, metrics, and workload tokens |
+| Gateway execution role | `iam.Role` | Lets the Gateway get OAuth2 tokens and invoke this Runtime only |
+| OAuth provider function | `lambda_.Function` | Creates the OAuth2 credential provider |
+| Runtime health check function | `lambda_.Function` | Waits for the Runtime to reach `READY` |
+| MCP server Runtime | `bedrockagentcore.CfnRuntime` | Hosts the MCP server container with a JWT authorizer |
+| Gateway | `bedrockagentcore.CfnGateway` | Entry point with a `CUSTOM_JWT` authorizer |
+| Gateway Target | `bedrockagentcore.CfnGatewayTarget` | Routes tool calls to the Runtime with OAuth2 credentials |
+
+The stack takes six parameters.
+
+| Parameter | Description |
+|-----------|-------------|
+| `ECRImageUri` | The MCP server image in ECR |
+| `Neo4jUri` | The Neo4j URI. It must start with `neo4j://`, `neo4j+s://`, or `neo4j+ssc://`. |
+| `Neo4jDatabase` | The database name. The default is `neo4j`. |
+| `Neo4jUsername` | The database user. The default is `neo4j`. |
+| `Neo4jPasswordSecretArn` | The Secrets Manager ARN of the Neo4j password |
+| `NetworkMode` | The Runtime network mode, `PUBLIC` or `PRIVATE`. The default is `PUBLIC`. |
+
+- **Runtime environment:** The container gets `NEO4J_URI`, `NEO4J_DATABASE`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`. It also gets `NEO4J_TRANSPORT=http`, port `8000`, path `/mcp`, and `NEO4J_READ_ONLY=true`.
+- **Outputs:** The stack exports the Runtime ID, ARN, and invocation URL, the Gateway URL, ID, and target name, the Cognito pool ID, client ID, token URL, and scope, and the agent execution role ARN. `./deploy.py credentials` reads these outputs.
 
 ### Authentication Architecture
 
-The system uses machine-to-machine (M2M) OAuth2 authentication:
+The system uses machine-to-machine OAuth2. One Cognito machine client backs both tokens. The agent's token gets it into the Gateway. The Gateway's token gets it into the Runtime.
 
-```mermaid
-sequenceDiagram
-    participant Agent as AI Agent
-    participant Cognito as Amazon Cognito
-    participant Gateway as AgentCore Gateway
-    participant OAuth as OAuth Provider
-    participant Runtime as AgentCore Runtime
-    participant MCP as Neo4j MCP Server
-    participant Neo4j as Neo4j Database
+![Machine-to-machine auth sequence: the agent gets a JWT from Cognito, the Gateway validates it, gets a Runtime token from the OAuth2 provider, and the Runtime runs read-only Cypher on Neo4j](images/m2m-auth-sequence.svg)
 
-    Note over Agent,Neo4j: Step 1: Agent Authentication (M2M)
-    Agent->>Cognito: POST /oauth2/token<br/>(client_credentials grant)
-    Cognito-->>Agent: Access Token (JWT)
+1. **Get a token:** The agent posts `client_credentials` to the Cognito `/oauth2/token` endpoint and gets a JWT.
+2. **Call the Gateway:** The agent sends an MCP request with the JWT. The Gateway checks the issuer and the allowed client.
+3. **Gateway to Runtime:** The Gateway gets a Runtime token from the OAuth2 provider and forwards the request with it.
+4. **Run the tool:** The Runtime checks the allowed client. The MCP server runs read-only Cypher with the password that the container read from Secrets Manager at startup. The response returns through the Runtime and the Gateway.
 
-    Note over Agent,Neo4j: Step 2: MCP Request via Gateway
-    Agent->>Gateway: MCP Request<br/>Authorization: Bearer JWT
-    Gateway->>Gateway: Validate JWT<br/>(allowed_clients check)
+Machine-to-machine auth through the Gateway has these benefits.
 
-    Note over Agent,Neo4j: Step 3: Gateway to Runtime Authentication
-    Gateway->>OAuth: Get OAuth Token for Runtime
-    OAuth-->>Gateway: Runtime Access Token
-    Gateway->>Runtime: Forward Request + OAuth Token
-
-    Note over Agent,Neo4j: Step 4: Execute Query
-    Runtime->>MCP: MCP Tool Call
-    MCP->>Neo4j: Cypher Query<br/>(env credentials)
-    Neo4j-->>MCP: Query Results
-    MCP-->>Runtime: MCP Response
-    Runtime-->>Gateway: Response
-    Gateway-->>Agent: MCP Response
-```
-
-**Why M2M-Only via Gateway:**
-
-1. **No User Management** - No passwords to rotate, no users to create/delete
-2. **Simplified Auth** - Agents use client credentials, not interactive login
-3. **Centralized Access** - Gateway provides single entry point with audit logging
-4. **Automatic Token Handling** - Gateway manages OAuth tokens with Runtime
-5. **Tool Discovery** - Gateway enables semantic tool search across MCP servers
-6. **Security Isolation** - Runtime only accepts Gateway traffic
+- **No user management:** The user pool has no users, so there are no user passwords to rotate.
+- **Simple agent auth:** Agents use client credentials instead of an interactive login.
+- **One entry point:** The Gateway gives every agent one MCP endpoint.
+- **Managed outbound tokens:** The Gateway gets and refreshes the Runtime token on its own.
+- **Locked-down Runtime:** The Runtime accepts only tokens issued to the stack's machine client.
 
 ---
 
-## AI Agents Architecture
+## Aircraft Fleet Demo
 
-Two agent implementations are provided in `demos/aircraft-fleet/`:
+The aircraft fleet demo in `demos/aircraft-fleet/` uses both access paths over one graph. Its [architecture documents](../demos/aircraft-fleet/docs/ARCHITECTURE.md) cover it in full.
 
-### Aircraft Fleet GraphRAG Agent
-
-A single Strands agent in `graphrag-agent/` that answers questions over the aircraft graph. It connects to Neo4j directly with the Neo4j Python driver. It does not use the MCP server or the AgentCore Gateway.
-
-```mermaid
-flowchart TB
-    subgraph Input["Input"]
-        USER[User Query]
-    end
-
-    subgraph GraphRAGAgent["GraphRAG Agent (runtime_app.py)"]
-        LLM[Claude Sonnet 4.5<br/>via Bedrock]
-        AGENT[Strands Agent<br/>schema in system prompt]
-        GQ[graph_query_tool<br/>Text2Cypher]
-        VS[vector_search_tool<br/>semantic search]
-    end
-
-    subgraph External["External"]
-        TITAN[Titan Text Embeddings v2]
-        NEO4J[(Neo4j Database)]
-    end
-
-    USER --> AGENT
-    AGENT <--> LLM
-    AGENT --> GQ
-    AGENT --> VS
-    GQ --> NEO4J
-    VS --> TITAN
-    VS --> NEO4J
-
-    style AGENT fill:#e1f5fe
-```
-
-The agent reads the graph schema once at startup and puts it in the system prompt. `graph_query_tool` handles exact lookups, counts, aggregations, and traversals. It turns the question into read-only Cypher with the `neo4j-graphrag` Text2Cypher retriever. `vector_search_tool` handles descriptive questions. It searches maintenance-document chunks through the `maintenanceChunkEmbeddings` vector index. The embedder must match the one the pipeline used to load the chunks.
-
-**Key Components:**
-
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| LLM | Claude Sonnet 4.5 (Bedrock) | Reasoning and response generation |
-| Agent Framework | Strands `Agent` | Tool calling and streamed answers |
-| Retrieval | `neo4j-graphrag` retrievers | Text2Cypher and vector search |
-| Database Access | Neo4j Python driver | Direct connection, no MCP or Gateway |
-| Embeddings | Amazon Titan Text Embeddings v2 | Query embeddings for vector search |
-
-**Usage:**
-
-```bash
-cd demos/aircraft-fleet/graphrag-agent
-uv sync                   # Install dependencies
-uv run fleet-server       # Run locally (port 7070)
-uv run fleet-cli "How many aircraft are in the database?"
-./agent.sh deploy         # Deploy to AgentCore Runtime
-```
-
-The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD` from the shared `.env` at the `aircraft-fleet` root. See [graphrag-agent/README.md](../demos/aircraft-fleet/graphrag-agent/README.md) for the full command list.
-
-### Supervisor Agent (Multi-Agent)
-
-A supervisor agent that routes queries to specialized domain experts using LangGraph StateGraph.
-
-```mermaid
-flowchart TB
-    subgraph Input["Input"]
-        USER[User Query]
-    end
-
-    subgraph Supervisor["Supervisor Agent"]
-        ROUTER[Router Node<br/>Query Classification]
-
-        subgraph Workers["Specialist Workers"]
-            MAINT[Maintenance Agent<br/>Faults, Components, Sensors]
-            OPS[Operations Agent<br/>Flights, Delays, Routes]
-        end
-    end
-
-    subgraph MCP["MCP Server"]
-        GATEWAY[AgentCore Gateway]
-        MCPSERVER[Neo4j MCP Server]
-    end
-
-    subgraph External["External"]
-        NEO4J[(Neo4j Database)]
-    end
-
-    USER --> ROUTER
-    ROUTER -->|maintenance keywords| MAINT
-    ROUTER -->|operations keywords| OPS
-    MAINT --> GATEWAY
-    OPS --> GATEWAY
-    GATEWAY --> MCPSERVER
-    MCPSERVER --> NEO4J
-
-    style ROUTER fill:#fff3e0
-    style MAINT fill:#e8f5e9
-    style OPS fill:#e3f2fd
-```
-
-**StateGraph Architecture:**
-
-```mermaid
-stateDiagram-v2
-    [*] --> Router: User Query
-    Router --> Maintenance: maintenance keywords
-    Router --> Operations: operations keywords
-    Maintenance --> [*]: Response
-    Operations --> [*]: Response
-
-    note right of Router
-        Classifies query using LLM:
-        - maintenance, fault, component → Maintenance
-        - flight, delay, route → Operations
-    end note
-
-    note right of Maintenance
-        Domain expertise:
-        - Aircraft health monitoring
-        - Component reliability
-        - Fault analysis
-        - Sensor data interpretation
-    end note
-
-    note right of Operations
-        Domain expertise:
-        - Flight scheduling
-        - Delay analysis
-        - Route management
-        - Airline performance
-    end note
-```
-
-**Agent State Flow:**
-
-```mermaid
-flowchart LR
-    subgraph State["SupervisorState"]
-        MSG[messages: list]
-        NEXT[next_agent: str]
-    end
-
-    subgraph Nodes["Graph Nodes"]
-        R[router]
-        M[maintenance]
-        O[operations]
-    end
-
-    START((START)) --> R
-    R -->|next_agent=maintenance| M
-    R -->|next_agent=operations| O
-    M --> END((END))
-    O --> END
-```
-
-**Domain Specialists:**
-
-| Agent | Handles | Example Queries |
-|-------|---------|-----------------|
-| **Maintenance** | MaintenanceEvent, Component, Sensor, System, Fault | "Most common maintenance faults", "Hydraulic system issues" |
-| **Operations** | Flight, Delay, Airport, Route, Operator | "Common delay causes", "Busiest routes" |
-
-**Key Components:**
-
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Supervisor | LangGraph `StateGraph` | Multi-agent coordination |
-| Router | Claude LLM + Classification Prompt | Query routing |
-| Workers | LangGraph `create_react_agent` | Domain-specific ReAct agents |
-| State | `TypedDict` with `add_messages` | Conversation history |
-| Memory | `MemorySaver` | Session persistence |
-
-**Usage:**
-
-```bash
-cd demos/aircraft-fleet/supervisor-agent
-uv sync                       # Install dependencies
-./agent.sh start              # Run locally (port 8080)
-./agent.sh test-maintenance   # Test routing to Maintenance Agent
-./agent.sh test-operations    # Test routing to Operations Agent
-./agent.sh deploy             # Deploy to AgentCore Runtime
-```
-
----
-
-## End-to-End Request Flow
-
-Complete flow from user query to Neo4j response:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Agent as Supervisor Agent
-    participant Router
-    participant Worker as Specialist Agent
-    participant LLM as Claude Sonnet
-    participant Gateway as AgentCore Gateway
-    participant Runtime as AgentCore Runtime
-    participant MCP as Neo4j MCP Server
-    participant Neo4j
-
-    User->>Agent: "What are the most common faults?"
-
-    Note over Agent,Router: Step 1: Query Routing
-    Agent->>Router: Classify query
-    Router->>LLM: ROUTER_PROMPT + query
-    LLM-->>Router: "maintenance"
-    Router-->>Agent: next_agent = maintenance
-
-    Note over Agent,Worker: Step 2: Specialist Processing
-    Agent->>Worker: Forward to Maintenance Agent
-    Worker->>LLM: MAINTENANCE_PROMPT + query
-
-    Note over Worker,Neo4j: Step 3: Tool Execution (ReAct Loop)
-    loop ReAct: Thought → Action → Observation
-        LLM-->>Worker: Thought: Need to query faults
-        Worker->>Gateway: MCP call_tool(read_neo4j_cypher, query)
-        Gateway->>Runtime: Forward with OAuth
-        Runtime->>MCP: Execute tool
-        MCP->>Neo4j: MATCH (m:MaintenanceEvent)...
-        Neo4j-->>MCP: Results
-        MCP-->>Runtime: Tool response
-        Runtime-->>Gateway: Response
-        Gateway-->>Worker: Observation: [fault data]
-        Worker->>LLM: Observation + continue
-    end
-
-    Note over Worker,User: Step 4: Response
-    LLM-->>Worker: Final answer
-    Worker-->>Agent: Response message
-    Agent-->>User: "The most common faults are..."
-```
+- **Pipeline:** The pipeline loads a generated fleet and its maintenance manuals into Neo4j with a direct driver.
+- **GraphRAG agent:** The GraphRAG agent answers with Text2Cypher and hybrid search over a direct driver.
+- **Supervisor agent:** The supervisor agent routes questions to two specialists that query the graph through the `fleet` deployment of this MCP server.
+- **Memory:** Both agents keep conversation memory in a second Neo4j database.
 
 ---
 
@@ -606,15 +228,37 @@ sequenceDiagram
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **MCP Server** | Go, Neo4j Driver | Cypher query execution |
-| **Container** | Docker, ARM64 | Cross-platform deployment |
-| **Infrastructure** | AWS CDK (Python) | Infrastructure as Code |
-| **Runtime** | Bedrock AgentCore | MicroVM container hosting |
-| **Gateway** | Bedrock AgentCore | Tool aggregation, auth |
-| **Auth** | Amazon Cognito | OAuth2 M2M tokens |
-| **Agents** | LangGraph, LangChain | Multi-agent orchestration |
-| **LLM** | Claude Sonnet 4 (Bedrock) | Reasoning, tool selection |
-| **Observability** | CloudWatch, X-Ray | Logs, traces, metrics |
+| **MCP server** | Python FastMCP, `mcp-neo4j-cypher` | Read-only Cypher execution |
+| **Container** | Docker buildx, arm64 | AgentCore Runtime image |
+| **Infrastructure** | AWS CDK in Python | Infrastructure as code |
+| **Runtime** | Amazon Bedrock AgentCore Runtime | MicroVM container hosting |
+| **Gateway** | Amazon Bedrock AgentCore Gateway | One MCP endpoint with inbound and outbound auth |
+| **Auth** | Amazon Cognito, AgentCore Identity | OAuth2 M2M tokens |
+| **Secrets** | AWS Secrets Manager | Neo4j passwords |
+| **Agents** | Strands Agents, LangGraph | Tool calling and multi-agent orchestration |
+| **LLM** | Claude on Amazon Bedrock | Reasoning and tool selection |
+| **Embeddings** | Amazon Titan Text Embeddings v2 | Fleet chunk and query embeddings |
+| **Observability** | CloudWatch, X-Ray | Logs, traces, and metrics |
+
+The projects use different Claude models.
+
+| Model | Used by |
+|-------|---------|
+| Claude Sonnet 5.5 | Both fleet agents, fleet pipeline extraction, and fleet memory extraction |
+| Claude Haiku 4.5 | The quickstart agent and the fraud memory agent by default |
+| Claude Sonnet 4.6 | The SEC filings notebook |
+
+---
+
+## Diagrams
+
+| Diagram | Shows |
+|---------|-------|
+| [`system-overview.svg`](images/system-overview.svg) | The MCP path and the direct-driver path to Neo4j |
+| [`mcp-server-architecture.svg`](images/mcp-server-architecture.svg) | The MCP server stack and its six-step request path |
+| [`mcp-deploy-flow.svg`](images/mcp-deploy-flow.svg) | The `deploy.py` steps and which commands run them |
+| [`cdk-stack-components.svg`](images/cdk-stack-components.svg) | The resources the CDK stack builds and how they connect |
+| [`m2m-auth-sequence.svg`](images/m2m-auth-sequence.svg) | The machine-to-machine token flow from agent to Neo4j |
 
 ---
 
@@ -632,7 +276,8 @@ sequenceDiagram
 
 ### Project Resources
 
-- [Neo4j MCP Server](https://github.com/neo4j/mcp)
+- [Neo4j MCP Server](https://github.com/neo4j-partners/mcp-neo4j)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Strands Agents](https://strandsagents.com/)
 - [LangGraph Multi-Agent](https://langchain-ai.github.io/langgraph/concepts/multi_agent/)
 - [AWS CDK Python Reference](https://docs.aws.amazon.com/cdk/api/v2/python/)

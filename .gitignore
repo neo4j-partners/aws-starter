@@ -200,8 +200,11 @@ secrets.json
 # Per-deployment credentials from ./deploy.py --env NAME
 .mcp-credentials.*.json
 neo4j-sso-config.json
-*_secret*
-!integrations/databricks/setup_databricks_secrets.sh
+# Secret files such as client_secret.json or db_secret.txt. Narrow on purpose:
+# source files such as test_secrets.py or setup_databricks_secrets.sh must stay tracked.
+*_secret
+*_secret.*
+client_secret*.json
 *.secret
 .secrets/
 token.json
@@ -223,3 +226,6 @@ amazon-bedrock-ide-app-export-*
 
 # MCP credentials (contains secrets - never commit)
 .mcp.json
+
+# Local planning notes and work logs
+worklog/

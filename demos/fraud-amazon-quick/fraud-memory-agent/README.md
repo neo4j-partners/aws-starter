@@ -151,6 +151,7 @@ Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 - **Smoke test:** A deploy counts as verified only after the runtime is `READY` and a one-turn graph test succeeds. This test calls the real NAMS, model, and Neo4j MCP server. The check waits up to 10 minutes for a new runtime to reach `READY`.
 - **`--skip-smoke`:** This flag uploads without the smoke test. Run `./agent.sh verify` before you send traffic to it.
 - **Dependency rebuild:** Deploy records a fingerprint of `pyproject.toml` and `uv.lock`. When either file changes, deploy forces AgentCore to rebuild dependencies. Add `--force-rebuild-deps` to force a rebuild yourself.
+- **`invoke-cloud` errors:** `invoke-cloud` exits 1 when the response holds an error event, so scripts can check its exit code.
 - **Stale runtime binding:** Deploy clears the saved runtime binding only when the runtime is in another Region or AWS confirms it no longer exists.
 
 Recovery and diagnostics commands:

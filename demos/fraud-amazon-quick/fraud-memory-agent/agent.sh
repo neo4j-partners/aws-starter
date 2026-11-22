@@ -114,6 +114,34 @@ verify_deployment() {
         --agent "$AGENT_NAME"
 }
 
+invoke_deployed() {
+    # `agentcore invoke` prints each streamed event as one JSON object per
+    # line and exits 0 even when the runtime sends an error event. Show the
+    # response as it arrives, then fail when it holds an error event. The
+    # pipe makes the CLI wrap at 80 columns, so pass the terminal width on.
+    local output status columns="${COLUMNS:-}"
+    if [ -z "$columns" ] && [ -t 1 ]; then
+        columns="$(tput cols 2>/dev/null || true)"
+    fi
+    output="$(mktemp)"
+    set +e
+    COLUMNS="${columns:-80}" uv run agentcore invoke "$1" | tee "$output"
+    status=${PIPESTATUS[0]}
+    set -e
+    if [ "$status" -ne 0 ]; then
+        rm -f "$output"
+        return "$status"
+    fi
+    # Strip any color codes first, in case FORCE_COLOR is set.
+    if sed $'s/\x1b\\[[0-9;]*m//g' "$output" \
+        | grep -Eq '^[[:space:]]*\{"type": ?"error"'; then
+        rm -f "$output"
+        echo -e "${RED}The agent returned an error event. See the response above.${NC}"
+        return 1
+    fi
+    rm -f "$output"
+}
+
 archive_local_config() {
     if [ ! -f "$CONFIG_FILE" ]; then
         echo "No local AgentCore config exists at $CONFIG_FILE."
@@ -296,7 +324,7 @@ case "${1:-help}" in
         fi
         echo "Prompt: $PROMPT"
         echo ""
-        uv run agentcore invoke "{\"prompt\": \"$PROMPT\"}"
+        invoke_deployed "{\"prompt\": \"$PROMPT\"}"
         ;;
 
     destroy)

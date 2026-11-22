@@ -140,7 +140,12 @@ export AWS_PROFILE=my-profile   # only if you use a non-default AWS profile
 ./deploy.py
 ```
 
-The deploy takes about 5 to 10 minutes. It does these steps:
+The deploy takes about 5 to 10 minutes. On a Mac that may go to sleep
+during the deploy, run it as `caffeinate -i ./deploy.py`. Idle sleep pauses
+the CDK wait, and the deploy then takes much longer. The same applies to
+`./deploy.py cleanup`.
+
+It does these steps:
 
 1. It checks that it can connect to Neo4j.
 2. It builds the ARM64 Docker image. It builds the server from `NEO4J_MCP_REPO`, then adds the startup entrypoint from `image/`.

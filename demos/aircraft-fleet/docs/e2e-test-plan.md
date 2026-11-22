@@ -1056,8 +1056,14 @@ passed. The Runtime logs show no errors.
 
 1. A SIGINT to the `load-test` process did not stop it between requests.
    The loop kept sending requests until a SIGTERM stopped it.
+   **Resolved:** This is not a load test bug. The run started the load
+   test as a background job from a script. Bash then sets SIGINT to
+   ignored, and Python keeps that setting. A recheck with job control on,
+   as in a terminal, stopped the loop mid-request and printed the totals.
+   Ctrl+C in a terminal works.
 2. A long `./deploy.py` run stalls while the Mac sleeps. Running it under
    `caffeinate -i` keeps the CDK wait alive.
+   **Resolved:** `neo4j-mcp-server/README.md` Step 3 now has this tip.
 
 **Cloud resources confirmed destroyed:** Both `agent.sh destroy --yes` runs
 exited 0. `./deploy.py --env fleet cleanup` exited 0 after 4 minutes 15

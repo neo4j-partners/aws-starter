@@ -703,24 +703,21 @@ history.
   7. Done: the MCP runtime now gets only `NEO4J_PASSWORD_SECRET_ARN`. An
      image entrypoint reads the password at startup. A cloud deploy has not
      tested it yet.
-  8. Explained, not fixed: `npm audit` reports 3 vulnerabilities in the
-     CDK dependencies of both agents, 2 moderate and 1 high. They are
-     denial-of-service bugs in glob matching, in `minimatch`
-     (GHSA-g3hv-75wg-m249) and `brace-expansion` (GHSA-q2hr-2g5m-vwhr,
-     GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).
-     - **Where they run:** Both packages run only during `cdk synth` on
-       the developer machine, on patterns from this repository. Neither
-       reaches a Runtime.
-     - **Why no override:** `aws-cdk-lib` bundles both packages, so an npm
-       override cannot replace them.
-     - **The fix:** `aws-cdk-lib` 2.278.0 clears all three, and `npm audit`
-       then reports 0. The AgentCore CLI 1.2.0 manages these dependencies
-       and vends `aws-cdk-lib ~2.269.0`. With 2.278.0 pinned,
-       `agentcore build` and `agentcore deploy` stop with an error.
-     - **The options:** Wait for a CLI release that vends 2.278.0 or later,
-       or turn off the CLI's dependency management with
-       `agentcore config disableDependencyManagement true` and pin 2.278.0.
-       That setting is global to the machine.
+  8. Done: `npm audit` reports 0 vulnerabilities in both agents' CDK
+     folders. It had reported 3, in the `minimatch` and `brace-expansion`
+     copies that `aws-cdk-lib` bundles (GHSA-g3hv-75wg-m249,
+     GHSA-q2hr-2g5m-vwhr, GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p).
+     - **The fix:** `package.json` declares `aws-cdk-lib` as
+       `>=2.278.0 <3` and `aws-cdk` as `>=2.1149.0 <3`, and
+       `package-lock.json` locks 2.278.0 and 2.1149.0. `aws-cdk-lib`
+       2.278.0 clears the advisories. Its cloud assembly needs CLI 2.1149.0
+       or later to synthesize.
+     - **Why a range:** The AgentCore CLI 1.2.0 rewrites a single pinned
+       version to the one it vends, `~2.269.0`, and refuses a newer pin.
+       It leaves a range unchanged and prints a warning, so no global
+       `disableDependencyManagement` setting is needed. The CLI still
+       manages `@aws/agentcore-cdk`, `constructs`, and the TypeScript
+       packages.
   9. AgentCore keeps the runtime log groups after a destroy, and they have
      no retention. This run left two of them. The deploys also turned on
      CloudWatch Transaction Search for the account.

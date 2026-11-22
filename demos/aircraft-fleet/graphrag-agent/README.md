@@ -171,6 +171,18 @@ The deployed agent has the same `/invocations` modes as the local server.
 - **Final check:** It asks CloudFormation whether the stack `AgentCore-AircraftFleet-default` is gone. It fails while the stack exists in any state other than `DELETE_COMPLETE`.
 - **Log groups:** The stack delete keeps the Runtime's log group, `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`. Destroy reads the Runtime ID from `agentcore/.cli/deployed-state.json` before it removes anything. After the final check passes, it deletes each log group that starts with `<runtime-id>-` and prints `Removed` or `Not found` for each. A failed delete does not stop the others, but destroy then exits 1 and names the group. When no ID is recorded, or the stack was already gone, destroy leaves the log groups alone.
 
+If a log group delete fails, or the runtime ID was lost, remove the group by hand after the stack is gone. Use the Region from `agentcore/aws-targets.json`. The failure lines name the group, and the AWS Console lists it under CloudWatch log groups.
+
+```bash
+REGION=us-east-1
+RUNTIME_ID=<runtime-id>
+aws logs describe-log-groups --region "$REGION" \
+    --log-group-name-prefix "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-" \
+    --query 'logGroups[].logGroupName' --output text
+aws logs delete-log-group --region "$REGION" \
+    --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT"
+```
+
 ## Conversation memory
 
 ![Conversation memory lifecycle](../docs/images/memory-lifecycle.svg)

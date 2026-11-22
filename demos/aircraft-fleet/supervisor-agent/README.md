@@ -196,6 +196,18 @@ treats the provider as orphaned and deletes it. If it happens, run
 - **Log groups:** The stack delete keeps the runtime's log group, `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`. Destroy reads the runtime ID from `agentcore/.cli/deployed-state.json` before it removes anything. After the final check passes, it deletes each log group that starts with `<runtime-id>-` and prints `Removed` or `Not found` for each. A failed delete does not stop the others, but destroy then exits 1 and names the group. When no ID is recorded, or the stack was already gone, destroy leaves the log groups alone.
 - **Lost local state:** If `agentcore/.cli/` is lost, destroy still deletes the stack. The AWS check then names the leftover provider. Without the recorded runtime ID, the log groups stay.
 
+If a log group delete fails, or the runtime ID was lost, remove the group by hand after the stack is gone. Use the Region from `agentcore/aws-targets.json`. The failure lines name the group, and the AWS Console lists it under CloudWatch log groups.
+
+```bash
+REGION=us-east-1
+RUNTIME_ID=<runtime-id>
+aws logs describe-log-groups --region "$REGION" \
+    --log-group-name-prefix "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-" \
+    --query 'logGroups[].logGroupName' --output text
+aws logs delete-log-group --region "$REGION" \
+    --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT"
+```
+
 ### Upgrade a checkout that already deployed
 
 Git used to track `agentcore/aws-targets.json`, and the first deploy edited it.

@@ -282,6 +282,18 @@ the delete. It skips this step when the stack was already absent or the
 stack delete failed. If a log group delete fails, cleanup finishes the other
 steps, names the group, and exits 1.
 
+If a log group delete fails, remove the group by hand. Use the Region from `AWS_REGION` in `.env`, and the runtime ID from the `Could not delete` lines.
+
+```bash
+REGION=us-east-1
+RUNTIME_ID=<runtime-id>
+aws logs describe-log-groups --region "$REGION" \
+    --log-group-name-prefix "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-" \
+    --query 'logGroups[].logGroupName' --output text
+aws logs delete-log-group --region "$REGION" \
+    --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT"
+```
+
 ## Commands
 
 All commands run from `neo4j-mcp-server/`.

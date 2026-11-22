@@ -55,7 +55,7 @@ from urllib.parse import urlparse
 
 import boto3
 import httpx
-from botocore.exceptions import ClientError, WaiterError
+from botocore.exceptions import BotoCoreError, ClientError, WaiterError
 
 # ============================================================================
 # Configuration
@@ -890,18 +890,21 @@ def _find_runtime_id(aws: Aws, cfg: Config) -> str:
         kwargs["nextToken"] = token
 
 
-def _delete_agent_runtime(aws: Aws, cfg: Config, timeout: int = 600, delay: int = 10) -> None:
+def _delete_agent_runtime(aws: Aws, cfg: Config, timeout: int = 600, delay: int = 10) -> str:
     """Delete the AgentCore runtime out of band and wait for it to disappear.
 
     CloudFormation's AWS::BedrockAgentCore::Runtime handler gives up with
     NotStabilized before AgentCore finishes deleting a runtime, which drops the
     whole stack into DELETE_FAILED. Deleting the runtime here first (and waiting
     as long as it actually takes) leaves the stack's own delete a no-op.
+
+    Returns the runtime ID it looked up, or "" when there is no runtime, so
+    cleanup can remove the runtime's log groups once the stack is gone.
     """
     runtime_id = _find_runtime_id(aws, cfg)
     if not runtime_id:
         log_info("No AgentCore runtime found, skipping")
-        return
+        return ""
 
     client = aws.client("bedrock-agentcore-control")
     log_info(f"Deleting AgentCore runtime: {runtime_id}")
@@ -910,18 +913,72 @@ def _delete_agent_runtime(aws: Aws, cfg: Config, timeout: int = 600, delay: int 
     except ClientError as exc:
         if exc.response["Error"]["Code"] not in _NOT_FOUND_CODES:
             raise
-        return
+        return runtime_id
 
     deadline = time.time() + timeout
     while time.time() < deadline:
         if not _exists(lambda: client.get_agent_runtime(agentRuntimeId=runtime_id)):
             log_success("Runtime deleted")
-            return
+            return runtime_id
         log_info(f"Runtime still deleting, waiting {delay}s...")
         time.sleep(delay)
 
     # Not fatal: cdk destroy runs next and may still finish the job.
     log_error(f"Runtime {runtime_id} still present after {timeout}s")
+    return runtime_id
+
+
+# AgentCore writes each runtime's logs to <prefix><runtime-id>-<endpoint>.
+RUNTIME_LOG_PREFIX = "/aws/bedrock-agentcore/runtimes/"
+# The AgentCore runtime ID pattern: the runtime name, a dash, and 10 characters.
+RUNTIME_ID_PATTERN = re.compile(r"[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}")
+
+
+def _delete_runtime_log_groups(aws: Aws, runtime_id: str) -> list[str]:
+    """Delete the runtime's CloudWatch log groups and return those that failed.
+
+    Neither the runtime delete nor cdk destroy removes them. The prefix ends
+    with the dash after the full ID, so it cannot match another runtime's
+    group. A missing group is not a failure. A failed delete does not stop
+    the others.
+    """
+    if not RUNTIME_ID_PATTERN.fullmatch(runtime_id):
+        log_warning(f"Runtime ID {runtime_id!r} is not valid, so its log groups stay in place")
+        return []
+    prefix = f"{RUNTIME_LOG_PREFIX}{runtime_id}-"
+    logs = aws.client("logs")
+    try:
+        names = [
+            group["logGroupName"]
+            for page in logs.get_paginator("describe_log_groups").paginate(
+                logGroupNamePrefix=prefix
+            )
+            for group in page.get("logGroups", [])
+            if group["logGroupName"].startswith(prefix)
+        ]
+    except (BotoCoreError, ClientError) as exc:
+        log_error(f"Could not list the log groups under {prefix}: {exc}")
+        return [f"{prefix}*"]
+    if not names:
+        log_info(f"Not found: log groups under {prefix} in {aws.region}")
+        return []
+
+    failed: list[str] = []
+    for name in names:
+        try:
+            logs.delete_log_group(logGroupName=name)
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] == "ResourceNotFoundException":
+                log_info(f"Not found: log group {name}")
+                continue
+            log_error(f"Could not delete log group {name}: {exc}")
+            failed.append(name)
+        except BotoCoreError as exc:
+            log_error(f"Could not delete log group {name}: {exc}")
+            failed.append(name)
+        else:
+            log_success(f"Removed: log group {name}")
+    return failed
 
 
 def _retry_stack_delete(aws: Aws, cfg: Config) -> bool:
@@ -958,8 +1015,9 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
         return
 
     stack_deleted = True
+    failed_log_groups: list[str] = []
     if stack_exists(aws, cfg):
-        _delete_agent_runtime(aws, cfg)
+        runtime_id = _delete_agent_runtime(aws, cfg)
 
         log_info(f"Deleting CDK stack: {cfg.stack_name}")
         setup_cdk_deps()
@@ -973,6 +1031,10 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
         stack_deleted = result.returncode == 0 or _retry_stack_delete(aws, cfg)
         if stack_deleted:
             log_success("Stack deleted")
+            # The runtime is gone with the stack, so its log groups can go
+            # now. The stack does not own them, so cdk destroy leaves them.
+            if runtime_id:
+                failed_log_groups = _delete_runtime_log_groups(aws, runtime_id)
     else:
         log_info("Stack does not exist, skipping")
 
@@ -1007,6 +1069,12 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
             f"--stack-name {cfg.stack_name} --max-items 20"
         )
         raise DeployError("stack delete failed")
+
+    if failed_log_groups:
+        log_error(f"Could not delete these log groups in {aws.region}:")
+        for name in failed_log_groups:
+            log_error(f"  {name}")
+        raise DeployError("log group delete failed")
 
     log_success("Cleanup complete")
 

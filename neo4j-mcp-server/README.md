@@ -274,6 +274,14 @@ This command deletes the stack, the Secrets Manager password, and the ECR
 repository. It asks you to confirm first. It asks again before it deletes the
 ECR repository. Add `--env NAME` to remove one named deployment.
 
+The stack delete leaves the Runtime's CloudWatch log groups behind. After the
+stack is gone, cleanup deletes the groups under
+`/aws/bedrock-agentcore/runtimes/<runtime-id>-` and prints `Removed` or
+`Not found` for each. It reads the runtime ID from the stack outputs before
+the delete. It skips this step when the stack was already absent or the
+stack delete failed. If a log group delete fails, cleanup finishes the other
+steps, names the group, and exits 1.
+
 ## Commands
 
 All commands run from `neo4j-mcp-server/`.
@@ -290,7 +298,7 @@ All commands run from `neo4j-mcp-server/`.
 | `./deploy.py status` | Show the stack status and outputs |
 | `./deploy.py credentials` | Write `.mcp-credentials.json` with the Gateway URL and a JWT token |
 | `./deploy.py stack-name` | Print the resolved stack name. The shell scripts use this. |
-| `./deploy.py cleanup` | Delete the stack and the password secret, with no recovery window. It asks separately before deleting the shared ECR repository. |
+| `./deploy.py cleanup` | Delete the stack, the Runtime's log groups, and the password secret, with no recovery window. It asks separately before deleting the shared ECR repository. |
 | `./deploy.py help` | Show the full help text |
 | `./deploy.py --env NAME ...` | Run any command against the `.env.NAME` deployment |
 

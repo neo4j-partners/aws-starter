@@ -31,7 +31,7 @@ DEFAULT_PROMPT = (
 DEFAULT_READY_TIMEOUT_SECONDS = 600
 DEFAULT_POLL_INTERVAL_SECONDS = 15
 # Statuses from which a runtime cannot become READY without a new deploy.
-TERMINAL_STATUSES = frozenset({"CREATE_FAILED", "UPDATE_FAILED", "DELETING"})
+TERMINAL_STATUSES = frozenset({"CREATE_FAILED", "UPDATE_FAILED", "DELETING", "DELETE_FAILED"})
 
 
 def parse_args() -> argparse.Namespace:

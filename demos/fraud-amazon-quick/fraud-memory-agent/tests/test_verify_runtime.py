@@ -5,9 +5,10 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 _SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "verify_agentcore_runtime.py"
 _SPEC = importlib.util.spec_from_file_location("verify_agentcore_runtime", _SCRIPT)
@@ -88,6 +89,29 @@ class WaitForReadyTests(unittest.TestCase):
         self.assertIn("no failure reason supplied", error)
         self.assertEqual(clock.sleeps, [])
 
+    def test_a_delete_failure_fails_without_waiting(self) -> None:
+        clock = FakeClock()
+
+        error = self.wait(control_returning({"status": "DELETE_FAILED"}), clock)
+
+        self.assertIn("status='DELETE_FAILED'", error)
+        self.assertEqual(clock.sleeps, [])
+
+    def test_a_deleting_runtime_fails_without_waiting(self) -> None:
+        clock = FakeClock()
+
+        error = self.wait(control_returning({"status": "DELETING"}), clock)
+
+        self.assertIn("status='DELETING'", error)
+        self.assertEqual(clock.sleeps, [])
+
+    def test_an_updating_runtime_is_polled_until_ready(self) -> None:
+        clock = FakeClock()
+        control = control_returning({"status": "UPDATING"}, {"status": "READY"})
+
+        self.assertIsNone(self.wait(control, clock))
+        self.assertEqual(clock.sleeps, [15])
+
     def test_a_runtime_that_never_becomes_ready_times_out(self) -> None:
         clock = FakeClock()
         control = Mock()
@@ -100,6 +124,27 @@ class WaitForReadyTests(unittest.TestCase):
         )
         self.assertEqual(clock.sleeps, [15, 15, 10])
         self.assertEqual(control.get_agent_runtime.call_count, 4)
+
+
+class ArgumentTests(unittest.TestCase):
+    def run_main(self, *flags: str) -> tuple[int, str]:
+        argv = ["verify", "--config", "missing.yaml", "--agent", "agent", *flags]
+        stderr = io.StringIO()
+        with patch.object(sys, "argv", argv), contextlib.redirect_stderr(stderr):
+            code = verify.main()
+        return code, stderr.getvalue()
+
+    def test_a_negative_ready_timeout_is_rejected(self) -> None:
+        code, stderr = self.run_main("--ready-timeout-seconds", "-1")
+
+        self.assertEqual(code, 2)
+        self.assertIn("--ready-timeout-seconds must not be negative", stderr)
+
+    def test_a_poll_interval_below_1_is_rejected(self) -> None:
+        code, stderr = self.run_main("--poll-interval-seconds", "0")
+
+        self.assertEqual(code, 2)
+        self.assertIn("--poll-interval-seconds must be positive", stderr)
 
 
 if __name__ == "__main__":

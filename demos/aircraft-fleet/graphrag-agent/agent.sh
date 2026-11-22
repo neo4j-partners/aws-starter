@@ -295,6 +295,42 @@ stack_status() {
     fi
 }
 
+# Return 0 when CloudFormation shows no stack for $TARGET, after saying so.
+# CLI 1.2.0 fails the deploy that destroy runs when the target has no stack,
+# so destroy checks first. Any error other than "does not exist" exits. The
+# temp folder and its EXIT trap follow the report_remaining pattern, and both
+# are cleared before this returns. destroy calls this inside if, where set -e
+# is off, so every step is checked.
+stack_absent() {
+    local entry region stack cfn_status
+    if ! entry=$(target_entry); then
+        echo -e "${RED}Could not read the region for target '$TARGET' from $TARGETS_FILE.${NC}"
+        exit 1
+    fi
+    read -r _ region <<<"$entry"
+    if ! stack=$(stack_name); then
+        echo -e "${RED}Could not read the project name from $PROJECT_SPEC.${NC}"
+        exit 1
+    fi
+    REPORT_TMP=""
+    trap '[ -z "$REPORT_TMP" ] || rm -rf "$REPORT_TMP"' EXIT
+    if ! REPORT_TMP=$(mktemp -d); then
+        echo -e "${RED}Could not create a temp folder for the stack check.${NC}"
+        exit 1
+    fi
+    if ! cfn_status=$(stack_status "$stack" "$region"); then
+        echo -e "${RED}Could not check stack $stack in $region with CloudFormation.${NC}"
+        exit 1
+    fi
+    rm -rf "$REPORT_TMP"
+    REPORT_TMP=""
+    trap - EXIT
+    if [ "$cfn_status" != "absent" ] && [ "$cfn_status" != "DELETE_COMPLETE" ]; then
+        return 1
+    fi
+    echo -e "${YELLOW}Stack $stack does not exist in $region, so there is nothing to remove.${NC}"
+}
+
 report_remaining() {
     local status parsed region remaining status_err parse_err stack cfn_status
     # The stderr files below go in one folder that the EXIT trap removes, so
@@ -488,6 +524,14 @@ case "${1:-help}" in
         # Check the account before anything changes, so credentials for
         # another account cannot deploy the empty project there.
         require_target_account
+        # With no stack there is nothing to remove, and the deploy below
+        # would fail. The report still checks what AWS shows, so a leftover
+        # still fails the run.
+        if stack_absent; then
+            echo ""
+            report_remaining
+            exit 0
+        fi
         if [ "${2:-}" != "--yes" ]; then
             confirm_destroy
         fi
@@ -496,7 +540,8 @@ case "${1:-help}" in
         ensure_cdk_deps
         # CLI 1.2.0 has no destroy command. A deploy of a project that
         # declares nothing removes the target's stack, so remove the Runtime
-        # from the spec, deploy, and put the spec back.
+        # from the spec, deploy, and put the spec back. That deploy fails
+        # when the target has no stack, which stack_absent rules out above.
         echo -e "${YELLOW}Removing agent from AgentCore Runtime...${NC}"
         echo ""
         # With the Runtime removed, synth skips the Neo4j settings, so destroy

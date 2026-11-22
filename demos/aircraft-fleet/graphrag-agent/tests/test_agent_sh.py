@@ -65,6 +65,17 @@ if [ "$1 $2" = "sts get-caller-identity" ]; then
     exit 0
 fi
 if [ "$1 $2" != "cloudformation describe-stacks" ]; then exit 99; fi
+# destroy checks the stack before it deploys. While STUB_STACK_BEFORE_DEPLOY
+# is set, even to "", the checks before the deploy read only it and the
+# STUB_PRECHECK_* settings, and the settings after this block act on the
+# checks after the deploy. "" reads as a stack that does not exist.
+if [ -n "${STUB_STACK_BEFORE_DEPLOY+set}" ] && ! grep -q "^agentcore deploy" "$STUB_LOG"; then
+    if [ "$STUB_INTERRUPT" = precheck ]; then kill -INT 0; sleep 5; fi
+    if [ -n "$STUB_PRECHECK_ERROR" ]; then echo "$STUB_PRECHECK_ERROR" >&2; exit 254; fi
+    if [ -n "$STUB_STACK_BEFORE_DEPLOY" ]; then echo "$STUB_STACK_BEFORE_DEPLOY"; exit 0; fi
+    echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
+    exit 254
+fi
 if [ "$STUB_INTERRUPT" = describe-stacks ]; then kill -INT 0; sleep 5; fi
 if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
 if [ -n "$STUB_AWS_WARNING" ]; then echo "$STUB_AWS_WARNING" >&2; fi
@@ -186,6 +197,8 @@ def run_destroy(
         "STUB_PYTHON": sys.executable,
         "STUB_TMP": str(project.parent / "tmp"),
         "STUB_STATUS_JSON": _status(),
+        # The stack exists when destroy starts, unless a test says otherwise.
+        "STUB_STACK_BEFORE_DEPLOY": "CREATE_COMPLETE",
         **stub_env,
     }
     result = subprocess.run(
@@ -205,6 +218,11 @@ def run_destroy(
 def calls(project: Path) -> list[str]:
     log = project.parent / "calls.log"
     return log.read_text().splitlines() if log.exists() else []
+
+
+def calls_after_deploy(project: Path) -> list[str]:
+    logged = calls(project)
+    return logged[logged.index("agentcore deploy --target default --yes") + 1 :]
 
 
 def leftover_temp_files(project: Path) -> list[str]:
@@ -227,6 +245,73 @@ def test_clean_destroy_checks_cloudformation_and_succeeds(project: Path, stack_s
         c.startswith(f"aws cloudformation describe-stacks --stack-name {STACK} --region us-east-1")
         for c in logged
     )
+    assert spec.read_bytes() == tracked
+    assert leftover_temp_files(project) == []
+
+
+# With no stack there is nothing to remove. destroy skips the prompt, the
+# CDK install, and the deploy, which CLI 1.2.0 fails when no stack exists.
+@pytest.mark.parametrize("stack_status", ["", "DELETE_COMPLETE"])
+def test_an_absent_stack_skips_the_deploy_and_succeeds(project: Path, stack_status: str) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+    remove_cdk_install(project)
+
+    result = run_destroy(project, "", STUB_STACK_BEFORE_DEPLOY=stack_status)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Stack {STACK} does not exist in us-east-1, so there is nothing to remove." in (
+        result.stdout
+    )
+    assert f"Cleanup complete. Stack {STACK} does not exist in us-east-1." in result.stdout
+    assert "Continue?" not in result.stdout
+    logged = calls(project)
+    assert not any(c.startswith(("agentcore remove", "agentcore deploy", "npm")) for c in logged)
+    assert "agentcore status --json --target default" in logged
+    assert spec.read_bytes() == tracked
+    assert leftover_temp_files(project) == []
+
+
+def test_an_absent_stack_still_fails_when_status_reports_a_resource(project: Path) -> None:
+    deployed = [
+        {"resourceType": "runtime", "name": "graphrag_agent", "deploymentState": "deployed"}
+    ]
+
+    result = run_destroy(project, STUB_STACK_BEFORE_DEPLOY="", STUB_STATUS_JSON=_status(deployed))
+
+    assert result.returncode == 1
+    assert "runtime graphrag_agent: deployed" in result.stdout
+    assert "Cleanup complete" not in result.stdout
+    assert not any(c.startswith("agentcore deploy") for c in calls(project))
+
+
+def test_an_aws_error_in_the_stack_check_fails_before_any_change(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(
+        project,
+        "",
+        STUB_PRECHECK_ERROR="An error occurred (ExpiredToken) when calling the DescribeStacks operation",
+    )
+
+    assert result.returncode == 1
+    assert f"Could not check stack {STACK} in us-east-1 with CloudFormation." in result.stdout
+    assert "ExpiredToken" in result.stderr
+    assert "Continue?" not in result.stdout
+    assert not any(c.startswith("agentcore ") for c in calls(project))
+    assert spec.read_bytes() == tracked
+    assert leftover_temp_files(project) == []
+
+
+def test_ctrl_c_during_the_stack_check_removes_the_temp_files(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_INTERRUPT="precheck")
+
+    assert result.returncode != 0
+    assert not any(c.startswith("agentcore ") for c in calls(project))
     assert spec.read_bytes() == tracked
     assert leftover_temp_files(project) == []
 
@@ -266,7 +351,7 @@ def test_unreadable_status_output_fails(project: Path, status_json: str) -> None
     assert result.returncode == 1
     assert "Could not read the agentcore status output" in result.stdout
     assert "Cleanup complete" not in result.stdout
-    assert not any(c.startswith("aws cloudformation") for c in calls(project))
+    assert not any(c.startswith("aws cloudformation") for c in calls_after_deploy(project))
 
 
 def test_failed_status_call_fails_and_removes_its_temp_file(project: Path) -> None:
@@ -330,7 +415,7 @@ def test_credentials_for_another_account_fail_before_the_stack_check(project: Pa
     assert "agentcore deploy --target default --yes" in calls(project)
     assert f"account 999988887777, but target 'default' is in account {ACCOUNT}" in result.stdout
     assert "Cleanup complete" not in result.stdout
-    assert not any(c.startswith("aws cloudformation") for c in calls(project))
+    assert not any(c.startswith("aws cloudformation") for c in calls_after_deploy(project))
 
 
 @pytest.mark.parametrize("args", [("--yes",), ("",)])

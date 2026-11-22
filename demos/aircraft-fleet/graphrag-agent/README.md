@@ -167,6 +167,7 @@ The deployed agent has the same `/invocations` modes as the local server.
 
 - **Confirmation:** It asks first and cancels unless you answer `y`. Pass `--yes` to skip the question.
 - **Account check:** It confirms that the active AWS credentials belong to the account recorded in `agentcore/aws-targets.json`.
+- **No stack:** When CloudFormation shows no stack, there is nothing to remove. It skips the question and the deploy and goes straight to the final check.
 - **Final check:** It asks CloudFormation whether the stack `AgentCore-AircraftFleet-default` is gone. It fails while the stack exists in any state other than `DELETE_COMPLETE`.
 
 ## Conversation memory

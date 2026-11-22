@@ -440,7 +440,7 @@ Set `MCP_SERVER_URL` to point `test`, `tools`, and `call` at a different URL.
 
 [ARCHITECTURE.md](./ARCHITECTURE.md) covers these topics:
 
-- **Diagrams:** The file has detailed Mermaid architecture diagrams.
+- **Diagrams:** The file has SVG diagrams of the request path, the login flow, and the CDK stack.
 - **CDK stack:** The file breaks down the stack by module.
 - **Login flow:** The file has sequence diagrams for authentication.
 - **Gateway only:** The file explains why agents use machine login through the Gateway.

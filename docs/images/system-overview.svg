@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>System Overview</title>
+  <desc>Agents in quickstart and the demos reach Neo4j in one of two ways. Agents over MCP get a JWT from Amazon Cognito and call the AgentCore Gateway. The Gateway calls the Neo4j MCP server on AgentCore Runtime, which runs read-only Cypher on Neo4j. The fleet pipeline, the GraphRAG agent, the fraud graph loader, and the SEC filings notebook use the Neo4j Python driver directly. Every agent calls Claude on Amazon Bedrock.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="900" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">System Overview</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Agents reach Neo4j through the MCP Gateway or with a direct driver.</text>
+  <rect x="40" y="120" width="380" height="490" rx="18" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="64" y="152" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Agents over the MCP Gateway</text>
+  <rect x="70" y="175" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="207" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Quickstart agent</text>
+  <text x="230.0" y="233" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">LangGraph ReAct agent</text>
+  <text x="230.0" y="255" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">default deployment</text>
+  <rect x="70" y="315" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="347" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fleet supervisor</text>
+  <text x="230.0" y="373" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, two specialists</text>
+  <text x="230.0" y="395" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">--env fleet</text>
+  <rect x="70" y="455" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="487" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fraud memory agent</text>
+  <text x="230.0" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands agent</text>
+  <text x="230.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">--env finance</text>
+  <rect x="560" y="130" width="300" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="710.0" y="162" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Cognito</text>
+  <text x="710.0" y="188" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client_credentials grant</text>
+  <text x="710.0" y="210" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">issues the M2M JWT</text>
+  <rect x="560" y="330" width="300" height="140" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="710.0" y="362" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">AgentCore Gateway</text>
+  <text x="710.0" y="388" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">validates the JWT</text>
+  <text x="710.0" y="410" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">gets a Runtime token</text>
+  <text x="710.0" y="432" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">target___tool names</text>
+  <rect x="560" y="520" width="300" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="710.0" y="552" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Amazon Bedrock</text>
+  <text x="710.0" y="578" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Claude and Titan</text>
+  <rect x="980" y="320" width="340" height="170" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1150.0" y="352" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">AgentCore Runtime</text>
+  <text x="1150.0" y="378" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Neo4j MCP server in Go</text>
+  <text x="1150.0" y="400" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">port 8000, read-only mode</text>
+  <text x="1150.0" y="422" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">get_neo4j_schema</text>
+  <text x="1150.0" y="444" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read_neo4j_cypher</text>
+  <rect x="1380" y="310" width="190" height="190" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1475.0" y="342" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Neo4j</text>
+  <text x="1475.0" y="368" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Aura or</text>
+  <text x="1475.0" y="390" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">self-hosted</text>
+  <text x="1475.0" y="412" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet, fraud,</text>
+  <text x="1475.0" y="434" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">or any graph</text>
+  <path d="M420,190 H556" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="463" y="163" width="50" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="488" y="178" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">token</text>
+  <path d="M420,400 H556" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="449" y="373" width="79" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="488" y="388" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">MCP + JWT</text>
+  <path d="M420,575 H556" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="459" y="548" width="57" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="488" y="563" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">Claude</text>
+  <path d="M710,330 V254" fill="none" stroke="#D97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
+  <rect x="674" y="282" width="72" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="710" y="297" font-size="13" font-weight="600" fill="#8A4B08" text-anchor="middle">validate</text>
+  <path d="M860,400 H976" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="889" y="373" width="57" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="918" y="388" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">OAuth2</text>
+  <path d="M1320,400 H1376" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="40" y="670" width="1300" height="200" rx="18" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="64" y="702" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Direct Neo4j driver, no MCP</text>
+  <rect x="70" y="725" width="290" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="215.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fleet pipeline</text>
+  <text x="215.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">builds the fleet graph</text>
+  <text x="215.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraft-fleet/pipeline</text>
+  <rect x="385" y="725" width="290" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="530.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">GraphRAG agent</text>
+  <text x="530.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Text2Cypher, hybrid search</text>
+  <text x="530.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, port 7070</text>
+  <rect x="700" y="725" width="290" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="845.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fraud graph loader</text>
+  <text x="845.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loads the fraud graph</text>
+  <text x="845.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fraud-amazon-quick</text>
+  <rect x="1015" y="725" width="290" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1160.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">SEC filings notebook</text>
+  <text x="1160.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">four GraphRAG levels</text>
+  <text x="1160.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sec-filings-graphrag</text>
+  <path d="M710,670 V634" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <path d="M1340,770 H1475 V504" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1428" y="585" width="93" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1475" y="600" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">Bolt driver</text>
+</svg>

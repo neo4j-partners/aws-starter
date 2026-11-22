@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Defense in Depth</title>
+  <desc>The interceptor checks the admin group before the Runtime is called. The admin_action tool checks the X-User-Groups header again. Each check denies in its own way.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="640" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Defense in Depth</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">admin_action is checked twice: once at the Gateway and once in the MCP server.</text>
+  <rect x="40" y="160" width="240" height="110" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="160.0" y="192" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Request</text>
+  <text x="160.0" y="218" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">tools/call admin_action</text>
+  <polygon points="520,145 690,215 520,285 350,215" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="520" y="210" font-size="16" font-weight="700" fill="#4A2EB0" text-anchor="middle">Interceptor:</text>
+  <text x="520" y="232" font-size="16" font-weight="700" fill="#4A2EB0" text-anchor="middle">admin in groups?</text>
+  <polygon points="1000,145 1190,215 1000,285 810,215" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1000" y="210" font-size="16" font-weight="700" fill="#851651" text-anchor="middle">admin in groups</text>
+  <text x="1000" y="232" font-size="16" font-weight="700" fill="#851651" text-anchor="middle">or no X-User-Id?</text>
+  <rect x="1300" y="160" width="260" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1430.0" y="192" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Allowed</text>
+  <text x="1430.0" y="218" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">success: true</text>
+  <path d="M280,215 H346" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <path d="M690,215 H806" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="730" y="190" width="36" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="748" y="205" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">yes</text>
+  <path d="M1190,215 H1296" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1225" y="190" width="36" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1243" y="205" font-size="13" font-weight="600" fill="#00594A" text-anchor="middle">yes</text>
+  <rect x="370" y="380" width="300" height="130" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="520.0" y="412" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">Denied at the Gateway</text>
+  <text x="520.0" y="438" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">result with isError true</text>
+  <text x="520.0" y="460" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the Runtime is not called</text>
+  <path d="M520,285 V376" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="527" y="323" width="28" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="534" y="338" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="start">no</text>
+  <rect x="850" y="380" width="300" height="130" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1000.0" y="412" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Denied in the tool</text>
+  <text x="1000.0" y="438" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">success: false</text>
+  <text x="1000.0" y="460" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">a normal tool result</text>
+  <path d="M1000,285 V376" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <rect x="1007" y="323" width="28" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1014" y="338" font-size="13" font-weight="600" fill="#851651" text-anchor="start">no</text>
+  <rect x="40" y="540" width="1520" height="68" rx="16" fill="#FFFFFF" stroke="#667085" stroke-width="1"/>
+  <text x="64" y="572" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">The server check</text>
+  <text x="64" y="598" font-size="14" font-weight="400" fill="#5C6470" text-anchor="start">The server check passes when X-User-Id is missing. That happens only on a direct Runtime call that skips the Gateway.</text>
+</svg>

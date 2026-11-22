@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="930" viewBox="0 0 1600 930" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Neo4j MCP Server on AgentCore</title>
+  <desc>An agent gets a JWT from Cognito and calls the AgentCore Gateway. The Gateway validates the JWT, gets a Runtime token from the OAuth2 credential provider, and forwards the call to the AgentCore Runtime, where the read-only Neo4j MCP server queries Neo4j.</desc>
+  <defs>
+    <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="930" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Neo4j MCP Server on AgentCore</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Agents reach a read-only Neo4j MCP server through an authenticated Gateway</text>
+  <rect x="390" y="104" width="860" height="616" rx="18" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="410" y="128" font-size="14" font-weight="700" fill="#344054" text-anchor="start">AWS account</text>
+  <rect x="40" y="360" width="220" height="130" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="150.0" y="392" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">AI agent</text>
+  <text x="150.0" y="418" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, LangGraph,</text>
+  <text x="150.0" y="440" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">or any MCP client</text>
+  <rect x="420" y="140" width="300" height="110" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="570.0" y="172" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Cognito</text>
+  <text x="570.0" y="198" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">User pool, machine client</text>
+  <text x="570.0" y="220" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client_credentials only</text>
+  <rect x="880" y="140" width="330" height="110" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1045.0" y="172" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">OAuth2 credential provider</text>
+  <text x="1045.0" y="198" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AgentCore Identity</text>
+  <text x="1045.0" y="220" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">holds the machine client secret</text>
+  <rect x="420" y="360" width="300" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="570.0" y="392" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">AgentCore Gateway</text>
+  <text x="570.0" y="418" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">CUSTOM_JWT authorizer</text>
+  <text x="570.0" y="440" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j-mcp-server-target</text>
+  <rect x="880" y="360" width="330" height="180" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1045" y="390" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">AgentCore Runtime</text>
+  <text x="1045" y="413" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">MCP protocol, JWT authorizer</text>
+  <rect x="905" y="428" width="280" height="94" rx="10" fill="#FFFFFF" stroke="#008C72" stroke-width="1.5"/>
+  <text x="1045" y="454" font-size="16" font-weight="700" fill="#00594A" text-anchor="middle">mcp-neo4j-cypher</text>
+  <text x="1045" y="476" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">port 8000, path /mcp</text>
+  <text x="1045" y="500" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">NEO4J_READ_ONLY=true</text>
+  <rect x="1360" y="380" width="200" height="120" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1460.0" y="412" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Neo4j</text>
+  <text x="1460.0" y="438" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Aura or self-hosted</text>
+  <text x="1460.0" y="460" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j+s://</text>
+  <rect x="560" y="610" width="200" height="92" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="660.0" y="642" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Amazon ECR</text>
+  <text x="660.0" y="668" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">ARM64 image</text>
+  <rect x="880" y="610" width="170" height="92" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="965.0" y="642" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Secrets Manager</text>
+  <text x="965.0" y="668" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Neo4j password</text>
+  <rect x="1065" y="610" width="145" height="92" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1137.5" y="642" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">CloudWatch</text>
+  <text x="1137.5" y="668" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">logs and traces</text>
+  <path d="M110 360 V185 H420" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M420 225 H190 V360" fill="none" stroke="#D97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
+  <circle cx="300" cy="185" r="14" fill="#D97706" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="300" y="190" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <circle cx="300" cy="225" r="14" fill="#D97706" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="300" y="230" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <path d="M260 425 H420" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-start="url(#a-blue)" marker-end="url(#a-blue)"/>
+  <circle cx="340" cy="425" r="14" fill="#2E6DB4" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="340" y="430" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <path d="M570 360 V250" fill="none" stroke="#D97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
+  <circle cx="570" cy="305" r="14" fill="#D97706" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="570" y="310" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <path d="M660 360 V305 H990 V250" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <circle cx="825" cy="305" r="14" fill="#7A5AF8" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="825" y="310" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+  <path d="M880 195 H720" fill="none" stroke="#7A5AF8" stroke-width="2.5" stroke-dasharray="7 5" marker-start="url(#a-purple)" marker-end="url(#a-purple)"/>
+  <path d="M720 425 H880" fill="none" stroke="#008C72" stroke-width="2.5" marker-start="url(#a-teal)" marker-end="url(#a-teal)"/>
+  <circle cx="800" cy="425" r="14" fill="#008C72" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="800" y="430" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+  <path d="M1210 450 H1360" fill="none" stroke="#C11574" stroke-width="2.5" marker-start="url(#a-pink)" marker-end="url(#a-pink)"/>
+  <circle cx="1285" cy="450" r="14" fill="#C11574" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="1285" y="455" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">7</text>
+  <path d="M660 610 V570 H850 V500 H880" fill="none" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <path d="M965 610 V540" fill="none" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <path d="M1137 540 V610" fill="none" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <circle cx="70" cy="775" r="14" fill="#D97706" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="70" y="780" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+  <text x="98" y="780" font-size="15" font-weight="400" fill="#344054" text-anchor="start">The agent requests a token from Cognito with client_credentials.</text>
+  <circle cx="70" cy="813" r="14" fill="#D97706" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="70" y="818" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+  <text x="98" y="818" font-size="15" font-weight="400" fill="#344054" text-anchor="start">Cognito returns a JWT that stays valid for 24 hours.</text>
+  <circle cx="70" cy="851" r="14" fill="#2E6DB4" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="70" y="856" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+  <text x="98" y="856" font-size="15" font-weight="400" fill="#344054" text-anchor="start">The agent sends an MCP request with the JWT as a Bearer token.</text>
+  <circle cx="70" cy="889" r="14" fill="#D97706" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="70" y="894" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+  <text x="98" y="894" font-size="15" font-weight="400" fill="#344054" text-anchor="start">The Gateway checks the JWT against the Cognito discovery URL.</text>
+  <circle cx="830" cy="775" r="14" fill="#7A5AF8" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="830" y="780" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+  <text x="858" y="780" font-size="15" font-weight="400" fill="#344054" text-anchor="start">The Gateway gets a Runtime token from the provider, which asks Cognito.</text>
+  <circle cx="830" cy="813" r="14" fill="#008C72" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="830" y="818" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+  <text x="858" y="818" font-size="15" font-weight="400" fill="#344054" text-anchor="start">The Gateway forwards the request to the Runtime with that token.</text>
+  <circle cx="830" cy="851" r="14" fill="#C11574" stroke="#F7F8FA" stroke-width="3"/>
+  <text x="830" y="856" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">7</text>
+  <text x="858" y="856" font-size="15" font-weight="400" fill="#344054" text-anchor="start">The MCP server runs read-only Cypher against Neo4j.</text>
+  <line x1="816" y1="889" x2="844" y2="889" stroke="#667085" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="858" y="894" font-size="15" font-weight="400" fill="#344054" text-anchor="start">Dashed slate arrows: image pull, password at deploy, and logs.</text>
+</svg>

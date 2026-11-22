@@ -977,6 +977,9 @@ true' to manage the CDK dependencies yourself.
 2. `./agent.sh destroy --yes` exits 1 when nothing is deployed. The CLI
    reports that the project "declares no resources to deploy" and that no
    stack exists.
+   **Resolved:** Commits ea56382 and 1a497f9 make both destroys check the
+   stack first. With no stack they skip the deploy and run the final check,
+   which exits 0 only when AWS shows nothing left.
 3. The `runtimeUserId` fix in commit 00222c9 is still untested in the
    cloud.
 

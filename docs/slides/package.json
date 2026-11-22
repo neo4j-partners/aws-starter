@@ -17,6 +17,11 @@
   },
   "overrides": {
     "@puppeteer/browsers": "3.2.2",
-    "@xmldom/xmldom": "0.9.12"
+    "@xmldom/xmldom": "0.9.12",
+    "katex": "0.19.1",
+    "chromium-bidi": {
+      "zod": "4.6.7"
+    },
+    "get-uri": "8.0.2"
   }
 }

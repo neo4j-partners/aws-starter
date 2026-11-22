@@ -37,12 +37,12 @@ itself.
 - **Server:** The image is `mcp-neo4j-cypher`, the Python FastMCP server from `neo4j-partners/mcp-neo4j`. Docker buildx builds it for arm64 from the folder in `NEO4J_MCP_REPO`.
 - **Image tags:** Each build gets the git short SHA and `latest`. `IMAGE_TAG` overrides the SHA tag.
 - **Read-only:** The container runs with `NEO4J_READ_ONLY=true`, so the supervisor gets only `get_neo4j_schema` and `read_neo4j_cypher`.
-- **Password:** `deploy.py` writes the password to the secret `<stack>/neo4j-password` and passes only the ARN to the stack. CloudFormation resolves it into the Runtime with a `{{resolve:secretsmanager}}` reference.
+- **Password:** `deploy.py` writes the password to the secret `<stack>/neo4j-password` and passes only the ARN to the stack. CloudFormation resolves it with a `{{resolve:secretsmanager}}` reference. The Runtime then holds the password as the plain environment variable `NEO4J_PASSWORD`.
 - **Tokens:** Cognito issues 24-hour access tokens to the machine client, with the scope `neo4j-mcp-server-fleet-mcp/invoke`.
 
-`NEO4J_USERNAME` in `.env.fleet` can name a least-privilege Neo4j user in
-place of the admin user. The MCP server already refuses writes, so a
-read-only database user adds a second guard. `./deploy.py redeploy` replaces
+`NEO4J_USERNAME` in `.env.fleet` names the read-only Neo4j user
+`fleet_reader`, not the admin user. The MCP server already refuses writes,
+so the read-only user is a second guard. `./deploy.py redeploy` replaces
 only the image. A change to the Neo4j settings needs a full `./deploy.py
 --env fleet`.
 

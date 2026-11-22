@@ -100,7 +100,7 @@ uv sync
 
 - **Default size:** The default loads 30 aircraft over 90 days, about 800,000 nodes.
 - **Full size:** Set `LOAD_FULL_DATASET=true` in `.env` to load 100 aircraft.
-- **No model calls:** Run `./setup.sh load-operational` to build only the operational graph. Its final check fails, because that graph has no manual enrichment.
+- **No model calls:** Run `./setup.sh load-operational` to build only the operational graph. Its final check prints warnings for the missing manual enrichment.
 
 See the [pipeline README](./pipeline/README.md) for each stage and the dual graph.
 

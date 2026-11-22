@@ -130,7 +130,9 @@ case "$CMD" in
     do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db load-operational
-    uv run populate-aircraft-db verify --strict
+    # Not --strict: this graph has no documents, chunks, or limits, so the
+    # enrichment checks would always fail. They print as warnings instead.
+    uv run populate-aircraft-db verify
     ;;
   verify)
     require_generated

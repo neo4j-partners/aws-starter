@@ -89,7 +89,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 | `./setup.sh` | Install dependencies, generate, clean, load, enrich, fuse, and `verify --strict` |
 | `./setup.sh generate` | Stage 1 only |
 | `./setup.sh load` | Regenerate if stale, clean, then stages 2 to 5. This needs Bedrock or LLM access. |
-| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. The clean removes any enrichment, so the final `verify --strict` fails. |
+| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. It ends with a plain `verify`, which prints the missing enrichment as warnings. |
 | `./setup.sh verify` | Stage 5 only, with `--strict`. It is read-only. It needs the CSVs in `generated/`, so run `./setup.sh generate` first in a fresh clone. |
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |

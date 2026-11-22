@@ -93,7 +93,7 @@ The environment picks one of two paths.
 - **Local token:** The agent sends the OAuth `client_credentials` request to the `token_url` in that file. It does not use OAuth discovery, so the secret goes only to that URL.
 - **Cloud:** When `CREDENTIAL_FLEET_GATEWAY_NAME` or `GATEWAY_URL` is set, the agent gets an M2M token from the AgentCore Identity provider. Both must be set, or the agent stops with an error that names the missing one.
 - **Cloud token:** Each request fetches the token with its own workload access token. The cache is shared because the token is M2M and not tied to a user.
-- **Runtime user ID:** The Runtime issues a workload access token only when the call names a user. `fleet-supervisor-invoke` and `load-test` send `runtimeUserId` `default`, the same value `agentcore invoke` sends. The caller's IAM identity needs `bedrock-agentcore:InvokeAgentRuntimeForUser` as well as `InvokeAgentRuntime`.
+- **Runtime user ID:** The Runtime issues a workload access token only when the call names a user. Every deployed call through `fleet_supervisor.client` sends `runtimeUserId` `default`, the same value `agentcore invoke` sends. That covers `fleet-supervisor-cli`, `fleet-supervisor-invoke` and `load-test`. The caller's IAM identity needs `bedrock-agentcore:InvokeAgentRuntimeForUser` as well as `InvokeAgentRuntime`.
 - **File location:** The credentials file sits outside this folder on purpose, because `agentcore deploy` zips this whole folder.
 
 ## Conversation memory

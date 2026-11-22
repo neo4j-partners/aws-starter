@@ -3,6 +3,8 @@
 import json
 
 import pytest
+from botocore.exceptions import ClientError, EndpointConnectionError
+
 import secret_entrypoint as entrypoint
 
 ARN = "arn:aws:secretsmanager:us-west-2:123456789012:secret:neo4j-mcp-server/neo4j-password-AbCdEf"
@@ -117,3 +119,66 @@ def test_main_exits_on_a_bad_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(SystemExit) as exit_info:
         entrypoint.main()
     assert entrypoint.SECRET_ARN_VAR in str(exit_info.value.code)
+
+
+@pytest.mark.parametrize("partition", ["aws-cn", "aws-us-gov"])
+def test_region_comes_from_an_arn_in_any_partition(partition: str) -> None:
+    arn = f"arn:{partition}:secretsmanager:cn-north-1:123456789012:secret:x-AbCdEf"
+    assert entrypoint.region_from_arn(arn) == "cn-north-1"
+
+
+class FailingClient:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def get_secret_value(self, SecretId: str) -> dict[str, str]:
+        raise self.error
+
+
+ACCESS_DENIED = ClientError(
+    {
+        "Error": {
+            "Code": "AccessDeniedException",
+            "Message": f"User: arn:aws:sts::123456789012:assumed-role/role is not "
+            f"authorized to perform secretsmanager:GetSecretValue on {ARN}",
+        }
+    },
+    "GetSecretValue",
+)
+
+
+@pytest.mark.parametrize(
+    ("error", "named"),
+    [
+        (ACCESS_DENIED, "AccessDeniedException"),
+        (EndpointConnectionError(endpoint_url="https://example"), "EndpointConnectionError"),
+    ],
+)
+def test_fetch_turns_an_aws_error_into_a_secret_error(
+    monkeypatch: pytest.MonkeyPatch, error: Exception, named: str
+) -> None:
+    monkeypatch.setattr(
+        entrypoint.boto3, "client", lambda service, region_name: FailingClient(error)
+    )
+
+    with pytest.raises(entrypoint.SecretError) as error_info:
+        entrypoint.fetch_secret_string(ARN)
+
+    message = str(error_info.value)
+    assert named in message
+    assert "assumed-role" not in message
+    assert "123456789012" not in message
+    assert error_info.value.__cause__ is None
+    assert error_info.value.__suppress_context__ is True
+
+
+def test_main_exits_cleanly_when_access_is_denied(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(entrypoint.SECRET_ARN_VAR, ARN)
+    monkeypatch.setattr(
+        entrypoint.boto3, "client", lambda service, region_name: FailingClient(ACCESS_DENIED)
+    )
+
+    with pytest.raises(SystemExit) as exit_info:
+        entrypoint.main()
+    assert "AccessDeniedException" in str(exit_info.value.code)
+    assert "assumed-role" not in str(exit_info.value.code)

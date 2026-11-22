@@ -28,10 +28,10 @@ import time
 from pathlib import Path
 
 from mcp_operations import (
-    connect_and_run,
-    run_full_tests,
-    list_tools,
     call_tool,
+    connect_and_run,
+    list_tools,
+    run_full_tests,
 )
 
 # Configuration
@@ -93,8 +93,8 @@ def load_env() -> dict:
 
 def check_server(url: str, timeout: int = 2) -> bool:
     """Check if the server is responding."""
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     try:
         req = urllib.request.Request(url, method="GET", headers={"Accept": "text/event-stream"})
@@ -137,19 +137,33 @@ def start_server() -> bool:
 
     # Build docker run command
     docker_cmd = [
-        "docker", "run", "-d",
-        "--name", CONTAINER_NAME,
-        "-p", f"{host_port}:{CONTAINER_PORT}",
-        "-e", f"NEO4J_URI={env_vars['NEO4J_URI']}",
-        "-e", f"NEO4J_DATABASE={env_vars.get('NEO4J_DATABASE', 'neo4j')}",
-        "-e", f"NEO4J_USERNAME={env_vars['NEO4J_USERNAME']}",
-        "-e", f"NEO4J_PASSWORD={env_vars['NEO4J_PASSWORD']}",
-        "-e", "NEO4J_TRANSPORT=http",
-        "-e", "NEO4J_MCP_SERVER_HOST=0.0.0.0",
-        "-e", f"NEO4J_MCP_SERVER_PORT={CONTAINER_PORT}",
-        "-e", "NEO4J_MCP_SERVER_PATH=/mcp",
-        "-e", "NEO4J_LOG_LEVEL=debug",
-        "-e", "NEO4J_READ_ONLY=true",
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        CONTAINER_NAME,
+        "-p",
+        f"{host_port}:{CONTAINER_PORT}",
+        "-e",
+        f"NEO4J_URI={env_vars['NEO4J_URI']}",
+        "-e",
+        f"NEO4J_DATABASE={env_vars.get('NEO4J_DATABASE', 'neo4j')}",
+        "-e",
+        f"NEO4J_USERNAME={env_vars['NEO4J_USERNAME']}",
+        "-e",
+        f"NEO4J_PASSWORD={env_vars['NEO4J_PASSWORD']}",
+        "-e",
+        "NEO4J_TRANSPORT=http",
+        "-e",
+        "NEO4J_MCP_SERVER_HOST=0.0.0.0",
+        "-e",
+        f"NEO4J_MCP_SERVER_PORT={CONTAINER_PORT}",
+        "-e",
+        "NEO4J_MCP_SERVER_PATH=/mcp",
+        "-e",
+        "NEO4J_LOG_LEVEL=debug",
+        "-e",
+        "NEO4J_READ_ONLY=true",
         "neo4j-mcp-server:latest",
     ]
 

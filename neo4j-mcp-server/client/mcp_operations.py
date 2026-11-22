@@ -45,7 +45,6 @@ import httpx2
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-
 # =============================================================================
 # Connection
 # =============================================================================
@@ -61,13 +60,16 @@ async def connect_and_run(mcp_url: str, operation, *args, headers: dict = None):
         *args: Additional arguments to pass to the operation
         headers: Optional HTTP headers (e.g., for JWT auth)
     """
-    async with httpx2.AsyncClient(headers=headers or {}, timeout=120.0) as http_client:
-        async with streamable_http_client(
-            mcp_url, http_client=http_client, terminate_on_close=False
-        ) as (read_stream, write_stream):
-            async with ClientSession(read_stream, write_stream) as session:
-                await session.initialize()
-                await operation(session, *args)
+    async with (
+        httpx2.AsyncClient(headers=headers or {}, timeout=120.0) as http_client,
+        streamable_http_client(mcp_url, http_client=http_client, terminate_on_close=False) as (
+            read_stream,
+            write_stream,
+        ),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        await session.initialize()
+        await operation(session, *args)
 
 
 # =============================================================================
@@ -123,10 +125,7 @@ async def get_tool_map(session: ClientSession) -> dict[str, str]:
         # Extract base name (after ___ prefix if present)
         # This allows client code to use friendly names like "get_neo4j_schema"
         # while we handle the Gateway prefix internally
-        if "___" in full_name:
-            base_name = full_name.split("___", 1)[1]
-        else:
-            base_name = full_name
+        base_name = full_name.split("___", 1)[1] if "___" in full_name else full_name
 
         tool_map[base_name] = full_name
 
@@ -203,10 +202,7 @@ async def run_full_tests(session: ClientSession):
     for tool in tool_result.tools:
         full_name = tool.name
         # Extract base name for mapping (handles Gateway prefix)
-        if "___" in full_name:
-            base_name = full_name.split("___", 1)[1]
-        else:
-            base_name = full_name
+        base_name = full_name.split("___", 1)[1] if "___" in full_name else full_name
         tool_map[base_name] = full_name
 
         desc = tool.description.split("\n")[0] if tool.description else ""
@@ -342,7 +338,9 @@ async def run_query(session: ClientSession):
     actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
     result = await session.call_tool(
         actual_name,
-        {"query": "MATCH (n) RETURN labels(n)[0] as label, count(*) as count ORDER BY count DESC LIMIT 10"},
+        {
+            "query": "MATCH (n) RETURN labels(n)[0] as label, count(*) as count ORDER BY count DESC LIMIT 10"
+        },
     )
     if result.content:
         print(result.content[0].text)

@@ -67,8 +67,7 @@ def main() -> None:
     if not path.is_file():
         env_flag = f" --env {args.env}" if args.env else ""
         sys.exit(
-            f"Credentials file not found: {path}\n"
-            f"Run ./deploy.py{env_flag} credentials first."
+            f"Credentials file not found: {path}\nRun ./deploy.py{env_flag} credentials first."
         )
 
     try:

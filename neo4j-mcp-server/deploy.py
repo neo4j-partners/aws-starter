@@ -106,8 +106,7 @@ from naming import (  # noqa: E402  (needs CDK_DIR on sys.path first)
 # cover the full stack (all services + IAM role creation) without using the
 # AdministratorAccess ARN. Override via CDK_BOOTSTRAP_EXECUTION_POLICIES.
 DEFAULT_CDK_BOOTSTRAP_EXECUTION_POLICIES = (
-    "arn:aws:iam::aws:policy/PowerUserAccess,"
-    "arn:aws:iam::aws:policy/IAMFullAccess"
+    "arn:aws:iam::aws:policy/PowerUserAccess,arn:aws:iam::aws:policy/IAMFullAccess"
 )
 
 # Commands that do not need Neo4j connectivity tested up front.
@@ -136,6 +135,10 @@ def log_error(message: str) -> None:
 
 def log_success(message: str) -> None:
     print(f"OK    {message}", file=sys.stderr)
+
+
+def log_warning(message: str) -> None:
+    print(f"WARN  {message}", file=sys.stderr)
 
 
 def log_step(message: str) -> None:
@@ -348,12 +351,17 @@ def test_neo4j_connection(cfg: Config) -> None:
     result = subprocess.run(
         [
             "cypher-shell",
-            "-a", cfg.neo4j_uri,
-            "-u", cfg.neo4j_username,
-            "-p", cfg.neo4j_password,
-            "-d", cfg.neo4j_database,
+            "-a",
+            cfg.neo4j_uri,
+            "-u",
+            cfg.neo4j_username,
+            "-p",
+            cfg.neo4j_password,
+            "-d",
+            cfg.neo4j_database,
             "--non-interactive",
-            "--format", "plain",
+            "--format",
+            "plain",
         ],
         input="RETURN 1 AS test;",
         text=True,
@@ -419,16 +427,12 @@ class Aws:
     @property
     def account_id(self) -> str:
         if self._account_id is None:
-            self._account_id = self.client("sts").get_caller_identity()[
-                "Account"
-            ]
+            self._account_id = self.client("sts").get_caller_identity()["Account"]
         return self._account_id
 
 
 def get_ecr_uri(account_id: str, cfg: Config) -> str:
-    return (
-        f"{account_id}.dkr.ecr.{cfg.aws_region}.amazonaws.com/{cfg.ecr_repo_name}"
-    )
+    return f"{account_id}.dkr.ecr.{cfg.aws_region}.amazonaws.com/{cfg.ecr_repo_name}"
 
 
 def secret_name(cfg: Config) -> str:
@@ -437,18 +441,12 @@ def secret_name(cfg: Config) -> str:
 
 def ecr_repo_exists(aws: Aws, cfg: Config) -> bool:
     return _exists(
-        lambda: aws.client("ecr").describe_repositories(
-            repositoryNames=[cfg.ecr_repo_name]
-        )
+        lambda: aws.client("ecr").describe_repositories(repositoryNames=[cfg.ecr_repo_name])
     )
 
 
 def stack_exists(aws: Aws, cfg: Config) -> bool:
-    return _exists(
-        lambda: aws.client("cloudformation").describe_stacks(
-            StackName=cfg.stack_name
-        )
-    )
+    return _exists(lambda: aws.client("cloudformation").describe_stacks(StackName=cfg.stack_name))
 
 
 def _stack_outputs(aws: Aws, stack_name: str) -> dict[str, str]:
@@ -470,16 +468,12 @@ def ensure_password_secret(aws: Aws, cfg: Config) -> None:
 
     if _exists(lambda: sm.describe_secret(SecretId=name)):
         log_info(f"Updating Secrets Manager secret: {name}")
-        result = sm.put_secret_value(
-            SecretId=name, SecretString=cfg.neo4j_password
-        )
+        result = sm.put_secret_value(SecretId=name, SecretString=cfg.neo4j_password)
     else:
         log_info(f"Creating Secrets Manager secret: {name}")
         result = sm.create_secret(
             Name=name,
-            Description=(
-                f"Neo4j password for {cfg.stack_name} MCP server runtime"
-            ),
+            Description=(f"Neo4j password for {cfg.stack_name} MCP server runtime"),
             SecretString=cfg.neo4j_password,
         )
 
@@ -530,9 +524,13 @@ def cmd_build(cfg: Config) -> None:
     # The server image from NEO4J_MCP_REPO, unchanged.
     subprocess.run(
         [
-            "docker", "buildx", "build",
-            "--platform", "linux/arm64",
-            "--tag", base_image,
+            "docker",
+            "buildx",
+            "build",
+            "--platform",
+            "linux/arm64",
+            "--tag",
+            base_image,
             "--load",
             cfg.neo4j_mcp_repo,
         ],
@@ -542,11 +540,17 @@ def cmd_build(cfg: Config) -> None:
     # FROM the base image loaded above, so it runs on the same local builder.
     subprocess.run(
         [
-            "docker", "buildx", "build",
-            "--platform", "linux/arm64",
-            "--build-arg", f"BASE_IMAGE={base_image}",
-            "--tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
-            "--tag", f"{cfg.ecr_repo_name}:latest",
+            "docker",
+            "buildx",
+            "build",
+            "--platform",
+            "linux/arm64",
+            "--build-arg",
+            f"BASE_IMAGE={base_image}",
+            "--tag",
+            f"{cfg.ecr_repo_name}:{cfg.image_tag}",
+            "--tag",
+            f"{cfg.ecr_repo_name}:latest",
             "--load",
             str(IMAGE_DIR),
         ],
@@ -568,8 +572,7 @@ def _docker_context_host() -> str | None:
     """
     try:
         result = subprocess.run(
-            ["docker", "context", "inspect", "--format",
-             "{{.Endpoints.docker.Host}}"],
+            ["docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"],
             capture_output=True,
             text=True,
             check=True,
@@ -609,9 +612,7 @@ def _isolated_docker_env() -> Iterator[dict[str, str]]:
         yield env
 
 
-def _docker_ecr_login(
-    aws: Aws, account_id: str, cfg: Config, env: dict[str, str]
-) -> None:
+def _docker_ecr_login(aws: Aws, account_id: str, cfg: Config, env: dict[str, str]) -> None:
     log_info("Authenticating with ECR...")
     token = aws.client("ecr").get_authorization_token()
     auth = token["authorizationData"][0]["authorizationToken"]
@@ -673,14 +674,12 @@ def cmd_push(aws: Aws, cfg: Config) -> None:
 
         log_info("Tagging image...")
         subprocess.run(
-            ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
-             f"{ecr_uri}:{cfg.image_tag}"],
+            ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}", f"{ecr_uri}:{cfg.image_tag}"],
             check=True,
             env=docker_env,
         )
         subprocess.run(
-            ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}",
-             f"{ecr_uri}:latest"],
+            ["docker", "tag", f"{cfg.ecr_repo_name}:{cfg.image_tag}", f"{ecr_uri}:latest"],
             check=True,
             env=docker_env,
         )
@@ -691,13 +690,9 @@ def cmd_push(aws: Aws, cfg: Config) -> None:
             check=True,
             env=docker_env,
         )
-        subprocess.run(
-            ["docker", "push", f"{ecr_uri}:latest"], check=True, env=docker_env
-        )
+        subprocess.run(["docker", "push", f"{ecr_uri}:latest"], check=True, env=docker_env)
 
-    log_success(
-        f"Image pushed successfully: {ecr_uri}:{cfg.image_tag} + latest"
-    )
+    log_success(f"Image pushed successfully: {ecr_uri}:{cfg.image_tag} + latest")
 
 
 # ============================================================================
@@ -708,12 +703,19 @@ def cmd_push(aws: Aws, cfg: Config) -> None:
 def _cdk_deploy(cfg: Config, full_image_uri: str) -> int:
     proc = subprocess.run(
         [
-            "cdk", "deploy", cfg.stack_name,
-            "--require-approval", "never",
-            "--parameters", f"ECRImageUri={full_image_uri}",
-            "--parameters", f"Neo4jUri={cfg.neo4j_uri}",
-            "--parameters", f"Neo4jDatabase={cfg.neo4j_database}",
-            "--parameters", f"Neo4jUsername={cfg.neo4j_username}",
+            "cdk",
+            "deploy",
+            cfg.stack_name,
+            "--require-approval",
+            "never",
+            "--parameters",
+            f"ECRImageUri={full_image_uri}",
+            "--parameters",
+            f"Neo4jUri={cfg.neo4j_uri}",
+            "--parameters",
+            f"Neo4jDatabase={cfg.neo4j_database}",
+            "--parameters",
+            f"Neo4jUsername={cfg.neo4j_username}",
             "--parameters",
             f"Neo4jPasswordSecretArn={cfg.neo4j_password_secret_arn}",
         ],
@@ -744,12 +746,11 @@ def cmd_stack(aws: Aws, cfg: Config) -> None:
     cfn = aws.client("cloudformation")
     if not _exists(lambda: cfn.describe_stacks(StackName="CDKToolkit")):
         log_info("CDK not bootstrapped in this region, bootstrapping...")
-        log_info(
-            "CFN execution policies: "
-            f"{cfg.cdk_bootstrap_execution_policies}"
-        )
+        log_info(f"CFN execution policies: {cfg.cdk_bootstrap_execution_policies}")
         bootstrap_cmd = [
-            "cdk", "bootstrap", f"aws://{account_id}/{cfg.aws_region}",
+            "cdk",
+            "bootstrap",
+            f"aws://{account_id}/{cfg.aws_region}",
         ]
         if cfg.cdk_bootstrap_execution_policies:
             bootstrap_cmd += [
@@ -780,9 +781,7 @@ def cmd_stack(aws: Aws, cfg: Config) -> None:
                 "stabilize). Cleaning up and retrying..."
             )
             cfn.delete_stack(StackName=cfg.stack_name)
-            cfn.get_waiter("stack_delete_complete").wait(
-                StackName=cfg.stack_name
-            )
+            cfn.get_waiter("stack_delete_complete").wait(StackName=cfg.stack_name)
 
             log_info("Waiting 30 seconds for services to stabilize...")
             time.sleep(30)
@@ -832,15 +831,10 @@ def cmd_status(aws: Aws, cfg: Config) -> None:
     log_step("Stack Status and Outputs")
 
     try:
-        stacks = aws.client("cloudformation").describe_stacks(
-            StackName=cfg.stack_name
-        )
+        stacks = aws.client("cloudformation").describe_stacks(StackName=cfg.stack_name)
     except ClientError as exc:
         if exc.response["Error"]["Code"] in _NOT_FOUND_CODES:
-            log_error(
-                f"Stack '{cfg.stack_name}' does not exist in region "
-                f"'{cfg.aws_region}'"
-            )
+            log_error(f"Stack '{cfg.stack_name}' does not exist in region '{cfg.aws_region}'")
             raise DeployError("stack does not exist") from exc
         raise
 
@@ -851,16 +845,11 @@ def cmd_status(aws: Aws, cfg: Config) -> None:
     print()
 
     if "COMPLETE" in status and "DELETE" not in status:
-        outputs = {
-            o["OutputKey"]: o["OutputValue"]
-            for o in stack.get("Outputs", [])
-        }
+        outputs = {o["OutputKey"]: o["OutputValue"] for o in stack.get("Outputs", [])}
         print("Stack Outputs:")
         print("-" * 68)
         print(f"  Gateway URL: {outputs.get('GatewayUrl', '')}")
-        print(
-            f"  Cognito Client ID: {outputs.get('CognitoMachineClientId', '')}"
-        )
+        print(f"  Cognito Client ID: {outputs.get('CognitoMachineClientId', '')}")
         print(f"  Token URL: {outputs.get('CognitoTokenUrl', '')}")
         print(f"  Runtime ARN: {outputs.get('MCPServerRuntimeArn', '')}")
         print()
@@ -901,9 +890,7 @@ def _find_runtime_id(aws: Aws, cfg: Config) -> str:
         kwargs["nextToken"] = token
 
 
-def _delete_agent_runtime(
-    aws: Aws, cfg: Config, timeout: int = 600, delay: int = 10
-) -> None:
+def _delete_agent_runtime(aws: Aws, cfg: Config, timeout: int = 600, delay: int = 10) -> None:
     """Delete the AgentCore runtime out of band and wait for it to disappear.
 
     CloudFormation's AWS::BedrockAgentCore::Runtime handler gives up with
@@ -996,9 +983,7 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
         )
         reply = input(f"Delete ECR repository '{cfg.ecr_repo_name}'? (y/N): ")
         if reply[:1] in ("y", "Y"):
-            aws.client("ecr").delete_repository(
-                repositoryName=cfg.ecr_repo_name, force=True
-            )
+            aws.client("ecr").delete_repository(repositoryName=cfg.ecr_repo_name, force=True)
             log_success("ECR repository deleted")
         else:
             log_info("Leaving ECR repository in place")
@@ -1031,13 +1016,31 @@ def cmd_cleanup(aws: Aws, cfg: Config) -> None:
 # ============================================================================
 
 
+def warn_if_plaintext_password(environment: dict[str, str]) -> bool:
+    """Warn when a Runtime still holds NEO4J_PASSWORD in plain text.
+
+    Stacks deployed before the image read its password from Secrets Manager
+    pass NEO4J_PASSWORD to the Runtime. A redeploy carries the current
+    environment over unchanged, so only a full ./deploy.py removes it.
+    Returns True when it warned.
+    """
+    if "NEO4J_PASSWORD" not in environment:
+        return False
+    log_warning(
+        "This Runtime still holds NEO4J_PASSWORD in plain text. The stack "
+        "predates the image's secret entrypoint, and a redeploy keeps the "
+        "current settings. Run a full './deploy.py' once to replace it with "
+        "NEO4J_PASSWORD_SECRET_ARN."
+    )
+    return True
+
+
 def cmd_redeploy(aws: Aws, cfg: Config) -> None:
     log_step("Redeploying MCP Server (build + push + update runtime)")
 
     if not stack_exists(aws, cfg):
         log_error(
-            f"Stack '{cfg.stack_name}' does not exist. Run './deploy.py' "
-            "for initial deployment."
+            f"Stack '{cfg.stack_name}' does not exist. Run './deploy.py' for initial deployment."
         )
         raise DeployError("stack does not exist")
 
@@ -1075,11 +1078,10 @@ def cmd_redeploy(aws: Aws, cfg: Config) -> None:
         "environmentVariables",
     )
     preserved = {key: current[key] for key in preserved_keys if key in current}
+    warn_if_plaintext_password(current.get("environmentVariables", {}))
     control.update_agent_runtime(
         agentRuntimeId=runtime_id,
-        agentRuntimeArtifact={
-            "containerConfiguration": {"containerUri": full_image_uri}
-        },
+        agentRuntimeArtifact={"containerConfiguration": {"containerUri": full_image_uri}},
         roleArn=role_arn,
         networkConfiguration=current["networkConfiguration"],
         **preserved,
@@ -1105,8 +1107,7 @@ def _wait_for_dns(hostname: str, max_attempts: int = 30, delay: int = 10) -> boo
         except socket.gaierror:
             if attempt < max_attempts - 1:
                 print(
-                    f"   DNS not ready, waiting {delay}s... "
-                    f"(attempt {attempt + 1}/{max_attempts})"
+                    f"   DNS not ready, waiting {delay}s... (attempt {attempt + 1}/{max_attempts})"
                 )
                 time.sleep(delay)
     return False
@@ -1116,9 +1117,7 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
     log_step("Generating MCP Credentials")
 
     if not stack_exists(aws, cfg):
-        log_error(
-            f"Stack '{cfg.stack_name}' does not exist. Run ./deploy.py first."
-        )
+        log_error(f"Stack '{cfg.stack_name}' does not exist. Run ./deploy.py first.")
         raise DeployError("stack does not exist")
 
     log_info("Retrieving stack outputs...")
@@ -1139,30 +1138,20 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
 
     print("   Getting client secret from Cognito...")
     cognito = aws.client("cognito-idp")
-    response = cognito.describe_user_pool_client(
-        UserPoolId=user_pool_id, ClientId=client_id
-    )
+    response = cognito.describe_user_pool_client(UserPoolId=user_pool_id, ClientId=client_id)
     client_secret = response["UserPoolClient"]["ClientSecret"]
     print(f"   Client secret retrieved ({len(client_secret)} chars)")
 
     parsed = urlparse(token_url)
     if not _wait_for_dns(parsed.hostname):
-        print(
-            f"   ERROR: DNS did not resolve for {parsed.hostname} after "
-            "multiple attempts"
-        )
-        print(
-            "   The Cognito domain may still be propagating. Try again in a "
-            "few minutes:"
-        )
+        print(f"   ERROR: DNS did not resolve for {parsed.hostname} after multiple attempts")
+        print("   The Cognito domain may still be propagating. Try again in a few minutes:")
         env_flag = f" --env {cfg.env_suffix}" if cfg.env_suffix else ""
         print(f"   ./deploy.py{env_flag} credentials")
         raise DeployError("Cognito DNS did not resolve")
 
     print("   Requesting JWT token...")
-    creds = base64.b64encode(
-        f"{client_id}:{client_secret}".encode()
-    ).decode()
+    creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     headers = {
         "Authorization": f"Basic {creds}",
         "Content-Type": "application/x-www-form-urlencoded",
@@ -1180,16 +1169,10 @@ def cmd_credentials(aws: Aws, cfg: Config) -> None:
             break
         except httpx.ConnectError as exc:
             if retry < max_retries - 1:
-                print(
-                    f"   Connection error, retrying in 10s... "
-                    f"({retry + 1}/{max_retries})"
-                )
+                print(f"   Connection error, retrying in 10s... ({retry + 1}/{max_retries})")
                 time.sleep(10)
             else:
-                print(
-                    "   ERROR: Failed to connect to token endpoint after "
-                    f"{max_retries} attempts"
-                )
+                print(f"   ERROR: Failed to connect to token endpoint after {max_retries} attempts")
                 print(f"   Error: {exc}")
                 raise DeployError("token endpoint connection failed") from exc
 
@@ -1424,10 +1407,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         sys.exit(130)
     except subprocess.CalledProcessError as exc:
-        log_error(
-            f"Command failed (exit {exc.returncode}): "
-            f"{' '.join(map(str, exc.cmd))}"
-        )
+        log_error(f"Command failed (exit {exc.returncode}): {' '.join(map(str, exc.cmd))}")
         # Only set when the caller captured output; otherwise the child already
         # printed its own error straight to the terminal.
         for stream in (exc.stdout, exc.stderr):

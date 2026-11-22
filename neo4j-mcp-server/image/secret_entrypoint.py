@@ -14,6 +14,7 @@ import os
 import sys
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 SECRET_ARN_VAR = "NEO4J_PASSWORD_SECRET_ARN"
 PASSWORD_VAR = "NEO4J_PASSWORD"
@@ -26,15 +27,28 @@ class SecretError(RuntimeError):
 def region_from_arn(secret_arn: str) -> str:
     """Return the region named in a Secrets Manager secret ARN."""
     parts = secret_arn.split(":")
-    if len(parts) < 7 or parts[:3] != ["arn", "aws", "secretsmanager"] or not parts[3]:
+    # Any partition works (aws, aws-cn, aws-us-gov), as in the agents.
+    if len(parts) < 7 or parts[0] != "arn" or parts[2] != "secretsmanager" or not parts[3]:
         raise SecretError(f"{secret_arn!r} is not a Secrets Manager secret ARN.")
     return parts[3]
 
 
 def fetch_secret_string(secret_arn: str) -> str:
-    """Read the secret's string value with the container's AWS credentials."""
+    """Read the secret's string value with the container's AWS credentials.
+
+    An AWS failure becomes a SecretError that names only the error code. The
+    full botocore message names the role and the secret ARN, so it stays out
+    of the container log.
+    """
     client = boto3.client("secretsmanager", region_name=region_from_arn(secret_arn))
-    response = client.get_secret_value(SecretId=secret_arn)
+    # "from None" drops the botocore error from the traceback context.
+    try:
+        response = client.get_secret_value(SecretId=secret_arn)
+    except ClientError as error:
+        code = error.response.get("Error", {}).get("Code", "ClientError")
+        raise SecretError(f"Reading the secret failed with {code}.") from None
+    except BotoCoreError as error:
+        raise SecretError(f"Reading the secret failed with {type(error).__name__}.") from None
     if "SecretString" not in response:
         raise SecretError("The secret holds binary data, not a string.")
     return response["SecretString"]

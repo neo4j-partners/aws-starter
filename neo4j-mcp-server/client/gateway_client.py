@@ -27,12 +27,11 @@ from pathlib import Path
 
 from mcp_operations import (
     connect_and_run,
-    run_full_tests,
-    list_tools,
     get_schema,
+    list_tools,
+    run_full_tests,
     run_query,
 )
-
 
 # =============================================================================
 # Credentials
@@ -117,10 +116,7 @@ def cmd_token():
     if check_token_expiry(credentials):
         print("Status: VALID")
     else:
-        print(
-            "Status: EXPIRED - run "
-            f"'./deploy.py{_env_flag()} credentials' to refresh"
-        )
+        print(f"Status: EXPIRED - run './deploy.py{_env_flag()} credentials' to refresh")
         sys.exit(1)
 
     print()

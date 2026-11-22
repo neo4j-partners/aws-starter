@@ -47,7 +47,7 @@ sequence, the CDK stack layout, and the design reasons.
 
 - **Docker:** Docker must have buildx support. The deploy builds an ARM64 image.
 - **AWS CLI:** The AWS CLI must have working credentials.
-- **AWS CDK CLI:** Install it with `npm install -g aws-cdk`.
+- **AWS CDK CLI:** Install version 2.1149.0 or later with `npm install -g aws-cdk`. The stack's aws-cdk-lib 2.278.0 needs it.
 - **Python:** Python 3.10 or later is required.
 - **Neo4j:** You need a Neo4j Aura database or another Neo4j instance.
 

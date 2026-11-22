@@ -31,7 +31,7 @@ uv run python setup_users.py  # create the test users
 - **uv:** [uv](https://docs.astral.sh/uv/) installs Python and the project dependencies.
 - **Docker:** Docker builds the ARM64 container image.
 - **Node.js:** Install Node.js 18 or later with npm.
-- **AWS CDK CLI:** Install version 2.220.0 or later with `npm install -g aws-cdk`.
+- **AWS CDK CLI:** Install version 2.1149.0 or later with `npm install -g aws-cdk`. The stack's aws-cdk-lib 2.278.0 needs it.
 
 ## Step 1: Set up the Python environment
 

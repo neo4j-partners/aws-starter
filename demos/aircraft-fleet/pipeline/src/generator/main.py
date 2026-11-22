@@ -367,8 +367,8 @@ def _write_dataset(
 
             if (ac_idx + 1) % 20 == 0 or ac_idx + 1 == len(fleet):
                 console.print(
-                    f"  [dim]{ac_idx + 1}/{len(fleet)} aircraft processed — "
-                    f"{total_readings:,} readings, {len(maintenance_rows)} events so far[/dim]"
+                    f"  [dim]{ac_idx + 1}/{len(fleet)} aircraft processed: "
+                    f"{total_readings:,} readings and {len(maintenance_rows)} events so far[/dim]"
                 )
 
     console.print(
@@ -416,7 +416,7 @@ def _write_dataset(
         rels_dep,
         rels_arr,
         rels_delay,
-    ) = generate_operations(fleet, config, rng)
+    ) = generate_operations(fleet, config, rng, maintenance_rows)
 
     write_csv(airport_rows, work / "nodes_airports.csv")
     write_csv(flight_rows, work / "nodes_flights.csv")
@@ -584,18 +584,31 @@ def validate(
         if not path.exists():
             errors.append(f"Missing file: {filename}")
             return set()
+        ids: set[str] = set()
+        duplicates = 0
         with path.open() as f:
-            return {row[id_col] for row in _csv.DictReader(f)}
+            for row in _csv.DictReader(f):
+                if row[id_col] in ids:
+                    duplicates += 1
+                ids.add(row[id_col])
+        if duplicates:
+            errors.append(f"{filename}: {duplicates} duplicate {id_col} value(s)")
+        return ids
 
     def check_fk(filename: str, col: str, valid_ids: set[str], label: str) -> None:
         path = directory / filename
         if not path.exists():
+            errors.append(f"Missing file: {filename}")
             return
         with path.open() as f:
-            for i, row in enumerate(_csv.DictReader(f), start=2):
+            reader = _csv.DictReader(f)
+            if col not in (reader.fieldnames or []):
+                errors.append(f"{filename}: missing column {col}")
+                return
+            for i, row in enumerate(reader, start=2):
                 val = row.get(col)
                 if val and val not in valid_ids:
-                    errors.append(f"{filename}:{i} — {col}={val!r} not in {label}")
+                    errors.append(f"{filename}:{i}: {col}={val!r} not in {label}")
 
     aircraft_ids = load_ids("nodes_aircraft.csv", ":ID(Aircraft)")
     system_ids = load_ids("nodes_systems.csv", ":ID(System)")
@@ -605,18 +618,37 @@ def validate(
     flight_ids = load_ids("nodes_flights.csv", ":ID(Flight)")
     delay_ids = load_ids("nodes_delays.csv", ":ID(Delay)")
     event_ids = load_ids("nodes_maintenance.csv", ":ID(MaintenanceEvent)")
+    removal_ids = load_ids("nodes_removals.csv", ":ID(Removal)")
+    # Only checked for duplicates: no relationship file points at a reading.
+    load_ids("nodes_readings.csv", "reading_id")
 
+    check_fk("nodes_readings.csv", "sensor_id", sensor_ids, "Sensor")
     check_fk("rels_aircraft_system.csv", ":START_ID(Aircraft)", aircraft_ids, "Aircraft")
     check_fk("rels_aircraft_system.csv", ":END_ID(System)", system_ids, "System")
     check_fk("rels_system_component.csv", ":START_ID(System)", system_ids, "System")
     check_fk("rels_system_component.csv", ":END_ID(Component)", component_ids, "Component")
     check_fk("rels_system_sensor.csv", ":START_ID(System)", system_ids, "System")
     check_fk("rels_system_sensor.csv", ":END_ID(Sensor)", sensor_ids, "Sensor")
+    check_fk("rels_aircraft_flight.csv", ":START_ID(Aircraft)", aircraft_ids, "Aircraft")
+    check_fk("rels_aircraft_flight.csv", ":END_ID(Flight)", flight_ids, "Flight")
+    check_fk("rels_flight_departure.csv", ":START_ID(Flight)", flight_ids, "Flight")
     check_fk("rels_flight_departure.csv", ":END_ID(Airport)", airport_ids, "Airport")
+    check_fk("rels_flight_arrival.csv", ":START_ID(Flight)", flight_ids, "Flight")
     check_fk("rels_flight_arrival.csv", ":END_ID(Airport)", airport_ids, "Airport")
     check_fk("rels_flight_delay.csv", ":START_ID(Flight)", flight_ids, "Flight")
     check_fk("rels_flight_delay.csv", ":END_ID(Delay)", delay_ids, "Delay")
+    check_fk("rels_component_event.csv", ":START_ID(Component)", component_ids, "Component")
     check_fk("rels_component_event.csv", ":END_ID(MaintenanceEvent)", event_ids, "MaintenanceEvent")
+    check_fk(
+        "rels_event_aircraft.csv", ":START_ID(MaintenanceEvent)", event_ids, "MaintenanceEvent"
+    )
+    check_fk("rels_event_aircraft.csv", ":END_ID(Aircraft)", aircraft_ids, "Aircraft")
+    check_fk("rels_event_system.csv", ":START_ID(MaintenanceEvent)", event_ids, "MaintenanceEvent")
+    check_fk("rels_event_system.csv", ":END_ID(System)", system_ids, "System")
+    check_fk("rels_aircraft_removal.csv", ":START_ID(Aircraft)", aircraft_ids, "Aircraft")
+    check_fk("rels_aircraft_removal.csv", ":END_ID(Removal)", removal_ids, "Removal")
+    check_fk("rels_component_removal.csv", ":START_ID(Removal)", removal_ids, "Removal")
+    check_fk("rels_component_removal.csv", ":END_ID(Component)", component_ids, "Component")
 
     if errors:
         console.print(f"[red]Found {len(errors)} referential integrity error(s):[/red]")

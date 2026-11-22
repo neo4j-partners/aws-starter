@@ -272,7 +272,7 @@ _NODE_DEFINITIONS: list[tuple[str, str, str]] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Relationship loading — matches notebook 02 Cypher exactly
+# Relationship loading. The Cypher matches notebook 02 exactly.
 # ---------------------------------------------------------------------------
 
 _REL_DEFINITIONS: list[tuple[str, str, str]] = [

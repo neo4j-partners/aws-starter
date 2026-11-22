@@ -13,14 +13,39 @@ import pytest
 
 from generator import removals as removal_module
 from generator.config import GeneratorConfig
-from generator.fleet import AircraftNode, generate_fleet
+from generator.fleet import AircraftNode, ComponentNode, SystemNode, generate_fleet
 from generator.main import generate
 from generator.removals import (
     _BASE_REMOVALS_PER_YEAR,
     _MIN_HOURS_SINCE_INSTALL,
+    _causing_event,
+    _events_by_component,
+    _inspection_routes,
     _most_hours_since_install,
     generate_removals,
 )
+from generator.specs import CORRECTIVE_ACTIONS
+
+
+def _event(
+    event_id: str,
+    aircraft: AircraftNode,
+    system: SystemNode,
+    component: ComponentNode,
+    fault: str,
+    severity: str,
+    reported_at: str,
+) -> dict[str, str]:
+    """A maintenance event row with the columns removals read."""
+    return {
+        ":ID(MaintenanceEvent)": event_id,
+        "component_id": component.component_id,
+        "system_id": system.system_id,
+        "aircraft_id": aircraft.aircraft_id,
+        "fault": fault,
+        "severity": severity,
+        "reported_at": reported_at,
+    }
 
 
 def test_start_date_too_soon_after_entry_into_service_is_rejected() -> None:
@@ -107,7 +132,12 @@ def test_a_busy_component_is_removed_again_after_its_replacement() -> None:
     config = GeneratorConfig(n_aircraft=2, n_days=365)
     fleet = generate_fleet(config)
     busy = fleet[0]
-    events = [{"aircraft_id": busy.aircraft_id, "severity": "CRITICAL"}] * 200
+    engine = busy.systems[0]
+    part = engine.components[0]
+    events = [
+        _event(f"ME{n:04d}", busy, engine, part, "Overheat", "CRITICAL", "2024-07-01T00:00:00")
+        for n in range(200)
+    ]
 
     removals, _, _ = generate_removals(fleet, events, config, random.Random(0))
 
@@ -134,3 +164,74 @@ def test_a_year_makes_every_drawn_removal(year_dataset: Path) -> None:
     fleet = generate_fleet(GeneratorConfig(n_aircraft=30, n_airports=40, n_days=365, seed=42))
     assert [a.aircraft_id for a in fleet] == aircraft
     _assert_spread(removals, fleet)
+
+
+def test_the_causing_event_is_the_parts_latest_event_after_its_install() -> None:
+    fleet = generate_fleet(GeneratorConfig(n_aircraft=1))
+    aircraft = fleet[0]
+    engine = aircraft.systems[0]
+    part = engine.components[0]
+    events = _events_by_component(
+        [
+            _event("ME0002", aircraft, engine, part, "Leak", "MAJOR", "2024-07-20T10:00:00"),
+            _event("ME0001", aircraft, engine, part, "Overheat", "MINOR", "2024-07-05T08:00:00"),
+            _event("ME0003", aircraft, engine, part, "Overheat", "CRITICAL", "2024-08-02T00:00:00"),
+        ]
+    )[part.component_id]
+    removed = datetime(2024, 7, 25)
+
+    # The latest event at or before the removal wins, whatever the row order.
+    assert _causing_event(events, datetime(2024, 1, 1), removed)[":ID(MaintenanceEvent)"] == (
+        "ME0002"
+    )
+    # An event on the part this one replaced cannot cause its removal.
+    assert _causing_event(events, datetime(2024, 7, 21), removed) is None
+    # An event after the removal cannot cause it either.
+    assert _causing_event(events, datetime(2024, 1, 1), datetime(2024, 7, 1)) is None
+
+
+def test_every_component_type_has_an_inspection_fault() -> None:
+    for aircraft in generate_fleet(GeneratorConfig(n_aircraft=100)):
+        for system in aircraft.systems:
+            for component in system.components:
+                routes = _inspection_routes(aircraft.model, system, component)
+                assert routes, (aircraft.model, system.type, component.type)
+                assert {r.fault for r in routes} <= set(CORRECTIVE_ACTIONS)
+
+
+def test_removal_reasons_name_the_causing_event_or_an_inspection_fault(
+    year_dataset: Path,
+) -> None:
+    events: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for e in _rows(year_dataset / "nodes_maintenance.csv"):
+        events[e["component_id"]].append(e)
+    caused = inspected = 0
+    for r in _rows(year_dataset / "nodes_removals.csv"):
+        prior = [
+            e
+            for e in events[r["component_id"]]
+            if r["installation_date"] <= e["reported_at"] <= r["removal_date"]
+        ]
+        if prior:
+            last = max(prior, key=lambda e: e["reported_at"])
+            expected = (
+                f"{last['fault']} after {last['severity']} event {last[':ID(MaintenanceEvent)']}"
+            )
+            assert r["RMV_REA_TX"] == expected, r
+            caused += 1
+        else:
+            fault, _, rest = r["RMV_REA_TX"].partition(" found on inspection")
+            assert fault in CORRECTIVE_ACTIONS and rest == "", r
+            inspected += 1
+    # A year of events gives both kinds of removal.
+    assert caused and inspected
+
+
+def test_removal_reasons_are_the_same_for_a_seed() -> None:
+    config = GeneratorConfig(n_aircraft=6, n_days=30)
+    fleet = generate_fleet(config)
+
+    first, _, _ = generate_removals(fleet, [], config, random.Random(7))
+    second, _, _ = generate_removals(fleet, [], config, random.Random(7))
+
+    assert [r["RMV_REA_TX"] for r in first] == [r["RMV_REA_TX"] for r in second]

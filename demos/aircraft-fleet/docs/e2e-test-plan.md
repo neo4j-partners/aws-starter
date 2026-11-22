@@ -305,7 +305,7 @@ health endpoint returns `{"status":"Healthy"}`. History:
 uv run fleet-cli "How many aircraft are in the database?"
 ```
 
-Expect a numeric answer consistent with the loaded dataset (default ~20
+Expect a numeric answer consistent with the loaded dataset (default 30
 aircraft).
 
 **Result:** PASS. The operator started `uv run fleet-server` manually

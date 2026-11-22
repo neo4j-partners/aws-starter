@@ -1,10 +1,14 @@
-"""Flights, airframe hours, and cycles follow one utilization per aircraft."""
+"""Flights, airframe hours, and cycles follow one utilization per aircraft.
+
+A CRITICAL event cancels the rest of its day's legs, so each grounded day
+can lose up to one day of flying against the airframe hours and cycles.
+"""
 
 from __future__ import annotations
 
 import csv
-from collections import defaultdict
-from datetime import datetime, time, timedelta
+from collections import Counter, defaultdict
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -42,6 +46,20 @@ def flights_by_aircraft(dataset: Path) -> dict[str, list[tuple[datetime, datetim
 
 
 @pytest.fixture(scope="module")
+def grounded_days(dataset: Path) -> dict[str, set[date]]:
+    """The days each aircraft has a CRITICAL event, which cancels the rest of its legs."""
+    days: dict[str, set[date]] = defaultdict(set)
+    for e in _rows(dataset / "nodes_maintenance.csv"):
+        if e["severity"] == "CRITICAL":
+            days[e["aircraft_id"]].add(_ts(e["reported_at"]).date())
+    return days
+
+
+def _grounded_between(days: set[date], start: datetime, end: datetime) -> int:
+    return sum(start.date() <= day <= end.date() for day in days)
+
+
+@pytest.fixture(scope="module")
 def removals_by_aircraft(dataset: Path) -> dict[str, list[dict[str, str]]]:
     removals: dict[str, list[dict[str, str]]] = defaultdict(list)
     for r in _rows(dataset / "nodes_removals.csv"):
@@ -49,11 +67,12 @@ def removals_by_aircraft(dataset: Path) -> dict[str, list[dict[str, str]]]:
     return {a: sorted(rs, key=lambda r: r["removal_date"]) for a, rs in removals.items()}
 
 
-def test_mean_block_hours_per_day_is_within_utilization(flights_by_aircraft) -> None:
+def test_mean_block_hours_per_day_is_within_utilization(flights_by_aircraft, grounded_days) -> None:
     low, high = UTILIZATION.hours_per_day
     for aircraft, legs in flights_by_aircraft.items():
         block_hours = sum((arr - dep).total_seconds() for dep, arr in legs) / 3600
-        assert low <= block_hours / DAYS <= high, aircraft
+        flying_days = DAYS - len(grounded_days[aircraft])
+        assert low * flying_days <= block_hours <= high * DAYS, aircraft
 
 
 def test_an_aircraft_flies_one_leg_at_a_time(flights_by_aircraft) -> None:
@@ -100,15 +119,17 @@ def test_hours_per_cycle_stays_in_the_model_band(dataset: Path, removals_by_airc
 
 
 def test_airframe_hours_between_removals_match_the_flights(
-    flights_by_aircraft, removals_by_aircraft
+    flights_by_aircraft, removals_by_aircraft, grounded_days
 ) -> None:
     # Airframe hours grow continuously, flights in daily blocks, so the two
     # can differ by up to one day of flying, plus 1 for whole-hour rounding.
-    tolerance = UTILIZATION.hours_per_day[1] + 1
+    # Each grounded day in between can lose one more day of flying.
+    day = UTILIZATION.hours_per_day[1]
     pairs = 0
     for aircraft, removals in removals_by_aircraft.items():
         for first, last in zip(removals, removals[1:], strict=False):
             start, end = _ts(first["removal_date"]), _ts(last["removal_date"])
+            tolerance = day + 1 + day * _grounded_between(grounded_days[aircraft], start, end)
             flown = sum(
                 (arr - dep).total_seconds() / 3600
                 for dep, arr in flights_by_aircraft[aircraft]
@@ -121,16 +142,19 @@ def test_airframe_hours_between_removals_match_the_flights(
 
 
 def test_cycles_between_removals_match_the_legs_flown(
-    flights_by_aircraft, removals_by_aircraft
+    flights_by_aircraft, removals_by_aircraft, grounded_days
 ) -> None:
     # A cycle is one leg. Cycles grow continuously and legs in daily blocks,
     # so the two can differ by up to one day's legs, plus 1 for rounding.
+    # Each grounded day in between can cancel one more day's legs.
     pairs = 0
     for aircraft, removals in removals_by_aircraft.items():
         legs = flights_by_aircraft[aircraft]
-        tolerance = len(legs) / DAYS + 1
+        legs_per_day = max(Counter(dep.date() for dep, _ in legs).values())
         for first, last in zip(removals, removals[1:], strict=False):
             start, end = _ts(first["removal_date"]), _ts(last["removal_date"])
+            grounded = _grounded_between(grounded_days[aircraft], start, end)
+            tolerance = legs_per_day * (1 + grounded) + 1
             flown = sum(1 for dep, _ in legs if start <= dep < end)
             gained = int(last["flight_cycles_at_removal"]) - int(first["flight_cycles_at_removal"])
             assert abs(gained - flown) <= tolerance, (aircraft, gained, flown)

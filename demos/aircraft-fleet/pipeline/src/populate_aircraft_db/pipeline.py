@@ -112,7 +112,7 @@ class ContextPrependingSplitter(TextSplitter):
 
     **Why this is necessary:**  ``SimpleKGPipeline`` passes ``document_metadata``
     (which includes the aircraft type) only to the lexical graph builder for
-    storage on ``Document`` nodes — it is never injected into the LLM extraction
+    storage on ``Document`` nodes. It is never injected into the LLM extraction
     prompt.  The LLM sees only the raw chunk text.  After the inner splitter
     divides a 30 000-character maintenance manual into ~40 chunks of ~800
     characters, most chunks land deep in engine-specific sections where the
@@ -263,7 +263,7 @@ Assign a unique ID (string) to each node and reuse it for relationships.
 
 Output rules:
 - Return ONLY the JSON object, no additional text.
-- Omit any backticks — output raw JSON.
+- Omit any backticks. Output raw JSON.
 - The JSON must be a single object, not wrapped in a list.
 - Property names must be in double quotes.
 - Property values must be strings, numbers, booleans, or arrays of those values.

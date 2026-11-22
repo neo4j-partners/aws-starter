@@ -626,7 +626,7 @@ MANUFACTURER: dict[str, str] = {
 @dataclass(frozen=True)
 class OperatorProfile:
     name: str
-    # Multiplies degradation slopes — 1.0 is average, >1.0 means worse maintenance quality
+    # Multiplies degradation slopes. 1.0 is average, and above 1.0 means worse maintenance.
     degradation_multiplier: float
     # Baseline probability that any given flight incurs a delay
     delay_rate: float

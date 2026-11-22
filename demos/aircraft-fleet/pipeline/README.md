@@ -165,7 +165,7 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 
 | Setting | Fleet | Size |
 |---------|-------|------|
-| `LOAD_FULL_DATASET=false` | 30 aircraft over 90 days | About 800,000 nodes, 828,000 relationships, a 52 MB readings file, and 227 maintenance events |
+| `LOAD_FULL_DATASET=false` | 30 aircraft over 90 days | About 800,000 nodes, 827,000 relationships, a 52 MB readings file, and 227 maintenance events |
 | `LOAD_FULL_DATASET=true` | 100 aircraft over 90 days | About 2.7 million nodes and 180 MB of readings |
 
 - **Aura Free:** Both sizes are past the Aura Free limits. Use a paid Aura tier or a local Neo4j.

@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import DirectoryPath, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Resolved once at import time — stable regardless of cwd.
+# Resolved once at import time, so the paths hold whatever the cwd is.
 _PKG_DIR = Path(__file__).resolve().parent
 _PIPELINE_DIR = _PKG_DIR.parent.parent
 _LAB_SETUP_DIR = _PIPELINE_DIR.parent
@@ -40,25 +40,25 @@ class Settings(BaseSettings):
     data_dir: DirectoryPath = _DATA_DIR  # type: ignore[assignment]
     document_dir: DirectoryPath = _DOCUMENT_DIR  # type: ignore[assignment]
 
-    # OpenAI embeddings — required for the `setup` command.
+    # OpenAI embeddings. The `setup` command requires them.
     openai_api_key: SecretStr | None = None
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
 
-    # OpenAI chat model — used by the `setup` command for entity extraction.
+    # OpenAI chat model. The `setup` command uses it for entity extraction.
     openai_extraction_model: str = "gpt-5-mini"
     openai_extraction_max_completion_tokens: int = 8000
 
-    # LLM provider selection — "bedrock" (default), "openai", or "anthropic".
+    # LLM provider: "bedrock", "openai", or "anthropic". The default is "bedrock".
     # Controls BOTH entity extraction and chunk embeddings.
     llm_provider: Literal["bedrock", "openai", "anthropic"] = "bedrock"
 
-    # Anthropic — only required when llm_provider is "anthropic".
+    # Anthropic. Required only when llm_provider is "anthropic".
     anthropic_api_key: SecretStr | None = None
     anthropic_extraction_model: str = "claude-sonnet-5-5"
     anthropic_extraction_max_tokens: int = 8000
 
-    # Amazon Bedrock — used when llm_provider is "bedrock". Credentials come
+    # Amazon Bedrock, used when llm_provider is "bedrock". Credentials come
     # from the standard AWS chain (env vars / ~/.aws), not from this file.
     # Region is the shared AWS_REGION (also read by the agent); defaults to
     # us-east-1, this repo's AgentCore region. Override via AWS_REGION.

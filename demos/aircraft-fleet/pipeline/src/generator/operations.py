@@ -4,12 +4,18 @@ Flight operations and delay generation.
 Hub airports receive disproportionately more routes, producing a realistic
 hub-and-spoke network where PageRank and Betweenness centrality produce
 non-trivial rankings.
+
+A CRITICAL maintenance event grounds its aircraft from the hour it is
+reported to the end of that day. Every leg that would depart in that time is
+cancelled, so it has no Flight row. The aircraft flies again the next morning
+from the airport where it last landed.
 """
 
 from __future__ import annotations
 
 import random
-from datetime import timedelta
+from collections.abc import Iterable, Mapping
+from datetime import date, datetime, timedelta
 
 from .config import GeneratorConfig
 from .fleet import AircraftNode
@@ -29,23 +35,46 @@ _TURNAROUND_MINUTES = (45, 90)
 _FIRST_DEPARTURE = 5.0
 _LATEST_FIRST_DEPARTURE = 9.0
 
-# Hub airports get this weight multiplier in route selection
+# Hub airports get this weight multiplier in route selection.
 _HUB_WEIGHT = 4.0
+
+# Events of this severity ground the aircraft for the rest of their day.
+_GROUNDING_SEVERITY = "CRITICAL"
+
+
+def _grounding_starts(
+    maintenance_events: Iterable[Mapping[str, str]],
+) -> dict[tuple[str, date], datetime]:
+    """When each aircraft is grounded on each day, keyed by (aircraft_id, day).
+
+    The value is the day's earliest grounding event. The aircraft stays on
+    the ground from then until midnight.
+    """
+    starts: dict[tuple[str, date], datetime] = {}
+    for evt in maintenance_events:
+        if evt["severity"] != _GROUNDING_SEVERITY:
+            continue
+        reported = datetime.fromisoformat(evt["reported_at"])
+        key = (evt["aircraft_id"], reported.date())
+        starts[key] = min(starts.get(key, reported), reported)
+    return starts
 
 
 def generate_operations(
     fleet: list[AircraftNode],
     config: GeneratorConfig,
     rng: random.Random,
-) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
-    """
-    Returns (airport_nodes, flight_nodes, delay_nodes,
-             rels_aircraft_flight, rels_flight_departure, rels_flight_arrival,
-             rels_flight_delay)
+    maintenance_events: Iterable[Mapping[str, str]] = (),
+) -> tuple[list[dict], list[dict], list[dict], list[dict], list[dict], list[dict], list[dict]]:
+    """Generate airports, flights, and delays, with no flights while a CRITICAL event grounds.
 
-    Actually returns six lists — see return statement.
+    Returns:
+        Seven lists: (airport_nodes, flight_nodes, delay_nodes,
+        rels_aircraft_flight, rels_flight_departure, rels_flight_arrival,
+        rels_flight_delay).
     """
     airports = AIRPORTS[: config.n_airports]
+    grounding_starts = _grounding_starts(maintenance_events)
 
     airport_nodes = [
         {
@@ -100,9 +129,13 @@ def generate_operations(
             current_time = config.start_date + timedelta(
                 days=day, hours=rng.uniform(_FIRST_DEPARTURE, latest)
             )
+            grounded_from = grounding_starts.get((aircraft.aircraft_id, current_time.date()))
 
             for leg, raw_block in enumerate(raw_blocks):
-                # Weighted destination selection — hubs attract more traffic
+                # A grounded aircraft cancels this leg and the rest of the day's.
+                if grounded_from is not None and current_time >= grounded_from:
+                    break
+                # Weighted destination selection: hubs attract more traffic.
                 candidates = [ap for ap in airports if ap.airport_id != current_airport.airport_id]
                 candidate_weights = [_HUB_WEIGHT if ap.is_hub else 1.0 for ap in candidates]
                 destination = rng.choices(candidates, weights=candidate_weights)[0]
@@ -137,7 +170,7 @@ def generate_operations(
                     {":START_ID(Flight)": flight_id, ":END_ID(Airport)": destination.airport_id}
                 )
 
-                # Delays — probability scaled by operator quality
+                # The operator's quality scales the delay probability.
                 if rng.random() < delay_rate:
                     delay_counter += 1
                     spec = rng.choices(DELAY_CAUSE_SPECS, weights=_DELAY_WEIGHTS)[0]

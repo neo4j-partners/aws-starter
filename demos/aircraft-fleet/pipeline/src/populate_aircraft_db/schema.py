@@ -74,7 +74,7 @@ COMPONENT_ALIASES_TEXT = "; ".join(
 # OperatingLimit parameterName.
 SENSOR_PARAMETER_NAMES = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)
 
-# (label, property) pairs — one uniqueness constraint each.
+# (label, property) pairs, one uniqueness constraint each.
 CONSTRAINTS: list[tuple[str, str]] = [
     ("Aircraft", "aircraft_id"),
     ("System", "system_id"),
@@ -92,7 +92,7 @@ CONSTRAINTS: list[tuple[str, str]] = [
     ("Dataset", "id"),
 ]
 
-# (label, property) pairs — property indexes for common lookups.
+# (label, property) pairs: property indexes for common lookups.
 INDEXES: list[tuple[str, str]] = [
     ("MaintenanceEvent", "severity"),
     ("Flight", "aircraft_id"),
@@ -101,7 +101,7 @@ INDEXES: list[tuple[str, str]] = [
     ("Removal", "aircraft_id"),
 ]
 
-# (index_name, label, [properties]) — fulltext indexes for sample queries.
+# (index_name, label, [properties]): fulltext indexes for sample queries.
 FULLTEXT_INDEXES: list[tuple[str, str, list[str]]] = [
     ("maintenance_search", "MaintenanceEvent", ["fault", "corrective_action"]),
     ("delay_search", "Delay", ["cause"]),

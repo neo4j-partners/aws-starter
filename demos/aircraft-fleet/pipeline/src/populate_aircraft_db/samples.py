@@ -37,7 +37,7 @@ def pick_seed_chunk(driver: Driver, database: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# 1. Aircraft Fleet (shows all — not limited by sample_size)
+# 1. Aircraft Fleet. Shows every aircraft, whatever the sample_size.
 # ---------------------------------------------------------------------------
 
 _FLEET_Q = """\
@@ -64,7 +64,7 @@ def _aircraft_fleet(driver: Driver, database: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. System-Component hierarchy (shows one aircraft — structural limit)
+# 2. System-Component hierarchy. Shows one aircraft to keep the output short.
 # ---------------------------------------------------------------------------
 
 _HIERARCHY_Q = """\
@@ -372,7 +372,7 @@ def _vector_similarity(driver: Driver, database: str, limit: int, seed_id: str |
 
 
 # ---------------------------------------------------------------------------
-# 10. Full-text search (Lab 3 — keyword search via fulltext index)
+# 10. Full-text search. Lab 3 keyword search through the fulltext index.
 # ---------------------------------------------------------------------------
 
 _FULLTEXT_Q = """\
@@ -411,7 +411,7 @@ def _fulltext_search(driver: Driver, database: str, limit: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 11. Vector search with document context (Lab 3 — VectorCypherRetriever)
+# 11. Vector search with document context. Lab 3 VectorCypherRetriever.
 # ---------------------------------------------------------------------------
 
 _VECTOR_DOC_Q = """\
@@ -474,7 +474,7 @@ def _vector_document_context(
 
 
 # ---------------------------------------------------------------------------
-# 12. Adjacent chunk retrieval (Lab 3 — VectorCypherRetriever + NEXT_CHUNK)
+# 12. Adjacent chunk retrieval. Lab 3 VectorCypherRetriever with NEXT_CHUNK.
 # ---------------------------------------------------------------------------
 
 _ADJACENT_Q = """\
@@ -534,7 +534,7 @@ def _adjacent_chunks(driver: Driver, database: str, limit: int, seed_id: str | N
 
 
 # ---------------------------------------------------------------------------
-# 13. Vector search → Aircraft topology (Lab 3 — system connection pattern)
+# 13. Vector search → Aircraft topology. Lab 3 system connection pattern.
 # ---------------------------------------------------------------------------
 
 _VECTOR_TOPO_Q = """\
@@ -606,7 +606,7 @@ def _vector_topology(driver: Driver, database: str, limit: int, seed_id: str | N
 
 
 # ---------------------------------------------------------------------------
-# 14. Hybrid search comparison (Lab 3 — vector vs fulltext side-by-side)
+# 14. Hybrid search comparison. Lab 3 vector and fulltext side by side.
 # ---------------------------------------------------------------------------
 
 _HYBRID_VECTOR_Q = """\

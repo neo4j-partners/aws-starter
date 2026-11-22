@@ -57,6 +57,10 @@ STUB_AWS = r"""#!/bin/bash
 echo "aws $*" >> "$STUB_LOG"
 if [ "$1 $2" = "sts get-caller-identity" ]; then
     if [ -n "$STUB_STS_ERROR" ]; then echo "$STUB_STS_ERROR" >&2; exit 254; fi
+    # Change the targets file after agent.sh read it for the account check.
+    if [ -n "$STUB_STS_REWRITE_TARGETS" ]; then
+        printf '%s\n' "$STUB_STS_REWRITE_TARGETS" > agentcore/aws-targets.json
+    fi
     if [ -n "$STUB_CALLER_ACCOUNT_AFTER_DEPLOY" ] && grep -q "^agentcore deploy" "$STUB_LOG"; then
         echo "$STUB_CALLER_ACCOUNT_AFTER_DEPLOY"
         exit 0
@@ -301,6 +305,50 @@ def test_an_aws_error_in_the_stack_check_fails_before_any_change(project: Path) 
     assert "Continue?" not in result.stdout
     assert not any(c.startswith("agentcore ") for c in calls(project))
     assert spec.read_bytes() == tracked
+    assert leftover_temp_files(project) == []
+
+
+# The account check read the targets file, then it changed before the stack
+# check read the region.
+def test_an_unreadable_target_in_the_stack_check_fails_before_any_change(
+    project: Path,
+) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, "", STUB_STS_REWRITE_TARGETS="[]")
+
+    assert result.returncode == 1
+    assert (
+        "Could not read the region for target 'default' from agentcore/aws-targets.json."
+        in result.stdout
+    )
+    assert "Continue?" not in result.stdout
+    logged = calls(project)
+    assert not any(c.startswith("agentcore ") for c in logged)
+    assert not any("describe-stacks" in c for c in logged)
+    assert spec.read_bytes() == tracked
+    assert leftover_temp_files(project) == []
+
+
+def test_an_unreadable_project_name_in_the_stack_check_fails_before_any_change(
+    project: Path,
+) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    data = json.loads(spec.read_text())
+    del data["name"]
+    spec.write_text(json.dumps(data))
+    broken = spec.read_bytes()
+
+    result = run_destroy(project, "")
+
+    assert result.returncode == 1
+    assert "Could not read the project name from agentcore/agentcore.json." in result.stdout
+    assert "Continue?" not in result.stdout
+    logged = calls(project)
+    assert not any(c.startswith("agentcore ") for c in logged)
+    assert not any("describe-stacks" in c for c in logged)
+    assert spec.read_bytes() == broken
     assert leftover_temp_files(project) == []
 
 

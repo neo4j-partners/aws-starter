@@ -69,6 +69,11 @@ case "$1 $2" in
         if [ -n "${STUB_STACK_BEFORE_DEPLOY+set}" ] && ! grep -q "^agentcore deploy" "$STUB_LOG"; then
             if [ -n "${STUB_PRECHECK_SIGNAL:-}" ]; then kill -s "$STUB_PRECHECK_SIGNAL" "$PPID" "$$"; fi
             if [ -n "${STUB_PRECHECK_ERROR:-}" ]; then echo "$STUB_PRECHECK_ERROR" >&2; exit 254; fi
+            # Replace .env.local with a link after agent.sh checked it.
+            if [ -n "${STUB_PRECHECK_LINK_ENV_LOCAL:-}" ]; then
+                rm -f agentcore/.env.local
+                ln -s "$STUB_PRECHECK_LINK_ENV_LOCAL" agentcore/.env.local
+            fi
             if [ -n "$STUB_STACK_BEFORE_DEPLOY" ]; then echo "$STUB_STACK_BEFORE_DEPLOY"; exit 0; fi
             echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
             exit 254
@@ -496,12 +501,43 @@ def test_an_aws_error_in_the_stack_check_fails_before_any_change(project: Path) 
     )
 
     assert result.returncode == 1
-    assert "Could not check AWS for remaining resources" in result.stdout
+    assert (
+        "Could not check stack AgentCore-fleetsupervisor-default in us-west-2 with CloudFormation:"
+        in result.stdout
+    )
     assert "ExpiredToken" in result.stdout
     assert "Continue?" not in result.stdout
     assert not any(c.startswith("agentcore") for c in calls(project))
     assert spec.read_bytes() == tracked
     assert not list((project.parent / "tmp").iterdir())
+
+
+# The start check passed, then .env.local became a link before the strip on
+# the path with no stack. The strip refuses, and no later step retries it.
+def test_an_absent_stack_with_a_failed_strip_fails_and_says_to_delete_by_hand(
+    project: Path,
+) -> None:
+    target = project.parent / "shared.env"
+    target.write_text(SECRET_LINE + "A=1\n")
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text("A=1\n")
+
+    result = run_destroy(
+        project, STUB_STACK_BEFORE_DEPLOY="", STUB_PRECHECK_LINK_ENV_LOCAL=str(target)
+    )
+
+    assert result.returncode == 1
+    assert ABSENT_MESSAGE in result.stdout
+    assert "agentcore/.env.local is a symbolic link" in result.stderr
+    assert (
+        "Delete the AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET line "
+        "from agentcore/.env.local by hand." in result.stderr
+    )
+    assert env_local.is_symlink()
+    assert target.read_text() == SECRET_LINE + "A=1\n"
+    assert not list(env_local.parent.glob(".env.local.*"))
+    assert "Cleanup complete" not in result.stdout
+    assert not any(c.startswith(("agentcore remove", "agentcore deploy")) for c in calls(project))
 
 
 def test_an_interrupt_during_the_stack_check_leaves_no_temporary_file(project: Path) -> None:

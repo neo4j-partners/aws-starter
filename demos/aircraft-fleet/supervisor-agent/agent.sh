@@ -530,12 +530,12 @@ require_target_account() {
 
 # Run a read-only AWS lookup and keep its output in AWS_LOOKUP_OUTPUT.
 # Returns 0 if the resource exists and 1 if the error text contains
-# not_found. Any other failure exits, so an expired login or a missing
-# permission never reads as deleted. Call it directly, not in $(...), so
-# that exit stops the script.
+# not_found. Any other failure prints failure, then the AWS error, and
+# exits, so an expired login or a missing permission never reads as
+# deleted. Call it directly, not in $(...), so that exit stops the script.
 aws_lookup() {
-    local not_found="$1" output errors status=0
-    shift
+    local failure="$1" not_found="$2" output errors status=0
+    shift 2
     # aws_lookup runs inside if, where set -e is off, so check these.
     if ! output=$(make_temp) || ! errors=$(make_temp); then
         exit 1
@@ -551,7 +551,7 @@ aws_lookup() {
         rm -f "$errors"
         return 1
     fi
-    echo -e "${RED}Could not check AWS for remaining resources:${NC}"
+    echo -e "${RED}$failure${NC}"
     cat "$errors"
     rm -f "$errors"
     exit 1
@@ -562,6 +562,7 @@ aws_lookup() {
 # stack and the credential provider are also looked up in AWS by name.
 report_remaining() {
     local status errors remaining region
+    local failure="Could not check AWS for remaining resources:"
     errors=$(make_temp) || exit 1
     if ! status=$(agentcore status --json --target "$TARGET" 2>"$errors"); then
         echo -e "${RED}Could not check what remains deployed:${NC}"
@@ -587,13 +588,13 @@ report_remaining() {
     # account before the deploy, but the credentials can change after that,
     # for example when a session expires or a profile changes. So check again.
     require_target_account "$region"
-    if aws_lookup "does not exist" aws cloudformation describe-stacks \
+    if aws_lookup "$failure" "does not exist" aws cloudformation describe-stacks \
         --region "$region" --stack-name "$STACK_NAME" \
         --query 'Stacks[0].StackStatus' --output text; then
         remaining+="${remaining:+$'\n'}  stack $STACK_NAME: $AWS_LOOKUP_OUTPUT"
         remaining+=$'\n'"    Delete it with: aws cloudformation delete-stack --region $region --stack-name $STACK_NAME"
     fi
-    if aws_lookup "ResourceNotFoundException" aws bedrock-agentcore-control \
+    if aws_lookup "$failure" "ResourceNotFoundException" aws bedrock-agentcore-control \
         get-oauth2-credential-provider --region "$region" --name "$GATEWAY_PROVIDER"; then
         remaining+="${remaining:+$'\n'}  credential provider $GATEWAY_PROVIDER"
         remaining+=$'\n'"    Delete it with: aws bedrock-agentcore-control delete-oauth2-credential-provider --region $region --name $GATEWAY_PROVIDER"
@@ -794,7 +795,8 @@ case "${1:-help}" in
         # removed, as the restore after a deploy does. The report still looks
         # up the stack and the provider, so a leftover fails the run.
         stack_region=$(target_region)
-        if ! aws_lookup "does not exist" aws cloudformation describe-stacks \
+        if ! aws_lookup "Could not check stack $STACK_NAME in $stack_region with CloudFormation:" \
+            "does not exist" aws cloudformation describe-stacks \
             --region "$stack_region" --stack-name "$STACK_NAME" \
             --query 'Stacks[0].StackStatus' --output text; then
             echo -e "${YELLOW}Stack $STACK_NAME does not exist in $stack_region, so there is nothing to remove.${NC}"

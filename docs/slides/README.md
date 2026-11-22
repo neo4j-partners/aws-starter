@@ -36,10 +36,9 @@ The gallery page lists these decks from `docs/slides/current/`:
 - **`neosemantics.md`:** This deck gives a Neosemantics 4.0 overview. Its technical appendix shows graph representations, URI linking, mappings, and SHACL validation.
 - **`enterprise-knowledge-layer.md`:** This deck shows how a shared, governed Knowledge Layer gives every agent the same business meaning, source routing, policy, and decision traces.
 
-The export commands build `aws-neo4j-finance-overview.md`,
-`fraud-data-architecture.md`, `neocarta-slides-v2.md`, `neosemantics.md`, and
-`neocarta-slides.md`. The folder also holds `neocarta-aws-appendix.md`. Neither
-the gallery nor the exports build it.
+The export commands build every deck above, plus `neocarta-slides.md`. The
+folder also holds `neocarta-aws-appendix.md`. Neither the gallery nor the
+exports build it.
 
 ## Resources section
 

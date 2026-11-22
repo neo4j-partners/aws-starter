@@ -17,11 +17,14 @@ if (!supportedFormats.has(format)) {
 }
 
 const decks = [
+  "current/hyperscaler-overview.md",
+  "current/aws-main-services.md",
   "current/aws-neo4j-finance-overview.md",
   "current/fraud-data-architecture.md",
   "current/neocarta-slides.md",
   "current/neocarta-slides-v2.md",
   "current/neosemantics.md",
+  "current/enterprise-knowledge-layer.md",
 ];
 
 rmSync("dist", { force: true, recursive: true });

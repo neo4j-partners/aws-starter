@@ -16,6 +16,10 @@ memory. The cache goes only for this agent, and its parent folder only when
 nothing else is left in it. The Runtime's log groups go only after the Runtime
 is gone, and only under the exact runtime ID followed by a dash. A missing
 resource is reported, not treated as an error.
+
+Exit codes: 0 when the cleanup ran without failures, 1 when a step failed or
+the config could not be read after destroy, 2 when the snapshot is unusable,
+and 3 when destroy did not remove the agent, so nothing was cleaned.
 """
 
 from __future__ import annotations
@@ -41,6 +45,8 @@ RUNTIME_ID_PATTERN = re.compile(r"[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}")
 # Destroy asks AgentCore to delete the runtime but does not wait for it.
 RUNTIME_DELETE_TIMEOUT = 600
 RUNTIME_DELETE_POLL = 10
+# agent.sh reads this exit code as "destroy did not finish".
+EXIT_DESTROY_NOT_FINISHED = 3
 
 ClientFactory = Callable[..., object]
 
@@ -270,12 +276,21 @@ def main() -> int:
 
     # Destroy removes the agent from the config only when it finished without
     # errors. A cancelled or failed destroy leaves the agent in place.
-    if args.config.exists() and load_agent(args.config, args.agent) is not None:
+    try:
+        still_configured = args.config.exists() and load_agent(args.config, args.agent) is not None
+    except (OSError, yaml.YAMLError) as error:
+        print(
+            f"Could not read {args.config.name} after destroy, so the leftovers stay "
+            f"in place: {error}",
+            file=sys.stderr,
+        )
+        return 1
+    if still_configured:
         print(
             f"agentcore destroy did not remove '{args.agent}' from {args.config.name}. "
             "It was cancelled or failed, so the leftovers stay in place."
         )
-        return 0
+        return EXIT_DESTROY_NOT_FINISHED
 
     report, failures = clean_leftovers(agent, args.agent, args.cache_dir)
     for line in report:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import tempfile
@@ -18,6 +19,8 @@ UV_STUB = """#!/bin/bash
 printf '%s\\n' "$*" >> "$STUB_LOG"
 [ -z "${STUB_UV_OUTPUT:-}" ] || printf '%s\\n' "$STUB_UV_OUTPUT"
 [ -z "${STUB_UV_REMOVE:-}" ] || rm -f "$STUB_UV_REMOVE"
+# Ctrl+C: interrupt agent.sh, which is the parent of this stub.
+[ -z "${STUB_UV_SIGINT:-}" ] || kill -INT "$PPID"
 exit "${STUB_UV_STATUS:-0}"
 """
 
@@ -54,12 +57,16 @@ class AgentShTestCase(unittest.TestCase):
         write_executable(self.bin / "uv", UV_STUB)
         self.log = Path(temp.name) / "calls.log"
         self.log.touch()
+        # agent.sh's mktemp files land here, so tests can check they are gone.
+        self.tmp = Path(temp.name) / "tmp"
+        self.tmp.mkdir()
 
     def run_agent(self, *args: str, **env: str) -> subprocess.CompletedProcess[str]:
         run_env = {
             **os.environ,
             "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
             "STUB_LOG": str(self.log),
+            "TMPDIR": str(self.tmp),
             **env,
         }
         return subprocess.run(
@@ -123,6 +130,19 @@ class InvokeCloudTests(AgentShTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("highest risk scores", self.calls()[0])
 
+    def test_the_response_file_is_removed_on_every_exit(self) -> None:
+        for env in ({}, {"STUB_UV_STATUS": "3"}, {"STUB_UV_OUTPUT": '{"type": "error"}'}):
+            with self.subTest(env=env):
+                self.run_agent("invoke-cloud", "Find chains", **env)
+
+                self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_ctrl_c_removes_the_response_file(self) -> None:
+        result = self.run_agent("invoke-cloud", "Find chains", STUB_UV_SIGINT="1")
+
+        self.assertEqual(result.returncode, -signal.SIGINT)
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
 
 class DestroyTests(AgentShTestCase):
     CONFIG = "agents:\n  fraud_memory_agent:\n    name: fraud_memory_agent\n"
@@ -134,12 +154,12 @@ class DestroyTests(AgentShTestCase):
         self.snapshot_copy = self.log.parent / "snapshot-copy.yaml"
 
     def destroy(self, **env: str) -> subprocess.CompletedProcess[str]:
-        return self.run_agent(
-            "destroy",
-            STUB_UV_REMOVE=str(self.config),
-            STUB_SNAPSHOT_COPY=str(self.snapshot_copy),
-            **env,
-        )
+        # env can override STUB_UV_REMOVE, for a destroy that keeps the config.
+        defaults = {
+            "STUB_UV_REMOVE": str(self.config),
+            "STUB_SNAPSHOT_COPY": str(self.snapshot_copy),
+        }
+        return self.run_agent("destroy", **{**defaults, **env})
 
     def test_destroy_cleans_up_from_a_copy_of_the_config(self) -> None:
         self.config.write_text(self.CONFIG)
@@ -155,6 +175,42 @@ class DestroyTests(AgentShTestCase):
         self.assertIn(f"--cache-dir {self.root / '.bedrock_agentcore'}", python_call)
         self.assertEqual(self.snapshot_copy.read_text(), self.CONFIG)
         self.assertIn("Cleanup complete!", result.stdout)
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_a_destroy_that_did_not_finish_does_not_claim_cleanup_complete(self) -> None:
+        self.config.write_text(self.CONFIG)
+
+        # The helper exits 3 when destroy left the agent in the config.
+        result = self.destroy(STUB_UV_REMOVE="", STUB_PY_STATUS="3")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("Cleanup complete!", result.stdout)
+        self.assertNotIn("Some leftovers were not removed", result.stdout)
+        self.assertIn(
+            "Destroy did not finish, so fraud_memory_agent is still deployed", result.stdout
+        )
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_ctrl_c_during_destroy_removes_the_config_copy(self) -> None:
+        self.config.write_text(self.CONFIG)
+
+        result = self.destroy(STUB_UV_REMOVE="", STUB_UV_SIGINT="1")
+
+        self.assertEqual(result.returncode, -signal.SIGINT)
+        self.assertEqual(self.calls(), ["run agentcore destroy"])
+        self.assertNotIn("Cleanup complete!", result.stdout)
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_a_failed_config_copy_removes_the_empty_temp_file(self) -> None:
+        self.config.write_text(self.CONFIG)
+        self.config.chmod(0)
+        self.addCleanup(self.config.chmod, 0o644)
+
+        result = self.destroy()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(list(self.tmp.iterdir()), [])
 
     def test_a_failed_destroy_skips_the_cleanup(self) -> None:
         self.config.write_text(self.CONFIG)

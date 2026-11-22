@@ -406,8 +406,19 @@ class MainTests(unittest.TestCase):
 
         code, stdout, _, cleaner = self.run_main()
 
-        self.assertEqual(code, 0)
+        # agent.sh reads exit 3 as "destroy did not finish".
+        self.assertEqual(code, 3)
         self.assertIn("leftovers stay in place", stdout)
+        cleaner.assert_not_called()
+
+    def test_an_unreadable_config_after_destroy_exits_1_without_a_traceback(self) -> None:
+        self.config.write_text("agents: [unclosed\n")
+
+        code, _, stderr, cleaner = self.run_main()
+
+        self.assertEqual(code, 1)
+        self.assertIn("Could not read .bedrock_agentcore.yaml after destroy", stderr)
+        self.assertNotIn("Traceback", stderr)
         cleaner.assert_not_called()
 
     def test_failures_exit_1(self) -> None:

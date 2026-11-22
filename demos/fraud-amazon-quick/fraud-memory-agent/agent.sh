@@ -50,6 +50,35 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Temp files that must go on every exit path, including Ctrl+C and a set -e
+# exit. These are the script's only traps. Functions register files with
+# new_temp_file and never set traps of their own, so nothing leaks between
+# them. On INT or TERM, remove the files, then die by the same signal so the
+# caller sees the interrupt.
+TEMP_FILES=()
+remove_temp_files() {
+    if [ "${#TEMP_FILES[@]}" -gt 0 ]; then
+        rm -f "${TEMP_FILES[@]}"
+    fi
+}
+trap remove_temp_files EXIT
+trap 'remove_temp_files; trap - INT; kill -INT "$$"' INT
+trap 'remove_temp_files; trap - TERM; kill -TERM "$$"' TERM
+
+# Usage: new_temp_file VAR. Sets VAR to a new temp file that the traps above
+# remove. It sets VAR by name because $(...) would add to TEMP_FILES in a
+# subshell, where the traps never see it.
+new_temp_file() {
+    local path
+    path="$(mktemp)"
+    TEMP_FILES+=("$path")
+    printf -v "$1" '%s' "$path"
+}
+
+# clean_destroy_leftovers.py exits with this when destroy did not remove the
+# agent from the config, because it was cancelled or had errors.
+DESTROY_NOT_FINISHED=3
+
 # NAMS configuration. Source it from fraud-memory-agent/.env. Read the first
 # matching value only; split on the first '=' so keys containing '=' survive.
 read_env_var() {
@@ -123,7 +152,7 @@ invoke_deployed() {
     if [ -z "$columns" ] && [ -t 1 ]; then
         columns="$(tput cols 2>/dev/null || true)"
     fi
-    output="$(mktemp)"
+    new_temp_file output
     set +e
     COLUMNS="${columns:-80}" uv run agentcore invoke "$1" | tee "$output"
     status=${PIPESTATUS[0]}
@@ -186,14 +215,16 @@ destroy_agent() {
     # `agentcore destroy` keeps the CodeBuild source bucket, the memory log
     # group, the local build cache and the Runtime's log groups. It also
     # deletes the config, so copy it first for
-    # scripts/clean_destroy_leftovers.py to read.
+    # scripts/clean_destroy_leftovers.py to read. Sets DESTROY_FINISHED to
+    # false when destroy left the agent in the config.
+    DESTROY_FINISHED=true
     if [ ! -f "$CONFIG_FILE" ]; then
         uv run agentcore destroy
         echo -e "${YELLOW}No $(basename "$CONFIG_FILE"), so the leftover cleanup was skipped.${NC}"
         return
     fi
     local snapshot status
-    snapshot="$(mktemp)"
+    new_temp_file snapshot
     cp "$CONFIG_FILE" "$snapshot"
     set +e
     uv run agentcore destroy
@@ -214,6 +245,10 @@ destroy_agent() {
     status=$?
     set -e
     rm -f "$snapshot"
+    if [ "$status" -eq "$DESTROY_NOT_FINISHED" ]; then
+        DESTROY_FINISHED=false
+        return 0
+    fi
     if [ "$status" -ne 0 ]; then
         echo -e "${RED}Some leftovers were not removed. See \"Tear down\" in README.md.${NC}"
         return 1
@@ -371,7 +406,11 @@ case "${1:-help}" in
         echo ""
         destroy_agent
         echo ""
-        echo -e "${GREEN}Cleanup complete!${NC}"
+        if [ "$DESTROY_FINISHED" = true ]; then
+            echo -e "${GREEN}Cleanup complete!${NC}"
+        else
+            echo -e "${YELLOW}Destroy did not finish, so $AGENT_NAME is still deployed. Check the output above, then run ./agent.sh destroy again.${NC}"
+        fi
         ;;
 
     help|--help|-h)

@@ -829,6 +829,10 @@ credential resolver.
    Runtime, TLS then uses the Linux system CA store.
    `tests/test_truststore.py` checks the start under
    `opentelemetry-instrument`. Rerun this retest to confirm it in the cloud.
+   Cloud Retest 2 confirmed the fix in the cloud.
+   **Note:** The sentence about the Linux system CA store is imprecise.
+   `docs/architecture/deployment.md` has the corrected wording. TLS falls
+   back to each library's default CA store.
 2. The `ClosedResourceError` tracebacks come from the MCP Python SDK's
    stateless HTTP transport. They fill the MCP Runtime log.
 3. `scripts/sync-credentials.sh` also copied the old
@@ -847,3 +851,144 @@ pre-run snapshot for stacks, Runtimes, credential providers, Gateways,
 Cognito pools, IAM roles, log groups, ECR repositories, and secrets.
 `.env` and `.env.fleet` are back to the admin user without the secret
 ARNs. CloudWatch Transaction Search stays on.
+
+## Cloud Retest 2: 2026-11-22
+
+This run retested the cloud path at main `e16af89` to confirm the truststore
+fix from commit 37c97c4. It reused the graph from the 2026-11-21 run. Account
+IDs are masked.
+
+**Overall status:** PARTIAL. The truststore fix works in both Runtimes. The
+MCP server, the GraphRAG agent, and supervisor routing through
+`./agent.sh invoke-cloud` passed. The supervisor load test failed on a
+separate bug.
+
+- **Setup:** The run created `fleet_reader` again with the `reader` and
+  `graphql_app_read_only_709ad5c7` roles. It created the secrets
+  `fleet/neo4j-reader` and `fleet/memory-neo4j`. `.env` got both secret
+  ARNs, and `.env.fleet` named `fleet_reader`.
+- **Local Runtime start:** PASS. The check under
+  `opentelemetry-instrument` exited 0 in both agent folders. The injection
+  was skipped in both. The local run printed no "Skipping truststore" line.
+- **MCP deploy:** PASS. `./deploy.py --env fleet` exited 0 after 5 minutes
+  18 seconds. It built image tag `f1b33d3`, and the stack reached
+  `CREATE_COMPLETE`.
+- **MCP Gateway tests:** PASS. All four `./cloud.sh --env fleet` tool tests
+  passed. `MATCH (a:Aircraft) RETURN count(a)` returned 30. A `CREATE` and
+  a `SET` were both refused with "Only MATCH queries are allowed for
+  read-query". No probe node or property was written.
+- **GraphRAG deploy:** PASS. `./agent.sh deploy` exited 0 after 5 minutes
+  25 seconds.
+- **GraphRAG cloud queries:** PASS. "How many aircraft are in the
+  database?" returned HTTP 200 with "**30 aircraft**". The agent used
+  `graph_query_tool`. A question about troubleshooting high EGT returned
+  HTTP 200. The agent used `vector_search_tool`.
+- **GraphRAG user name from the secret:** PASS. The Runtime environment
+  has `NEO4J_USERNAME=neo4j`. Only the secret holds `fleet_reader` and its
+  password. `login_from` prefers the secret's `username`, and the graph
+  queries succeeded.
+- **Supervisor deploy:** PASS. `./agent.sh deploy` exited 0 after 5 minutes
+  22 seconds.
+- **Supervisor routing:** PASS through `./agent.sh invoke-cloud`. "What are
+  the most common maintenance faults?" went to the Maintenance Agent. "What
+  are the most common delay causes?" went to the Operations Agent. Each
+  request fetched a Gateway token from
+  `fleetsupervisor_default_fleet-gateway`.
+- **Supervisor invoke client:** FAIL. Two `fleet-supervisor-invoke` calls
+  returned "The agent could not complete this request." after about 8
+  seconds.
+- **Load test:** FAIL. `./agent.sh load-test` ran for about 2 minutes. All
+  19 requests failed with `RuntimeError: No workload access token for the
+  Gateway token request`.
+- **Runtime logs:** PASS for the truststore fix. Each agent's log has 4
+  "Skipping truststore: botocore, httpx, requests, urllib3 already
+  imported; using the default CA store." lines. Neither log has a
+  `RecursionError` or `CERTIFICATE_VERIFY_FAILED`. The GraphRAG log has no
+  traceback. The supervisor log has no traceback for the
+  `invoke-cloud` requests.
+
+### Root cause of the load test failure
+
+The supervisor fetches its Gateway token from AgentCore Identity on the
+request path. Identity needs the request's workload access token. The
+Runtime issues that token only when the call carries a `runtimeUserId`.
+
+- **The AgentCore CLI:** `agentcore invoke` always sends a user ID. Its
+  default is `"default"`, so `./agent.sh invoke-cloud` works.
+- **The invoke client:** `fleet_supervisor/client/transport.py` called
+  `invoke_agent_runtime` without `runtimeUserId`. `fleet-supervisor-invoke`
+  and `load-test` use that client, so every request failed.
+- **Fix:** Commit 00222c9 sends `runtimeUserId` `"default"` from the
+  client.
+
+**Cloud resources:** Both `agent.sh destroy --yes` runs exited 0. The
+secrets `fleet/neo4j-reader` and `fleet/memory-neo4j` were force-deleted.
+The fleet MCP stack, `fleet_reader`, and the `.env` changes stayed in place
+for Cloud Retest 3.
+
+## Cloud Retest 3: 2026-11-22
+
+This run retested the agents at main `00222c9`. The GraphRAG agent moved to
+mcp 2.3.0. Both agent CDK apps moved to TypeScript 7.0.2 and `@types/node`
+26.6.6. The supervisor client now sends `runtimeUserId`. The run reused the
+fleet MCP stack, `fleet_reader`, and the `.env` changes from Cloud Retest 2.
+Account IDs are masked.
+
+**Overall status:** FAIL. Both agent deploys stopped at the AgentCore CLI's
+dependency check, so no agent cloud step ran.
+
+- **Setup:** The run created `fleet/neo4j-reader` and `fleet/memory-neo4j`
+  again. `.env` got the new secret ARNs.
+- **Local Runtime start:** PASS. The check under
+  `opentelemetry-instrument` exited 0 in both agent folders. With logging
+  on, each agent printed "Skipping truststore: botocore, httpx, requests,
+  urllib3 already imported; using the default CA store." The GraphRAG
+  agent ran mcp 2.3.0.
+- **CDK dependencies:** PASS. `./agent.sh deploy` saw the newer
+  `package-lock.json` and ran `npm ci`. npm reported 0 vulnerabilities.
+  Both CDK folders then had TypeScript 7.0.2. `npm run build` exited 0 in
+  both folders.
+- **GraphRAG deploy:** FAIL. `./agent.sh deploy` exited 1 after 9 seconds.
+- **Supervisor deploy:** FAIL. `./agent.sh deploy` exited 1 with the same
+  error.
+- **Not run:** The GraphRAG invokes, the supervisor routing checks, the two
+  `fleet-supervisor-invoke` calls, the load test, and the Runtime log
+  checks did not run. No agent Runtime was created.
+
+Both deploys printed this error:
+
+```
+Error: agentcore/cdk/package.json pins @types/node ~26.6.6, newer than the
+version this CLI vends (~24.13.3). agentcore/cdk/package.json pins
+typescript ~7.0.2, newer than the version this CLI vends (~5.9.3). Run
+'agentcore update', or run 'agentcore config disableDependencyManagement
+true' to manage the CDK dependencies yourself.
+```
+
+### Follow-ups from this run
+
+1. The AgentCore CLI 1.2.0 refuses CDK pins newer than the versions it
+   vends. The TypeScript 7.0.2 and `@types/node` 26.6.6 pins need a newer
+   CLI or `disableDependencyManagement`. The other option is to keep the
+   pins at or below TypeScript 5.9.3 and `@types/node` 24.13.3.
+   **Resolved:** Commits b59bf92 and 10f0d9e revert both CDK apps to
+   TypeScript 5.9.3 and `@types/node` 24.13.3. CLI 1.2.0 is the newest
+   release, so TypeScript 7 waits for a CLI that vends it.
+2. `./agent.sh destroy --yes` exits 1 when nothing is deployed. The CLI
+   reports that the project "declares no resources to deploy" and that no
+   stack exists.
+3. The `runtimeUserId` fix in commit 00222c9 is still untested in the
+   cloud.
+
+**Cloud resources confirmed destroyed:** No agent stack existed. Both
+`agent.sh destroy --yes` runs found nothing to remove.
+`./deploy.py --env fleet cleanup` exited 0 after 23 minutes. It deleted the
+MCP Runtime, the stack, the ECR repository, and the password secret. The
+run then force-deleted `fleet/neo4j-reader` and `fleet/memory-neo4j`. It
+dropped `fleet_reader` and deleted the three Runtime log groups from
+Cloud Retest 2. List calls match the pre-run snapshot for stacks, Runtimes,
+credential providers, Gateways, Cognito pools, IAM roles, log groups, ECR
+repositories, and secrets. `.env` and `.env.fleet` match their pre-run
+copies. The fleet credentials copies are removed. The fraud agent's
+`.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
+on, and the fleet graph is unchanged.

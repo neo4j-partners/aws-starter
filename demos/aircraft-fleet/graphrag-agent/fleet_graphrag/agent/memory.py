@@ -55,7 +55,7 @@ from pydantic import SecretStr
 
 from fleet_graphrag.agent.config import ConfigError, settings
 from fleet_graphrag.agent.neo4j_errors import UNREACHABLE, auth_error
-from fleet_graphrag.agent.secrets import memory_password
+from fleet_graphrag.agent.secrets import memory_login
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +130,15 @@ def memory_settings() -> MemorySettings:
             "MEM_NEO4J_USERNAME and MEM_NEO4J_PASSWORD instead."
         )
     region = settings.aws_region
+    login = memory_login()
     return MemorySettings(
         # Set explicitly so a MEMORY_API_KEY in the environment cannot switch
         # the backend to the hosted service.
         backend="bolt",
         neo4j=Neo4jConfig(
             uri=uri,
-            username=os.getenv("MEM_NEO4J_USERNAME") or "neo4j",
-            password=SecretStr(memory_password()),
+            username=login.username,
+            password=SecretStr(login.password),
             database=os.getenv("MEM_NEO4J_DATABASE") or "neo4j",
         ),
         # Provider instances, because the nested NAM_EMBEDDING__* variables

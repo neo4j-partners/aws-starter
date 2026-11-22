@@ -77,6 +77,21 @@ def test_settings_come_from_the_mem_vars(monkeypatch: pytest.MonkeyPatch, memory
     assert settings.extraction.extractor_type is ExtractorType.LLM
 
 
+def test_secret_username_wins_over_the_local_username(monkeypatch: pytest.MonkeyPatch) -> None:
+    arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:mem-AbCdEf"
+    monkeypatch.setenv("MEM_NEO4J_URI", "bolt://127.0.0.1:37687")
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD_SECRET_ARN", arn)
+    monkeypatch.setenv("MEM_NEO4J_USERNAME", "admin")
+    monkeypatch.setattr(
+        secrets,
+        "_read_secret",
+        lambda secret_arn, secret_arn_var: secrets._SecretLogin("mem_reader", "from-secret"),
+    )
+    settings = memory.memory_settings()
+    assert settings.neo4j.username == "mem_reader"
+    assert settings.neo4j.password.get_secret_value() == "from-secret"
+
+
 def test_bedrock_providers_are_explicit(memory_on) -> None:
     settings = memory.memory_settings()
     assert isinstance(settings.embedding, BedrockEmbeddingProvider)

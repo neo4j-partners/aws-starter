@@ -127,6 +127,7 @@ Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
 
 - **Settings:** The deploy reads its connection settings from `.env`.
 - **Passwords:** The deploy never sends a password. The runtime reads each one from the Secrets Manager secret named by `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN`.
+- **User names:** A secret with a `username` key also sets the Neo4j user. The shared `.env` can then keep the admin user for the pipeline while the agents read as a read-only user.
 
 See [Deploy](graphrag-agent/README.md#deploy) for the one-time setup.
 

@@ -31,7 +31,7 @@ fleet graph and the maintenance manuals stored in Neo4j.
 ![Aircraft fleet architecture](../docs/images/architecture.svg)
 
 - **Neo4j:** The agent reads `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`.
-- **Cloud password:** When `NEO4J_PASSWORD_SECRET_ARN` is set, the agent reads the password from that secret once at startup. The secret holds a JSON object with a `password` key. Other keys are ignored.
+- **Cloud login:** When `NEO4J_PASSWORD_SECRET_ARN` is set, the agent reads the password from that secret once at startup. The secret holds a JSON object with a `password` key. When it also has a `username` key, that user replaces `NEO4J_USERNAME`. Other keys are ignored.
 - **Bedrock:** The agent uses the standard AWS credential chain for Claude and Titan.
 - **Memory:** The agent reads `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, `MEM_NEO4J_DATABASE`, and `MEM_NEO4J_PASSWORD`. `MEM_NEO4J_PASSWORD_SECRET_ARN` works the same way as the fleet secret.
 
@@ -103,6 +103,7 @@ the shell wins. Synth stops with a list of any that are missing.
 - **Fleet connection:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_DATABASE`.
 - **Memory connection:** Set `MEM_NEO4J_URI`, `MEM_NEO4J_USERNAME`, and `MEM_NEO4J_DATABASE`.
 - **Passwords:** Set `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` to complete secret ARNs. A complete ARN ends in the six-character suffix that Secrets Manager adds.
+- **User names:** Put the Neo4j user in each secret's `username` key. The Runtime then ignores `NEO4J_USERNAME` and `MEM_NEO4J_USERNAME`, so `.env` can keep the pipeline's admin user.
 - **Secret access:** The stack grants `secretsmanager:GetSecretValue` on exactly those two ARNs. A secret under a customer managed KMS key also needs `kms:Decrypt`, which the stack does not grant.
 
 ### How the deploy works
@@ -208,12 +209,12 @@ These numbers were measured on a local Neo4j.
 | Variable | Default |
 |----------|---------|
 | `NEO4J_URI` | Required |
-| `NEO4J_USERNAME` | `neo4j` |
+| `NEO4J_USERNAME` | `neo4j`. The secret's `username` key wins when it has one. |
 | `NEO4J_PASSWORD` | Local runs only. Required when `NEO4J_PASSWORD_SECRET_ARN` is unset. |
 | `NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. |
 | `NEO4J_DATABASE` | `neo4j` |
 | `MEM_NEO4J_URI` | Required. The memory database. |
-| `MEM_NEO4J_USERNAME` | `neo4j` |
+| `MEM_NEO4J_USERNAME` | `neo4j`. The secret's `username` key wins when it has one. |
 | `MEM_NEO4J_DATABASE` | `neo4j` |
 | `MEM_NEO4J_PASSWORD` | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
 | `MEM_NEO4J_PASSWORD_SECRET_ARN` | Unset locally. Set by the deploy. |

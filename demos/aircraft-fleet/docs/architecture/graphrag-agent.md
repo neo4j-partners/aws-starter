@@ -125,7 +125,7 @@ lifecycle.
 | Prompt caching | `CacheConfig(strategy="auto")` on the system prompt and tool specs |
 | Local server | `uv run fleet-server` on port 7070 |
 | Cloud runtime | `graphrag_agent` on AgentCore Runtime, port 8080 |
-| Secrets | The fleet and memory passwords come from Secrets Manager on the Runtime |
+| Secrets | The fleet and memory passwords, and optional user names, come from Secrets Manager on the Runtime |
 | Tracing | AWS Distro for OpenTelemetry |
 
 [Deployment](deployment.md) covers the Runtime deploy and the secret ARNs. The

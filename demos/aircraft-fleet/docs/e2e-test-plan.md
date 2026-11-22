@@ -689,10 +689,9 @@ history.
   2. Pass a longer `request_timeout` to `SharedMemory.open` in the
      agents' `memory.py`, or speed up the open upstream in
      neo4j-agent-memory.
-  3. Separate the pipeline writer user from the agent reader user in the
-     shared `.env`. Today the agent runs need `NEO4J_USERNAME=fleet_reader`
-     exported in the shell, because the secret ARN wins for the password
-     while `.env` still names the admin user.
+  3. Done: when a password secret has a `username` key, both agents now
+     read the user name from the secret too. The shared `.env` keeps the
+     admin user for the pipeline, and no shell export is needed.
   4. Done: the Step 0 text now names `global.anthropic.claude-sonnet-5-5`.
   5. The AgentCore CLI 1.2.0 is out. This run used 1.1.0.
   6. The AgentCore CLI and CDK print the full account ID in deploy logs.

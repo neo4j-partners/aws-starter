@@ -246,10 +246,10 @@ to:
 | `GATEWAY_URL` | unset | The Gateway endpoint for the cloud path. It must use `https://`. |
 | `GATEWAY_SCOPES` | unset | Space-separated OAuth scopes for the cloud path |
 | `MEM_NEO4J_URI` | required | The memory database URI |
-| `MEM_NEO4J_USERNAME` | `neo4j` | The memory database user |
+| `MEM_NEO4J_USERNAME` | `neo4j` | The memory database user. The secret's `username` key wins when it has one. |
 | `MEM_NEO4J_DATABASE` | `neo4j` | The memory database name |
 | `MEM_NEO4J_PASSWORD` | unset | Local runs only. Required when `MEM_NEO4J_PASSWORD_SECRET_ARN` is unset. |
-| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Set by the deploy. The secret holds a JSON object with a `password` key. |
+| `MEM_NEO4J_PASSWORD_SECRET_ARN` | unset | Set by the deploy. The secret holds a JSON object with a `password` key and an optional `username` key. |
 | `FLEET_ENV_FILE` | `../.env` | The shared env file the server loads at startup |
 
 ## Tests

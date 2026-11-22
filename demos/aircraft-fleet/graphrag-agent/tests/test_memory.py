@@ -22,7 +22,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import (
     BedrockProvider,
 )
 
-from fleet_graphrag.agent import memory
+from fleet_graphrag.agent import memory, secrets
 from fleet_graphrag.agent.config import ConfigError
 from fleet_graphrag.agent.neo4j_errors import is_auth_error
 
@@ -132,14 +132,29 @@ def test_secret_arn_wins_over_the_local_password(
     monkeypatch.setenv("MEM_NEO4J_PASSWORD_SECRET_ARN", arn)
     read: list[str] = []
 
-    def fake_read(secret_arn: str, secret_arn_var: str) -> str:
+    def fake_read(secret_arn: str, secret_arn_var: str) -> secrets._SecretLogin:
         read.append(secret_arn_var)
-        return "from-secret"
+        return secrets._SecretLogin(None, "from-secret")
 
     monkeypatch.setattr("fleet_graphrag.agent.secrets._read_secret", fake_read)
     built = memory.memory_settings()
     assert built.neo4j.password.get_secret_value() == "from-secret"
     assert read == ["MEM_NEO4J_PASSWORD_SECRET_ARN"]
+
+
+def test_secret_username_wins_over_the_local_username(
+    monkeypatch: pytest.MonkeyPatch, mem_env: None
+) -> None:
+    arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:mem-AbCdEf"
+    monkeypatch.setenv("MEM_NEO4J_PASSWORD_SECRET_ARN", arn)
+    monkeypatch.setenv("MEM_NEO4J_USERNAME", "admin")
+    monkeypatch.setattr(
+        "fleet_graphrag.agent.secrets._read_secret",
+        lambda secret_arn, secret_arn_var: secrets._SecretLogin("mem_reader", "from-secret"),
+    )
+    built = memory.memory_settings()
+    assert built.neo4j.username == "mem_reader"
+    assert built.neo4j.password.get_secret_value() == "from-secret"
 
 
 def _hook(name: str) -> Callable[[], None]:

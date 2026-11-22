@@ -6,6 +6,8 @@ Memory is required. These variables configure it:
   the memory database. It is a separate database from the fleet graph.
 - ``MEM_NEO4J_PASSWORD_SECRET_ARN`` names a Secrets Manager secret in the
   cloud. ``MEM_NEO4J_PASSWORD`` holds the password itself for a local run.
+  When the secret has a ``username`` key, that user replaces
+  ``MEM_NEO4J_USERNAME``.
 
 The settings are built once per process. If Neo4j rejects the password,
 :func:`forget_memory_settings` drops them so the next build reads the
@@ -43,7 +45,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, Be
 from pydantic import SecretStr
 
 from fleet_supervisor.core.config import AWS_REGION, ConfigError
-from fleet_supervisor.core.secrets import forget_secrets, password_from
+from fleet_supervisor.core.secrets import Neo4jLogin, forget_secrets, login_from
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +82,9 @@ SHUT_DOWN = "The memory clients are shut down."
 BackgroundHook = Callable[[str], Callable[[], None]]
 
 
-def memory_password() -> str:
-    """Return the memory database password."""
-    return password_from("MEM_NEO4J_PASSWORD_SECRET_ARN", "MEM_NEO4J_PASSWORD")
+def memory_login() -> Neo4jLogin:
+    """Return the memory database user name and password."""
+    return login_from("MEM_NEO4J_PASSWORD_SECRET_ARN", "MEM_NEO4J_USERNAME", "MEM_NEO4J_PASSWORD")
 
 
 @dataclass
@@ -194,6 +196,7 @@ def _build_memory_settings() -> MemorySettings:
     uri = os.environ.get(MEM_NEO4J_URI, "").strip()
     if not uri:
         raise ConfigError(f"{MEM_NEO4J_URI} is not set.")
+    login = memory_login()
     return MemorySettings(
         # Every value comes from here, never from a .env file.
         _env_file=None,
@@ -202,8 +205,8 @@ def _build_memory_settings() -> MemorySettings:
         backend="bolt",
         neo4j=Neo4jConfig(
             uri=uri,
-            username=os.environ.get("MEM_NEO4J_USERNAME") or "neo4j",
-            password=SecretStr(memory_password()),
+            username=login.username,
+            password=SecretStr(login.password),
             database=os.environ.get("MEM_NEO4J_DATABASE") or "neo4j",
         ),
         # Provider instances, so the region and dimensions are set here and

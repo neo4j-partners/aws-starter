@@ -80,7 +80,7 @@ from fleet_graphrag.agent.neo4j_errors import (  # noqa: E402
 )
 from fleet_graphrag.agent.secrets import (  # noqa: E402
     NEO4J_PASSWORD_SECRET_ARN,
-    neo4j_password,
+    neo4j_login,
 )
 from fleet_graphrag.agent.tools import (  # noqa: E402
     MAX_TOP_K,
@@ -531,7 +531,7 @@ def main(default_port: int = 7070) -> None:
     if os.environ.get(NEO4J_PASSWORD_SECRET_ARN):
         # Read the secret before serving, so a bad ARN or a missing IAM grant
         # stops startup instead of failing the first request.
-        neo4j_password()
+        neo4j_login()
     # Build the memory settings before serving, so a missing MEM_NEO4J_* value
     # or an unreadable memory secret stops startup.
     memory_settings()

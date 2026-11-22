@@ -226,3 +226,6 @@ amazon-bedrock-ide-app-export-*
 
 # MCP credentials (contains secrets - never commit)
 .mcp.json
+
+# Local planning notes and work logs
+worklog/

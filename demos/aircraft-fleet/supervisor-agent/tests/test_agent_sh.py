@@ -1062,8 +1062,9 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
 
-    # The stack check before the deploy makes rm calls 1 and 2.
-    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:3")
+    # The stack check before the deploy makes rm calls 1 and 2. The restore
+    # then removes any strip copy with rm 3 and the spec backup with rm 4.
+    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:4")
 
     assert result.returncode == -SIGINT
     assert spec.read_bytes() == tracked

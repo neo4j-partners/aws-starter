@@ -9,13 +9,7 @@ long-running runtime never serves requests with an expired token.
 
 from contextlib import asynccontextmanager
 
-try:
-    # MCP 2.x uses its bundled HTTP client, which supports the SSE methods the
-    # transport requires. MCP 1.x uses the public httpx package instead.
-    import httpx2 as httpx
-except ImportError:  # pragma: no cover - exercised in the MCP 1.x local environment
-    import httpx
-
+import httpx2
 from mcp.client.streamable_http import streamable_http_client
 
 from core.credentials import get_active_credentials
@@ -25,7 +19,7 @@ from core.credentials import get_active_credentials
 async def _authenticated_transport(url: str, access_token: str):
     """Yield an MCP transport with an HTTP client that is closed on exit."""
     async with (
-        httpx.AsyncClient(headers={"Authorization": f"Bearer {access_token}"}) as http_client,
+        httpx2.AsyncClient(headers={"Authorization": f"Bearer {access_token}"}) as http_client,
         streamable_http_client(url, http_client=http_client) as transport,
     ):
         yield transport

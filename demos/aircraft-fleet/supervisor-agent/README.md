@@ -191,6 +191,7 @@ treats the provider as orphaned and deletes it. If it happens, run
 - **Confirmation:** It asks first. Pass `--yes` to skip the question.
 - **Account check:** It confirms that the active credentials belong to the account in `agentcore/aws-targets.json`, before it asks and again before its final lookups.
 - **How it works:** The CLI has no destroy command. The script removes the runtime from the spec and deploys, which deletes the stack and the provider.
+- **No stack:** When CloudFormation shows no stack, there is nothing to remove. It skips the question and the deploy, removes any client secret line left in `agentcore/.env.local`, and goes straight to the final check.
 - **Final check:** It reads `agentcore status` and looks up the stack and the provider in AWS by name. If anything remains, it prints the command that deletes it and exits with an error.
 - **Lost local state:** If `agentcore/.cli/` is lost, destroy still deletes the stack. The AWS check then names the leftover provider.
 

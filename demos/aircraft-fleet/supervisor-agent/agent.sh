@@ -788,6 +788,24 @@ case "${1:-help}" in
         # Check the account before anything changes, so credentials for
         # another account cannot deploy the empty project there.
         require_target_account
+        # The deploy below fails when the target has no stack. With no stack
+        # there is nothing to remove, so skip the prompt and the deploy. A
+        # secret line an interrupted deploy left in .env.local is still
+        # removed, as the restore after a deploy does. The report still looks
+        # up the stack and the provider, so a leftover fails the run.
+        stack_region=$(target_region)
+        if ! aws_lookup "does not exist" aws cloudformation describe-stacks \
+            --region "$stack_region" --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].StackStatus' --output text; then
+            echo -e "${YELLOW}Stack $STACK_NAME does not exist in $stack_region, so there is nothing to remove.${NC}"
+            if ! strip_gateway_secret; then
+                echo -e "${RED}Delete the $GATEWAY_SECRET_VAR line from $ENV_LOCAL by hand.${NC}" >&2
+                exit 1
+            fi
+            echo ""
+            report_remaining
+            exit 0
+        fi
         if [ "${2:-}" != "--yes" ]; then
             confirm_destroy
         fi
@@ -801,8 +819,10 @@ case "${1:-help}" in
         # deletes every credential provider that deployed-state.json records
         # and the spec no longer declares, so the fleet-gateway provider goes
         # without being declared. So remove the Runtime from the spec and
-        # deploy. With no Runtime, the stack reads no deploy settings, so
-        # destroy needs neither the credentials file nor the MCP server stack.
+        # deploy. That deploy fails when the target has no stack, which the
+        # check above rules out. With no Runtime, the stack reads no deploy
+        # settings, so destroy needs neither the credentials file nor the MCP
+        # server stack.
         begin_spec_restore
         agentcore remove runtime --name "$RUNTIME_NAME"
         agentcore deploy --target "$TARGET" --yes

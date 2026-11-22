@@ -60,6 +60,19 @@ case "$1 $2" in
         echo "${STUB_CALLER_ACCOUNT:-111122223333}"
         ;;
     "cloudformation describe-stacks")
+        # destroy checks the stack before it deploys. While
+        # STUB_STACK_BEFORE_DEPLOY is set, even to "", the lookups before the
+        # deploy read only it and the STUB_PRECHECK_* settings, and the
+        # settings below act on the lookups after the deploy. "" reads as a
+        # stack that does not exist. deploy leaves it unset, so its own
+        # lookup reads STUB_STACK_STATUS.
+        if [ -n "${STUB_STACK_BEFORE_DEPLOY+set}" ] && ! grep -q "^agentcore deploy" "$STUB_LOG"; then
+            if [ -n "${STUB_PRECHECK_SIGNAL:-}" ]; then kill -s "$STUB_PRECHECK_SIGNAL" "$PPID" "$$"; fi
+            if [ -n "${STUB_PRECHECK_ERROR:-}" ]; then echo "$STUB_PRECHECK_ERROR" >&2; exit 254; fi
+            if [ -n "$STUB_STACK_BEFORE_DEPLOY" ]; then echo "$STUB_STACK_BEFORE_DEPLOY"; exit 0; fi
+            echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
+            exit 254
+        fi
         # Ctrl+C reaches the whole foreground group, so the stub dies too.
         # bash ignores a SIGINT when its child exits normally.
         if [ -n "$STUB_LOOKUP_SIGNAL" ]; then kill -s "$STUB_LOOKUP_SIGNAL" "$PPID" "$$"; fi
@@ -228,6 +241,8 @@ def project(tmp_path: Path) -> Path:
 def run_destroy(
     project: Path, umask: int = -1, **stub_env: str
 ) -> subprocess.CompletedProcess[str]:
+    # The stack exists when destroy starts, unless a test says otherwise.
+    stub_env = {"STUB_STACK_BEFORE_DEPLOY": "CREATE_COMPLETE", **stub_env}
     return run_agent(project, "destroy", "--yes", umask=umask, **stub_env)
 
 
@@ -260,6 +275,11 @@ def run_agent(
 def calls(project: Path) -> list[str]:
     log = project.parent / "calls.log"
     return log.read_text().splitlines() if log.exists() else []
+
+
+def calls_after_deploy(project: Path) -> list[str]:
+    logged = calls(project)
+    return logged[logged.index("agentcore deploy --target default --yes") + 1 :]
 
 
 def test_clean_destroy_checks_aws_by_name_and_succeeds(project: Path) -> None:
@@ -308,7 +328,8 @@ def test_an_account_change_during_the_deploy_fails_before_the_aws_lookups(projec
     assert "Cleanup complete" not in result.stdout
     logged = calls(project)
     assert "agentcore deploy --target default --yes" in logged
-    assert not any(c.startswith(("aws cloudformation", "aws bedrock")) for c in logged)
+    after = calls_after_deploy(project)
+    assert not any(c.startswith(("aws cloudformation", "aws bedrock")) for c in after)
 
 
 def test_a_failed_identity_check_fails(project: Path) -> None:
@@ -401,6 +422,98 @@ def test_a_provider_left_in_aws_fails_and_names_the_delete_command(project: Path
     assert result.returncode == 1
     assert "credential provider fleetsupervisor_default_fleet-gateway" in result.stdout
     assert "delete-oauth2-credential-provider --region us-west-2" in result.stdout
+
+
+SECRET_LINE = "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
+ABSENT_MESSAGE = (
+    "Stack AgentCore-fleetsupervisor-default does not exist in us-west-2, "
+    "so there is nothing to remove."
+)
+
+
+# With no stack there is nothing to remove. destroy skips the prompt, the
+# CDK install, and the deploy, which the CLI fails when no stack exists.
+def test_an_absent_stack_skips_the_deploy_and_succeeds(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+    remove_cdk_install(project)
+
+    result = run_agent(project, "destroy", STUB_STACK_BEFORE_DEPLOY="")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert ABSENT_MESSAGE in result.stdout
+    assert "Cleanup complete. Nothing is deployed in target 'default'." in result.stdout
+    assert "Continue?" not in result.stdout
+    logged = calls(project)
+    assert not any(c.startswith(("agentcore remove", "agentcore deploy", "npm")) for c in logged)
+    assert any("get-oauth2-credential-provider" in c for c in logged)
+    assert spec.read_bytes() == tracked
+    assert not list((project.parent / "tmp").iterdir())
+
+
+# An interrupted deploy can leave the secret line in .env.local with no
+# stack deployed. The restore after a deploy removes it, and so does this.
+def test_an_absent_stack_still_strips_a_left_secret_line(project: Path) -> None:
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text(SECRET_LINE + "A=1\n")
+    env_local.chmod(0o600)
+
+    result = run_destroy(project, STUB_STACK_BEFORE_DEPLOY="")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert ABSENT_MESSAGE in result.stdout
+    assert env_local.read_text() == "A=1\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
+    assert not list(env_local.parent.glob(".env.local.*"))
+    assert not any(c.startswith("agentcore deploy") for c in calls(project))
+
+
+def test_an_absent_stack_with_a_provider_left_fails_and_names_the_delete_command(
+    project: Path,
+) -> None:
+    result = run_destroy(project, STUB_STACK_BEFORE_DEPLOY="", STUB_PROVIDER_EXISTS="1")
+
+    assert result.returncode == 1
+    assert ABSENT_MESSAGE in result.stdout
+    assert "credential provider fleetsupervisor_default_fleet-gateway" in result.stdout
+    assert (
+        "aws bedrock-agentcore-control delete-oauth2-credential-provider --region us-west-2 "
+        "--name fleetsupervisor_default_fleet-gateway"
+    ) in result.stdout
+    assert "Cleanup complete" not in result.stdout
+    assert not any(c.startswith(("agentcore remove", "agentcore deploy")) for c in calls(project))
+
+
+def test_an_aws_error_in_the_stack_check_fails_before_any_change(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_agent(
+        project,
+        "destroy",
+        STUB_STACK_BEFORE_DEPLOY="CREATE_COMPLETE",
+        STUB_PRECHECK_ERROR="An error occurred (ExpiredToken) when calling the DescribeStacks operation",
+    )
+
+    assert result.returncode == 1
+    assert "Could not check AWS for remaining resources" in result.stdout
+    assert "ExpiredToken" in result.stdout
+    assert "Continue?" not in result.stdout
+    assert not any(c.startswith("agentcore") for c in calls(project))
+    assert spec.read_bytes() == tracked
+    assert not list((project.parent / "tmp").iterdir())
+
+
+def test_an_interrupt_during_the_stack_check_leaves_no_temporary_file(project: Path) -> None:
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+
+    result = run_destroy(project, STUB_PRECHECK_SIGNAL="INT")
+
+    assert result.returncode == -SIGINT
+    assert not any(c.startswith("agentcore") for c in calls(project))
+    assert spec.read_bytes() == tracked
+    assert not list((project.parent / "tmp").iterdir())
 
 
 def test_an_aws_error_other_than_not_found_fails(project: Path) -> None:
@@ -744,10 +857,13 @@ def test_a_failed_cdk_install_without_a_package_lock_names_npm_install(
 # A pull that changes package-lock.json leaves it newer than the install,
 # which then has the old CDK libraries.
 # destroy reads the stack status as a stack that is still deployed, so only
-# deploy gets one.
+# deploy gets one. destroy gets a stack that exists before its deploy.
 @pytest.mark.parametrize(
     ("args", "stub_env"),
-    [(("deploy",), {"STUB_STACK_STATUS": DISCOVERY_URL}), (("destroy", "--yes"), {})],
+    [
+        (("deploy",), {"STUB_STACK_STATUS": DISCOVERY_URL}),
+        (("destroy", "--yes"), {"STUB_STACK_BEFORE_DEPLOY": "CREATE_COMPLETE"}),
+    ],
 )
 def test_a_package_lock_newer_than_the_install_is_installed_again(
     project: Path, args: tuple[str, ...], stub_env: dict[str, str]
@@ -827,10 +943,11 @@ def test_destroy_installs_missing_cdk_dependencies_before_removing(project: Path
     )
 
 
-# destroy makes seven temporary files: the spec backup, the strip copy, the
-# status errors, and an output and an errors file for each of the two AWS
-# lookups.
-@pytest.mark.parametrize("lost", range(1, 8))
+# destroy makes nine temporary files: an output and an errors file for the
+# stack check before the deploy, the spec backup, the strip copy, the status
+# errors, and an output and an errors file for each of the two AWS lookups
+# after the deploy.
+@pytest.mark.parametrize("lost", range(1, 10))
 def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lost: int) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
@@ -909,7 +1026,8 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
 
-    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:1")
+    # The stack check before the deploy makes rm calls 1 and 2.
+    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:3")
 
     assert result.returncode == -SIGINT
     assert spec.read_bytes() == tracked

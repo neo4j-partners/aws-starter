@@ -17,6 +17,7 @@ dependencies = [
     # Strands agent framework
     "strands-agents>=1.65",
     # Strands needs mcp. The agent does not import it. The floor keeps the 2.x line.
+    # strands-agents 1.65 caps mcp below 2.4, so 2.4 waits on a Strands release.
     "mcp>=2.2.0,<3",
     # The fleet fork of 0.8.0. [tool.uv.sources] says where the wheel is.
     "neo4j-agent-memory[strands]==0.8.0+fleet.8",

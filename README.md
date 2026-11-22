@@ -135,7 +135,7 @@ Folder: [`integrations/databricks/`](./integrations/databricks/)
 
 - **What it does:** This integration connects Databricks workspaces to the Neo4j MCP server on AgentCore. A Unity Catalog HTTP connection forwards MCP requests from Databricks notebooks and LangGraph agents to the AgentCore Gateway.
 - **Authentication:** The connection uses OAuth2 machine-to-machine auth through Cognito. Databricks refreshes the token for you.
-- **Why AgentCore:** The official Neo4j MCP server is a compiled Go binary. Databricks Apps cannot host it, so the recommended pattern is to run it on AgentCore.
+- **Why AgentCore:** Databricks reuses the MCP server that `neo4j-mcp-server/` deploys to AgentCore. The AWS agents call the same server, so Databricks needs no second deployment.
 - **Key features:** The sample includes a LangGraph agent deployed with MLflow. Neo4j access is read-only.
 - **Use case:** Use it when Databricks teams want to query Neo4j in plain language, or deploy agents that combine Spark processing with the graph.
 

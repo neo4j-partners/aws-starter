@@ -162,7 +162,7 @@ def test_session_manager_options() -> None:
         manager = memory.session_manager(shared, "s-1", "pilot-7")
         assert manager.session_id == "s-1"
         assert manager._user_id == "pilot-7"
-        assert manager._retrieval_config.min_score == 0.75
+        assert manager._retrieval_config.min_score == memory.RETRIEVAL_MIN_SCORE
         assert manager._extract_entities is True
         assert manager._defer_extraction is True
         assert manager._record_tool_calls is False

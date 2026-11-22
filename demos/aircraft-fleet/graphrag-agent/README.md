@@ -142,7 +142,7 @@ through its Strands `SharedMemory` and `Neo4jSessionManager`.
 ### What it does
 
 - **Session history:** Each session keeps its messages and restores them on the next turn. Tool calls are not recorded.
-- **Long-term memory:** The agent extracts entities from each message. It retrieves related entities and preferences on later turns. Matches below a vector score of 0.75 are left out.
+- **Long-term memory:** The agent extracts entities from each message. It retrieves related entities and preferences on later turns. Matches below a vector score of 0.675 are left out.
 - **Session and user:** The session ID comes from the AgentCore session header. The `user_id` field scopes long-term memory. A missing `user_id` becomes `anonymous`, so all anonymous callers share one profile.
 - **Separate database:** Point `MEM_NEO4J_*` at its own database, not the fleet graph. Memory labels in the fleet graph would reach the Text2Cypher prompt. A second database on the same Neo4j Enterprise server works.
 

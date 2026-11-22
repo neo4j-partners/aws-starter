@@ -65,8 +65,14 @@ EXTRACTOR_MODEL_ID = "bedrock/global.anthropic.claude-sonnet-5-5"
 EMBED_MODEL_ID = "bedrock/amazon.titan-embed-text-v2:0"
 EMBED_DIMENSIONS = 1024
 
-# A vector-index score. 0.75 equals cosine similarity 0.5.
-MIN_SCORE = 0.75
+# Memory hits that score below this are not added to the question. The
+# score is Neo4j's cosine vector score, (1 + cosine) / 2, so 0.675 is cosine
+# 0.35. Measured on 2026-11-21 with Titan v2 entity embeddings from real
+# Sonnet 5.5 extraction: 10 of 15 relevant hits and 3 of 417 unrelated pairs
+# scored 0.675 or higher. The old 0.75 kept only 6 of the 15 relevant hits.
+# An entity embeds only its name, so short names such as airport codes score
+# low against a full question.
+RETRIEVAL_MIN_SCORE = 0.675
 
 # Takes a background task's name and returns the callback for when it ends.
 BackgroundHook = Callable[[str], Callable[[], None]]
@@ -252,7 +258,7 @@ def session_manager(shared: SharedMemory, session_id: str, user_id: str) -> Neo4
     return shared.session_manager(
         session_id,
         user_id=user_id,
-        retrieval_config=Neo4jRetrievalConfig(min_score=MIN_SCORE),
+        retrieval_config=Neo4jRetrievalConfig(min_score=RETRIEVAL_MIN_SCORE),
         extract_entities=True,
         record_tool_calls=False,
         defer_extraction=True,

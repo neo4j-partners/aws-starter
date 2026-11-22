@@ -54,8 +54,14 @@ EMBEDDING_DIMENSIONS = 1024
 # The model that extracts entities from stored messages. Sonnet 5.5 rejects
 # a temperature and a forced toolChoice, so the extractor sends neither.
 EXTRACTION_MODEL = "bedrock/global.anthropic.claude-sonnet-5-5"
-# Only memories at least this similar to the question are added to it.
-RETRIEVAL_MIN_SCORE = 0.75
+# Memory hits that score below this are not added to the question. The
+# score is Neo4j's cosine vector score, (1 + cosine) / 2, so 0.675 is cosine
+# 0.35. Measured on 2026-11-21 with Titan v2 entity embeddings from real
+# Sonnet 5.5 extraction: 10 of 15 relevant hits and 3 of 417 unrelated pairs
+# scored 0.675 or higher. The old 0.75 kept only 6 of the 15 relevant hits.
+# An entity embeds only its name, so short names such as airport codes score
+# low against a full question.
+RETRIEVAL_MIN_SCORE = 0.675
 # How long shutdown waits for open sessions before it closes the clients.
 SESSION_WAIT_SECONDS = 30.0
 # The longest SharedMemory.close() takes. It waits up to its default timeout

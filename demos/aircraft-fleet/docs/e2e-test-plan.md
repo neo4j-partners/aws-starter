@@ -1078,8 +1078,9 @@ Runtimes, credential providers, Gateways, Cognito pools, IAM roles, log
 groups, ECR repositories, and secrets. `.env` and `.env.fleet` match their
 pre-run copies. The fleet credentials copies are removed. The run also removed
 `neo4j-mcp-server/.env.fleet.readonly`, which held the dropped
-`fleet_reader` login. `create_reader.py` reads that file as input. The next
-setup must write it again before it runs `create_reader.py`. The fraud agent's
+`fleet_reader` login. The run's scratch helper `create_reader.py`, which is
+not in the repo, reads that file as input. The next setup must write it again
+before it runs `create_reader.py`. The fraud agent's
 `.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
 on, and the fleet graph is unchanged.
 
@@ -1200,10 +1201,10 @@ fraud deploy check also ran before the new runtime was READY.
    memory log group under `/aws/vendedlogs/bedrock-agentcore/memory/`. It
    also keeps the 52 MB `.bedrock_agentcore/` dependency cache in the
    agent folder. The run deleted all three by hand.
-5. Retest 4 says `create_reader.py` writes
-   `neo4j-mcp-server/.env.fleet.readonly` again at the next setup. That is
-   wrong. `create_reader.py` reads that file as input, so the run
-   recreated it before setup.
+5. Retest 4 says the run's scratch helper `create_reader.py`, which is not
+   in the repo, writes `neo4j-mcp-server/.env.fleet.readonly` again at the
+   next setup. That is wrong. `create_reader.py` reads that file as input,
+   so the run recreated it before setup.
 6. The AWS SSO token expired during the run. `agent.sh` and the AgentCore
    CLI then failed with "Token is expired". The AWS CLI still had cached
    role credentials, so the run exported them and repeated the calls. This

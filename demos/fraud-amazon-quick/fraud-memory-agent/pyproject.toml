@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     # Shared core
     "httpx>=0.28.1",
+    "httpx2>=2.14.0",
     "boto3>=1.43.9",
     # client/transport.py reads .bedrock_agentcore.yaml; declare pyyaml
     # explicitly rather than rely on it arriving transitively via the toolkit.

@@ -693,7 +693,12 @@ history.
      read the user name from the secret too. The shared `.env` keeps the
      admin user for the pipeline, and no shell export is needed.
   4. Done: the Step 0 text now names `global.anthropic.claude-sonnet-5-5`.
-  5. The AgentCore CLI 1.2.0 is out. This run used 1.1.0.
+  5. Done: both agents now pin `@aws/agentcore-cdk` 1.2.0 for the
+     AgentCore CLI 1.2.0. That CLI syncs the CDK dependencies on every
+     build and deploy, so the committed pins match what a deploy installs.
+     `agentcore build` synthesized both stacks, and `agent.sh help` and
+     `agent.sh status` work in both agents. A cloud deploy has not tested
+     it yet.
   6. The AgentCore CLI and CDK print the full account ID in deploy logs.
   7. Done: the MCP runtime now gets only `NEO4J_PASSWORD_SECRET_ARN`. An
      image entrypoint reads the password at startup. A cloud deploy has not

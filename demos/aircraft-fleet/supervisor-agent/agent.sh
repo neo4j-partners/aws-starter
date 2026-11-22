@@ -54,8 +54,8 @@ GATEWAY_SECRET_VAR="AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET"
 ENV_LOCAL="agentcore/.env.local"
 # The stack and the credential provider names the CLI derives, so destroy
 # can check AWS for them directly. From resolveTargetStacks in
-# @aws/agentcore-cdk 1.1.0 (underscores become hyphens) and providerName in
-# @aws/agentcore 1.1.0.
+# @aws/agentcore-cdk 1.2.0 (underscores become hyphens) and providerName in
+# @aws/agentcore 1.2.0.
 STACK_NAME="AgentCore-${PROJECT_NAME//_/-}-${TARGET//_/-}"
 GATEWAY_PROVIDER="${PROJECT_NAME}_${TARGET}_${GATEWAY_CREDENTIAL}"
 # Local Gateway credentials, written by neo4j-mcp-server/deploy.py.

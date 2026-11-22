@@ -190,7 +190,7 @@ restore_spec() {
 
 # Report every resource that `agentcore status` still shows as deployed.
 # The CloudFormation stack the CLI deploys for $TARGET. @aws/agentcore-cdk
-# 1.1.0 (resolveTargetStacks) names it AgentCore-<project>-<target>, with each
+# 1.2.0 (resolveTargetStacks) names it AgentCore-<project>-<target>, with each
 # underscore replaced by a dash.
 stack_name() {
     uv run --quiet python -c '
@@ -494,7 +494,7 @@ case "${1:-help}" in
         # destroy runs agentcore deploy too. Install before the spec changes,
         # so a failed install stops with nothing changed.
         ensure_cdk_deps
-        # CLI 1.1.0 has no destroy command. A deploy of a project that
+        # CLI 1.2.0 has no destroy command. A deploy of a project that
         # declares nothing removes the target's stack, so remove the Runtime
         # from the spec, deploy, and put the spec back.
         echo -e "${YELLOW}Removing agent from AgentCore Runtime...${NC}"

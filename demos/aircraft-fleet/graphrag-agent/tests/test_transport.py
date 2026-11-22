@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import httpx
@@ -577,3 +579,24 @@ def test_local_call_logs_the_prompt_only_at_debug(
     assert f"{logged} prompt_chars={len(PROMPT)}" in info[0]
     assert not any(PROMPT in line for line in info)
     assert any(PROMPT in line for line in _client_log_lines(caplog, "DEBUG"))
+
+
+@pytest.mark.parametrize(
+    ("port", "expected"),
+    [(None, "http://localhost:7070/invocations"), ("9001", "http://localhost:9001/invocations")],
+)
+def test_local_url_follows_agent_port(port: str | None, expected: str) -> None:
+    # A fresh interpreter, since the URL is read once at import. Reloading
+    # the module here would leave other tests holding stale names.
+    env = {k: v for k, v in os.environ.items() if k != "AGENT_PORT"}
+    if port is not None:
+        env["AGENT_PORT"] = port
+    code = (
+        "from fleet_graphrag.client.transport import LOCAL_URL, invoke_local\n"
+        "print(LOCAL_URL)\n"
+        "print(invoke_local.__defaults__[1])\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True
+    )
+    assert result.stdout.split() == [expected, expected]

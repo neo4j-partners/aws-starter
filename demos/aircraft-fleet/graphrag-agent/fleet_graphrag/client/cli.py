@@ -21,7 +21,7 @@ import argparse
 import sys
 
 from fleet_graphrag.client.invoke import load_queries
-from fleet_graphrag.client.transport import Target, invoke
+from fleet_graphrag.client.transport import LOCAL_PORT, Target, invoke
 
 # Number of queries.txt entries to run when no question is given.
 DEMO_COUNT = 5
@@ -68,7 +68,7 @@ def main() -> None:
     parser.add_argument(
         "--remote",
         action="store_true",
-        help="Target the deployed AgentCore runtime instead of localhost:7070.",
+        help=f"Target the deployed AgentCore runtime instead of localhost:{LOCAL_PORT}.",
     )
     parser.add_argument(
         "question",

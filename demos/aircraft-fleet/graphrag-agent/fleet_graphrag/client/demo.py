@@ -34,6 +34,7 @@ import sys
 import textwrap
 
 from fleet_graphrag.client.transport import (
+    LOCAL_PORT,
     DeploymentNotFoundError,
     Target,
     invoke,
@@ -205,14 +206,14 @@ def main() -> None:
     parser.add_argument(
         "--remote",
         action="store_true",
-        help=("Drive the deployed AgentCore runtime instead of the local server on port 7070."),
+        help=f"Drive the deployed AgentCore runtime instead of the local server on port {LOCAL_PORT}.",
     )
     TARGET = "deployed" if parser.parse_args().remote else "local"
 
     mode_line = (
         "DEPLOYED: AgentCore runtime"
         if TARGET == "deployed"
-        else "LOCAL: fleet-server on port 7070"
+        else f"LOCAL: fleet-server on port {LOCAL_PORT}"
     )
     print()
     print("#" * WIDTH)

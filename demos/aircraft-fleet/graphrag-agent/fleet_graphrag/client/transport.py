@@ -6,7 +6,8 @@ SSE event shapes: ``{"type": "chunk", "data": ...}``,
 ``{"type": "complete"}``. Both transports below produce that same byte
 stream, so a single parser handles them:
 
-- :func:`invoke_local`: HTTP POST to a locally running runtime on port 7070.
+- :func:`invoke_local`: HTTP POST to a locally running runtime on
+  :data:`LOCAL_PORT`, ``AGENT_PORT`` or 7070.
 - :func:`invoke_deployed`: the boto3 ``bedrock-agentcore`` data plane.
 
 :func:`invoke` dispatches on ``target`` and returns the shape callers expect:
@@ -19,6 +20,7 @@ from __future__ import annotations
 import codecs
 import json
 import logging
+import os
 import subprocess
 import uuid
 from collections.abc import Iterable
@@ -36,7 +38,9 @@ logger = logging.getLogger(__name__)
 # project lives in agentcore/ under it, so `agentcore status` runs from here
 # regardless of the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parents[2]
-LOCAL_URL = "http://localhost:7070/invocations"
+# The port fleet-server listens on. AGENT_PORT overrides it there too.
+LOCAL_PORT = os.getenv("AGENT_PORT", "7070")
+LOCAL_URL = f"http://localhost:{LOCAL_PORT}/invocations"
 
 # A full agent turn with adaptive thinking and several tool calls can stream
 # for minutes. botocore's 60 s default read timeout would cut it off.
@@ -340,7 +344,7 @@ def invoke_local(
     timeout: int = 180,
     session_id: str | None = None,
 ) -> dict:
-    """Invoke a locally running ``fleet_graphrag.server`` over HTTP+SSE (port 7070).
+    """Invoke a locally running ``fleet_graphrag.server`` over HTTP+SSE at ``url``.
 
     ``session_id`` goes in the AgentCore session header. Without it, the
     server starts a new session for the call.

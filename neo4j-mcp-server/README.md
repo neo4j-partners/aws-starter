@@ -108,7 +108,7 @@ export AWS_PROFILE=my-profile   # only if you use a non-default AWS profile
 The deploy takes about 5 to 10 minutes. It does these steps:
 
 1. It checks that it can connect to Neo4j.
-2. It builds the ARM64 Docker image.
+2. It builds the ARM64 Docker image. It builds the server from `NEO4J_MCP_REPO`, then adds the startup entrypoint from `image/`.
 3. It creates an ECR repository and pushes the image.
 4. It stores the Neo4j password in Secrets Manager.
 5. It bootstraps CDK in the region if that has not been done yet.
@@ -350,7 +350,7 @@ This deployment uses machine login only. It has no user accounts.
 | Cognito OAuth2 | Machine token | The agent uses the client credentials flow with the machine client. |
 | Gateway JWT | Gateway access | The Gateway checks the bearer token against Cognito. |
 | OAuth2 provider | Gateway to Runtime | The Gateway trades its credentials for a Runtime token. |
-| Neo4j (env) | Database access | The container reads the database login at startup. |
+| Neo4j (Secrets Manager) | Database access | The Runtime gets the user name and the password secret ARN. The container reads the password from Secrets Manager at startup. |
 
 Login flow:
 
@@ -361,6 +361,14 @@ Gateway → OAuth Provider → Gets Runtime token
 Gateway → Runtime + OAuth Token → MCP Request
 Runtime → Neo4j (env credentials) → Query
 ```
+
+The Runtime never holds the password itself. The stack sets
+`NEO4J_PASSWORD_SECRET_ARN`, and the Runtime role may read only that secret.
+The image entrypoint `image/secret_entrypoint.py` reads the password when the
+container starts. It accepts a plain string, which is what `deploy.py` writes,
+or a JSON object with a `password` key. It then sets `NEO4J_PASSWORD` in its own
+process and starts `mcp-neo4j-cypher`. When the ARN is unset, as with
+`local.sh`, the server reads `NEO4J_PASSWORD` from the environment.
 
 Agents need only the Cognito client ID and secret. `./deploy.py credentials`
 gets both from AWS for you.
@@ -385,6 +393,10 @@ neo4j-mcp-server/
 │   └── mcp_operations.py             # MCP operation helpers
 ├── docs/
 │   └── CLAUDE_DESKTOP.md             # Claude Desktop setup
+├── image/
+│   ├── Dockerfile                    # Layer that adds the startup entrypoint
+│   └── secret_entrypoint.py          # Reads the password secret, starts the server
+├── tests/                            # Unit tests for the entrypoint (uv run pytest)
 ├── deploy.py                         # Deployment script
 ├── cloud.sh                          # Gateway tests (MCP client)
 ├── cloud-http.sh                     # Direct Runtime tests (raw HTTP)

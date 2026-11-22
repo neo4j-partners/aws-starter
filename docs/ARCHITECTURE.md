@@ -123,7 +123,7 @@ ECR stores the Neo4j MCP server image. `deploy.py` tags each build with the git 
 
 #### AWS Secrets Manager
 
-Secrets Manager stores the Neo4j password. `deploy.py` writes the secret and passes only its ARN to the stack. CloudFormation resolves the password into the Runtime environment at deploy time with a `{{resolve:secretsmanager}}` dynamic reference, so the password never appears in the template.
+Secrets Manager stores the Neo4j password. `deploy.py` writes the secret and passes only its ARN to the stack. The Runtime gets only that ARN. At startup, the image entrypoint reads the password with the Runtime role and sets it inside its own process, so the password never appears in the template or the Runtime configuration.
 
 #### Amazon CloudWatch
 
@@ -201,7 +201,7 @@ The system uses machine-to-machine OAuth2. One Cognito machine client backs both
 1. **Get a token:** The agent posts `client_credentials` to the Cognito `/oauth2/token` endpoint and gets a JWT.
 2. **Call the Gateway:** The agent sends an MCP request with the JWT. The Gateway checks the issuer and the allowed client.
 3. **Gateway to Runtime:** The Gateway gets a Runtime token from the OAuth2 provider and forwards the request with it.
-4. **Run the tool:** The Runtime checks the allowed client. The MCP server runs read-only Cypher with the password that CloudFormation resolved from Secrets Manager. The response returns through the Runtime and the Gateway.
+4. **Run the tool:** The Runtime checks the allowed client. The MCP server runs read-only Cypher with the password that the container read from Secrets Manager at startup. The response returns through the Runtime and the Gateway.
 
 Machine-to-machine auth through the Gateway has these benefits.
 

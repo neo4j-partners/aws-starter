@@ -12,7 +12,7 @@ The Neo4j MCP server runs as a container on Amazon Bedrock AgentCore Runtime. Ag
 - **Gateway target:** The target named `neo4j-mcp-server-target` points at the Runtime invocation URL. It gets its token from an OAuth2 credential provider in AgentCore Identity.
 - **Runtime:** The Runtime runs the `mcp-neo4j-cypher` server with the MCP protocol on port 8000 at `/mcp`. It has its own JWT authorizer for the same machine client.
 - **Neo4j:** The database can be Aura or self-hosted. The server sets `NEO4J_READ_ONLY=true`, so write tools are off.
-- **Supporting services:** The Runtime pulls its ARM64 image from Amazon ECR and sends logs and traces to CloudWatch. CloudFormation reads the Neo4j password from Secrets Manager at deploy time.
+- **Supporting services:** The Runtime pulls its ARM64 image from Amazon ECR and sends logs and traces to CloudWatch. The container reads the Neo4j password from Secrets Manager when it starts.
 
 ## Authentication flow
 
@@ -26,7 +26,7 @@ The Neo4j MCP server runs as a container on Amazon Bedrock AgentCore Runtime. Ag
 | 4. Run the query | The Runtime passes the call to the MCP server on port 8000. The server queries Neo4j, and the response returns along the same path. |
 
 - **Two checks:** The Gateway and the Runtime both validate a JWT. A token from another Cognito client fails at both.
-- **Neo4j password:** `deploy.py` stores the password in Secrets Manager as `{stack}/neo4j-password`. The stack receives only the secret ARN. CloudFormation resolves it into the `NEO4J_PASSWORD` variable with a `{{resolve:secretsmanager:...}}` dynamic reference, so the password never appears as a parameter or on the `cdk` command line.
+- **Neo4j password:** `deploy.py` stores the password in Secrets Manager as `{stack}/neo4j-password`. The stack receives only the secret ARN and passes it to the Runtime as `NEO4J_PASSWORD_SECRET_ARN`. At startup, the image entrypoint `image/secret_entrypoint.py` reads the secret with the Runtime role and sets `NEO4J_PASSWORD` inside its own process. The password never appears as a parameter, on the `cdk` command line, or in the Runtime configuration.
 
 ## CDK stack
 
@@ -56,7 +56,7 @@ Every resource name derives from the stack name. `cdk/naming.py` checks each der
 
 ### IAM
 
-- **Agent execution role:** The Runtime runs as this role. Its inline policy covers ECR image pulls, CloudWatch Logs under `/aws/bedrock-agentcore/`, X-Ray, CloudWatch metrics in the AgentCore namespace, and workload access tokens. Its trust policy limits it to this account.
+- **Agent execution role:** The Runtime runs as this role. Its inline policy covers ECR image pulls, CloudWatch Logs under `/aws/bedrock-agentcore/`, X-Ray, CloudWatch metrics in the AgentCore namespace, workload access tokens, and `secretsmanager:GetSecretValue` on the one password secret. Its trust policy limits it to this account.
 - **Gateway execution role:** The Gateway runs as this role. It can read OAuth2 tokens from the credential provider and token vault. It can invoke only this stack's Runtime. It also has Bedrock model access for semantic tool search.
 - **Custom resource role:** Both Lambda functions run as this role. It can read the machine client secret from Cognito, manage the OAuth2 credential provider, and read the status of this stack's Runtime.
 
@@ -69,7 +69,7 @@ Both functions run Python 3.12. The OAuth provider times out after 5 minutes and
 
 ### AgentCore
 
-- **Runtime:** The `CfnRuntime` runs the container from `EcrImageUri` with the MCP protocol. It sets the Neo4j connection, HTTP transport on `0.0.0.0:8000/mcp`, and read-only mode through environment variables.
+- **Runtime:** The `CfnRuntime` runs the container from `EcrImageUri` with the MCP protocol. It sets the Neo4j connection, the password secret ARN, HTTP transport on `0.0.0.0:8000/mcp`, and read-only mode through environment variables.
 - **Gateway:** The `CfnGateway` is named `{stack}-gateway`. It speaks MCP version `2025-03-26` and uses the `CUSTOM_JWT` authorizer.
 - **Gateway target:** The `CfnGatewayTarget` named `neo4j-mcp-server-target` connects the Gateway to the Runtime. It authenticates with the OAuth2 credential provider and the `{stack}-mcp/invoke` scope.
 

@@ -695,8 +695,9 @@ history.
   4. Done: the Step 0 text now names `global.anthropic.claude-sonnet-5-5`.
   5. The AgentCore CLI 1.2.0 is out. This run used 1.1.0.
   6. The AgentCore CLI and CDK print the full account ID in deploy logs.
-  7. The MCP runtime carries the Neo4j password as a plain
-     `NEO4J_PASSWORD` environment variable, resolved at deploy time.
+  7. Done: the MCP runtime now gets only `NEO4J_PASSWORD_SECRET_ARN`. An
+     image entrypoint reads the password at startup. A cloud deploy has not
+     tested it yet.
   8. `npm` reports 3 vulnerabilities in the supervisor's CDK
      dependencies, 2 moderate and 1 high.
   9. AgentCore keeps the runtime log groups after a destroy, and they have

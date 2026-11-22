@@ -199,7 +199,7 @@ Example: `neo4j-mcp-server-target___read_neo4j_cypher`
 | Cognito OAuth2 | M2M token for agent → Gateway |
 | Gateway JWT | Validates agent identity |
 | OAuth2 Provider | Gateway → Runtime token exchange |
-| Neo4j (Secrets Manager) | Database password resolved into the container at deploy time |
+| Neo4j (Secrets Manager) | Database password read by the container at startup |
 
 ## Key Patterns
 

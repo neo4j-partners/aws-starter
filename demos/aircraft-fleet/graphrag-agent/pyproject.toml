@@ -20,6 +20,7 @@ dependencies = [
     "mcp>=1.28,<2",
     # The fleet fork of 0.8.0. [tool.uv.sources] says where the wheel is.
     "neo4j-agent-memory[strands]==0.8.0+fleet.7",
+    "truststore>=0.10",
 ]
 
 [dependency-groups]

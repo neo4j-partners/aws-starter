@@ -16,6 +16,7 @@ dependencies = [
     # neo4j-partners fork adds the extractor's send_temperature and
     # tool_choice settings.
     "neo4j-agent-memory[strands]==0.8.0+fleet.7",
+    "truststore>=0.10",
 ]
 
 # Console entry points. The server runs in the foreground of its own

@@ -11,6 +11,10 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+# Import the package before any test module imports boto3, so its truststore
+# injection runs first, as it does in the console scripts and the Runtime.
+import fleet_supervisor  # noqa: F401
+
 _MEMORY_VARS = (
     "MEM_NEO4J_URI",
     "MEM_NEO4J_USERNAME",

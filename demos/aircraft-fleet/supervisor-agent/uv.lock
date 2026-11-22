@@ -19,6 +19,7 @@ dependencies = [
     { name = "mcp" },
     { name = "neo4j-agent-memory", extra = ["strands"] },
     { name = "strands-agents" },
+    { name = "truststore" },
 ]
 
 [package.dev-dependencies]
@@ -38,6 +39,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "neo4j-agent-memory", extras = ["strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.7/neo4j_agent_memory-0.8.0%2Bfleet.7-py3-none-any.whl" },
     { name = "strands-agents", specifier = ">=1.65" },
+    { name = "truststore", specifier = ">=0.10" },
 ]
 
 [package.metadata.requires-dev]
@@ -2311,6 +2313,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/31/ccfa8d64b4df059f3c6c82c726c3f2c5630f412daa8409a681da76919db8/strands_agents-1.65.0.tar.gz", hash = "sha256:cf0c348b98798723a0bf8bc001dc065e3d7a960ac09e6dfce98c2d7338fc5514", size = 2005369, upload-time = "2026-11-13T18:46:16.969Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/37/fb/375afbd6b85410fc5f572639804e690dbad7b4f02a9625092c531e07acb5/strands_agents-1.65.0-py3-none-any.whl", hash = "sha256:5e8dd8538fea593763f9da9aecf72f5b71f421413ba8fafbeef1b2ccd3093658", size = 1012483, upload-time = "2026-11-13T18:46:14.9Z" },
+]
+
+[[package]]
+name = "truststore"
+version = "0.10.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/9f/c5201d42a484c061e528825fc8e2d565f5abd50a4ced6fb7d29c4ec99b2b/truststore-0.10.5.tar.gz", hash = "sha256:30d36967ccaded5cbb38d602c433f53600036c79d502f4533a49b60a03bbefcd", size = 28091, upload-time = "2026-10-12T22:27:31.808Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl", hash = "sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c", size = 19017, upload-time = "2026-10-12T22:27:30.377Z" },
 ]
 
 [[package]]

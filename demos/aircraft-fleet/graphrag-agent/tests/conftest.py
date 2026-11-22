@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import os
 
+# Import the package before any test module imports boto3, so its truststore
+# injection runs first, as it does in the console scripts and the Runtime.
+import fleet_graphrag  # noqa: F401
+
 _AGENT_VARS = (
     "MODEL_ID",
     "MAX_TOKENS",

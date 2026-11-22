@@ -18,6 +18,7 @@ dependencies = [
     # shared
     "typer>=0.25.0",
     "rich>=15.0.0",
+    "truststore>=0.10",
 ]
 
 [project.optional-dependencies]

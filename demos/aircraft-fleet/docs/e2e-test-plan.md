@@ -681,8 +681,11 @@ history.
   answered 30 aircraft. The showcase figures, the top manual chunk, and the
   tool choices matched between Step 9 and Step 14.
 - **Follow-up actions / issues to file:**
-  1. Decide how to handle the macOS CA problem for local Python runs. One
-     option is to have the agents and the pipeline use certifi.
+  1. Done: the pipeline and both agents now depend on `truststore`. Each
+     package's `__init__.py` calls `truststore.inject_into_ssl()`, so
+     Python verifies TLS against the macOS keychain. Local runs no longer
+     need `SSL_CERT_FILE`. `populate-aircraft-db verify` and a `fleet-cli`
+     query both passed against the fleet Aura with `SSL_CERT_FILE` unset.
   2. Pass a longer `request_timeout` to `SharedMemory.open` in the
      agents' `memory.py`, or speed up the open upstream in
      neo4j-agent-memory.

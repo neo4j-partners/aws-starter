@@ -152,3 +152,17 @@ Folder: [`patterns/gateway-rbac-interceptor/`](./patterns/gateway-rbac-intercept
 
 - **[`CLAUDE.md`](CLAUDE.md):** This file lists detailed commands for Claude Code and for developers.
 - **[`demos/aircraft-fleet/README.md`](demos/aircraft-fleet/README.md):** This walkthrough builds a GraphRAG ingest pipeline on Bedrock, loads the aircraft digital twin graph into Neo4j, and runs an agent over it.
+
+## Upgrading dependencies
+
+Add or upgrade only to versions released at least a week ago. A new release can carry a CVE that has not been reported yet. Existing locked versions stay as they are. The rule applies whenever a version changes.
+
+Add the cutoff flag whenever you add or upgrade something:
+
+```bash
+uv lock --upgrade --exclude-newer "1 week"
+uv add <package> --exclude-newer "1 week"
+npm install <package> --min-release-age=7    # also npm update, and global CLIs
+```
+
+Don't put `exclude-newer` in a `pyproject.toml` or `min-release-age` in an `.npmrc`. Either setting re-resolves the current lockfiles. [`CLAUDE.md`](CLAUDE.md) records the same policy.

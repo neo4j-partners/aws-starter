@@ -12,11 +12,24 @@ from pathlib import Path
 
 AGENT_SH = Path(__file__).resolve().parents[1] / "agent.sh"
 
-# Records its arguments, prints STUB_UV_OUTPUT and exits with STUB_UV_STATUS.
+# Records its arguments, prints STUB_UV_OUTPUT, deletes STUB_UV_REMOVE when set
+# (as `agentcore destroy` deletes the config) and exits with STUB_UV_STATUS.
 UV_STUB = """#!/bin/bash
 printf '%s\\n' "$*" >> "$STUB_LOG"
 [ -z "${STUB_UV_OUTPUT:-}" ] || printf '%s\\n' "$STUB_UV_OUTPUT"
+[ -z "${STUB_UV_REMOVE:-}" ] || rm -f "$STUB_UV_REMOVE"
 exit "${STUB_UV_STATUS:-0}"
+"""
+
+# Stands in for .venv/bin/python. Records its arguments, copies the file after
+# --snapshot to STUB_SNAPSHOT_COPY and exits with STUB_PY_STATUS.
+PYTHON_STUB = """#!/bin/bash
+printf 'python %s\\n' "$*" >> "$STUB_LOG"
+while [ $# -gt 0 ]; do
+    if [ "$1" = "--snapshot" ]; then cp "$2" "$STUB_SNAPSHOT_COPY"; fi
+    shift
+done
+exit "${STUB_PY_STATUS:-0}"
 """
 
 
@@ -109,6 +122,64 @@ class InvokeCloudTests(AgentShTestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("highest risk scores", self.calls()[0])
+
+
+class DestroyTests(AgentShTestCase):
+    CONFIG = "agents:\n  fraud_memory_agent:\n    name: fraud_memory_agent\n"
+
+    def setUp(self) -> None:
+        super().setUp()
+        write_executable(self.root / ".venv" / "bin" / "python", PYTHON_STUB)
+        self.config = self.root / ".bedrock_agentcore.yaml"
+        self.snapshot_copy = self.log.parent / "snapshot-copy.yaml"
+
+    def destroy(self, **env: str) -> subprocess.CompletedProcess[str]:
+        return self.run_agent(
+            "destroy",
+            STUB_UV_REMOVE=str(self.config),
+            STUB_SNAPSHOT_COPY=str(self.snapshot_copy),
+            **env,
+        )
+
+    def test_destroy_cleans_up_from_a_copy_of_the_config(self) -> None:
+        self.config.write_text(self.CONFIG)
+
+        result = self.destroy()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        uv_call, python_call = self.calls()
+        self.assertEqual(uv_call, "run agentcore destroy")
+        self.assertIn("python scripts/clean_destroy_leftovers.py --snapshot ", python_call)
+        self.assertIn(f"--config {self.config}", python_call)
+        self.assertIn("--agent fraud_memory_agent", python_call)
+        self.assertIn(f"--cache-dir {self.root / '.bedrock_agentcore'}", python_call)
+        self.assertEqual(self.snapshot_copy.read_text(), self.CONFIG)
+        self.assertIn("Cleanup complete!", result.stdout)
+
+    def test_a_failed_destroy_skips_the_cleanup(self) -> None:
+        self.config.write_text(self.CONFIG)
+
+        result = self.destroy(STUB_UV_STATUS="4")
+
+        self.assertEqual(result.returncode, 4)
+        self.assertEqual(self.calls(), ["run agentcore destroy"])
+        self.assertNotIn("Cleanup complete!", result.stdout)
+
+    def test_a_cleanup_failure_exits_1(self) -> None:
+        self.config.write_text(self.CONFIG)
+
+        result = self.destroy(STUB_PY_STATUS="1")
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Some leftovers were not removed", result.stdout)
+        self.assertNotIn("Cleanup complete!", result.stdout)
+
+    def test_no_config_runs_destroy_without_the_cleanup(self) -> None:
+        result = self.destroy()
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.calls(), ["run agentcore destroy"])
+        self.assertIn("leftover cleanup was skipped", result.stdout)
 
 
 if __name__ == "__main__":

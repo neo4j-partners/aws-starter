@@ -182,6 +182,43 @@ print_usage() {
     echo "  ./agent.sh help               Show this help message"
 }
 
+destroy_agent() {
+    # `agentcore destroy` keeps the CodeBuild source bucket, the memory log
+    # group and the local build cache. It also deletes the config, so copy it
+    # first for scripts/clean_destroy_leftovers.py to read.
+    if [ ! -f "$CONFIG_FILE" ]; then
+        uv run agentcore destroy
+        echo -e "${YELLOW}No $(basename "$CONFIG_FILE"), so the leftover cleanup was skipped.${NC}"
+        return
+    fi
+    local snapshot status
+    snapshot="$(mktemp)"
+    cp "$CONFIG_FILE" "$snapshot"
+    set +e
+    uv run agentcore destroy
+    status=$?
+    set -e
+    if [ "$status" -ne 0 ]; then
+        rm -f "$snapshot"
+        return "$status"
+    fi
+    echo ""
+    echo -e "${YELLOW}Removing what agentcore destroy leaves behind...${NC}"
+    set +e
+    .venv/bin/python scripts/clean_destroy_leftovers.py \
+        --snapshot "$snapshot" \
+        --config "$CONFIG_FILE" \
+        --agent "$AGENT_NAME" \
+        --cache-dir "$ROOT_DIR/.bedrock_agentcore"
+    status=$?
+    set -e
+    rm -f "$snapshot"
+    if [ "$status" -ne 0 ]; then
+        echo -e "${RED}Some leftovers were not removed. See \"Tear down\" in README.md.${NC}"
+        return 1
+    fi
+}
+
 ensure_deps() {
     if [ ! -d ".venv" ]; then
         echo -e "${YELLOW}Installing dependencies (first run)...${NC}"
@@ -331,7 +368,7 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${YELLOW}Removing agent from AgentCore Runtime...${NC}"
         echo ""
-        uv run agentcore destroy
+        destroy_agent
         echo ""
         echo -e "${GREEN}Cleanup complete!${NC}"
         ;;

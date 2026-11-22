@@ -167,18 +167,17 @@ Recovery and diagnostics commands:
 
 ### Tear down
 
-`agentcore destroy` leaves three things behind:
+`agentcore destroy` leaves three things behind. `./agent.sh destroy` removes them after destroy finishes:
 
-- **Source bucket:** The empty S3 bucket `bedrock-agentcore-codebuild-sources-<account>-<region>` stays. Every toolkit agent in that account and Region shares it, so delete it only when it is empty.
-- **Memory log group:** The log group `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` stays.
-- **Dependency cache:** The local `.bedrock_agentcore/` folder in the agent root stays. It can hold about 50 MB.
+- **Source bucket:** It deletes the S3 bucket `bedrock-agentcore-codebuild-sources-<account>-<region>` only when the bucket is empty. Every toolkit agent in that account and Region shares it.
+- **Memory log group:** It deletes `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` only when the toolkit created the memory. Destroy keeps a pre-existing memory, so its log group stays too.
+- **Build cache:** It deletes the local `.bedrock_agentcore/fraud_memory_agent/` folder, which can hold about 50 MB. It deletes `.bedrock_agentcore/` only when nothing else is left in it.
 
-`destroy` deletes `.bedrock_agentcore.yaml`, so note the memory ID and Region first. Then remove the leftovers by hand:
+It prints `Removed`, `Skipped` or `Not found` for each one. A missing resource is not an error. When destroy is cancelled or fails, the cleanup does not run. When an AWS call fails, `agent.sh` exits 1.
+
+If the cleanup fails, remove the leftovers by hand. `destroy` has already deleted `.bedrock_agentcore.yaml`, so take the Region and memory ID from the `Could not remove` lines:
 
 ```bash
-grep -E "memory_id|region" .bedrock_agentcore.yaml   # before destroy
-./agent.sh destroy
-
 REGION=us-east-1
 MEMORY_ID=<memory-id>
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -190,7 +189,7 @@ aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
 
 aws logs delete-log-group --region "$REGION" \
     --log-group-name "/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/$MEMORY_ID"
-rm -rf .bedrock_agentcore/
+rm -rf .bedrock_agentcore/fraud_memory_agent/
 ```
 
 ## Generate NAMS traffic

@@ -202,9 +202,9 @@ def get_user_token(
             AuthParameters={"USERNAME": username, "PASSWORD": password, "SECRET_HASH": secret_hash},
         )
     except cognito.exceptions.NotAuthorizedException as e:
-        raise Exception(f"Authentication failed: {e}")
+        raise Exception(f"Authentication failed: {e}") from e
     except cognito.exceptions.UserNotFoundException:
-        raise Exception(f"User not found: {username}")
+        raise Exception(f"User not found: {username}") from None
 
     result = auth_response.get("AuthenticationResult", {})
     _token_cache = result.get("AccessToken")

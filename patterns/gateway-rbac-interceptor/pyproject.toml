@@ -17,7 +17,7 @@ dependencies = [
     "mcp>=2.2.0,<3",
     # client/demo.py configures the MCP HTTP client directly. It is already
     # a dependency of mcp 2.x; declared here only to make the import explicit.
-    "httpx2",
+    "httpx2>=2.16.0",
 ]
 
 [tool.ruff]
@@ -30,7 +30,3 @@ extend-exclude = ["*.md"]
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
 ignore = ["E501"]
-
-[tool.ruff.lint.per-file-ignores]
-# raise ... from e would change the traceback the demo prints; left as is.
-"client/demo.py" = ["B904"]

@@ -330,24 +330,16 @@ def _allow_request(auth_header, body, user_id, groups, client_id) -> dict[str, A
 The demo client in `client/demo.py` reads the user client secret with `describe_user_pool_client`. It then computes the SECRET_HASH and calls `initiate_auth`.
 
 ```python
-# client/demo.py:206-212 - SECRET_HASH calculation
+# client/demo.py:193-195 - SECRET_HASH calculation
 message = username + client_id
-dig = hmac.new(
-    client_secret.encode("utf-8"),
-    message.encode("utf-8"),
-    hashlib.sha256
-).digest()
+dig = hmac.new(client_secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
 secret_hash = base64.b64encode(dig).decode()
 
-# client/demo.py:216-224 - Authentication
+# client/demo.py:199-203 - Authentication
 auth_response = cognito.initiate_auth(
     ClientId=client_id,
     AuthFlow="USER_PASSWORD_AUTH",
-    AuthParameters={
-        "USERNAME": username,
-        "PASSWORD": password,
-        "SECRET_HASH": secret_hash
-    }
+    AuthParameters={"USERNAME": username, "PASSWORD": password, "SECRET_HASH": secret_hash},
 )
 ```
 

@@ -236,7 +236,7 @@ Progress:
 3. **Errors:** Let every error propagate to the AgentCore app.
 4. **No user_id:** Reject the request with an error.
 5. **Deploy tooling:** Fix the configure flag only. Keep the starter toolkit.
-6. **Model:** Keep Haiku 4.5 and add the prompt rules.
+6. **Model:** Add the prompt rules. After Cloud Retest 9 miscounted transfers, the default moved from Haiku 4.5 to Sonnet 4.5. The next retest compares accuracy.
 7. **Graph loader:** Fix the query and add tests.
 8. **AWS cleanup:** Delete the leftover log groups and the workload identity. Leave the secret `neo4j-mcp/default` and the bucket `neo4j-finance-demo`.
 9. **MCP request noise:** A separate agent investigates and fixes it.

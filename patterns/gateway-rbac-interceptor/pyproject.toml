@@ -15,9 +15,7 @@ dependencies = [
     "botocore[crt]",
     "requests>=2.31.0",
     "mcp>=2.2.0,<3",
-    # client/demo.py configures the MCP HTTP client directly. It is already
-    # a dependency of mcp 2.x; declared here only to make the import explicit.
-    "httpx2>=2.16.0",
+    "fastmcp-slim[client]>=4.2,<5",
 ]
 
 [tool.ruff]

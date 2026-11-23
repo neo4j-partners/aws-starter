@@ -41,9 +41,11 @@ See: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-tool-
 
 import json
 
-import httpx2
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
+
+# Per-request timeout in seconds. FastMCP keeps its 300 s floor for SSE reads.
+REQUEST_TIMEOUT = 120
 
 # =============================================================================
 # Connection
@@ -56,19 +58,15 @@ async def connect_and_run(mcp_url: str, operation, *args, headers: dict = None):
 
     Args:
         mcp_url: The MCP server endpoint URL
-        operation: Async function to run with the session
+        operation: Async function to run with the connected client
         *args: Additional arguments to pass to the operation
         headers: Optional HTTP headers (e.g., for JWT auth)
     """
-    async with (
-        httpx2.AsyncClient(headers=headers or {}, timeout=120.0) as http_client,
-        streamable_http_client(mcp_url, http_client=http_client, terminate_on_close=False) as (
-            read_stream,
-            write_stream,
-        ),
-        ClientSession(read_stream, write_stream) as session,
-    ):
-        await session.initialize()
+    transport = StreamableHttpTransport(mcp_url, headers=headers or {})
+    # The deployed server is the mcp-neo4j-cypher fork on mcp 1.22. It answers
+    # the server/discover probe with a 400, so skip the probe. Remove
+    # mode="legacy" when the server moves off the fork.
+    async with Client(transport, mode="legacy", timeout=REQUEST_TIMEOUT) as session:
         await operation(session, *args)
 
 
@@ -86,7 +84,7 @@ async def connect_and_run(mcp_url: str, operation, *args, headers: dict = None):
 # =============================================================================
 
 
-async def get_tool_map(session: ClientSession) -> dict[str, str]:
+async def get_tool_map(session: Client) -> dict[str, str]:
     """
     Build a map from base tool names to actual tool names.
 
@@ -115,10 +113,10 @@ async def get_tool_map(session: ClientSession) -> dict[str, str]:
             'read_neo4j_cypher': 'neo4j-mcp-server-target___read_neo4j_cypher'
         }
     """
-    result = await session.list_tools()
+    tools = await session.list_tools()
     tool_map = {}
 
-    for tool in result.tools:
+    for tool in tools:
         # Store the full name (as returned by Gateway or Runtime)
         full_name = tool.name
 
@@ -154,7 +152,7 @@ def resolve_tool_name(tool_map: dict[str, str], base_name: str) -> str:
     Example:
         >>> tool_map = await get_tool_map(session)
         >>> actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
-        >>> result = await session.call_tool(actual_name, {})
+        >>> result = await session.call_tool(actual_name, {}, raise_on_error=False)
     """
     if base_name in tool_map:
         return tool_map[base_name]
@@ -170,7 +168,7 @@ def resolve_tool_name(tool_map: dict[str, str], base_name: str) -> str:
 # =============================================================================
 
 
-async def run_full_tests(session: ClientSession):
+async def run_full_tests(session: Client):
     """
     Run the full MCP client test suite.
 
@@ -196,10 +194,10 @@ async def run_full_tests(session: ClientSession):
     print("AVAILABLE TOOLS")
     print("=" * 60)
     print()
-    tool_result = await session.list_tools()
+    tools = await session.list_tools()
     tool_map = {}
 
-    for tool in tool_result.tools:
+    for tool in tools:
         full_name = tool.name
         # Extract base name for mapping (handles Gateway prefix)
         base_name = full_name.split("___", 1)[1] if "___" in full_name else full_name
@@ -228,7 +226,7 @@ async def run_full_tests(session: ClientSession):
     print("1. Testing get_neo4j_schema...")
     try:
         actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
-        result = await session.call_tool(actual_name, {})
+        result = await session.call_tool(actual_name, {}, raise_on_error=False)
         if result.content and result.content[0].text:
             text = result.content[0].text
             if len(text) > 100:
@@ -246,7 +244,9 @@ async def run_full_tests(session: ClientSession):
     print("2. Testing read_neo4j_cypher (RETURN 1 as test)...")
     try:
         actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
-        result = await session.call_tool(actual_name, {"query": "RETURN 1 as test"})
+        result = await session.call_tool(
+            actual_name, {"query": "RETURN 1 as test"}, raise_on_error=False
+        )
         if result.content and result.content[0].text:
             print(f"   Result: {result.content[0].text}")
             print("   PASSED")
@@ -261,7 +261,9 @@ async def run_full_tests(session: ClientSession):
     try:
         actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(
-            actual_name, {"query": "CALL db.labels() YIELD label RETURN label LIMIT 5"}
+            actual_name,
+            {"query": "CALL db.labels() YIELD label RETURN label LIMIT 5"},
+            raise_on_error=False,
         )
         if result.content and result.content[0].text:
             print(f"   Result: {result.content[0].text}")
@@ -277,7 +279,9 @@ async def run_full_tests(session: ClientSession):
     try:
         actual_name = resolve_tool_name(tool_map, "read_neo4j_cypher")
         result = await session.call_tool(
-            actual_name, {"query": "MATCH (n) RETURN count(n) as nodeCount"}
+            actual_name,
+            {"query": "MATCH (n) RETURN count(n) as nodeCount"},
+            raise_on_error=False,
         )
         if result.content and result.content[0].text:
             print(f"   Result: {result.content[0].text}")
@@ -293,15 +297,15 @@ async def run_full_tests(session: ClientSession):
     print("=" * 60)
 
 
-async def list_tools(session: ClientSession):
+async def list_tools(session: Client):
     """
     List available MCP tools.
 
     Displays the full tool names as returned by the server. When accessed via
     Gateway, these will include the target prefix (e.g., "neo4j-mcp-server-target___get_neo4j_schema").
     """
-    result = await session.list_tools()
-    for tool in result.tools:
+    tools = await session.list_tools()
+    for tool in tools:
         print(f"{tool.name}")
         if tool.description:
             desc = tool.description.split("\n")[0].strip()
@@ -309,7 +313,7 @@ async def list_tools(session: ClientSession):
         print()
 
 
-async def get_schema(session: ClientSession):
+async def get_schema(session: Client):
     """
     Get Neo4j database schema.
 
@@ -320,12 +324,12 @@ async def get_schema(session: ClientSession):
     """
     tool_map = await get_tool_map(session)
     actual_name = resolve_tool_name(tool_map, "get_neo4j_schema")
-    result = await session.call_tool(actual_name, {})
+    result = await session.call_tool(actual_name, {}, raise_on_error=False)
     if result.content:
         print(result.content[0].text)
 
 
-async def run_query(session: ClientSession):
+async def run_query(session: Client):
     """
     Run a test query (node counts by label).
 
@@ -341,12 +345,13 @@ async def run_query(session: ClientSession):
         {
             "query": "MATCH (n) RETURN labels(n)[0] as label, count(*) as count ORDER BY count DESC LIMIT 10"
         },
+        raise_on_error=False,
     )
     if result.content:
         print(result.content[0].text)
 
 
-async def call_tool(session: ClientSession, tool_name: str, args_json: str):
+async def call_tool(session: Client, tool_name: str, args_json: str):
     """
     Call a specific MCP tool with JSON arguments.
 
@@ -360,7 +365,7 @@ async def call_tool(session: ClientSession, tool_name: str, args_json: str):
         args_json: JSON string of tool arguments
     """
     args = json.loads(args_json)
-    result = await session.call_tool(tool_name, args)
+    result = await session.call_tool(tool_name, args, raise_on_error=False)
     if result.content:
         print("Result:", result.content[0].text)
     else:

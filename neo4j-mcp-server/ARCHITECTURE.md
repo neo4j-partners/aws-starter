@@ -140,11 +140,11 @@ Write tools do not appear because the server runs with `NEO4J_READ_ONLY=true`.
 The clients in this repository discover the real names at run time. They call `tools/list` and map each base name to its full name, as `client/mcp_operations.py` does:
 
 ```python
-async def get_tool_map(session: ClientSession) -> dict[str, str]:
+async def get_tool_map(session: Client) -> dict[str, str]:
     """Build a map from base tool names to actual (possibly prefixed) names."""
-    result = await session.list_tools()
+    tools = await session.list_tools()
     tool_map = {}
-    for tool in result.tools:
+    for tool in tools:
         full_name = tool.name
         # Extract base name (after ___ prefix if present)
         if "___" in full_name:
@@ -161,7 +161,7 @@ The same pattern appears in other code:
 
 | Code | File | Location |
 |------|------|----------|
-| `patterns/gateway-rbac-interceptor` in this repository | `client/demo.py` | Line 315 |
+| `patterns/gateway-rbac-interceptor` in this repository | `client/demo.py` | Line 283 |
 | AWS sample shopping-concierge-agent | `gateway_client.py` | Line 142 |
 | AWS sample AWS-operations-agent | `mcp-tool-handler.py` | Lines 8-10 |
 

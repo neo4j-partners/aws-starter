@@ -31,10 +31,9 @@ import sys
 from datetime import datetime, timedelta
 
 import boto3
-import httpx2
 import requests
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+from fastmcp import Client
+from fastmcp.client.transports import StreamableHttpTransport
 
 # =============================================================================
 # DEFAULTS
@@ -267,24 +266,15 @@ async def call_mcp_tools(
     print("\n[MCP] Connecting to Gateway...")
     print(f"    URL: {gateway_url}")
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-
-    # mcp 2.x takes headers and timeouts on the HTTP client: 60s for each
-    # request and 300s to read a held-open response stream.
-    http_client = httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(60, read=300))
+    # A string auth value is sent as a Bearer token. The client waits 60s for
+    # each request, and FastMCP allows 300s to read a held-open response stream.
+    transport = StreamableHttpTransport(gateway_url, auth=token)
 
     try:
-        async with (
-            http_client,
-            streamable_http_client(
-                gateway_url, http_client=http_client, terminate_on_close=False
-            ) as (read_stream, write_stream),
-            ClientSession(read_stream, write_stream) as session,
-        ):
-            await session.initialize()
+        # The deployed server is the mcp-neo4j-cypher fork on mcp 1.22. It
+        # answers the server/discover probe with a 400, so skip the probe.
+        # Remove mode="legacy" when the server moves off the fork.
+        async with Client(transport, mode="legacy", timeout=60) as session:
             print("    Session initialized!")
 
             # List tools
@@ -292,7 +282,7 @@ async def call_mcp_tools(
             tool_names = {}
             print("\n    Available Tools:")
             print("    " + "-" * 50)
-            for tool in tools.tools:
+            for tool in tools:
                 base_name = tool.name.split("___")[-1] if "___" in tool.name else tool.name
                 tool_names[base_name] = tool.name
                 # Truncate description for display
@@ -307,14 +297,18 @@ async def call_mcp_tools(
             print("\n[Test] Calling echo tool (public)...")
             echo_tool = tool_names.get("echo", "echo")
             result = await session.call_tool(
-                name=echo_tool, arguments={"message": "Hello from RBAC demo!"}
+                name=echo_tool,
+                arguments={"message": "Hello from RBAC demo!"},
+                raise_on_error=False,
             )
             print(f"    Result: {result.content[0].text}")
 
             # Test get_user_info
             print("\n[Test] Calling get_user_info tool...")
             user_info_tool = tool_names.get("get_user_info", "get_user_info")
-            result = await session.call_tool(name=user_info_tool, arguments={})
+            result = await session.call_tool(
+                name=user_info_tool, arguments={}, raise_on_error=False
+            )
             print(f"    Result: {result.content[0].text}")
 
             # Test admin_action (protected tool)
@@ -323,7 +317,9 @@ async def call_mcp_tools(
                 admin_tool = tool_names.get("admin_action", "admin_action")
                 try:
                     result = await session.call_tool(
-                        name=admin_tool, arguments={"action": "test_admin_operation"}
+                        name=admin_tool,
+                        arguments={"action": "test_admin_operation"},
+                        raise_on_error=False,
                     )
                     response_text = result.content[0].text
                     print(f"    Result: {response_text}")

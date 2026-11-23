@@ -15,7 +15,7 @@ dependencies = [
     # APIs changed between minor releases. The fleet build of the
     # neo4j-partners fork adds the extractor's send_temperature and
     # tool_choice settings.
-    "neo4j-agent-memory[strands]==0.8.0+fleet.8",
+    "neo4j-agent-memory[strands]==0.8.0+fleet.9",
     "truststore>=0.10",
 ]
 
@@ -39,7 +39,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.8/neo4j_agent_memory-0.8.0%2Bfleet.8-py3-none-any.whl" }
+neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" }
 
 [build-system]
 requires = ["hatchling"]

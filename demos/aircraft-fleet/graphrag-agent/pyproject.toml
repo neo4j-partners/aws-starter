@@ -20,7 +20,7 @@ dependencies = [
     # strands-agents 1.65 caps mcp below 2.4, so 2.4 waits on a Strands release.
     "mcp>=2.2.0,<3",
     # The fleet fork of 0.8.0. [tool.uv.sources] says where the wheel is.
-    "neo4j-agent-memory[strands]==0.8.0+fleet.8",
+    "neo4j-agent-memory[strands]==0.8.0+fleet.9",
     "truststore>=0.10",
 ]
 
@@ -42,7 +42,7 @@ fleet-demo = "fleet_graphrag.client.demo:main"
 fleet-invoke = "fleet_graphrag.client.invoke:main"
 
 [tool.uv.sources]
-neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.8/neo4j_agent_memory-0.8.0%2Bfleet.8-py3-none-any.whl" }
+neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" }
 
 [build-system]
 requires = ["hatchling"]

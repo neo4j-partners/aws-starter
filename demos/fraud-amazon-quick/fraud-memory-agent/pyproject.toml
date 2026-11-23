@@ -21,8 +21,8 @@ dependencies = [
     "strands-agents>=1.65,<2",
     # The Strands session manager (Neo4jSessionManager.for_nams) persists
     # and restores each conversation and injects workspace entities. This is
-    # the fleet build of 0.8.0, which completes the reasoning trace at the
-    # end of each turn. [tool.uv.sources] says where the wheel is.
+    # the fleet build of 0.8.0. It ends each turn's reasoning trace with a
+    # "turn outcome" step. [tool.uv.sources] says where the wheel is.
     "neo4j-agent-memory[nams,strands]==0.8.0+fleet.9",
     # server/runtime_app.py loads the local .env for development runs.
     "python-dotenv>=1.2.2",

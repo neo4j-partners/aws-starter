@@ -36,7 +36,7 @@ The manager reads `MEMORY_API_KEY`, `MEMORY_ENDPOINT`, and
 2. **Restore:** The manager loads the conversation's earlier turns into the Strands message history. The model sees them as real turns.
 3. **Retrieve:** Before the user turn reaches the model, the manager searches the workspace for the five entities that best match the question.
 4. **Prefix:** The manager adds those entities to the user message in a `<user_context>` block. The system prompt tells the model to treat the block as background data and to check facts against the graph.
-5. **Record:** The manager records each MCP tool call as a reasoning step. It completes the reasoning trace at the end of the turn. It stores user and assistant text turns as messages. Tool results are not stored as messages.
+5. **Record:** The manager records each MCP tool call as a reasoning step. At the end of the turn it adds a last step, `turn outcome`, that records whether the turn succeeded. It stores user and assistant text turns as messages. Tool results are not stored as messages.
 6. **Close:** The runtime closes the response stream, then calls `close()` on the manager. The manager saves the last buffered message at that point.
 
 NAMS extracts entities from the stored messages on the server. Extraction
@@ -72,6 +72,7 @@ manager replaces it for these reasons:
 
 ## Known gaps
 
+- **Open traces:** NAMS has no endpoint to complete a reasoning trace. Each trace stays open after the turn, with no completion time. The `turn outcome` step is the only record of how the turn ended.
 - **No redaction after save:** NAMS has no endpoint to update or delete a message. A redaction that arrives after the manager saved the message does not reach NAMS.
 
 ## Optional memory tools

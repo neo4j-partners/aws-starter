@@ -73,7 +73,7 @@ Behavior changes to accept:
 
 - **Conversation key:** The manager finds conversations by `metadata.strands_session_id`. Today the code uses `metadata.client_session_id`. Conversations from earlier retests will not be reused. The memory DB holds only retest data.
 - **Recall:** Today recall searches the messages of up to 10 other conversations of the same user. The manager instead restores the current conversation and, with `retrieval_config`, injects workspace entities into each user message. See "NAMS Memory Scope" below.
-- **Open traces:** The manager starts a reasoning trace and records each tool call, but 0.8.0 never calls `complete_trace`. Traces stay open after the turn. This is a library gap, not ours to patch through private attributes. Fixed on 2026-11-23 by the move to `0.8.0+fleet.9`, which completes the trace at the end of each turn.
+- **Open traces:** The manager starts a reasoning trace and records each tool call, but 0.8.0 never calls `complete_trace`. Traces stay open after the turn. This is a library gap, not ours to patch through private attributes. Partly addressed on 2026-11-23 by the move to `0.8.0+fleet.9`. That build ends each trace with a `turn outcome` step that records success or failure. NAMS has no endpoint to complete a trace, so the trace still stays open.
 - **Stored content:** The manager stores text turns only. Tool results are not stored as messages. This matches today.
 - **Extraction:** Extraction runs on assistant turns as well. The three "agent" Person nodes from Retest 8 may come from this. Phase 3 checks whether they keep appearing.
 
@@ -219,6 +219,13 @@ Steps 2 to 4 ran on 2026-11-23. The record is Cloud Retest 9 in `demos/aircraft-
 - **Pass:** The fourth deploy finished at 18:36Z, and its graph smoke test passed. One `./agent.sh invoke-cloud "Find circular transfer chains"` question returned HTTP 200 with `complete=true` and 11,954 bytes. Only the end of the answer was saved, so its accuracy was not checked.
 - **Teardown:** `./agent.sh destroy` removed the Runtime, both Identity credentials, and the Runtime log group. `./deploy.py --env finance cleanup` deleted the MCP stack, its log group, the shared `neo4j-mcp-server` ECR repository, and the password secret. No matching stack, Runtime, or credential provider is left in us-east-1.
 
+**fleet.9 cloud test, 2026-11-23.** After the move to `0.8.0+fleet.9` in commit 44ce0af, both stacks were deployed again in us-east-1.
+
+- **Deploy:** The deploy finished at 19:30Z, and its graph smoke test passed. The CodeZip held `neo4j_agent_memory-0.8.0+fleet.9`.
+- **Invoke:** One `./agent.sh invoke-cloud "Find circular transfer chains"` question returned HTTP 200 with `complete=true` and 11,815 bytes.
+- **Trace:** The turn's NAMS trace has 8 tool-call steps and a last `turn outcome` step. That step's thought is "The turn succeeded." and its observation is `success`. The trace's completion time, outcome, and success fields are still empty. The 18:36Z trace from 0.8.0 has no outcome step.
+- **Teardown:** `./agent.sh destroy` and `./deploy.py --env finance cleanup` ran at 19:37Z and 19:41Z. No matching stack, Runtime, or credential provider is left in us-east-1.
+
 ### Phase 11: Documentation Refresh
 
 The fraud docs have no mermaid diagrams today. They describe the system in prose and code blocks only. The fleet demo replaced its mermaid and ASCII diagrams with hand-written SVG files in `docs/images/`. The fraud demo follows the same pattern.
@@ -250,7 +257,7 @@ Progress:
 
 ## Decisions
 
-1. **Memory library:** Adopt Neo4j Agent Memory 0.8.0 from PyPI and the session manager. Accept the Phase 3 behavior changes. On 2026-11-23 the agent moved to the fleet build `0.8.0+fleet.9`, as the fleet agents did. That build completes reasoning traces. The release-age exception approved for the fleet agents now covers the fraud agent too. Only `neo4j-agent-memory` changed in the lock.
+1. **Memory library:** Adopt Neo4j Agent Memory 0.8.0 from PyPI and the session manager. Accept the Phase 3 behavior changes. On 2026-11-23 the agent moved to the fleet build `0.8.0+fleet.9`, as the fleet agents did. That build records each turn's outcome as a last trace step. NAMS still keeps the trace open. The release-age exception approved for the fleet agents now covers the fraud agent too. Only `neo4j-agent-memory` changed in the lock.
 2. **OAuth:** Keep `GatewayTokenAuth` and `core/credentials.py`, as the fleet supervisor does.
 3. **Errors:** Let every error propagate to the AgentCore app.
 4. **No user_id:** Reject the request with an error.

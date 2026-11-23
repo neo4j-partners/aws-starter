@@ -55,7 +55,7 @@ ANALYSES: dict[str, Analysis] = {
     "shared-kyc": (
         "Customers sharing a phone number or address, with their owned accounts.",
         """
-        CALL {
+        CALL () {
             MATCH (first:Customer)-[:HAS_PHONE]->(identifier:Phone)<-[:HAS_PHONE]-(second:Customer)
             WHERE first.customer_id < second.customer_id
             MATCH (first)-[:OWNS]->(first_account:Account)

@@ -1607,3 +1607,77 @@ under `/aws/bedrock-agentcore/runtimes/`, or a log group under
 `/aws/vendedlogs/bedrock-agentcore/memory/`. Two credential files
 changed during the run and were restored. All 11 backed-up local files
 match their pre-run hashes, and `.bedrock_agentcore.yaml` is absent.
+
+## Cloud Retest 9: 2026-11-23
+
+This run retested the fraud memory agent after the `fraud-fixes.md`
+work, on main `46a35ce` plus the uncommitted Phase 1 to 9 changes. The
+agent now uses the Neo4j Agent Memory 0.8.0 Strands session manager. The
+run deployed only the finance MCP server and the fraud memory agent, and
+it reused the fraud graph in Aura `709ad5c7`. Account IDs are masked.
+
+**Overall status:** PASS, with two open findings. Every Retest 8
+follow-up that this run could check passed. One answer had a wrong
+transfer count, and the idle `POST /mcp` traffic on the MCP server came
+back.
+
+- **Teardown watchdog:** A background watchdog would destroy both stacks
+  at 16:45Z if they still existed. The SSO access token expired at
+  16:59Z. The watchdog was stopped by flag after teardown and never
+  reached its deadline.
+- **Local checks:** PASS. `fraud-cli` answered against the local server.
+  A request with no user ID returned HTTP 400. In session
+  `retest9-local-1795449927`, turn 2 recalled account 3805 from turn 1
+  without a tool call. A forced NAMS failure logged a traceback at
+  `ERROR`, and the client received an error event.
+- **MCP deploy:** PASS. `./deploy.py --env finance` and
+  `./deploy.py --env finance credentials` exited 0.
+- **Agent configure:** PASS. `./agent.sh configure` printed
+  "Memory: Disabled". `.bedrock_agentcore.yaml` recorded
+  `mode: NO_MEMORY`. This closes Retest 8 follow-up 3.
+- **Agent deploy:** PASS. `./agent.sh deploy` exited 0 after 4 minutes
+  31 seconds. It created the Runtime `fraud_memory_agent-c9lDS5GK7m` and
+  no memory. The deploy smoke test passed with a 201 character answer.
+  `./agent.sh verify` passed with a 191 character answer.
+- **Turn 2 prompt:** Partial. The prompt asked for the accounts that
+  13914 transferred money to. The answer found 33 distinct recipients
+  and listed them sorted by amount. The top five rows match the graph:
+  9355, 17159, 722, 3497 with 11 transfers and $10,239.08, and 11271.
+  The answer said 206 transfers. The graph has 238.
+- **Long query:** PASS. `fraud-cli --remote "Find circular transfer
+  chains"` ran for 3 minutes 15 seconds and made 13 tool calls. One
+  4-cycle query hit the Neo4j memory limit. The agent recovered and went
+  on. The answer reported 899,179 distinct triangles. A check with
+  `WITH DISTINCT a, b, c` returned the same number. Retest 8 had
+  reported paths instead.
+- **Failure lookup:** Not exercised in the cloud. `./agent.sh logs
+  --errors` printed "No failed traces found in session", and no turn in
+  that session failed. The local forced failure covers the error path.
+- **NAMS memory:** PASS. User `retest9-analyst` had 3 conversations, one
+  per session. Each stored the user's text as typed, without the
+  `<user_context>` block. The circular-chain conversation held 1 user
+  message and 14 assistant text messages, one for each text block
+  between tool calls.
+- **MCP request noise:** FAIL. The finance MCP Runtime logged 29
+  `GET /ping` and 4608 `POST /mcp` requests in the 40 minutes before
+  teardown. The rate climbed from 2 per minute at 16:02Z to 794 per
+  minute at 16:16Z. The agent made about 20 tool calls in that window,
+  so almost all of the requests came from somewhere else.
+- **Agent destroy:** PASS. `./agent.sh destroy` exited 0 after 3 minutes
+  25 seconds. The leftover cleanup removed the CodeBuild sources S3
+  bucket, the local cache, and the Runtime log group. It printed
+  "Skipped: memory log group; the agent had no memory".
+- **MCP cleanup:** PASS. `./deploy.py --env finance cleanup` exited 0
+  after 4 minutes 20 seconds. It deleted the stack, the Runtime log
+  group, the `neo4j-mcp-server` ECR repository, and the password secret.
+
+### Follow-ups from this run
+
+1. The agent reported 206 transfers from 13914. The graph has 238.
+2. The idle `POST /mcp` traffic from Retest 8 follow-up 9 is still
+   there, and it grows over time.
+
+**Cloud resources confirmed destroyed:** After teardown, `us-east-1` has
+no CloudFormation stack, Runtime, Gateway, or log group under
+`/aws/bedrock-agentcore/runtimes/`. The only ECR repositories are the
+CDK assets repository and one unrelated repository.

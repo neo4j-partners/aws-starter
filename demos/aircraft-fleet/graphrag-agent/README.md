@@ -169,9 +169,9 @@ The deployed agent has the same `/invocations` modes as the local server.
 - **Account check:** It confirms that the active AWS credentials belong to the account recorded in `agentcore/aws-targets.json`.
 - **No stack:** When CloudFormation shows no stack, there is nothing to remove. It skips the question and the deploy and goes straight to the final check.
 - **Final check:** It asks CloudFormation whether the stack `AgentCore-AircraftFleet-default` is gone. It fails while the stack exists in any state other than `DELETE_COMPLETE`.
-- **Log groups:** The stack delete keeps the Runtime's log group, `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`. Destroy reads the Runtime ID from `agentcore/.cli/deployed-state.json` before it removes anything. After the final check passes, it deletes each log group that starts with `<runtime-id>-` and prints `Removed` or `Not found` for each. A failed delete does not stop the others, but destroy then exits 1 and names the group. When no ID is recorded, or the stack was already gone, destroy leaves the log groups alone.
+- **Log groups:** The stack delete keeps the Runtime's log group, `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`. Before it removes anything, destroy reads the Runtime ID from the stack's `AWS::BedrockAgentCore::Runtime` resource. The AgentCore CLI does not record the ID locally. After the final check passes, it deletes each log group that starts with `<runtime-id>-` and prints `Removed` or `Not found` for each. A failed delete does not stop the others, but destroy then exits 1 and names the group. When the stack has no single matching Runtime, or the stack was already gone, destroy leaves the log groups alone.
 
-If a log group delete fails, or the runtime ID was lost, remove the group by hand after the stack is gone. Use the Region from `agentcore/aws-targets.json`. The failure lines name the group, and the AWS Console lists it under CloudWatch log groups.
+If a log group delete fails, or destroy could not read the runtime ID, remove the group by hand after the stack is gone. Use the Region from `agentcore/aws-targets.json`. The failure lines name the group, and the AWS Console lists it under CloudWatch log groups.
 
 ```bash
 REGION=us-east-1

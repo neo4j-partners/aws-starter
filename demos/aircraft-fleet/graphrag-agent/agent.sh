@@ -85,8 +85,6 @@ PROJECT_SPEC="agentcore/agentcore.json"
 TARGETS_FILE="agentcore/aws-targets.json"
 # The CDK app that agentcore deploy synthesizes.
 CDK_DIR="agentcore/cdk"
-# The CLI records each deployed Runtime's ID here. Git ignores it.
-DEPLOYED_STATE="agentcore/.cli/deployed-state.json"
 # AgentCore writes each Runtime's logs to <prefix><runtime-id>-<endpoint>.
 RUNTIME_LOG_PREFIX="/aws/bedrock-agentcore/runtimes/"
 
@@ -335,29 +333,55 @@ stack_absent() {
     echo -e "${YELLOW}Stack $stack does not exist in $region, so there is nothing to remove.${NC}"
 }
 
-# Print the ID of $RUNTIME_NAME in $TARGET from the CLI's deployed state, or
-# fail. The deploy that destroy runs drops the Runtime from that file, so
-# destroy reads it first. The ID must match the AgentCore pattern, so the
-# log group prefix built from it can only match this Runtime.
+# Print the ID of $RUNTIME_NAME's Runtime from the target's CloudFormation
+# stack, or fail. CLI 1.2.0 does not record the ID in its deployed state.
+# The stack names the Runtime ApplicationRuntime<Name>Runtime<hash>: the
+# 'Application' construct in agentcore/cdk/lib/cdk-stack.ts, the
+# RuntimeEnvironment and AgentCoreRuntime construct IDs from
+# @aws/agentcore-cdk, and the 8-character hash CDK adds. Its physical ID is
+# the Runtime ARN. Exactly one resource must match, and the ID must match the
+# AgentCore pattern, so the log group prefix built from it can only match
+# this Runtime. The stack delete removes the resource, so destroy reads it
+# first. destroy calls this inside if, where set -e is off, so every step is
+# checked.
 runtime_id() {
+    local entry region stack resources
+    entry=$(target_entry) || return 1
+    read -r _ region <<<"$entry"
+    stack=$(stack_name) || return 1
+    resources=$(aws cloudformation describe-stack-resources --stack-name "$stack" \
+        --region "$region" --output json) || return 1
     uv run --quiet python -c '
 import json
 import re
 import sys
-from pathlib import Path
 
-path, target, name = sys.argv[1:4]
+name, stack = sys.argv[1:3]
+pascal = "".join(part[:1].upper() + part[1:] for part in re.split(r"[-_]", name))
+logical_id = re.compile(rf"ApplicationRuntime{pascal}Runtime[0-9A-F]{{8}}")
+id_pattern = r"[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}"
+arn = re.compile(rf"arn:aws[a-z-]*:bedrock-agentcore:[a-z0-9-]+:\d{{12}}:runtime/({id_pattern})")
 try:
-    state = json.loads(Path(path).read_text())
-    runtime_id = state["targets"][target]["resources"]["runtimes"][name]["runtimeId"]
-except (OSError, ValueError, TypeError, KeyError) as error:
-    sys.exit(f"{path} has no runtimeId for {name} in target {target}: {error!r}")
-if not isinstance(runtime_id, str) or not re.fullmatch(
-    r"[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}", runtime_id
-):
-    sys.exit(f"{path} has an invalid runtimeId for {name}: {runtime_id!r}")
-print(runtime_id)
-' "$DEPLOYED_STATE" "$TARGET" "$RUNTIME_NAME"
+    physical_ids = [
+        resource.get("PhysicalResourceId")
+        for resource in json.load(sys.stdin)["StackResources"]
+        if resource.get("ResourceType") == "AWS::BedrockAgentCore::Runtime"
+        and logical_id.fullmatch(str(resource.get("LogicalResourceId")))
+    ]
+except (ValueError, TypeError, KeyError, AttributeError) as error:
+    sys.exit(f"Could not read the resources of stack {stack}: {error!r}")
+if len(physical_ids) != 1:
+    sys.exit(f"Stack {stack} has {len(physical_ids)} Runtime resources for {name}, not 1.")
+physical_id = physical_ids[0]
+if not isinstance(physical_id, str):
+    sys.exit(f"Stack {stack} has no physical ID for the {name} Runtime.")
+if match := arn.fullmatch(physical_id):
+    print(match.group(1))
+elif re.fullmatch(id_pattern, physical_id):
+    print(physical_id)
+else:
+    sys.exit(f"Stack {stack} has an invalid Runtime ID for {name}: {physical_id!r}")
+' "$RUNTIME_NAME" "$stack" <<<"$resources"
 }
 
 # Delete the CloudWatch log groups of Runtime $1 in region $2. Neither the
@@ -615,11 +639,11 @@ case "${1:-help}" in
         # so a failed install stops with nothing changed.
         ensure_cdk_deps
         # The Runtime's log groups outlive the stack. Read its ID now, while
-        # the deployed state still records it, and delete them once the
+        # the stack still holds the Runtime, and delete them once the
         # report confirms the stack is gone.
         if ! RUNTIME_ID=$(runtime_id); then
             RUNTIME_ID=""
-            echo -e "${YELLOW}No Runtime ID is recorded, so destroy will not remove the Runtime's log groups.${NC}"
+            echo -e "${YELLOW}No Runtime ID was found in the stack, so destroy will not remove the Runtime's log groups.${NC}"
         fi
         # CLI 1.2.0 has no destroy command. A deploy of a project that
         # declares nothing removes the target's stack, so remove the Runtime

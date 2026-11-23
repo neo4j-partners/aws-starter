@@ -174,7 +174,7 @@ Recovery and diagnostics commands:
 - **Build cache:** It deletes the local `.bedrock_agentcore/fraud_memory_agent/` folder, which can hold about 50 MB. It deletes `.bedrock_agentcore/` only when nothing else is left in it.
 - **Runtime log groups:** It deletes the log groups under `/aws/bedrock-agentcore/runtimes/<runtime-id>-`, such as the `-DEFAULT` endpoint's group. The runtime ID is the `agent_id` from the config. Destroy does not wait for AgentCore to delete the Runtime, so the cleanup waits up to 10 minutes for the Runtime to disappear first. It stops at once if the Runtime reaches `DELETE_FAILED` and prints the failure reason. If the Runtime is still there, the log groups stay and `agent.sh` exits 1.
 
-It prints `Removed`, `Skipped` or `Not found` for each one. A missing resource is not an error. When destroy is cancelled or fails, the cleanup does not run. When an AWS call fails, `agent.sh` exits 1.
+It prints `Removed`, `Skipped` or `Not found` for each one. A missing resource is not an error. When destroy is cancelled or ends with errors, the cleanup does not run, and `agent.sh` prints `Destroy did not finish` and exits 3. When an AWS call fails, `agent.sh` exits 1.
 
 If the cleanup fails, remove the leftovers by hand. `destroy` has already deleted `.bedrock_agentcore.yaml`, so take the Region, memory ID and runtime ID from the `Could not remove` lines:
 

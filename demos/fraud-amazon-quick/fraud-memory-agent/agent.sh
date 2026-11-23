@@ -76,7 +76,8 @@ new_temp_file() {
 }
 
 # clean_destroy_leftovers.py exits with this when destroy did not remove the
-# agent from the config, because it was cancelled or had errors.
+# agent from the config, because it was cancelled or had errors. `destroy`
+# then exits with it too.
 DESTROY_NOT_FINISHED=3
 
 # NAMS configuration. Source it from fraud-memory-agent/.env. Read the first
@@ -410,6 +411,7 @@ case "${1:-help}" in
             echo -e "${GREEN}Cleanup complete!${NC}"
         else
             echo -e "${YELLOW}Destroy did not finish, so $AGENT_NAME is still deployed. Check the output above, then run ./agent.sh destroy again.${NC}"
+            exit "$DESTROY_NOT_FINISHED"
         fi
         ;;
 

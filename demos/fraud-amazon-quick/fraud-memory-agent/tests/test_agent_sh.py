@@ -183,7 +183,7 @@ class DestroyTests(AgentShTestCase):
         # The helper exits 3 when destroy left the agent in the config.
         result = self.destroy(STUB_UV_REMOVE="", STUB_PY_STATUS="3")
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
         self.assertNotIn("Cleanup complete!", result.stdout)
         self.assertNotIn("Some leftovers were not removed", result.stdout)
         self.assertIn(

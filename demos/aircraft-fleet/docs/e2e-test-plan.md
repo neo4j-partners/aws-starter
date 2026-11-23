@@ -1427,3 +1427,183 @@ roles, S3 buckets, log groups, ECR repositories, and secrets. All 22
 backed-up local files match their pre-run hashes. The fleet credentials
 copies and `.env.fleet.readonly` are removed. The fleet graph is
 unchanged.
+
+## Cloud Retest 8: 2026-11-23
+
+This run retested the fraud memory agent in the cloud at main `c2fe929`.
+It deployed only the finance MCP server and the fraud memory agent, and
+it reused the fraud graph in Aura `709ad5c7`. It did not run the fleet
+demo. A pre-run snapshot recorded the AWS resources in `us-east-1` and
+`us-west-2` and hashed 11 local files. Account IDs are masked.
+
+**Overall status:** PASS after a fix. The NAMS blocker from Retests 5
+and 6 is resolved. The first long query failed on a 5 second MCP read
+timeout. The user approved a transport fix, and the same prompt passed
+after a redeploy. Teardown left the account matching the pre-run
+snapshot.
+
+- **Credentials:** The AWS SSO token had expired when the run started at
+  14:04Z. The first steps used exported CLI credentials. After the user
+  ran `aws sso login`, every later step used the normal SSO credential
+  chain.
+- **Teardown watchdog:** A background watchdog would destroy the fraud
+  agent and the finance MCP stack at a deadline if they still existed.
+  It started at 14:04Z with exported credentials. At 14:23Z it restarted
+  on the SSO chain with an 18:30Z deadline. It restarted twice more, with
+  deadlines of 16:45Z and then 16:15Z. The SSO client registration
+  expires at 16:22Z, and botocore cannot refresh the token after that.
+  The watchdog never reached its deadline. It was stopped by PID after
+  teardown.
+- **MCP deploy:** PASS. `./deploy.py --env finance` exited 0 after 5
+  minutes 17 seconds. `./deploy.py --env finance credentials` exited 0.
+- **MCP Gateway tests:** PASS. All four `./cloud.sh --env finance` tool
+  tests passed. The graph reported 107491 nodes and 242720 `SIMILAR_TO`
+  relationships.
+- **Agent deploy:** PASS. `./agent.sh configure` exited 0. It answered
+  "no" to both memory prompts, but the toolkit printed "Short-term memory
+  will be enabled (default)". This carries over from the Retest 5
+  configure step. `./agent.sh deploy` exited 0 after 7 minutes 1 second.
+  It created the Runtime `fraud_memory_agent-BOmnkM8yEO` and a short-term
+  memory that the agent does not use. The deploy smoke test passed.
+  `./agent.sh verify` also passed, with a 205 character answer.
+- **First long query:** FAIL. `./agent.sh invoke-cloud "Find circular
+  transfer chains"` exited 1 after 24 seconds. It ran as NAMS user
+  `anonymous` in client session `fraud-anonymous`. The agent called
+  `get_neo4j_schema` and then `read_neo4j_cypher`. The
+  `read_neo4j_cypher` span ended after 6.2 seconds with an
+  `httpx2.ReadTimeout`. The MCP `tools/call` request inside it hit the
+  5 second read timeout at 5.0 seconds. The agent's next three tool calls failed at once
+  with `MCPClientInitializationError`. The Runtime returned "Connection
+  to the MCP server was closed". The Runtime log export
+  `rtlog-fraud-1.json` has two traceback events with the ReadTimeout.
+  Each one chains an `httpcore2` timeout to `httpx2.ReadTimeout`.
+- **Root cause:** `core/transport.py` built its own
+  `httpx2.AsyncClient` and passed it to `streamable_http_client`. That
+  client used the httpx2 default timeout of 5 seconds. MCP's own
+  `create_mcp_http_client` sets 30 seconds, and 300 seconds for SSE
+  reads, but `streamable_http_client` skips those defaults when the
+  caller passes a client. Any tool call longer than 5 seconds closed the
+  MCP session.
+- **NAMS memory turns:** PASS. Three short turns ran with
+  `uv run fraud-invoke` as user `retest8-analyst`. Turn 1 in session
+  `retest8-s1` listed the top three accounts by `risk_score`: 13914,
+  7429, and 4342. Turn 2 in the same session listed accounts that 13914
+  transferred money to. Turn 3 ran in a new session, `retest8-s2`. It
+  recalled the earlier session's question and the same three accounts.
+  A read-only NAMS API check found two conversations for the user. Each
+  carried its `client_session_id`. The `retest8-s1` conversation had 4
+  messages and 2 reasoning steps. The `retest8-s2` conversation had 2
+  messages. The memory store then held 5 conversations in all. Two came
+  from `agentcore-smoke` runs. One was the partial `anonymous`
+  conversation from the failed invoke, with 1 message and 5 reasoning
+  steps. The other two were `retest8-s1` and `retest8-s2`.
+- **Turn 2 accuracy:** The Turn 2 answer has model errors. It claimed
+  13914 sent money to 47 unique accounts. The verifier's graph check
+  found 33 distinct recipients across 238 transfers. The list was not
+  sorted by amount. The answer counted 9 transfers from 13914 to 3497.
+  The graph has 11, totaling $10,239.08.
+- **Failure lookup:** FAIL. `./agent.sh logs --errors` read the failed
+  session ID from the config. It printed "No failed traces found in
+  session", although that session's invoke had failed. The cause is in
+  `server/runtime_app.py` lines 221 to 226. The handler catches the
+  exception and yields an error event inside an HTTP 200 response. The
+  `POST /invocations` span ends with status `UNSET`, so `obs list
+  --errors` finds no failed root trace.
+- **Fix:** The user chose to let Strands build the MCP transport. The
+  fix deletes `core/transport.py`. `core/factory.py` now builds
+  `MCPClient(url=..., auth_provider=GatewayTokenAuth())`, and
+  `GatewayTokenAuth` is an `httpx.Auth` that sets the Gateway bearer
+  token on each request. Strands then builds the client with
+  `create_mcp_http_client`, which keeps the MCP timeouts. The fix adds
+  `tests/test_mcp_client.py`. It was committed as `0c62305` after the
+  redeploy. The committed `core/` and `pyproject.toml` lines match the
+  deployed diff exactly.
+- **Redeploy:** PASS. `./agent.sh deploy` exited 0 after 4 minutes 25
+  seconds. `./agent.sh verify` passed again with a 205 character answer.
+- **Long query after the fix:** PASS. `uv run fraud-invoke "Find circular
+  transfer chains"` exited 0 after 2 minutes 15 seconds, with a fresh
+  user and session. The Runtime log export `rtlog-fraud-1b.json` holds
+  Strands tool spans for six calls, in the trace whose ID ends in
+  `5e6dbe41`. `get_neo4j_schema` took 3.9 seconds. The five
+  `read_neo4j_cypher` calls took 15.2, 36.1, 36.0, 21.0, and 4.0
+  seconds. The 15 and 21 second calls returned `OK`, so calls longer
+  than 5 seconds no longer close the session. The two 36 second calls
+  ended with `gen_ai.tool.status` `error`. Each error was
+  `Neo.ClientError.Transaction.TransactionTimedOutClientConfiguration`,
+  returned by Neo4j through the MCP server as the tool result. The MCP
+  session stayed open, and the agent went on to make two more calls.
+  The `aws/spans` log group held only the
+  `AgentCore.Runtime.Invoke` span. The spans-only export `spans-1b.json`
+  held zero events. The tool timings therefore come from
+  `rtlog-fraud-1b.json`.
+- **Answer accuracy:** The independent verifier checked the invoke
+  answer against the graph. The top three chains and the first four hub
+  counts are correct, and every hub is a ring account. The fifth hub row
+  is wrong. Hannah Gilmore, account 16205, ranks 8th, and account 10660
+  is the real 5th. The answer's "cycles" counts paths, which is about 5
+  times the number of distinct triangles. The graph does not support
+  three claims: "$122K+" flowing through the hubs, a "persistent circular
+  network", and "deliberate structuring" across months. These are model
+  accuracy issues. They are not tool or transport bugs.
+- **Agent destroy:** PASS. `./agent.sh destroy` exited 0 after 3 minutes
+  28 seconds, with "Resources removed: 7, Warnings: 0, Errors: 0". It
+  removed the Runtime, the memory, and `.bedrock_agentcore.yaml`. The
+  leftover cleanup removed the CodeBuild sources S3 bucket, the memory
+  `APPLICATION_LOGS` log group, the local `.bedrock_agentcore/` cache,
+  and the log group
+  `/aws/bedrock-agentcore/runtimes/fraud_memory_agent-BOmnkM8yEO-DEFAULT`.
+- **MCP cleanup:** PASS. `./deploy.py --env finance cleanup` exited 0
+  after 4 minutes 16 seconds, with both prompts answered `y` on stdin. It
+  deleted the MCP Runtime, the stack, the Runtime log group, the
+  `neo4j-mcp-server` ECR repository, and the password secret.
+
+### Follow-ups from this run
+
+1. `./agent.sh logs --errors` reported no failed traces for a session
+   whose invoke failed. The Runtime handler returns errors inside an HTTP
+   200, so the root trace never shows a failure.
+2. The exception path in `server/runtime_app.py` does not close the NAMS
+   reasoning trace or store an assistant message. Every `invoke-cloud`
+   call without a user ID reuses the partial `anonymous` conversation.
+3. `./agent.sh configure` ignores the answer that skips short-term
+   memory, so deploy creates a memory the agent does not use. This
+   carries over from Retest 5.
+4. The Turn 2 and long-query answers have model accuracy errors. They
+   are listed above under Turn 2 accuracy and Answer accuracy. They are
+   not transport bugs.
+5. The user has queued the two hand-built MCP clients to move to
+   FastMCP. They are `neo4j-mcp-server/client/mcp_operations.py` and
+   `patterns/gateway-rbac-interceptor/client/demo.py`.
+6. `pyproject.toml` line 9 still declares `httpx2>=2.14.0`. No Python
+   file in `core/`, `server/`, `client/`, or `tests/` imports it now.
+7. Some resources were already in the pre-run snapshot, and this run
+   did not create them. In `us-east-1` they are the workload identity
+   `finance_agent-Yuwcn1Ccw3` and the Lambda log groups
+   `/aws/lambda/neo4j-mcp-server-finance-*`,
+   `/aws/lambda/neo4j-agentcore-mcp-server-finance-*`,
+   `/aws/lambda/neo4j-mcp-server-fleet-*`, and
+   `/aws/lambda/simple-neo4j-mcp-server-*`. In `us-west-2` they are the
+   `neo4j-mcp-server-*` Lambda and CodeBuild log groups and the secret
+   `neo4j-mcp/default`. The S3 bucket `neo4j-finance-demo` is also
+   pre-existing. They are outside the scope of this run and were left
+   alone.
+8. In graph-loader, the shared-KYC query in `analyze_graph` uses the
+   deprecated `CALL {` subquery scope. graph-loader has no tests.
+9. The finance MCP server logged about 180 `POST /mcp` requests per
+   minute from 14:10Z, before any agent traffic. The rate rose to about
+   360 per minute from 14:19Z to 14:25Z. Each request came with an "Error
+   in message router" traceback ending in `anyio.ClosedResourceError`.
+   The source of these requests is not known yet.
+10. The SSO client registration sets a hard limit on unattended runs.
+   Once it expires, botocore cannot refresh the token, so a watchdog
+   deadline must fall before that time.
+
+**Cloud resources confirmed destroyed:** A snapshot after both teardowns
+matches the pre-run snapshot in `us-east-1` and `us-west-2` for stacks,
+Runtimes, memories, workload identities, credential providers, Gateways,
+Cognito pools, CodeBuild projects, ECR repositories, secrets, log groups,
+IAM roles, and S3 buckets. Neither region has a Runtime, a log group
+under `/aws/bedrock-agentcore/runtimes/`, or a log group under
+`/aws/vendedlogs/bedrock-agentcore/memory/`. Two credential files
+changed during the run and were restored. All 11 backed-up local files
+match their pre-run hashes, and `.bedrock_agentcore.yaml` is absent.

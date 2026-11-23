@@ -211,6 +211,14 @@ Steps 2 to 4 ran on 2026-11-23. The record is Cloud Retest 9 in `demos/aircraft-
 - **Open:** The transfer count in Phase 6 and the `POST /mcp` traffic in Phase 8 are still open.
 - **Next:** Retest again after the OTel relock on or after 2026-11-25.
 
+**AgentCore CLI cloud test, 2026-11-23.** After the move to the AgentCore CLI, the fraud agent was deployed to us-east-1 next to the finance MCP stack. Three failures came up before it passed.
+
+- **No workload access token:** The smoke test failed with "The request has no workload access token for AgentCore Identity." A SigV4 caller gets that token only when it sends a runtime user ID. The smoke test, `invoke-cloud`, and the `fraud-cli --remote` transport now send the payload's `user_id` as the runtime user ID. The user's role already allowed `bedrock-agentcore:InvokeAgentRuntimeForUser`. Commits 68475b1 and 7f20f99.
+- **Legacy model:** Bedrock then refused Sonnet 4.5. It marks the model as Legacy, and the account had not used it in 30 days. The default moved to Sonnet 5.5. Commit 54fa1f7.
+- **Temperature:** Sonnet 5.5 rejected the request because it sets `temperature`. The agent no longer sets it. Commit 5bb37c2.
+- **Pass:** The fourth deploy finished at 18:36Z, and its graph smoke test passed. One `./agent.sh invoke-cloud "Find circular transfer chains"` question returned HTTP 200 with `complete=true` and 11,954 bytes. Only the end of the answer was saved, so its accuracy was not checked.
+- **Teardown:** `./agent.sh destroy` removed the Runtime, both Identity credentials, and the Runtime log group. `./deploy.py --env finance cleanup` deleted the MCP stack, its log group, the shared `neo4j-mcp-server` ECR repository, and the password secret. No matching stack, Runtime, or credential provider is left in us-east-1.
+
 ### Phase 11: Documentation Refresh
 
 The fraud docs have no mermaid diagrams today. They describe the system in prose and code blocks only. The fleet demo replaced its mermaid and ASCII diagrams with hand-written SVG files in `docs/images/`. The fraud demo follows the same pattern.

@@ -1674,8 +1674,13 @@ back.
 ### Follow-ups from this run
 
 1. The agent reported 206 transfers from 13914. The graph has 238.
+   **Status:** The fraud agent now defaults to Sonnet 5.5. The next
+   retest checks the count.
 2. The idle `POST /mcp` traffic from Retest 8 follow-up 9 is still
    there, and it grows over time.
+   **Status:** Fixed in 263fad9. The MCP server Runtime now has a
+   60-second idle session timeout. A cloud check on 2026-11-23 showed
+   each session ending after about 64 seconds.
 
 **Cloud resources confirmed destroyed:** After teardown, `us-east-1` has
 no CloudFormation stack, Runtime, Gateway, or log group under

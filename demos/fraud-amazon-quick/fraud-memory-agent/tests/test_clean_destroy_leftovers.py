@@ -85,7 +85,29 @@ class CleanLeftoversTests(unittest.TestCase):
         return agent_cache
 
     def run_clean(self, agent: dict) -> tuple[list[str], list[str]]:
-        return clean.clean_leftovers(agent, AGENT, self.cache_dir, self.clients)
+        """Run the cleanup and keep what it prints in self.stdout."""
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            result = clean.clean_leftovers(agent, AGENT, self.cache_dir, self.clients)
+        self.stdout = stdout.getvalue()
+        return result
+
+    def test_the_runtime_wait_is_announced_before_polling(self) -> None:
+        def get_agent_runtime(agentRuntimeId: str) -> None:
+            # The message must already be out when the first poll happens.
+            self.assertIn(
+                f"Waiting for Runtime {RUNTIME_ID} to be deleted (up to 10 minutes)...",
+                printed.getvalue(),
+            )
+            raise client_error("ResourceNotFoundException")
+
+        self.clients.control.get_agent_runtime.side_effect = get_agent_runtime
+        printed = io.StringIO()
+
+        with contextlib.redirect_stdout(printed):
+            clean.clean_leftovers(agent_config(), AGENT, self.cache_dir, self.clients)
+
+        self.clients.control.get_agent_runtime.assert_called_once_with(agentRuntimeId=RUNTIME_ID)
 
     def test_all_four_leftovers_are_removed(self) -> None:
         self.make_agent_cache()

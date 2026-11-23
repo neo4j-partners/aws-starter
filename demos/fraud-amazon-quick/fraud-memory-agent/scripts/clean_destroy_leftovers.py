@@ -123,6 +123,12 @@ def remove_memory_log_group(logs, memory: dict) -> str:
 
 def runtime_is_gone(control, runtime_id: str) -> bool:
     """Wait for the runtime to disappear. Return False if it outlasts the timeout."""
+    # Say so up front, so a long wait does not look like a hang.
+    print(
+        f"Waiting for Runtime {runtime_id} to be deleted "
+        f"(up to {RUNTIME_DELETE_TIMEOUT // 60} minutes)...",
+        flush=True,
+    )
     deadline = time.monotonic() + RUNTIME_DELETE_TIMEOUT
     while True:
         try:

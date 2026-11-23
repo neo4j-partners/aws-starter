@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="820" viewBox="0 0 1600 820" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Fraud Graph Data Model</title>
+  <desc>Customers own accounts and link to phone numbers and addresses. Accounts transact with merchants and transfer money to other accounts. GDS enrichment adds risk, community, and centrality properties and SIMILAR_TO relationships.</desc>
+  <style>
+    .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
+    .sub { font-size: 17px; fill: #5C6470; }
+    .t { font-size: 19px; font-weight: 700; }
+    .s { font-size: 14px; fill: #475467; }
+    .m { font-size: 13px; fill: #475467; font-family: Menlo, Consolas, monospace; }
+    .lbl { font-size: 13px; font-weight: 600; fill: #344054; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="820" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" class="h1">Fraud Graph Data Model</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">Nodes and relationships after fraud-graph-load and fraud-graph-enrich.</text>
+  <rect x="80" y="140" width="380" height="190" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="270" y="174" text-anchor="middle" class="t" fill="#8A4B08">Customer</text>
+  <text x="270" y="198" text-anchor="middle" class="s">customer_id</text>
+  <text x="270" y="220" text-anchor="middle" class="s">name</text>
+  <text x="270" y="242" text-anchor="middle" class="s">email</text>
+  <rect x="80" y="470" width="170" height="100" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="165" y="504" text-anchor="middle" class="t" fill="#8A4B08">Phone</text>
+  <text x="165" y="528" text-anchor="middle" class="s">number</text>
+  <rect x="290" y="470" width="170" height="100" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="375" y="504" text-anchor="middle" class="t" fill="#8A4B08">Address</text>
+  <text x="375" y="528" text-anchor="middle" class="s">address</text>
+  <rect x="600" y="140" width="440" height="300" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="820" y="174" text-anchor="middle" class="t" fill="#1E3A5F">Account</text>
+  <text x="820" y="198" text-anchor="middle" class="s">account_id, account_hash, account_name</text>
+  <text x="820" y="220" text-anchor="middle" class="s">account_type, region, balance</text>
+  <text x="820" y="242" text-anchor="middle" class="s">opened_date, holder_age</text>
+  <line x1="630" y1="300" x2="1010" y2="300" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="820" y="328" text-anchor="middle" class="lbl" fill="#1E3A5F">GDS properties (fraud-graph-enrich)</text>
+  <text x="820" y="354" text-anchor="middle" class="s">risk_score, community_id</text>
+  <text x="820" y="378" text-anchor="middle" class="s">betweenness_centrality</text>
+  <rect x="1260" y="140" width="280" height="150" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1400" y="174" text-anchor="middle" class="t" fill="#00594A">Merchant</text>
+  <text x="1400" y="198" text-anchor="middle" class="s">merchant_id</text>
+  <text x="1400" y="220" text-anchor="middle" class="s">merchant_name</text>
+  <text x="1400" y="242" text-anchor="middle" class="s">category, region</text>
+  <path d="M460,235 L592,235" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="505.2" y="210" width="41.6" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="526" y="225" text-anchor="middle" class="lbl">OWNS</text>
+  <path d="M165,330 L165,462" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="125.7" y="387" width="78.6" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="165" y="402" text-anchor="middle" class="lbl">HAS_PHONE</text>
+  <path d="M375,330 L375,462" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="328.3" y="387" width="93.4" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="375" y="402" text-anchor="middle" class="lbl">HAS_ADDRESS</text>
+  <path d="M1040,215 L1252,215" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1088.5" y="190" width="123.0" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1150" y="205" text-anchor="middle" class="lbl">TRANSACTED_WITH</text>
+  <text x="1150" y="244" text-anchor="middle" class="m">txn_id, amount,</text>
+  <text x="1150" y="262" text-anchor="middle" class="m">txn_timestamp, txn_hour</text>
+  <path d="M660,440 C660,560 800,560 800,448" fill="none" stroke="#7A5AF8" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-purple)"/>
+  <rect x="664.8" y="571" width="130.4" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="730" y="586" text-anchor="middle" class="lbl">SIMILAR_TO (GDS)</text>
+  <text x="730" y="608" text-anchor="middle" class="m">similarity_score</text>
+  <path d="M860,440 C860,560 1000,560 1000,448" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="872.2" y="571" width="115.6" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="930" y="586" text-anchor="middle" class="lbl">TRANSFERRED_TO</text>
+  <text x="930" y="608" text-anchor="middle" class="m">link_id, amount,</text>
+  <text x="930" y="626" text-anchor="middle" class="m">transfer_timestamp</text>
+  <rect x="1180" y="360" width="360" height="210" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1360" y="394" text-anchor="middle" class="t" fill="#4A2EB0">GDS enrichment</text>
+  <text x="1360" y="418" text-anchor="middle" class="s">risk_score: PageRank</text>
+  <text x="1360" y="440" text-anchor="middle" class="s">community_id: Louvain</text>
+  <text x="1360" y="462" text-anchor="middle" class="s">betweenness_centrality</text>
+  <text x="1360" y="484" text-anchor="middle" class="s">SIMILAR_TO: nodeSimilarity,</text>
+  <text x="1360" y="506" text-anchor="middle" class="s">Jaccard, topK 10</text>
+  <rect x="80" y="690" width="1460" height="90" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="810" y="722" text-anchor="middle" class="t" fill="#344054">Shared identifiers</text>
+  <text x="810" y="746" text-anchor="middle" class="s">Customers that share a Phone or Address are the ring signal behind the shared-kyc analysis.</text>
+</svg>

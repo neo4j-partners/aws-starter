@@ -11,6 +11,8 @@ Agent queries this graph through the Neo4j MCP server.
 - **Analysis:** A read-only command runs fraud investigation queries and prints the results.
 - **Fraud rings:** The file [ground_truth.json](../data/ground_truth.json) lists the fraud rings planted in the data.
 
+![Fraud graph data model: customers own accounts, accounts transact with merchants and transfer to accounts, and GDS adds risk, community, and similarity](../docs/images/data-model.svg)
+
 ## Quick start
 
 ```bash

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>NAMS Memory Lifecycle</title>
+  <desc>The session manager restores a session's earlier turns, prefixes each user turn with matching workspace entities, records MCP tool calls as reasoning steps, and saves the turn when the stream closes. Every holder of the workspace API key shares its conversations and entities. user_id is metadata, not isolation.</desc>
+  <style>
+    .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
+    .sub { font-size: 17px; fill: #5C6470; }
+    .t { font-size: 19px; font-weight: 700; }
+    .s { font-size: 14px; fill: #475467; }
+    .m { font-size: 13px; fill: #475467; font-family: Menlo, Consolas, monospace; }
+    .lbl { font-size: 13px; font-weight: 600; fill: #344054; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="880" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" class="h1">NAMS Memory Lifecycle</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">Neo4jSessionManager maps each session_id to one NAMS conversation. The workspace is the access boundary.</text>
+  <rect x="40" y="120" width="1520" height="720" rx="20" fill="#FFFFFF" fill-opacity="0.6" stroke="#C11574" stroke-width="2" stroke-dasharray="9 6"/>
+  <text x="62" y="150" text-anchor="start" class="lbl" fill="#851651" font-size="15">NAMS workspace (MEMORY_WORKSPACE_ID): everyone with its API key shares all of it</text>
+  <rect x="80" y="180" width="420" height="300" rx="14" fill="#FFFFFF" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="100" y="214" text-anchor="start" class="t" fill="#851651">Conversations</text>
+  <rect x="100" y="230" width="380" height="64" rx="10" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="120" y="257" text-anchor="start" class="m" fill="#851651">session fraud-3f2a...</text>
+  <text x="120" y="280" text-anchor="start" class="s">user_id=analyst-1 (tag only)</text>
+  <rect x="100" y="308" width="380" height="64" rx="10" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="120" y="335" text-anchor="start" class="m" fill="#851651">session investigation-42</text>
+  <text x="120" y="358" text-anchor="start" class="s">user_id=analyst-1 (tag only)</text>
+  <rect x="100" y="386" width="380" height="64" rx="10" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
+  <text x="120" y="413" text-anchor="start" class="m" fill="#851651">session fraud-91c0...</text>
+  <text x="120" y="436" text-anchor="start" class="s">user_id=analyst-2 (tag only)</text>
+  <rect x="560" y="520" width="420" height="150" rx="14" fill="#FFFFFF" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="770" y="554" text-anchor="middle" class="t" fill="#851651">Messages + reasoning steps</text>
+  <text x="770" y="578" text-anchor="middle" class="s">user and assistant text turns</text>
+  <text x="770" y="600" text-anchor="middle" class="s">MCP tool calls (record_tool_calls)</text>
+  <text x="770" y="622" text-anchor="middle" class="s">scoped to one conversation</text>
+  <rect x="80" y="520" width="420" height="150" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="290" y="554" text-anchor="middle" class="t" fill="#4A2EB0">Entities</text>
+  <text x="290" y="578" text-anchor="middle" class="s">extracted on the NAMS server</text>
+  <text x="290" y="600" text-anchor="middle" class="s">shared across the workspace</text>
+  <text x="290" y="622" text-anchor="middle" class="s">may trail the turn that made them</text>
+  <path d="M560,595 L508,595" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="502.1" y="567" width="63.8" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="534" y="582" text-anchor="middle" class="lbl">extract</text>
+  <rect x="1040" y="180" width="480" height="490" rx="14" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1060" y="214" text-anchor="start" class="t" fill="#1E3A5F">One request</text>
+  <rect x="1060" y="230" width="440" height="56" rx="10" fill="#EEF4FB" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="1080" y="254" text-anchor="start" class="m" fill="#1E3A5F">for_nams(session_id, user_id)</text>
+  <text x="1080" y="275" text-anchor="start" class="s">open the session</text>
+  <rect x="1060" y="300" width="440" height="56" rx="10" fill="#EEF4FB" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="1080" y="324" text-anchor="start" class="m" fill="#1E3A5F">restore</text>
+  <text x="1080" y="345" text-anchor="start" class="s">earlier turns of this session_id</text>
+  <rect x="1060" y="370" width="440" height="56" rx="10" fill="#EEF4FB" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="1080" y="394" text-anchor="start" class="m" fill="#1E3A5F">retrieve</text>
+  <text x="1080" y="415" text-anchor="start" class="s">top 5 entities that match the prompt</text>
+  <rect x="1060" y="440" width="440" height="56" rx="10" fill="#EEF4FB" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="1080" y="464" text-anchor="start" class="m" fill="#1E3A5F">prefix</text>
+  <text x="1080" y="485" text-anchor="start" class="s">&lt;user_context&gt; block on the user turn</text>
+  <rect x="1060" y="510" width="440" height="56" rx="10" fill="#EEF4FB" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="1080" y="534" text-anchor="start" class="m" fill="#1E3A5F">record</text>
+  <text x="1080" y="555" text-anchor="start" class="s">each MCP tool call as a reasoning step</text>
+  <rect x="1060" y="580" width="440" height="56" rx="10" fill="#EEF4FB" stroke="#B9CDE6" stroke-width="1.5"/>
+  <text x="1080" y="604" text-anchor="start" class="m" fill="#1E3A5F">close()</text>
+  <text x="1080" y="625" text-anchor="start" class="s">save the turn and flush</text>
+  <path d="M1052,327 L508,327" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="696.3" y="302" width="167.4" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="780" y="317" text-anchor="middle" class="lbl">restore earlier turns</text>
+  <path d="M440,520 L440,500 L1020,500 L1020,397 L1052,397" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="711.1" y="475" width="137.8" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="780" y="490" text-anchor="middle" class="lbl">matching entities</text>
+  <path d="M1052,545 L988,545" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <path d="M1052,615 L988,615" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <rect x="80" y="720" width="1440" height="90" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="800" y="752" text-anchor="middle" class="t" fill="#344054">Boundary rule</text>
+  <text x="800" y="776" text-anchor="middle" class="s">Use one NAMS workspace per trust boundary. user_id labels who asked; it does not stop another key holder from reading.</text>
+</svg>

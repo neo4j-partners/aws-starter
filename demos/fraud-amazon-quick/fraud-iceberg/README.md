@@ -12,6 +12,8 @@ Athena and Amazon Quick can then query the tables with SQL.
 - **Ground truth:** Separate answer-key tables mark the fraud accounts and rings. Keep them out of the graph and use them only to check graph results.
 - **Graph analysis:** The [`demos/fraud-amazon-quick/graph-loader/`](../graph-loader/) project loads Neo4j and runs the fraud queries. This folder only loads Iceberg.
 
+![Fraud investigation architecture: the dataset feeds the Iceberg loaders, whose tables Athena queries, and the graph loader, which fills Neo4j](../docs/images/architecture.svg)
+
 ## Quick start
 
 Run from `demos/fraud-amazon-quick/fraud-iceberg/`. Each script declares its

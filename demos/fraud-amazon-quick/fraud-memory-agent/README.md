@@ -7,11 +7,14 @@ turn in the hosted Neo4j Agent Memory Service.
 ## Overview
 
 - **Graph access:** The agent calls Neo4j MCP tools through the AgentCore Gateway. It never connects to Neo4j directly.
-- **NAMS:** The Neo4j Agent Memory Service, called **NAMS** below, stores each user and assistant turn. It also extracts entities and records MCP tool calls as reasoning traces.
+- **NAMS:** The Neo4j Agent Memory Service, called **NAMS** below, holds the agent's memory. The agent reaches it through `Neo4jSessionManager` from `neo4j-agent-memory` 0.8.0.
+- **Sessions:** Each `session_id` is one NAMS conversation. A call that repeats a `session_id` restores that conversation's earlier turns.
 - **Separate stores:** The fraud graph and agent memory stay apart. The MCP server owns graph access. NAMS owns memory storage, embeddings, and its schema.
 - **Credentials:** The agent needs no `NEO4J_*` values. It needs a NAMS API key and the Gateway credentials file `.mcp-credentials.json`.
 - **Local and cloud:** You can run the agent locally on port 7020 or deploy it to AgentCore Runtime with `agent.sh`.
 - **Traffic generator:** A load client sends synthetic analyst traffic so you can inspect memory in NAMS.
+
+![Agent request flow: validate the request, open the NAMS session, build the agent, stream the turn, then release MCP and memory](../docs/images/agent-request-flow.svg)
 
 ## Quick start
 
@@ -37,37 +40,40 @@ uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Termina
 - **AWS credentials:** Your AWS credentials need access to the configured Bedrock model.
 - **NAMS API key:** You can create a key at [NAMS](https://memory.neo4jlabs.com/).
 
-## What NAMS captures
+## How memory works
 
-Each call to the agent stores its turn in a NAMS conversation. A call that
-omits `session_id` creates a new conversation. A call that repeats a
-`session_id` for the same `user_id` continues that conversation. The
-conversation is tagged with the request's `user_id` and `session_id`.
+![NAMS memory lifecycle: each session_id maps to one conversation inside a shared workspace](../docs/images/memory-lifecycle.svg)
 
-- **Messages:** NAMS saves the text messages when the turn completes.
-- **Entities:** NAMS extracts entities on the server side.
-- **Reasoning traces:** NAMS saves each MCP tool call as a reasoning trace.
-- **Conversation ID:** NAMS assigns the stored conversation UUID. The agent keeps `session_id` as metadata, so you can group load runs in the NAMS workspace.
+The agent passes a `Neo4jSessionManager` to the Strands `Agent`. The session
+manager reads `MEMORY_API_KEY`, `MEMORY_ENDPOINT`, and `MEMORY_WORKSPACE_ID`
+from the environment.
 
-## What the agent recalls
+- **Conversations:** Each `session_id` maps to one NAMS conversation. A call without a `session_id` starts a new conversation named `fraud-<uuid hex>`. A call that repeats a `session_id` continues that conversation.
+- **Session restore:** When a call continues a session, the session manager loads the earlier turns into the Strands message history. The model sees them as real turns.
+- **Messages:** NAMS stores the user and assistant text turns. The session manager saves the turn when the response stream closes.
+- **Reasoning steps:** NAMS records each MCP tool call as a reasoning step in the conversation.
+- **Entities:** NAMS extracts entities from the stored messages on the server. An entity can appear a little after the turn that produced it.
+- **Entity context:** Before each user turn, the session manager finds the five workspace entities that best match the question. It adds them to the user message in a `<user_context>` block. The system prompt tells the model to treat the block as background data and to check facts against the graph.
+- **Failures:** A failure to open the session or to store a message fails the request. The runtime logs the traceback at `ERROR`, marks the trace span `ERROR`, and sends an error event to the client.
+- **Soft failures:** The session manager logs a warning and goes on when entity retrieval or tool-call recording fails. The turn then runs without the `<user_context>` block or without those reasoning steps.
 
-Before each turn, the agent reads back the caller's own memory and adds it to
-the system prompt as background data.
+### The workspace is the access boundary
 
-- **This session:** When the call continues a session, NAMS returns that conversation's reflections, observations, and recent messages.
-- **Earlier sessions:** The agent searches the user's ten most recent other conversations for messages that match the question. Past answers are recalled this way, because the assistant reply is stored as a message.
-- **User filter:** Recall reads only conversations that belong to the request's `user_id`. NAMS entity search has no user filter, so the agent does not use it. This keeps a shared NAMS workspace safe for synthetic multi-user load runs.
-- **Anonymous calls:** A call without a `user_id` gets no recall, because every anonymous caller shares one NAMS user.
-- **Failures:** If a NAMS read fails, the agent logs a warning and answers without that part of the recall.
-- **Extraction lag:** Reflections and observations come from NAMS server-side processing, so they can trail the turn that produced them. Recent messages are available right away.
+NAMS separates data by workspace, not by user.
+
+- **Shared reads:** Everyone who holds the workspace API key can read all of its conversations and entities.
+- **User tag:** The agent tags each conversation with the request's `user_id`. The tag records who asked. It does not stop another key holder from reading the conversation.
+- **Shared entities:** Entity context comes from the whole workspace. Entities from one analyst's investigation can appear in another analyst's `<user_context>` block.
+- **Separate workspaces:** Use one workspace for each trust boundary, such as a team or a tenant. Give each deployment the API key and `MEMORY_WORKSPACE_ID` for its own workspace.
 
 ### Optional memory tools
 
 Set `MEMORY_TOOLS=true` to also give the agent the NAMS Strands tools
 (`search_context`, `set_entity_feedback`, `get_entity_provenance`, and a
-read-only `cypher_query`). The agent decides when to call them. These tools
-search the whole NAMS workspace, not only the current user's memory, so leave
-the flag off in a shared workspace. They also ignore `MEMORY_WORKSPACE_ID`.
+read-only `cypher_query`). The agent decides when to call them. Like entity
+context, these tools search the whole NAMS workspace. They use the same
+`MEMORY_API_KEY`, `MEMORY_ENDPOINT`, and `MEMORY_WORKSPACE_ID` as the session
+manager.
 
 ## Fraud graph dataset
 
@@ -126,7 +132,8 @@ uv run fraud-invoke --local memory-demo   # two turns in one session
 ```
 
 - **`MEMORY_API_KEY`:** This key is required. Without it, every request returns an error.
-- **`MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`:** These values are optional. Set them for a private or staging NAMS deployment.
+- **`MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`:** These values are optional. Set `MEMORY_ENDPOINT` for a private or staging NAMS deployment. Set `MEMORY_WORKSPACE_ID` to pick the workspace.
+- **`FRAUD_USER_ID`:** This value is optional. `./agent.sh invoke-cloud` sends it as the `user_id`. The default is `demo-user`, the same default as `fraud-cli`.
 - **`MEMORY_TOOLS`:** This value is optional. Set it to `true` to add the NAMS memory tools. It is off by default. `agent.sh deploy` passes it to the runtime when you set it.
 - **`MODEL_ID`:** This value is optional. The default is `global.anthropic.claude-haiku-4-5-20251001-v1:0`.
 - **`AWS_REGION`:** This value is optional. The default is `us-west-2`.
@@ -170,7 +177,7 @@ Recovery and diagnostics commands:
 `agentcore destroy` leaves four things behind. `./agent.sh destroy` removes them after destroy finishes:
 
 - **Source bucket:** It deletes the S3 bucket `bedrock-agentcore-codebuild-sources-<account>-<region>` only when the bucket is empty. Every toolkit agent in that account and Region shares it.
-- **Memory log group:** It deletes `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` only when the toolkit created the memory. Destroy keeps a pre-existing memory, so its log group stays too.
+- **Memory log group:** It deletes `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` only when the toolkit created the memory. Destroy keeps a pre-existing memory, so its log group stays too. `./agent.sh configure` passes `--disable-memory`, because the agent's memory is NAMS. A config made that way has no AgentCore memory, so this step prints `Skipped`.
 - **Build cache:** It deletes the local `.bedrock_agentcore/fraud_memory_agent/` folder, which can hold about 50 MB. It deletes `.bedrock_agentcore/` only when nothing else is left in it.
 - **Runtime log groups:** It deletes the log groups under `/aws/bedrock-agentcore/runtimes/<runtime-id>-`, such as the `-DEFAULT` endpoint's group. The runtime ID is the `agent_id` from the config. Destroy does not wait for AgentCore to delete the Runtime, so the cleanup waits up to 10 minutes for the Runtime to disappear first. It stops at once if the Runtime reaches `DELETE_FAILED` and prints the failure reason. If the Runtime is still there, the log groups stay and `agent.sh` exits 1.
 
@@ -267,32 +274,28 @@ payload:
 }
 ```
 
-`session_id` is optional. Without it, the runtime uses `fraud-<user_id>` as
-the ID and stores it in the conversation metadata.
+- **`prompt`:** This field is required. The runtime also accepts `message`, `query`, or `input` in its place.
+- **`user_id`:** This field is required. The runtime also accepts `actor_id` in its place. The value tags the NAMS conversation. It does not isolate memory. See [The workspace is the access boundary](#the-workspace-is-the-access-boundary).
+- **`session_id`:** This field is optional. Without it, the runtime starts a new conversation named `fraud-<uuid hex>`. Send the same `session_id` on each call to continue a conversation.
+- **Rejected requests:** A request without a prompt or a `user_id` gets HTTP 400 before the stream starts.
+
+Every bundled client sends a `user_id`. `fraud-cli` and `./agent.sh test`
+send `demo-user` unless you pass `--user-id`. `./agent.sh invoke-cloud`
+sends `FRAUD_USER_ID`.
+
+The response is a stream of server-sent events:
+
+- **`chunk`:** The event `{"type": "chunk", "data": "..."}` carries answer text as it streams.
+- **`tool`:** The event `{"type": "tool", "name": "..."}` arrives once for each MCP tool use.
+- **`complete`:** The event `{"type": "complete"}` follows the last chunk.
+- **Error:** The event `{"error": "...", "error_type": "...", "message": "..."}` reports a failure. `fraud-cli` prints it. `./agent.sh invoke-cloud` exits 1 when it sees it.
 
 ## Architecture
 
-```text
-client.traffic / client.cli
-          |
-          v
-Bedrock AgentCore Runtime
-  |                     |
-  |                     +--> NAMS
-  |                          messages, entities, reasoning traces
-  v
-AgentCore Gateway --> Neo4j MCP server --> fraud graph
-```
+![Fraud investigation architecture: the agent reaches the graph through the AgentCore Gateway and stores memory in NAMS](../docs/images/architecture.svg)
 
-NAMS and the fraud graph share no credentials and no database connection.
-
-## Limitation: no session recall yet
-
-The newer Neo4j Agent Memory docs describe a Strands `Neo4jSessionManager`.
-It saves a conversation and restores it when an agent reuses a session ID.
-The released `neo4j-agent-memory` 0.5.0 package used here does not export that
-API, so this agent does not use it.
-
-- **What the agent does:** The agent stores `session_id` as metadata and records the prompt, response, and MCP tool calls. It finds and continues a session by that metadata and recalls the user's earlier turns with the NAMS calls described in [What the agent recalls](#what-the-agent-recalls).
-- **What the agent does not do:** The agent does not restore the Strands message history of a session. Recalled memory reaches the model as text in the system prompt.
-- **Upgrade path:** `Neo4jSessionManager` would restore the Strands history itself. Use it after you upgrade to a release that exports it.
+The agent reaches the fraud graph only through the AgentCore Gateway and the
+Neo4j MCP server. NAMS and the fraud graph share no credentials and no
+database connection. See
+[Deployment topology](../docs/images/deployment-topology.svg) for the AWS
+resources each deploy step creates.

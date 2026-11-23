@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="860" viewBox="0 0 1600 860" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Fraud Investigation Architecture</title>
+  <desc>The data CSVs load into a Neo4j fraud graph through the graph loader and into Iceberg tables through the Iceberg loaders. The fraud memory agent and Amazon Quick reach the graph through the AgentCore Gateway and the Neo4j MCP server. The agent stores its memory in NAMS.</desc>
+  <style>
+    .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
+    .sub { font-size: 17px; fill: #5C6470; }
+    .t { font-size: 19px; font-weight: 700; }
+    .s { font-size: 14px; fill: #475467; }
+    .m { font-size: 13px; fill: #475467; font-family: Menlo, Consolas, monospace; }
+    .lbl { font-size: 13px; font-weight: 600; fill: #344054; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="860" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" class="h1">Fraud Investigation Architecture</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">One synthetic dataset feeds a Neo4j graph and Iceberg tables. Agents read the graph only through MCP.</text>
+  <rect x="60" y="150" width="260" height="150" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="190" y="184" text-anchor="middle" class="t" fill="#344054">data/</text>
+  <text x="190" y="208" text-anchor="middle" class="s">accounts, customers, merchants</text>
+  <text x="190" y="230" text-anchor="middle" class="s">transactions, account_links</text>
+  <text x="190" y="252" text-anchor="middle" class="s">ground_truth.json</text>
+  <rect x="60" y="380" width="260" height="150" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="190" y="414" text-anchor="middle" class="t" fill="#00594A">Graph loader</text>
+  <text x="190" y="438" text-anchor="middle" class="s">fraud-graph-load</text>
+  <text x="190" y="460" text-anchor="middle" class="s">fraud-graph-enrich (GDS)</text>
+  <text x="190" y="482" text-anchor="middle" class="s">fraud-graph-analyze</text>
+  <path d="M190,300 L190,372" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="154.4" y="327" width="71.2" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="190" y="342" text-anchor="middle" class="lbl">CSV rows</text>
+  <rect x="60" y="610" width="260" height="170" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="190" y="644" text-anchor="middle" class="t" fill="#00594A">Neo4j fraud graph</text>
+  <text x="190" y="668" text-anchor="middle" class="s">Account, Customer, Merchant</text>
+  <text x="190" y="690" text-anchor="middle" class="s">Phone, Address</text>
+  <text x="190" y="712" text-anchor="middle" class="s">risk_score, community_id</text>
+  <text x="190" y="734" text-anchor="middle" class="s">SIMILAR_TO</text>
+  <path d="M190,530 L190,602" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="143.3" y="557" width="93.4" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="190" y="572" text-anchor="middle" class="lbl">Bolt driver</text>
+  <rect x="400" y="150" width="280" height="150" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="540" y="184" text-anchor="middle" class="t" fill="#8A4B08">Iceberg loaders</text>
+  <text x="540" y="208" text-anchor="middle" class="s">write_finance_iceberg.py</text>
+  <text x="540" y="230" text-anchor="middle" class="s">write_finance_s3_tables.py</text>
+  <path d="M320,225 L392,225" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="400" y="380" width="280" height="150" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="540" y="414" text-anchor="middle" class="t" fill="#8A4B08">S3 + Glue or S3 Tables</text>
+  <text x="540" y="438" text-anchor="middle" class="s">Apache Iceberg tables</text>
+  <text x="540" y="460" text-anchor="middle" class="s">source + ground-truth tables</text>
+  <path d="M540,300 L540,372" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="508.1" y="327" width="63.8" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="540" y="342" text-anchor="middle" class="lbl">PyArrow</text>
+  <rect x="400" y="610" width="280" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="540" y="644" text-anchor="middle" class="t" fill="#8A4B08">Amazon Athena</text>
+  <text x="540" y="668" text-anchor="middle" class="s">SQL over the Glue tables</text>
+  <text x="540" y="690" text-anchor="middle" class="s">query_finance_athena.py</text>
+  <path d="M540,530 L540,602" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="760" y="120" width="400" height="690" rx="20" fill="#FFFFFF" fill-opacity="0.6" stroke="#2E6DB4" stroke-width="2" stroke-dasharray="9 6"/>
+  <text x="782" y="150" text-anchor="start" class="lbl" fill="#1E3A5F" font-size="15">AWS: neo4j-mcp-server CDK stack (finance env)</text>
+  <rect x="800" y="170" width="320" height="120" rx="14" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="960" y="204" text-anchor="middle" class="t" fill="#1E3A5F">Amazon Cognito</text>
+  <text x="960" y="228" text-anchor="middle" class="s">client_credentials grant</text>
+  <text x="960" y="250" text-anchor="middle" class="s">issues the agent JWT</text>
+  <rect x="800" y="340" width="320" height="150" rx="14" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="960" y="374" text-anchor="middle" class="t" fill="#1E3A5F">AgentCore Gateway</text>
+  <text x="960" y="398" text-anchor="middle" class="s">validates the JWT</text>
+  <text x="960" y="420" text-anchor="middle" class="s">tools named</text>
+  <text x="960" y="442" text-anchor="middle" class="s">&lt;target&gt;___&lt;tool&gt;</text>
+  <rect x="800" y="560" width="320" height="170" rx="14" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="960" y="594" text-anchor="middle" class="t" fill="#1E3A5F">Neo4j MCP server</text>
+  <text x="960" y="618" text-anchor="middle" class="s">AgentCore Runtime, port 8000</text>
+  <text x="960" y="640" text-anchor="middle" class="s">get_neo4j_schema</text>
+  <text x="960" y="662" text-anchor="middle" class="s">read_neo4j_cypher</text>
+  <text x="960" y="684" text-anchor="middle" class="s">password from Secrets Manager</text>
+  <path d="M960,490 L960,552" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="876.3" y="513" width="167.4" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="960" y="528" text-anchor="middle" class="lbl">OAuth2 provider token</text>
+  <path d="M800,700 L720,700 L720,805 L190,805 L190,788" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="382.4" y="795" width="145.2" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="455" y="810" text-anchor="middle" class="lbl">Cypher (read-only)</text>
+  <rect x="1240" y="170" width="300" height="190" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1390" y="204" text-anchor="middle" class="t" fill="#4A2EB0">Fraud memory agent</text>
+  <text x="1390" y="228" text-anchor="middle" class="s">Strands Agent</text>
+  <text x="1390" y="250" text-anchor="middle" class="s">Bedrock Claude Haiku 4.5</text>
+  <text x="1390" y="272" text-anchor="middle" class="s">local :7020 or</text>
+  <text x="1390" y="294" text-anchor="middle" class="s">AgentCore Runtime :8080</text>
+  <rect x="1240" y="430" width="300" height="140" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1390" y="464" text-anchor="middle" class="t" fill="#851651">NAMS</text>
+  <text x="1390" y="488" text-anchor="middle" class="s">Neo4j Agent Memory Service</text>
+  <text x="1390" y="510" text-anchor="middle" class="s">conversations, entities,</text>
+  <text x="1390" y="532" text-anchor="middle" class="s">reasoning traces</text>
+  <rect x="1240" y="640" width="300" height="130" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1390" y="674" text-anchor="middle" class="t" fill="#4A2EB0">Amazon Quick</text>
+  <text x="1390" y="698" text-anchor="middle" class="s">remote MCP connector</text>
+  <text x="1390" y="720" text-anchor="middle" class="s">Bearer token header</text>
+  <path d="M1240,210 L1128,226" fill="none" stroke="#7A5AF8" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-purple)"/>
+  <rect x="1159.5" y="191" width="49.0" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1184" y="206" text-anchor="middle" class="lbl">token</text>
+  <path d="M1240,300 L1128,408" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="1144.7" y="347" width="78.6" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1184" y="362" text-anchor="middle" class="lbl">MCP + JWT</text>
+  <path d="M1240,700 L1128,462" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="1144.7" y="585" width="78.6" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1184" y="600" text-anchor="middle" class="lbl">MCP + JWT</text>
+  <path d="M1390,360 L1390,422" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <rect x="1328.5" y="383" width="123.0" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1390" y="398" text-anchor="middle" class="lbl">session manager</text>
+</svg>

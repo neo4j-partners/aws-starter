@@ -10,34 +10,50 @@ results.
 - **Graph loader:** The folder [`demos/fraud-amazon-quick/graph-loader/`](./graph-loader/) loads the data into Neo4j with a direct driver. It also adds GDS fraud signals.
 - **Fraud memory agent:** The folder [`demos/fraud-amazon-quick/fraud-memory-agent/`](./fraud-memory-agent/) holds a Strands agent. The agent queries the graph through the MCP Gateway and records memory in NAMS.
 - **Iceberg loaders:** The folder [`demos/fraud-amazon-quick/fraud-iceberg/`](./fraud-iceberg/) writes the data to Iceberg tables in S3 or S3 Tables. Athena queries those tables.
-- **Amazon Quick:** Amazon Quick shows the Athena tables and the agent. You set it up in the AWS console.
+- **Amazon Quick:** Amazon Quick connects to the finance MCP Gateway as a remote MCP server. You set it up in the Amazon Quick app.
+
+![Fraud investigation architecture: the dataset feeds the graph loader and the Iceberg loaders, and the agent and Amazon Quick reach the graph through the AgentCore Gateway](./docs/images/architecture.svg)
+
+| Diagram | What it shows |
+|---|---|
+| [Architecture](./docs/images/architecture.svg) | The dataset, both loaders, the MCP stack, the agent, Amazon Quick, and NAMS. |
+| [Deployment topology](./docs/images/deployment-topology.svg) | The three deploy steps and the AWS resources each one creates. |
+| [Data model](./docs/images/data-model.svg) | The graph's node labels, relationships, and GDS properties. |
+| [Agent request flow](./docs/images/agent-request-flow.svg) | One agent call, from validation to the final SSE event. |
+| [NAMS memory lifecycle](./docs/images/memory-lifecycle.svg) | How the agent stores and restores memory, and why the workspace is the boundary. |
 
 ## Quick start
 
-Each command group starts from the repo root.
+Each block starts from the repo root.
+
+Load the graph and add GDS signals:
 
 ```bash
-# 1. Load the graph and add GDS signals
 cd demos/fraud-amazon-quick/graph-loader
 cp .env.sample .env              # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 uv sync
 uv run fraud-graph-load
 uv run fraud-graph-enrich
+```
 
-# 2. Deploy the MCP server for the same database
+Deploy the MCP server for the same database:
+
+```bash
 cd neo4j-mcp-server
 cp .env.sample .env.finance      # set the same NEO4J_* values
 ./deploy.py --env finance
 ./deploy.py --env finance credentials
 ../scripts/sync-credentials.sh
+```
 
-# 3. Run the fraud memory agent
+Run the fraud memory agent:
+
+```bash
 cd demos/fraud-amazon-quick/fraud-memory-agent
 cp .env.sample .env              # set MEMORY_API_KEY=nams_...
 uv sync
 uv run fraud-server              # Terminal 1
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Terminal 2
-
 ```
 
 ## Prerequisites
@@ -115,14 +131,13 @@ See
 [`demos/fraud-amazon-quick/fraud-memory-agent/README.md`](./fraud-memory-agent/README.md)
 for the request format, NAMS traffic generation, and diagnostics.
 
-
-## Step 6: Show the results in Amazon Quick
+## Step 5: Show the results in Amazon Quick
 
 Amazon Quick connects to the finance Neo4j MCP Gateway from Step 3 as a
 remote MCP server. You set it up in the Amazon Quick app. This repository does
 not script it.
 
-### 6.1 Create an Amazon Quick account
+### 5.1 Create an Amazon Quick account
 
 Create an Amazon Quick account. Sign-in with SSO does not work. A trial
 account with any Gmail address works.
@@ -131,12 +146,12 @@ Download and install the Amazon Quick app from the
 [Amazon Quick download page](https://aws.amazon.com/quick/download/). Sign in
 with the account you created.
 
-### 6.2 Create an MCP server connector
+### 5.2 Create an MCP server connector
 
 1. In the left sidebar, open **Settings** > **Capabilities**.
 2. On the **Connectors** tab, choose **Create** > **MCP server**.
 
-### 6.3 Configure the remote connection
+### 5.3 Configure the remote connection
 
 Print the finance Gateway URL. Run from
 [`neo4j-mcp-server/`](../../neo4j-mcp-server/):
@@ -159,7 +174,7 @@ jq -r .gateway_url .mcp-credentials.finance.json
 
 ![Add MCP dialog with Remote selected and the Add header button highlighted](./images/select_remote.png)
 
-### 6.4 Add the Authorization header
+### 5.4 Add the Authorization header
 
 Generate a fresh access token and copy it to the clipboard. Run from
 [`neo4j-mcp-server/`](../../neo4j-mcp-server/):
@@ -180,7 +195,7 @@ the connector fails once the token expires. To renew it, run the two commands
 above again. Then paste the new token into the header in the **Edit MCP**
 dialog.
 
-### 6.5 Query the finance graph from Quick
+### 5.5 Query the finance graph from Quick
 
 Once the connector is added, you can ask Quick about the graph in plain
 language. The prompt below is
@@ -200,7 +215,7 @@ and address cluster in Chicago, circular transfer loops, and the communities
 with the highest risk scores. A written summary of each finding follows the
 report.
 
-### 6.7 Ask Quick about the fraud graph
+### 5.6 Ask Quick about the fraud graph
 
 Open **New chat** and ask these questions in order. Each one builds on the
 answer before it. The expected answers come from the loaded graph after the

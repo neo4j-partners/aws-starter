@@ -1,51 +1,89 @@
 # Neo4j Agent Memory and Strands Agents
 
-## Project Overview
+The fraud memory agent keeps its memory in the hosted Neo4j Agent Memory
+Service. This page explains how the agent connects to it and why it uses
+the Strands session manager from Neo4j Agent Memory 0.8.0.
 
-Neo4j Agent Memory is a Python library from Neo4j Labs that gives AI agents persistent memory backed by a Neo4j graph database. Instead of agents forgetting everything between conversations, this library lets them remember past interactions, build up knowledge about people and things, and learn from their own reasoning patterns over time.
+![NAMS memory lifecycle: each session_id maps to one conversation inside a shared workspace](../../docs/images/memory-lifecycle.svg)
 
-The library organizes memory into three layers:
+## The parts
 
-- **Short-term memory** holds conversation history. Messages are stored per session so an agent can recall what was said earlier in a conversation and search across past sessions by meaning.
+- **Strands Agents:** Strands is the AWS open-source Python SDK for agents. It runs the agent loop: the model reasons, calls a tool, reads the result, and repeats. Strands also defines session managers, which load and save an agent's conversation through hooks.
+- **Neo4j Agent Memory:** This Neo4j Labs Python library gives agents memory stored in a Neo4j graph. It ships a Strands integration with a session manager and optional memory tools.
+- **NAMS:** The Neo4j Agent Memory Service is the hosted backend for the library. The rest of this page calls it **NAMS**. NAMS owns storage, embeddings, entity extraction, and its schema.
 
-- **Long-term memory** stores facts, preferences, and entities. It uses a classification system called POLE+O (Person, Object, Location, Event, Organization) to categorize extracted information. When an agent learns that "Alice works at Acme Corp," it creates Person and Organization entities and links them with a relationship. It also handles deduplication so the same entity doesn't get stored multiple times under different names.
+## How the agent uses NAMS
 
-- **Reasoning memory** records how an agent solved problems — what tools it called, what it was thinking, and what results it got. This lets agents learn from past problem-solving approaches rather than starting from scratch each time.
+`server/runtime_app.py` builds one session manager for each request:
 
-All three layers live in Neo4j's graph structure, which means the connections between entities are first-class citizens rather than afterthoughts. Searching memory can combine traditional vector similarity (finding things that mean something similar) with graph traversal (following relationship chains).
+```python
+Neo4jSessionManager.for_nams(
+    request.session_id,
+    user_id=request.user_id,
+    record_tool_calls=True,
+    retrieval_config=Neo4jRetrievalConfig(
+        include_entities=True, include_preferences=False, top_k=5
+    ),
+)
+```
 
-## What Is Strands
+The manager reads `MEMORY_API_KEY`, `MEMORY_ENDPOINT`, and
+`MEMORY_WORKSPACE_ID` from the environment. The agent passes it to
+`Agent(session_manager=...)`, and Strands calls it at each step of the turn.
 
-Strands Agents is AWS's open-source Python SDK for building AI agents. It provides a framework for creating agents that can use tools, reason through multi-step problems, and interact with AWS services like Amazon Bedrock for LLM access. Strands handles the agent loop — the cycle of thinking, deciding which tool to call, executing it, and incorporating the result — while developers supply the tools and configuration.
+1. **Open:** The manager finds the NAMS conversation for the `session_id`, or creates one. It tags a new conversation with the `user_id`.
+2. **Restore:** The manager loads the conversation's earlier turns into the Strands message history. The model sees them as real turns.
+3. **Retrieve:** Before the user turn reaches the model, the manager searches the workspace for the five entities that best match the question.
+4. **Prefix:** The manager adds those entities to the user message in a `<user_context>` block. The system prompt tells the model to treat the block as background data and to check facts against the graph.
+5. **Record:** The manager records each MCP tool call as a reasoning step. It stores user and assistant text turns as messages. Tool results are not stored as messages.
+6. **Close:** The runtime closes the response stream, then calls `close()` on the manager. The manager saves the last buffered message at that point.
 
-## How They Integrate
+NAMS extracts entities from the stored messages on the server. Extraction
+runs on assistant turns as well as user turns.
 
-Neo4j Agent Memory provides a dedicated Strands integration that exposes memory capabilities as four Strands-compatible tools. When these tools are registered with a Strands agent, the agent gains the ability to store and retrieve information from the graph memory system as part of its normal reasoning loop.
+## Failures
 
-### The Four Tools
+- **Hard failures:** The manager raises when it cannot open the session or store a message. The error propagates to `BedrockAgentCoreApp`. The app logs the traceback at `ERROR` and sends the client an error event. The runtime also marks its trace span `ERROR`.
+- **Soft failures:** The manager logs a warning and goes on when entity retrieval or tool-call recording fails. The turn then runs without that context or those reasoning steps.
 
-**Search Context** lets the agent search across all memory layers at once. Given a natural language query, it performs a semantic search against stored messages, entities, and preferences, returning the most relevant results with similarity scores. The agent uses this when it needs to recall something from a prior conversation or check what it already knows about a topic.
+## The workspace is the access boundary
 
-**Get Entity Graph** lets the agent explore relationships around a specific entity. If the agent knows about a person, it can traverse outward to see what organizations they belong to, what events they attended, or what locations they are connected to. The depth of traversal is configurable, and relationship types can be filtered. This is where the graph structure really pays off — following chains of connections is something a graph database does naturally.
+NAMS separates data by workspace. It has no per-user isolation.
 
-**Add Memory** lets the agent store new information. When the agent learns something worth remembering, it calls this tool with the content. Behind the scenes, the system generates embeddings for semantic search, runs entity extraction to identify people, places, organizations and other entities mentioned in the content, and stores everything in the graph with appropriate relationships. The agent doesn't need to understand the extraction pipeline — it just passes in text and the system handles the rest.
+- **Shared reads:** Everyone who holds the workspace API key can read all of its conversations and entities.
+- **User tag:** The `user_id` is metadata on the conversation. It records who asked. It does not stop another key holder from reading the conversation.
+- **Shared entities:** Entity retrieval searches the whole workspace. An entity found in one analyst's investigation can appear in another analyst's `<user_context>` block.
+- **Message search:** NAMS searches messages inside one conversation. It has no search across conversations.
+- **Separate workspaces:** Use one workspace for each trust boundary, such as a team or a tenant.
 
-**Get User Preferences** retrieves stored preferences for a specific user, optionally filtered by category. This gives agents quick access to things like communication preferences, topic interests, or configuration choices without searching through entire conversation histories.
+## Why the agent adopted the 0.8.0 session manager
 
-### How It Works at Runtime
+Before 0.8.0, the agent used about 150 lines of its own recall code. That
+code found or created the conversation, stored each turn, and searched the
+messages of up to ten earlier conversations of the same user. The session
+manager replaces it for these reasons:
 
-A developer installs the library with Strands support, configures a Neo4j connection and an embedding provider (typically Amazon Bedrock Titan for AWS deployments), and calls a factory function that returns all four tools ready to use. These tools are then passed to the Strands agent alongside any other tools it needs.
+- **Real boundary:** The NAMS docs name the workspace as the only tenancy boundary. The old user-scoped recall filtered on a label, so it promised an isolation that NAMS does not give.
+- **Shared entities anyway:** Entities are shared across the workspace whatever the agent reads. Skipping entity search protected nothing.
+- **Supported path:** The session manager is the library's supported way to restore a conversation and inject context. It uses the Strands session hooks, so the agent has no custom memory code left.
+- **Team work:** Fraud investigation is team work. Accounts and merchants found in one investigation help the next one. Workspace sharing is the behavior the demo wants.
+- **Search cost:** NAMS message search covers one conversation. Searching earlier conversations took one call per conversation and a hand-made cap.
 
-During a conversation, the Strands agent loop decides when to use memory tools just like it decides when to use any other tool. If a user asks "what did we discuss last week about the project timeline?", the agent recognizes it needs to search its memory and calls the search context tool. If a user shares new preferences, the agent stores them via the add memory tool. The agent treats memory as another capability it can reason about and invoke when appropriate.
+## Known gaps in 0.8.0
 
-The integration handles the mismatch between Strands' synchronous tool interface and the library's async internals, so the agent framework doesn't need to worry about async execution. It also caches the underlying Neo4j client connection so repeated tool calls don't create new database connections.
+- **Open traces:** The manager starts a reasoning trace and records each tool call, but it never completes the trace. Traces stay open after the turn.
+- **No redaction after save:** NAMS has no endpoint to update or delete a message. A redaction that arrives after the manager saved the message does not reach NAMS.
 
-### Where AWS Services Fit In
+## Optional memory tools
 
-The integration is designed for the AWS ecosystem. Amazon Bedrock provides both the LLM that powers the Strands agent (typically Claude) and the embedding model that powers semantic search within memory (typically Titan Embed). Neo4j runs as the graph database, either as Neo4j Aura (managed cloud) or self-hosted. The combination means agents deployed on AWS can maintain rich, relationship-aware memory without building custom storage infrastructure.
+Set `MEMORY_TOOLS=true` to also give the agent the NAMS Strands tools from
+`nams_context_graph_tools()`:
 
-The library also has a separate integration with AWS Bedrock AgentCore for agents deployed to that runtime, but the Strands integration is the primary path for developers building agents with the Strands SDK directly.
+- **`search_context`:** This tool searches agent memory in the workspace.
+- **`set_entity_feedback`:** This tool records positive or negative feedback on an entity.
+- **`get_entity_provenance`:** This tool shows where an entity came from.
+- **`cypher_query`:** This tool runs a read-only Cypher query against the memory graph.
 
-### Practical Example
-
-The project includes a financial services advisor example that demonstrates the Strands integration in a realistic setting. Multiple specialized agents (KYC verification, anti-money-laundering, relationship management, compliance) share a Neo4j memory graph. As agents process customer interactions, they build up entity graphs of customers, accounts, transactions, and risk assessments. Each agent can search context to understand a customer's full history, explore entity relationships to trace connections between accounts, and store new findings for other agents to discover. The shared graph memory becomes the connective tissue between independently operating agents.
+The agent decides when to call them. They search agent memory, not the
+fraud graph, and they cover the whole workspace. They use the same
+environment values as the session manager.

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Agent Request Flow</title>
+  <desc>The runtime validates the payload, opens a NAMS session, builds a Strands agent with the Gateway MCP tools, streams the answer as SSE events, then closes the MCP session and flushes memory. A failure marks the span ERROR and sends an error event.</desc>
+  <style>
+    .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
+    .sub { font-size: 17px; fill: #5C6470; }
+    .t { font-size: 19px; font-weight: 700; }
+    .s { font-size: 14px; fill: #475467; }
+    .m { font-size: 13px; fill: #475467; font-family: Menlo, Consolas, monospace; }
+    .lbl { font-size: 13px; font-weight: 600; fill: #344054; }
+  </style>
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#101828" flood-opacity="0.10"/></filter>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+  </defs>
+  <rect width="1600" height="880" fill="#F7F8FA"/>
+  <text x="800" y="54" text-anchor="middle" class="h1">Agent Request Flow</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">One call to /invocations, from validation to the final SSE event.</text>
+  <rect x="50" y="150" width="280" height="150" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="70" y="184" text-anchor="start" class="t" fill="#1E3A5F">1  Validate</text>
+  <text x="70" y="208" text-anchor="start" class="s">prompt and user_id required</text>
+  <text x="70" y="230" text-anchor="start" class="s">missing either: HTTP 400</text>
+  <text x="70" y="252" text-anchor="start" class="s">no session_id: fraud-&lt;uuid hex&gt;</text>
+  <path d="M330,225 L350,225" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="352" y="150" width="280" height="150" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="372" y="184" text-anchor="start" class="t" fill="#851651">2  Open memory</text>
+  <text x="372" y="208" text-anchor="start" class="s">for_nams(session_id, user_id)</text>
+  <text x="372" y="230" text-anchor="start" class="s">reads MEMORY_API_KEY, MEMORY_</text>
+  <text x="372" y="252" text-anchor="start" class="s">ENDPOINT, MEMORY_WORKSPACE_ID</text>
+  <path d="M632,225 L652,225" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="654" y="150" width="280" height="150" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="674" y="184" text-anchor="start" class="t" fill="#4A2EB0">3  Build agent</text>
+  <text x="674" y="208" text-anchor="start" class="s">restore earlier session turns</text>
+  <text x="674" y="230" text-anchor="start" class="s">MCPClient lists Gateway tools</text>
+  <text x="674" y="252" text-anchor="start" class="s">optional NAMS memory tools</text>
+  <path d="M934,225 L954,225" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="956" y="150" width="280" height="150" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="976" y="184" text-anchor="start" class="t" fill="#00594A">4  Stream turn</text>
+  <text x="976" y="208" text-anchor="start" class="s">&lt;user_context&gt; entities first</text>
+  <text x="976" y="230" text-anchor="start" class="s">model calls MCP tools</text>
+  <text x="976" y="252" text-anchor="start" class="s">chunk, tool, then complete</text>
+  <path d="M1236,225 L1256,225" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="1258" y="150" width="280" height="150" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1278" y="184" text-anchor="start" class="t" fill="#344054">5  Release</text>
+  <text x="1278" y="208" text-anchor="start" class="s">agent.cleanup() closes MCP</text>
+  <text x="1278" y="230" text-anchor="start" class="s">memory.close() flushes NAMS</text>
+  <text x="1278" y="252" text-anchor="start" class="s">runs even on error or cancel</text>
+  <rect x="50" y="420" width="280" height="110" rx="14" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="190" y="454" text-anchor="middle" class="t" fill="#1E3A5F">Client</text>
+  <text x="190" y="478" text-anchor="middle" class="s">fraud-cli, fraud-demo,</text>
+  <text x="190" y="500" text-anchor="middle" class="s">fraud-traffic, agent.sh</text>
+  <path d="M190,420 L190,308" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="254.0" y="365" width="263.6" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="260" y="380" text-anchor="start" class="lbl">POST {prompt, user_id, session_id}</text>
+  <rect x="352" y="420" width="280" height="110" rx="14" fill="#FFFFFF" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="492" y="454" text-anchor="middle" class="t" fill="#851651">NAMS workspace</text>
+  <text x="492" y="478" text-anchor="middle" class="s">conversation per session_id</text>
+  <text x="492" y="500" text-anchor="middle" class="s">entities, reasoning steps</text>
+  <path d="M492,308 L492,412" fill="none" stroke="#C11574" stroke-width="2.5" marker-start="url(#a-pink)" marker-end="url(#a-pink)"/>
+  <rect x="654" y="420" width="580" height="110" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="944" y="454" text-anchor="middle" class="t" fill="#00594A">Bedrock + AgentCore Gateway</text>
+  <text x="944" y="478" text-anchor="middle" class="s">Claude Haiku 4.5 via ConverseStream</text>
+  <text x="944" y="500" text-anchor="middle" class="s">Gateway -&gt; Neo4j MCP server -&gt; fraud graph</text>
+  <path d="M794,308 L794,412" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-start="url(#a-purple)" marker-end="url(#a-purple)"/>
+  <path d="M1096,308 L1096,412" fill="none" stroke="#008C72" stroke-width="2.5" marker-start="url(#a-teal)" marker-end="url(#a-teal)"/>
+  <path d="M1398,300 L1398,560 L560,560 L560,538" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <rect x="1306.9" y="435" width="182.2" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1398" y="450" text-anchor="middle" class="lbl">flush turn + tool calls</text>
+  <rect x="50" y="590" width="1500" height="230" rx="20" fill="#FFFFFF" fill-opacity="0.6" stroke="#667085" stroke-width="2" stroke-dasharray="9 6"/>
+  <text x="72" y="620" text-anchor="start" class="lbl" fill="#344054" font-size="15">SSE events the client receives</text>
+  <rect x="80" y="640" width="340" height="140" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="250" y="674" text-anchor="middle" class="t" fill="#00594A">chunk</text>
+  <text x="250" y="698" text-anchor="middle" class="m">{"type": "chunk", "data": ...}</text>
+  <text x="250" y="722" text-anchor="middle" class="s">answer text as it streams</text>
+  <rect x="445" y="640" width="340" height="140" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="615" y="674" text-anchor="middle" class="t" fill="#4A2EB0">tool</text>
+  <text x="615" y="698" text-anchor="middle" class="m">{"type": "tool", "name": ...}</text>
+  <text x="615" y="722" text-anchor="middle" class="s">once per MCP tool use</text>
+  <rect x="810" y="640" width="340" height="140" rx="14" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="980" y="674" text-anchor="middle" class="t" fill="#1E3A5F">complete</text>
+  <text x="980" y="698" text-anchor="middle" class="m">{"type": "complete"}</text>
+  <text x="980" y="722" text-anchor="middle" class="s">after the last chunk</text>
+  <rect x="1175" y="640" width="340" height="140" rx="14" fill="#FFFFFF" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1345" y="674" text-anchor="middle" class="t" fill="#8A4B08">error</text>
+  <text x="1345" y="698" text-anchor="middle" class="m">{"error", "error_type", "message"}</text>
+  <text x="1345" y="722" text-anchor="middle" class="s">span ERROR, traceback logged</text>
+</svg>

@@ -40,6 +40,10 @@ from constructs import Construct
 # before it builds anything, and a second copy here could drift from it.
 from naming import validate_derived_names
 
+# AgentCore's minimum idle session timeout. See the Runtime's
+# lifecycle_configuration for why the stack uses it.
+RUNTIME_IDLE_SESSION_TIMEOUT_SECONDS = 60
+
 
 class Neo4jMcpStack(Stack):
     """Stack deploying Neo4j MCP Server on Amazon Bedrock AgentCore Runtime with Gateway."""
@@ -486,6 +490,13 @@ class Neo4jMcpStack(Stack):
                 "NEO4J_MCP_SERVER_ALLOWED_HOSTS": "*",
                 "NEO4J_READ_ONLY": "true",
             },
+            # The Gateway opens a new Runtime session for each tool call, and
+            # AgentCore health-pings every live session with a POST /mcp every
+            # two seconds until it idles out. Every call is stateless, so end
+            # idle sessions at the 60-second minimum, not the 15-minute default.
+            lifecycle_configuration=bedrockagentcore.CfnRuntime.LifecycleConfigurationProperty(
+                idle_runtime_session_timeout=RUNTIME_IDLE_SESSION_TIMEOUT_SECONDS,
+            ),
         )
 
         # Scope runtime permissions to this specific runtime ARN instead of a

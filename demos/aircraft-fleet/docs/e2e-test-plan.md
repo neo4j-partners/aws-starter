@@ -1365,3 +1365,65 @@ roles, S3 buckets, log groups, ECR repositories, and secrets. `.env`,
 `.mcp-credentials.finance.json` match their pre-run copies. The fleet
 credentials copies and `.env.fleet.readonly` are removed. The fleet graph
 is unchanged.
+
+## Cloud Retest 7: 2026-11-22
+
+This run retested Retest 6 follow-up 1 at main `b81b0fc`. Commits 5301084
+and b81b0fc make the GraphRAG and supervisor `./agent.sh destroy` read the
+Runtime ID from the CloudFormation stack. They no longer read
+`agentcore/.cli/deployed-state.json`. The run deployed only the fleet MCP
+server and the two fleet agents, and it reused the fleet graph. Account
+IDs are masked.
+
+**Overall status:** PASS. Both destroys found the Runtime ID in the stack
+and removed their Runtime log groups.
+
+- **Setup:** The run created `fleet_reader` again with the `reader` and
+  `graphql_app_read_only_709ad5c7` roles. It created the secrets
+  `fleet/neo4j-reader` and `fleet/memory-neo4j`. `.env` got both secret
+  ARNs, and `.env.fleet` named `fleet_reader`.
+- **MCP deploy:** PASS. `./deploy.py --env fleet` exited 0 after 5 minutes
+  31 seconds. `./deploy.py --env fleet credentials` exited 0. The run
+  copied `.mcp-credentials.fleet.json` to the fleet demo by hand, so the
+  fraud agent's credentials stayed as they were.
+- **Agent deploys:** PASS. The GraphRAG `./agent.sh deploy` exited 0 after
+  5 minutes 22 seconds. The supervisor `./agent.sh configure` exited 0. Its
+  `./agent.sh deploy` exited 0 after 5 minutes 6 seconds.
+- **Stack resources:** Each stack holds one
+  `AWS::BedrockAgentCore::Runtime`. The GraphRAG logical ID is
+  `ApplicationRuntimeGraphragAgentRuntimeEA72D081`, and the supervisor
+  logical ID is `ApplicationRuntimeSupervisorRuntime1B54FC56`. Both match
+  the offline synth. The physical ID is the bare Runtime ID, such as
+  `AircraftFleet_default_graphrag_agent-pjMBPr29Gk`. The AWS docs say
+  `Ref` returns the ARN, so destroy accepts either form.
+- **GraphRAG cloud query:** PASS. "How many aircraft are in the
+  database?" returned "**30 aircraft**" in 15 seconds. The agent used
+  `graph_query_tool`.
+- **Supervisor cloud query:** PASS. "What are the most common maintenance
+  faults?" went to the Maintenance Agent in 35 seconds. The agent called
+  the Gateway tools `get_neo4j_schema` and `read_neo4j_cypher`.
+- **GraphRAG destroy:** PASS. `./agent.sh destroy --yes` exited 0 after 3
+  minutes 58 seconds. It removed the stack and printed `Removed: log group
+  /aws/bedrock-agentcore/runtimes/AircraftFleet_default_graphrag_agent-pjMBPr29Gk-DEFAULT`.
+- **Supervisor destroy:** PASS. `./agent.sh destroy --yes` exited 0 after
+  3 minutes 54 seconds. It removed the stack and the Gateway credential
+  provider. It printed `Removed: log group
+  /aws/bedrock-agentcore/runtimes/fleetsupervisor_default_supervisor-N3mJ6iH4ET-DEFAULT`.
+- **MCP cleanup:** PASS. `./deploy.py --env fleet cleanup` exited 0 after
+  4 minutes 14 seconds, with both prompts answered `y` on stdin. It
+  deleted the MCP Runtime, the stack, the Runtime log group, the password
+  secret, and the `neo4j-mcp-server` ECR repository. The repository was
+  not in the pre-run snapshot.
+
+**Cloud resources confirmed destroyed:** A listing 5 minutes after the
+supervisor destroy showed no log groups under
+`/aws/bedrock-agentcore/runtimes/`. A second listing 5 minutes after the
+MCP cleanup showed none in `us-east-1` or `us-west-2`. The run
+force-deleted `fleet/neo4j-reader` and `fleet/memory-neo4j` and dropped
+`fleet_reader`. List calls in `us-east-1` and `us-west-2` match the
+pre-run snapshot for stacks, Runtimes, memories, workload identities,
+credential providers, Gateways, Cognito pools, CodeBuild projects, IAM
+roles, S3 buckets, log groups, ECR repositories, and secrets. All 22
+backed-up local files match their pre-run hashes. The fleet credentials
+copies and `.env.fleet.readonly` are removed. The fleet graph is
+unchanged.

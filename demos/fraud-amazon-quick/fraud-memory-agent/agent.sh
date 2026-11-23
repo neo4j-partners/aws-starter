@@ -233,8 +233,10 @@ refuse_declared_credential() {
 #
 # The client ID and scope come from the credentials file, and the discovery
 # URL from the MCP server stack. The secret goes to the CLI on stdin, never
-# in argv, and the CLI stores it in agentcore/.env.local. The EXIT trap
-# removes that line and restores the tracked agentcore.json.
+# in argv, and the CLI stores it in agentcore/.env.local, where
+# `agentcore deploy` reads it. The deploy command clears lines a killed run
+# left before this runs. The restore after the deploy, or the EXIT trap,
+# removes the line and restores the tracked agentcore.json.
 add_gateway_credential() {
     ensure_credentials
     refuse_declared_credential "$GATEWAY_CREDENTIAL"
@@ -256,8 +258,6 @@ add_gateway_credential() {
         echo -e "${RED}ERROR: stack $stack_name has no CognitoDiscoveryUrl output in $REGION${NC}"
         exit 1
     fi
-    # Drop lines a killed run may have left, so the CLI writes fresh ones.
-    strip_credential_secrets
     jq -r '.client_secret' "$CREDENTIALS_FILE" | agentcore add credentials oauth \
         --name "$GATEWAY_CREDENTIAL" \
         --client-id "$client_id" \
@@ -292,7 +292,9 @@ PY
 # its first request. The CLI creates or updates that provider from the
 # credentials entry, as for the Gateway credential above. The key goes to
 # the CLI on stdin, never in argv, and the CLI stores it in
-# agentcore/.env.local. The EXIT trap removes that line.
+# agentcore/.env.local next to the Gateway secret. Neither add function
+# strips .env.local, because the strip removes both lines and the deploy
+# needs both. The restore after the deploy, or the EXIT trap, removes them.
 add_nams_credential() {
     refuse_declared_credential "$NAMS_CREDENTIAL"
     if ! nams_api_key check; then
@@ -300,7 +302,6 @@ add_nams_credential() {
         echo "NAMS memory is required. Set it in $SHARED_ENV and run './agent.sh deploy' again."
         exit 1
     fi
-    strip_credential_secrets
     nams_api_key print | agentcore add credentials api-key \
         --name "$NAMS_CREDENTIAL" \
         --api-key -
@@ -861,6 +862,12 @@ case "${1:-help}" in
         load_deploy_env
         ensure_cdk_deps
         begin_spec_restore
+        # Drop secret lines a killed run left, so the CLI writes one fresh
+        # line for each credential. This runs once, before both adds:
+        # agentcore deploy reads both lines from .env.local.
+        if ! strip_credential_secrets; then
+            exit 1
+        fi
         add_gateway_credential
         add_nams_credential
         # The key is in the provider now. Keep a shell export of it out of

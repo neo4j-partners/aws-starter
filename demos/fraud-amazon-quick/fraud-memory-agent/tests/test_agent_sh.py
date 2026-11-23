@@ -44,6 +44,8 @@ GATEWAY_COMMENT = (
 )
 NAMS_COMMENT = "# API key for credential provider 'nams-api-key' (set before deploy)"
 SECRET_LINES = f"{GATEWAY_VAR}=value\n{NAMS_VAR}=value\n"
+# The secret lines the stub CLI writes, as the deploy stub records them.
+FRESH_SECRETS = f"{GATEWAY_VAR}=encrypted,{NAMS_VAR}=encrypted"
 NAMS_KEY = "nams-key-from-env-file"
 CLIENT_SECRET = "gateway-client-secret"
 
@@ -102,6 +104,8 @@ case "$1" in
             echo "GATEWAY_SCOPES=${GATEWAY_SCOPES:-}"
             echo "MEMORY_ENDPOINT=${MEMORY_ENDPOINT:-}"
             echo "MEMORY_API_KEY=${MEMORY_API_KEY+set}"
+            # The secret lines the CLI reads from .env.local, in file order.
+            echo "ENV_LOCAL_SECRETS=$(grep '^AGENTCORE_CREDENTIAL_' agentcore/.env.local 2>/dev/null | paste -sd , -)"
         } >> "${STUB_LOG%/*}/deploy-env"
         if [ -n "${STUB_DEPLOY_TARGETS:-}" ]; then
             printf '%s\n' "$STUB_DEPLOY_TARGETS" > agentcore/aws-targets.json
@@ -1010,12 +1014,32 @@ def test_deploy_declares_both_credentials_and_restores_the_spec(project: Path) -
     assert seen["credentials"] == '["fraud-gateway","nams-api-key"]'
     assert seen["GATEWAY_URL"] == GATEWAY_URL
     assert seen["GATEWAY_SCOPES"] == "fraud/invoke"
+    # The CLI reads both secrets from .env.local while it deploys.
+    assert seen["ENV_LOCAL_SECRETS"] == FRESH_SECRETS
     # The tracked spec is back, and the CLI's secret lines are gone.
     assert spec.read_bytes() == tracked
     assert env_local.read_text() == "A=1\n"
     assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
     assert "the smoke test was skipped" in result.stdout
+
+
+# A killed deploy can leave both secret lines in .env.local. The next deploy
+# drops them before the CLI writes fresh ones, so the CLI sees one line for
+# each secret, and the restore removes those.
+def test_deploy_replaces_secret_lines_a_killed_run_left(project: Path) -> None:
+    ready_to_deploy(project)
+    env_local = project / "agentcore" / ".env.local"
+    env_local.write_text(SECRET_LINES + "A=1\n")
+    env_local.chmod(0o600)
+
+    result = run_deploy(project, "--skip-smoke")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert deploy_env(project)["ENV_LOCAL_SECRETS"] == FRESH_SECRETS
+    assert env_local.read_text() == "A=1\n"
+    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
+    assert not list(env_local.parent.glob(".env.local.*"))
 
 
 # The secrets reach the CLI on stdin only, never in argv or the output.

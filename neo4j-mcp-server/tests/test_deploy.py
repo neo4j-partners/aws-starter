@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from types import SimpleNamespace
 
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError
 
 import deploy
 
@@ -86,10 +86,35 @@ class FakeSecrets:
         raise client_error("ResourceNotFoundException", "DescribeSecret")
 
 
+class FakeControl:
+    """By default the runtime is gone: get_agent_runtime raises ResourceNotFoundException."""
+
+    def __init__(self) -> None:
+        self.deleted: list[str] = []
+        self.checked: list[str] = []
+        self.get_error: Exception | None = client_error(
+            "ResourceNotFoundException", "GetAgentRuntime"
+        )
+
+    def delete_agent_runtime(self, agentRuntimeId: str) -> None:
+        self.deleted.append(agentRuntimeId)
+
+    def get_agent_runtime(self, agentRuntimeId: str) -> dict[str, str]:
+        self.checked.append(agentRuntimeId)
+        if self.get_error is not None:
+            raise self.get_error
+        return {"agentRuntimeId": agentRuntimeId, "status": "DELETING"}
+
+
 class FakeAws:
     def __init__(self, logs: FakeLogs) -> None:
         self.region = "us-east-1"
-        self.clients = {"logs": logs, "secretsmanager": FakeSecrets()}
+        self.control = FakeControl()
+        self.clients = {
+            "logs": logs,
+            "secretsmanager": FakeSecrets(),
+            "bedrock-agentcore-control": self.control,
+        }
 
     def client(self, service: str) -> object:
         return self.clients[service]
@@ -130,8 +155,11 @@ def cleanup_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
 def test_cleanup_removes_only_the_runtime_log_groups(capsys: pytest.CaptureFixture[str]) -> None:
     logs = FakeLogs([LOG_GROUP, OTHER_GROUP])
 
-    deploy.cmd_cleanup(FakeAws(logs), CFG)
+    aws = FakeAws(logs)
 
+    deploy.cmd_cleanup(aws, CFG)
+
+    assert aws.control.checked == [RUNTIME_ID]
     assert logs.prefixes == [LOG_PREFIX]
     assert logs.deleted == [LOG_GROUP]
     err = capsys.readouterr().err
@@ -196,6 +224,42 @@ def test_a_failed_log_group_listing_fails_cleanup(capsys: pytest.CaptureFixture[
     assert f"ERROR   {LOG_PREFIX}*" in err
 
 
+@pytest.mark.parametrize(
+    ("get_error", "message"),
+    [
+        (None, f"Runtime {RUNTIME_ID} still exists, so its log groups stay in place"),
+        (
+            client_error("AccessDeniedException", "GetAgentRuntime"),
+            f"Could not check whether runtime {RUNTIME_ID} is gone",
+        ),
+        (
+            EndpointConnectionError(endpoint_url="https://example.invalid"),
+            f"Could not check whether runtime {RUNTIME_ID} is gone",
+        ),
+    ],
+)
+@pytest.mark.usefixtures("cleanup_env")
+def test_the_log_groups_stay_unless_the_runtime_is_confirmed_gone(
+    capsys: pytest.CaptureFixture[str], get_error: Exception | None, message: str
+) -> None:
+    logs = FakeLogs([LOG_GROUP])
+    aws = FakeAws(logs)
+    aws.control.get_error = get_error
+
+    with pytest.raises(deploy.DeployError, match="log group delete failed"):
+        deploy.cmd_cleanup(aws, CFG)
+
+    assert aws.control.checked == [RUNTIME_ID]
+    assert logs.prefixes == []
+    assert logs.deleted == []
+    # The secret step after it still ran.
+    assert aws.clients["secretsmanager"].checked == ["neo4j-mcp-server-fleet/neo4j-password"]
+    err = capsys.readouterr().err
+    assert message in err
+    assert f"ERROR   {LOG_PREFIX}*" in err
+    assert "Cleanup complete" not in err
+
+
 @pytest.mark.parametrize("runtime_id", ["", "neo4j_mcp_server_fleet", f"{RUNTIME_ID}*"])
 def test_cleanup_without_a_valid_runtime_id_skips_the_log_groups(
     cleanup_env: dict[str, object], runtime_id: str
@@ -231,17 +295,6 @@ def test_cleanup_keeps_the_log_groups_when_cancelled_or_the_stack_is_absent(
     deploy.cmd_cleanup(FakeAws(logs), CFG)
 
     assert logs.prefixes == []
-
-
-class FakeControl:
-    def __init__(self) -> None:
-        self.deleted: list[str] = []
-
-    def delete_agent_runtime(self, agentRuntimeId: str) -> None:
-        self.deleted.append(agentRuntimeId)
-
-    def get_agent_runtime(self, agentRuntimeId: str) -> None:
-        raise client_error("ResourceNotFoundException", "GetAgentRuntime")
 
 
 def test_delete_agent_runtime_returns_the_id_it_deleted(monkeypatch: pytest.MonkeyPatch) -> None:

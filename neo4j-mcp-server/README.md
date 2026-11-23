@@ -279,7 +279,9 @@ stack is gone, cleanup deletes the groups under
 `/aws/bedrock-agentcore/runtimes/<runtime-id>-` and prints `Removed` or
 `Not found` for each. It reads the runtime ID from the stack outputs before
 the delete. It skips this step when the stack was already absent or the
-stack delete failed. If a log group delete fails, cleanup finishes the other
+stack delete failed. Before it deletes anything, it asks AgentCore for the
+Runtime. If the Runtime still exists, or the check fails, the log groups stay
+and cleanup exits 1. If a log group delete fails, cleanup finishes the other
 steps, names the group, and exits 1.
 
 If a log group delete fails, remove the group by hand. Use the Region from `AWS_REGION` in `.env`, and the runtime ID from the `Could not delete` lines.

@@ -946,6 +946,26 @@ def _delete_runtime_log_groups(aws: Aws, runtime_id: str) -> list[str]:
         log_warning(f"Runtime ID {runtime_id!r} is not valid, so its log groups stay in place")
         return []
     prefix = f"{RUNTIME_LOG_PREFIX}{runtime_id}-"
+    # The groups go only once the runtime is confirmed gone. A runtime that
+    # still exists could write to them again.
+    try:
+        aws.client("bedrock-agentcore-control").get_agent_runtime(agentRuntimeId=runtime_id)
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] != "ResourceNotFoundException":
+            log_error(
+                f"Could not check whether runtime {runtime_id} is gone, so its log groups "
+                f"stay in place: {exc}"
+            )
+            return [f"{prefix}*"]
+    except BotoCoreError as exc:
+        log_error(
+            f"Could not check whether runtime {runtime_id} is gone, so its log groups "
+            f"stay in place: {exc}"
+        )
+        return [f"{prefix}*"]
+    else:
+        log_error(f"Runtime {runtime_id} still exists, so its log groups stay in place")
+        return [f"{prefix}*"]
     logs = aws.client("logs")
     try:
         names = [

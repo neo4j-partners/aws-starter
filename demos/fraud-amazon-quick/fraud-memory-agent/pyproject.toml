@@ -20,9 +20,10 @@ dependencies = [
     # every agent turn without a direct Neo4j driver or embedding setup.
     "strands-agents>=1.65,<2",
     # The Strands session manager (Neo4jSessionManager.for_nams) persists
-    # and restores each conversation and injects workspace entities. 0.8 is
-    # the tested line; move the cap only after retesting.
-    "neo4j-agent-memory[nams,strands]>=0.8.0,<0.9",
+    # and restores each conversation and injects workspace entities. This is
+    # the fleet build of 0.8.0, which completes the reasoning trace at the
+    # end of each turn. [tool.uv.sources] says where the wheel is.
+    "neo4j-agent-memory[nams,strands]==0.8.0+fleet.9",
     # server/runtime_app.py loads the local .env for development runs.
     "python-dotenv>=1.2.2",
 ]
@@ -50,6 +51,9 @@ build-backend = "hatchling.build"
 # Package the shared `core` plus `client`/`server` into the venv so the
 # console scripts resolve `client.*`/`server.*` and `from core import ...`
 # works without any sys.path manipulation.
+[tool.uv.sources]
+neo4j-agent-memory = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" }
+
 [tool.hatch.build.targets.wheel]
 packages = ["core", "client", "server"]
 

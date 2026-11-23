@@ -566,7 +566,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.9" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mcp", specifier = ">=2.2.0,<3" },
-    { name = "neo4j-agent-memory", extras = ["nams", "strands"], specifier = ">=0.8.0,<0.9" },
+    { name = "neo4j-agent-memory", extras = ["nams", "strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "strands-agents", specifier = ">=1.65,<2" },
 ]
@@ -829,17 +829,16 @@ wheels = [
 
 [[package]]
 name = "neo4j-agent-memory"
-version = "0.8.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.8.0+fleet.9"
+source = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" }
 dependencies = [
     { name = "neo4j" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/47/bcf31c29463923d26113ed5788029a7a1f48bb40b51b93f9b1830043fd93/neo4j_agent_memory-0.8.0.tar.gz", hash = "sha256:6e5c9c4bd7ac32e6688bb6fc1619d3c15b918b6777b122e135873f2a59ab09b2", size = 509463, upload-time = "2026-10-22T18:53:24.541Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/13/170a3c9a97c2daf7d08c5a914f81e62d32cc414cb7db146116242d52e46b/neo4j_agent_memory-0.8.0-py3-none-any.whl", hash = "sha256:5ebe42298fd0380d7c5079817f39bf619efefbe474bc15fe1433801c1766482d", size = 600127, upload-time = "2026-10-22T18:53:22.988Z" },
+    { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl", hash = "sha256:3071e71b917d2114550c30d980df5e456d23fe2a3e29a220041823480dc374c4" },
 ]
 
 [package.optional-dependencies]
@@ -850,6 +849,84 @@ strands = [
     { name = "boto3" },
     { name = "strands-agents" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "agent-framework-core", marker = "extra == 'all'", specifier = ">=1.13,<2" },
+    { name = "agent-framework-core", marker = "extra == 'full'", specifier = ">=1.13,<2" },
+    { name = "agent-framework-core", marker = "extra == 'microsoft-agent'", specifier = ">=1.13,<2" },
+    { name = "anthropic", marker = "extra == 'all'", specifier = ">=1.0,<2" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1.0,<2" },
+    { name = "anthropic", marker = "extra == 'full'", specifier = ">=1.0,<2" },
+    { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.26.0" },
+    { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.26.0" },
+    { name = "boto3", marker = "extra == 'strands'", specifier = ">=1.26.0" },
+    { name = "click", marker = "extra == 'cli'", specifier = ">=8.0.0" },
+    { name = "crewai", marker = "extra == 'all'", specifier = ">=1.0,<2" },
+    { name = "crewai", marker = "extra == 'crewai'", specifier = ">=1.0,<2" },
+    { name = "crewai", marker = "extra == 'full'", specifier = ">=1.0,<2" },
+    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=4.0,<5" },
+    { name = "gliner2", extras = ["local"], marker = "extra == 'extraction'", specifier = ">=2.0,<3" },
+    { name = "gliner2", extras = ["local"], marker = "extra == 'full'", specifier = ">=2.0,<3" },
+    { name = "gliner2", extras = ["local"], marker = "extra == 'gliner'", specifier = ">=2.0,<3" },
+    { name = "gliner2", extras = ["local"], marker = "extra == 'gliner2'", specifier = ">=2.0,<3" },
+    { name = "google-adk", marker = "extra == 'google-adk'", specifier = ">=2.0,<3" },
+    { name = "google-cloud-aiplatform", marker = "extra == 'google'", specifier = ">=2.0,<3" },
+    { name = "google-cloud-aiplatform", marker = "extra == 'vertex-ai'", specifier = ">=2.0,<3" },
+    { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.66" },
+    { name = "google-genai", marker = "extra == 'google-adk'", specifier = ">=1.0" },
+    { name = "google-genai", marker = "extra == 'vertex-ai'", specifier = ">=1.66" },
+    { name = "httpx", marker = "extra == 'nams'", specifier = ">=0.27.0" },
+    { name = "instructor", marker = "extra == 'full'", specifier = ">=1.7,<2" },
+    { name = "instructor", marker = "extra == 'instructor'", specifier = ">=1.7,<2" },
+    { name = "langchain", marker = "extra == 'langchain-agents'", specifier = ">=1.0,<2" },
+    { name = "langchain-core", marker = "extra == 'all'", specifier = ">=1.0,<2" },
+    { name = "langchain-core", marker = "extra == 'full'", specifier = ">=1.0,<2" },
+    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=1.0,<2" },
+    { name = "langchain-core", marker = "extra == 'langchain-agents'", specifier = ">=1.0,<2" },
+    { name = "litellm", marker = "extra == 'all'", specifier = ">=1.50,<2" },
+    { name = "litellm", marker = "extra == 'full'", specifier = ">=1.50,<2" },
+    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.50,<2" },
+    { name = "llama-index-core", marker = "extra == 'all'", specifier = ">=0.14,<1" },
+    { name = "llama-index-core", marker = "extra == 'full'", specifier = ">=0.14,<1" },
+    { name = "llama-index-core", marker = "extra == 'llamaindex'", specifier = ">=0.14,<1" },
+    { name = "neo4j", specifier = ">=5.20,<7" },
+    { name = "openai", marker = "extra == 'all'", specifier = ">=2.0,<4" },
+    { name = "openai", marker = "extra == 'full'", specifier = ">=2.0,<4" },
+    { name = "openai", marker = "extra == 'openai'", specifier = ">=2.0,<4" },
+    { name = "openai", marker = "extra == 'openai-agents'", specifier = ">=2.0,<4" },
+    { name = "opentelemetry-api", marker = "extra == 'observability'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-exporter-otlp", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'observability'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.20.0" },
+    { name = "opik", marker = "extra == 'opik'", specifier = ">=1.0.0" },
+    { name = "protobuf", marker = "extra == 'extraction'", specifier = ">=5" },
+    { name = "protobuf", marker = "extra == 'full'", specifier = ">=5" },
+    { name = "protobuf", marker = "extra == 'gliner'", specifier = ">=5" },
+    { name = "protobuf", marker = "extra == 'gliner2'", specifier = ">=5" },
+    { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'all'", specifier = ">=2.0,<3" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'full'", specifier = ">=2.0,<3" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'pydantic-ai'", specifier = ">=2.0,<3" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "rapidfuzz", marker = "extra == 'all'", specifier = ">=3.0.0" },
+    { name = "rapidfuzz", marker = "extra == 'full'", specifier = ">=3.0.0" },
+    { name = "rapidfuzz", marker = "extra == 'fuzzy'", specifier = ">=3.0.0" },
+    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0.0" },
+    { name = "sentence-transformers", marker = "extra == 'full'", specifier = ">=3.0,<7" },
+    { name = "sentence-transformers", marker = "extra == 'sentence-transformers'", specifier = ">=3.0,<7" },
+    { name = "sentencepiece", marker = "extra == 'extraction'", specifier = ">=0.2" },
+    { name = "sentencepiece", marker = "extra == 'full'", specifier = ">=0.2" },
+    { name = "sentencepiece", marker = "extra == 'gliner'", specifier = ">=0.2" },
+    { name = "sentencepiece", marker = "extra == 'gliner2'", specifier = ">=0.2" },
+    { name = "spacy", marker = "extra == 'extraction'", specifier = ">=3.7.0" },
+    { name = "spacy", marker = "extra == 'full'", specifier = ">=3.7.0" },
+    { name = "spacy", marker = "extra == 'spacy'", specifier = ">=3.7.0" },
+    { name = "strands-agents", marker = "extra == 'strands'", specifier = ">=1.55,<2" },
+    { name = "typing-extensions", specifier = ">=4.4" },
+]
+provides-extras = ["all", "anthropic", "aws", "bedrock", "cli", "crewai", "extraction", "full", "fuzzy", "gliner", "gliner2", "google", "google-adk", "instructor", "langchain", "langchain-agents", "litellm", "llamaindex", "mcp", "microsoft-agent", "nams", "observability", "openai", "openai-agents", "opentelemetry", "opik", "pydantic-ai", "sentence-transformers", "spacy", "strands", "vertex-ai"]
 
 [[package]]
 name = "opentelemetry-api"

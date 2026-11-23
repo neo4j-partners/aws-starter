@@ -73,7 +73,7 @@ Behavior changes to accept:
 
 - **Conversation key:** The manager finds conversations by `metadata.strands_session_id`. Today the code uses `metadata.client_session_id`. Conversations from earlier retests will not be reused. The memory DB holds only retest data.
 - **Recall:** Today recall searches the messages of up to 10 other conversations of the same user. The manager instead restores the current conversation and, with `retrieval_config`, injects workspace entities into each user message. See "NAMS Memory Scope" below.
-- **Open traces:** The manager starts a reasoning trace and records each tool call, but 0.8.0 never calls `complete_trace`. Traces stay open after the turn. This is a library gap, not ours to patch through private attributes.
+- **Open traces:** The manager starts a reasoning trace and records each tool call, but 0.8.0 never calls `complete_trace`. Traces stay open after the turn. This is a library gap, not ours to patch through private attributes. Fixed on 2026-11-23 by the move to `0.8.0+fleet.9`, which completes the trace at the end of each turn.
 - **Stored content:** The manager stores text turns only. Tool results are not stored as messages. This matches today.
 - **Extraction:** Extraction runs on assistant turns as well. The three "agent" Person nodes from Retest 8 may come from this. Phase 3 checks whether they keep appearing.
 
@@ -250,7 +250,7 @@ Progress:
 
 ## Decisions
 
-1. **Memory library:** Adopt Neo4j Agent Memory 0.8.0 from PyPI and the session manager. Accept the Phase 3 behavior changes.
+1. **Memory library:** Adopt Neo4j Agent Memory 0.8.0 from PyPI and the session manager. Accept the Phase 3 behavior changes. On 2026-11-23 the agent moved to the fleet build `0.8.0+fleet.9`, as the fleet agents did. That build completes reasoning traces. The release-age exception approved for the fleet agents now covers the fraud agent too. Only `neo4j-agent-memory` changed in the lock.
 2. **OAuth:** Keep `GatewayTokenAuth` and `core/credentials.py`, as the fleet supervisor does.
 3. **Errors:** Let every error propagate to the AgentCore app.
 4. **No user_id:** Reject the request with an error.

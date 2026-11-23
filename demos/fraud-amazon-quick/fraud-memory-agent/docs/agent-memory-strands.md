@@ -2,7 +2,8 @@
 
 The fraud memory agent keeps its memory in the hosted Neo4j Agent Memory
 Service. This page explains how the agent connects to it and why it uses
-the Strands session manager from Neo4j Agent Memory 0.8.0.
+the Strands session manager from Neo4j Agent Memory `0.8.0+fleet.9`. That
+version is the fleet build of 0.8.0, the same one the fleet agents run.
 
 ![NAMS memory lifecycle: each session_id maps to one conversation inside a shared workspace](../../docs/images/memory-lifecycle.svg)
 
@@ -35,7 +36,7 @@ The manager reads `MEMORY_API_KEY`, `MEMORY_ENDPOINT`, and
 2. **Restore:** The manager loads the conversation's earlier turns into the Strands message history. The model sees them as real turns.
 3. **Retrieve:** Before the user turn reaches the model, the manager searches the workspace for the five entities that best match the question.
 4. **Prefix:** The manager adds those entities to the user message in a `<user_context>` block. The system prompt tells the model to treat the block as background data and to check facts against the graph.
-5. **Record:** The manager records each MCP tool call as a reasoning step. It stores user and assistant text turns as messages. Tool results are not stored as messages.
+5. **Record:** The manager records each MCP tool call as a reasoning step. It completes the reasoning trace at the end of the turn. It stores user and assistant text turns as messages. Tool results are not stored as messages.
 6. **Close:** The runtime closes the response stream, then calls `close()` on the manager. The manager saves the last buffered message at that point.
 
 NAMS extracts entities from the stored messages on the server. Extraction
@@ -69,9 +70,8 @@ manager replaces it for these reasons:
 - **Team work:** Fraud investigation is team work. Accounts and merchants found in one investigation help the next one. Workspace sharing is the behavior the demo wants.
 - **Search cost:** NAMS message search covers one conversation. Searching earlier conversations took one call per conversation and a hand-made cap.
 
-## Known gaps in 0.8.0
+## Known gaps
 
-- **Open traces:** The manager starts a reasoning trace and records each tool call, but it never completes the trace. Traces stay open after the turn.
 - **No redaction after save:** NAMS has no endpoint to update or delete a message. A redaction that arrives after the manager saved the message does not reach NAMS.
 
 ## Optional memory tools

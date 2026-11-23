@@ -135,7 +135,7 @@ uv run fraud-invoke --local memory-demo   # two turns in one session
 - **`MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`:** These values are optional. Set `MEMORY_ENDPOINT` for a private or staging NAMS deployment. Set `MEMORY_WORKSPACE_ID` to pick the workspace.
 - **`FRAUD_USER_ID`:** This value is optional. `./agent.sh invoke-cloud` sends it as the `user_id`. The default is `demo-user`, the same default as `fraud-cli`.
 - **`MEMORY_TOOLS`:** This value is optional. Set it to `true` to add the NAMS memory tools. It is off by default. `agent.sh deploy` passes it to the runtime when you set it.
-- **`MODEL_ID`:** This value is optional. The default is `global.anthropic.claude-sonnet-4-5-20250929-v1:0`. Set it to `global.anthropic.claude-haiku-4-5-20251001-v1:0` for a faster, cheaper model.
+- **`MODEL_ID`:** This value is optional. The default is `global.anthropic.claude-sonnet-5-5`. Set it to `global.anthropic.claude-haiku-4-5-20251001-v1:0` for a faster, cheaper model.
 - **`AWS_REGION`:** This value is optional. The default is `us-west-2`.
 - **`PORT`:** This value is optional. The local server uses port 7020 by default.
 - **`--remote`:** This `fraud-cli` flag sends the question to the deployed runtime instead of the local server.

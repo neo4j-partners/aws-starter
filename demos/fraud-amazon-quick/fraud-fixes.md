@@ -252,7 +252,7 @@ Progress:
     - **Gateway token:** The Runtime gets it from the `fraud-gateway` OAuth2 credential provider. Local runs keep `.mcp-credentials.json`.
     - **IAM:** The CDK stack grants exactly the two credential providers and their two secrets, with no wildcards.
     - **Secret files:** `.env` and `.mcp-credentials.json` live in `demos/fraud-amazon-quick/`, one level above the zip folder. `./agent.sh deploy` refuses to run if a secret file is inside it.
-6. **Model:** Add the prompt rules. After Cloud Retest 9 miscounted transfers, the default moved from Haiku 4.5 to Sonnet 4.5. The next retest compares accuracy.
+6. **Model:** Add the prompt rules. After Cloud Retest 9 miscounted transfers, the default moved from Haiku 4.5 to Sonnet 4.5. On 2026-11-23 Bedrock refused Sonnet 4.5 as a Legacy model the account had not used in 30 days, so the default moved to Sonnet 5.5. The next retest compares accuracy.
 7. **Graph loader:** Fix the query and add tests.
 8. **AWS cleanup:** Delete the leftover log groups and the workload identity. Leave the secret `neo4j-mcp/default` and the bucket `neo4j-finance-demo`.
 9. **MCP request noise:** A separate agent investigates and fixes it. The fix is a 60-second Runtime idle timeout. See Phase 8.

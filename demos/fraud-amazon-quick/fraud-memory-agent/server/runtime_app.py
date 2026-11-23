@@ -15,6 +15,11 @@ session manager from Neo4j Agent Memory:
 The NAMS workspace is the access boundary. Everyone who holds its API key
 shares its conversations and entities. ``user_id`` tags each conversation
 with its owner, but it does not isolate reads.
+
+On AgentCore Runtime the NAMS API key is an AgentCore Identity API key
+credential. The first request reads it and sets ``MEMORY_API_KEY`` for the
+life of the process. Local runs read ``MEMORY_API_KEY`` from
+``demos/fraud-amazon-quick/.env``.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ import asyncio
 import logging
 import os
 import re
+import threading
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import aclosing
@@ -40,10 +46,15 @@ from opentelemetry.trace import Status, StatusCode
 from starlette.exceptions import HTTPException
 from strands import Agent
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+# demos/fraud-amazon-quick/.env, outside the deployed code zip. This file is
+# server/runtime_app.py in fraud-memory-agent/. On the Runtime the file does
+# not exist, and the settings come from the Runtime environment.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 from core import MEMORY_TOOLS_ENABLED, MODEL_ID, SYSTEM_PROMPT  # noqa: E402
-from core.factory import build_mcp_client, build_model  # noqa: E402
+from core.config import AWS_REGION  # noqa: E402
+from core.credentials import NAMS_PROVIDER_VAR  # noqa: E402
+from core.factory import build_mcp_client, build_model, workload_access_token  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,6 +73,10 @@ _PROMPT_KEYS = ("prompt", "message", "query", "input")
 # NAMS searches entities only. It has no preference or fact search.
 _RETRIEVAL = Neo4jRetrievalConfig(include_entities=True, include_preferences=False, top_k=5)
 
+# Serializes the first NAMS API key read, so concurrent first requests make
+# one Identity call.
+_nams_key_lock = threading.Lock()
+
 # Cleanup tasks that outlive a cancelled request. The event loop keeps only
 # weak references to tasks, so this set keeps each one alive until it ends.
 _cleanups: set[asyncio.Task[None]] = set()
@@ -76,6 +91,18 @@ class InvocationRequest:
     session_id: str
 
 
+def _nams_provider() -> str | None:
+    """The NAMS API key credential provider the construct names, or None locally."""
+    return os.environ.get(NAMS_PROVIDER_VAR, "").strip() or None
+
+
+def _nams_key_source() -> str:
+    """Where the NAMS API key comes from, for the startup log. Never the key."""
+    if provider := _nams_provider():
+        return f"identity:{provider}"
+    return "configured" if os.environ.get("MEMORY_API_KEY", "").strip() else "missing"
+
+
 def _log_startup(port: int, *, local: bool) -> None:
     """Log enough status to confirm the runtime is ready without exposing secrets."""
     logger.info(
@@ -83,8 +110,44 @@ def _log_startup(port: int, *, local: bool) -> None:
         port,
         "local" if local else "agentcore",
         MODEL_ID,
-        "configured" if os.environ.get("MEMORY_API_KEY", "").strip() else "missing",
+        _nams_key_source(),
     )
+
+
+def _load_nams_api_key(provider: str, workload_token: str) -> None:
+    """Read the NAMS API key from AgentCore Identity once per process. Blocks.
+
+    The key is cached in ``MEMORY_API_KEY``, which the session manager reads.
+    """
+    from bedrock_agentcore.services.identity import IdentityClient
+
+    with _nams_key_lock:
+        if os.environ.get("MEMORY_API_KEY", "").strip():
+            return
+        # get_api_key is async but calls blocking boto3 inside, so it runs on
+        # its own loop in this worker thread.
+        key = asyncio.run(
+            IdentityClient(AWS_REGION).get_api_key(
+                provider_name=provider, agent_identity_token=workload_token
+            )
+        )
+        if not key:
+            raise RuntimeError(f"Credential provider {provider} returned an empty API key")
+        os.environ["MEMORY_API_KEY"] = key
+        logger.info("Loaded the NAMS API key from credential provider %s", provider)
+
+
+async def _ensure_nams_api_key() -> None:
+    """Make sure ``MEMORY_API_KEY`` is set before the session manager is built.
+
+    Locally there is no provider, and the key comes from ``.env``. On the
+    Runtime the first request reads it with that request's workload access
+    token. Later requests find it already set.
+    """
+    provider = _nams_provider()
+    if provider is None or os.environ.get("MEMORY_API_KEY", "").strip():
+        return
+    await asyncio.to_thread(_load_nams_api_key, provider, workload_access_token())
 
 
 def _safe_scope_id(value: object) -> str | None:
@@ -194,6 +257,7 @@ async def _release_after_build(build: asyncio.Task[Agent], memory: Neo4jSessionM
 
 async def _run_agent(request: InvocationRequest) -> AsyncIterator[dict]:
     """Run one agent turn and map its stream to the client events."""
+    await _ensure_nams_api_key()
     memory = _session_manager(request)
     # The shield keeps a cancel from abandoning the build, so the release
     # can wait for it before closing memory.
@@ -253,14 +317,13 @@ async def invoke(payload: dict | None = None) -> AsyncIterator[dict]:
     return _stream(request)
 
 
-def main() -> None:
-    """Run the local server on port 7020 unless PORT is supplied."""
-    port = int(os.environ.get("PORT", "7020"))
-    _log_startup(port, local=True)
-    app.run(port=port)
+def main(default_port: int = 7020, *, local: bool = True) -> None:
+    """Start the server in the foreground. Stop it with Ctrl+C.
 
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8080"))
-    _log_startup(port, local=False)
+    ``uv run fraud-server`` calls this with the local port, 7020. The root
+    ``main.py`` calls it with 8080, the port AgentCore Runtime expects.
+    ``PORT`` overrides both.
+    """
+    port = int(os.environ.get("PORT", str(default_port)))
+    _log_startup(port, local=local)
     app.run(port=port)

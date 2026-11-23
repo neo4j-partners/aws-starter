@@ -5,9 +5,7 @@ import os
 # Default: Claude Sonnet 4.5. Haiku 4.5 miscounted transfers in Cloud Retest 9.
 # Override via the MODEL_ID env var, for example with Haiku 4.5:
 # global.anthropic.claude-haiku-4-5-20251001-v1:0
-MODEL_ID = os.environ.get(
-    "MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
-)
+MODEL_ID = os.environ.get("MODEL_ID", "global.anthropic.claude-sonnet-4-5-20250929-v1:0")
 AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 
 # Optional: give the agent NAMS memory tools it can call on its own. These

@@ -10,7 +10,7 @@ MCP_SERVER_DIR="$SCRIPT_DIR/../neo4j-mcp-server"
 TARGETS=(
     "../quickstart:.mcp-credentials.json"
     "../demos/aircraft-fleet:.mcp-credentials.fleet.json"
-    "../demos/fraud-amazon-quick/fraud-memory-agent:.mcp-credentials.finance.json"
+    "../demos/fraud-amazon-quick:.mcp-credentials.finance.json"
 )
 
 RED='\033[0;31m'

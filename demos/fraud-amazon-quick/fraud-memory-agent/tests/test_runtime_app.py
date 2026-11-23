@@ -7,8 +7,10 @@ reaches NAMS, Bedrock, or the Gateway.
 from __future__ import annotations
 
 import asyncio
+import os
+import threading
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -175,6 +177,127 @@ class SpanTests(unittest.TestCase):
         (span,) = self.exporter.get_finished_spans()
         self.assertEqual(span.status.status_code, StatusCode.UNSET)
         self.assertEqual(span.attributes["session.id"], "s1")
+
+
+NAMS_PROVIDER = "FraudMemory_default_nams-api-key"
+
+
+def env_without(*names: str) -> dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k not in names}
+
+
+class NamsApiKeyTests(unittest.TestCase):
+    """The first request reads the NAMS key from Identity; later requests reuse it."""
+
+    def setUp(self) -> None:
+        env = patch.dict(
+            os.environ,
+            env_without("MEMORY_API_KEY", "CREDENTIAL_NAMS_API_KEY_NAME"),
+            clear=True,
+        )
+        env.start()
+        self.addCleanup(env.stop)
+        self.client = Mock()
+        self.client.get_api_key = AsyncMock(return_value="nams-key-value")
+        patcher = patch(
+            "bedrock_agentcore.services.identity.IdentityClient", return_value=self.client
+        )
+        self.identity_client = patcher.start()
+        self.addCleanup(patcher.stop)
+        wat = patch.object(runtime_app, "workload_access_token", return_value="wat-1")
+        self.workload_token = wat.start()
+        self.addCleanup(wat.stop)
+
+    def test_local_run_never_calls_identity(self) -> None:
+        os.environ["MEMORY_API_KEY"] = "from-dotenv"
+        asyncio.run(runtime_app._ensure_nams_api_key())
+        self.identity_client.assert_not_called()
+        self.workload_token.assert_not_called()
+        self.assertEqual(os.environ["MEMORY_API_KEY"], "from-dotenv")
+
+    def test_first_request_reads_the_key_and_sets_it(self) -> None:
+        os.environ["CREDENTIAL_NAMS_API_KEY_NAME"] = NAMS_PROVIDER
+        asyncio.run(runtime_app._ensure_nams_api_key())
+        self.client.get_api_key.assert_awaited_once_with(
+            provider_name=NAMS_PROVIDER, agent_identity_token="wat-1"
+        )
+        self.identity_client.assert_called_once_with(runtime_app.AWS_REGION)
+        self.assertEqual(os.environ["MEMORY_API_KEY"], "nams-key-value")
+
+    def test_later_requests_reuse_the_key(self) -> None:
+        os.environ["CREDENTIAL_NAMS_API_KEY_NAME"] = NAMS_PROVIDER
+        asyncio.run(runtime_app._ensure_nams_api_key())
+        asyncio.run(runtime_app._ensure_nams_api_key())
+        self.client.get_api_key.assert_awaited_once()
+        self.workload_token.assert_called_once()
+
+    def test_concurrent_first_requests_read_once(self) -> None:
+        os.environ["CREDENTIAL_NAMS_API_KEY_NAME"] = NAMS_PROVIDER
+        threads = [
+            threading.Thread(target=runtime_app._load_nams_api_key, args=(NAMS_PROVIDER, "wat"))
+            for _ in range(8)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.client.get_api_key.assert_awaited_once()
+
+    def test_empty_key_fails_and_sets_nothing(self) -> None:
+        os.environ["CREDENTIAL_NAMS_API_KEY_NAME"] = NAMS_PROVIDER
+        self.client.get_api_key.return_value = ""
+        with self.assertRaisesRegex(RuntimeError, "empty API key"):
+            asyncio.run(runtime_app._ensure_nams_api_key())
+        self.assertNotIn("MEMORY_API_KEY", os.environ)
+
+    def test_key_is_read_before_the_session_manager(self) -> None:
+        os.environ["CREDENTIAL_NAMS_API_KEY_NAME"] = NAMS_PROVIDER
+        seen: list[str | None] = []
+
+        def session_manager(_request):
+            seen.append(os.environ.get("MEMORY_API_KEY"))
+            raise RuntimeError("stop here")
+
+        async def run() -> None:
+            async for _ in runtime_app._run_agent(REQUEST):
+                pass
+
+        with (
+            patch.object(runtime_app, "_session_manager", side_effect=session_manager),
+            self.assertRaisesRegex(RuntimeError, "stop here"),
+        ):
+            asyncio.run(run())
+        self.assertEqual(seen, ["nams-key-value"])
+
+    def test_startup_log_names_the_provider_not_the_key(self) -> None:
+        os.environ["CREDENTIAL_NAMS_API_KEY_NAME"] = NAMS_PROVIDER
+        self.assertEqual(runtime_app._nams_key_source(), f"identity:{NAMS_PROVIDER}")
+        os.environ.pop("CREDENTIAL_NAMS_API_KEY_NAME")
+        self.assertEqual(runtime_app._nams_key_source(), "missing")
+        os.environ["MEMORY_API_KEY"] = "secret"
+        self.assertEqual(runtime_app._nams_key_source(), "configured")
+
+
+class MainTests(unittest.TestCase):
+    def run_main(self, env: dict[str, str], **kwargs) -> tuple[int, bool]:
+        with (
+            patch.dict(os.environ, env_without("PORT") | env, clear=True),
+            patch.object(runtime_app.app, "run") as run,
+            patch.object(runtime_app, "_log_startup") as log,
+        ):
+            runtime_app.main(**kwargs)
+        port = run.call_args.kwargs["port"]
+        self.assertEqual(log.call_args.args[0], port)
+        return port, log.call_args.kwargs["local"]
+
+    def test_local_default(self) -> None:
+        self.assertEqual(self.run_main({}), (7020, True))
+
+    def test_runtime_entrypoint(self) -> None:
+        self.assertEqual(self.run_main({}, default_port=8080, local=False), (8080, False))
+
+    def test_port_overrides(self) -> None:
+        self.assertEqual(self.run_main({"PORT": "9001"}, default_port=8080, local=False)[0], 9001)
 
 
 if __name__ == "__main__":

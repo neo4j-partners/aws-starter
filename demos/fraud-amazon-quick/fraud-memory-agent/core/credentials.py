@@ -1,44 +1,110 @@
-"""Credential loading and in-memory OAuth2 token refresh.
+"""Gateway credentials for the cloud and local auth paths.
 
-Credentials come from ``.mcp-credentials.json`` at the agent root (one level
-above this package, so resolution is stable regardless of the working
-directory). The access token is refreshed in memory only — no
-file writes — so this works unchanged on AgentCore Runtime where the
-filesystem is ephemeral.
+Cloud: ``CREDENTIAL_FRAUD_GATEWAY_NAME`` names the AgentCore Identity OAuth2
+credential provider that holds the Gateway client secret. The AgentCore CDK
+construct sets it on the Runtime because ``agent.sh deploy`` declares the
+``fraud-gateway`` credential. ``GATEWAY_URL`` gives the Gateway endpoint, and
+``agentcore/cdk/lib/cdk-stack.ts`` sets it. Either variable selects this path,
+and then both must be set. No secret is read from disk.
+
+Local: the credentials file written by ``neo4j-mcp-server/deploy.py``. It
+defaults to ``demos/fraud-amazon-quick/.mcp-credentials.json``, resolved from
+this package, so the path does not depend on the working directory. That
+folder is outside the deployed code zip, so the secret is never packaged.
+``MCP_CREDENTIALS_FILE`` overrides the path. The access token is refreshed in
+memory only, with no file writes.
 """
 
 import json
 import logging
+import os
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
-# Anchor to the agent root (parent of the `core` package), not to the
-# current working directory, so credential resolution is stable.
-AGENT_ROOT = Path(__file__).resolve().parent.parent
-CREDENTIALS_FILE = AGENT_ROOT / ".mcp-credentials.json"
+# fraud-memory-agent/, the folder that holds main.py and core/. This file is
+# core/credentials.py, one level below it.
+AGENT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CREDENTIALS_FILE = AGENT_ROOT.parent / ".mcp-credentials.json"
+
+# The construct names these variables after the credentials:
+# CREDENTIAL_<NAME>_NAME.
+GATEWAY_PROVIDER_VAR = "CREDENTIAL_FRAUD_GATEWAY_NAME"
+NAMS_PROVIDER_VAR = "CREDENTIAL_NAMS_API_KEY_NAME"
 
 # Loaded once per process, refreshed in memory only.
 _CREDENTIALS: dict | None = None
 
 
+class ConfigError(ValueError):
+    """A Runtime setting is missing or invalid."""
+
+
+@dataclass(frozen=True)
+class IdentityCredentials:
+    """Cloud path: the Gateway token comes from an AgentCore Identity provider."""
+
+    gateway_url: str
+    provider_name: str
+    scopes: tuple[str, ...] = ()
+
+
+def is_https(url: str) -> bool:
+    """Report whether the URL uses https, so tokens never travel in clear text."""
+    return urlparse(url).scheme == "https"
+
+
+def identity_credentials() -> IdentityCredentials | None:
+    """Return the cloud path settings, or None for the local path."""
+    provider_name = os.getenv(GATEWAY_PROVIDER_VAR, "").strip()
+    gateway_url = os.getenv("GATEWAY_URL", "").strip()
+    if not provider_name and not gateway_url:
+        return None
+    if not provider_name:
+        raise ConfigError(
+            f"{GATEWAY_PROVIDER_VAR} is not set. The AgentCore construct sets it when "
+            "agentcore.json declares the fraud-gateway credential. "
+            "Deploy with ./agent.sh deploy, which declares it."
+        )
+    if not gateway_url:
+        raise ConfigError(f"GATEWAY_URL must be set when {GATEWAY_PROVIDER_VAR} is set")
+    if not is_https(gateway_url):
+        raise ConfigError("GATEWAY_URL must be an https URL")
+    return IdentityCredentials(
+        gateway_url=gateway_url,
+        provider_name=provider_name,
+        scopes=tuple(os.getenv("GATEWAY_SCOPES", "").split()),
+    )
+
+
+def credentials_file() -> Path:
+    """Return the local credentials file path."""
+    if override := os.getenv("MCP_CREDENTIALS_FILE", "").strip():
+        return Path(override).expanduser()
+    return DEFAULT_CREDENTIALS_FILE
+
+
 def load_credentials() -> dict:
-    """Load credentials from ``.mcp-credentials.json`` into a process cache."""
+    """Load the local credentials file into a process cache."""
     global _CREDENTIALS
 
     if _CREDENTIALS is None:
-        if not CREDENTIALS_FILE.exists():
+        path = credentials_file()
+        if not path.exists():
             raise FileNotFoundError(
-                f"Credentials file not found: {CREDENTIALS_FILE}\n"
-                "Copy from the MCP server deployment:\n"
-                "  cp ../../../neo4j-mcp-server/.mcp-credentials.finance.json .mcp-credentials.json"
+                f"Credentials file not found: {path}\n"
+                "Copy it from the MCP server deployment:\n"
+                "  cp neo4j-mcp-server/.mcp-credentials.finance.json "
+                "demos/fraud-amazon-quick/.mcp-credentials.json"
             )
-        with open(CREDENTIALS_FILE, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             _CREDENTIALS = json.load(f)
-        logger.info("Credentials loaded into memory")
+        logger.info("Credentials loaded into memory from %s", path)
 
     return _CREDENTIALS
 

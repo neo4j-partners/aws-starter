@@ -1,2 +1,17 @@
-# Recovery copies created by ./agent.sh reset-config contain local deployment metadata.
-.bedrock_agentcore.yaml.backup-*
+# AgentCore CLI state. deployed-state.json holds the account's stack and
+# credential ARNs, so it stays out of git. `agent.sh destroy` declares the
+# credential again before it deploys, so losing this file is safe.
+agentcore/.cli/
+
+# The deploy target. aws-targets.json holds the AWS account ID, so it stays
+# out of git. `agentcore deploy` recreates the default target from the
+# current AWS credentials.
+agentcore/aws-targets.json
+
+# AgentCore build cache, CDK output, and CDK dependencies.
+agentcore/.cache/
+agentcore/cdk/cdk.out/
+agentcore/cdk/node_modules/
+
+# The repo .gitignore ignores lib/ for Python builds; the CDK app needs its lib/.
+!agentcore/cdk/lib/

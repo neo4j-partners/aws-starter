@@ -1,0 +1,25 @@
+{
+  "name": "FraudMemory",
+  "version": 2,
+  "managedBy": "CDK",
+  "runtimes": [
+    {
+      "name": "fraud_memory_agent",
+      "description": "Fraud investigation agent with NAMS memory over the Neo4j MCP Gateway",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": ".",
+      "runtimeVersion": "PYTHON_3_12",
+      "protocol": "HTTP"
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "harnesses": []
+}

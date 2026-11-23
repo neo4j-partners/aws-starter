@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Deployment Topology</title>
-  <desc>The graph loader writes the fraud graph. deploy.py --env finance builds the MCP server stack and writes Gateway credentials. agent.sh deploys the agent to AgentCore Runtime through CodeBuild with the starter toolkit. NAMS holds memory.</desc>
+  <desc>The graph loader writes the fraud graph. deploy.py --env finance builds the MCP server stack and writes Gateway credentials. agent.sh deploys the agent to AgentCore Runtime as a CodeZip build with the AgentCore CLI and stores its two secrets in AgentCore Identity. NAMS holds memory.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -32,8 +32,8 @@
   <rect x="1078" y="148" width="40" height="34" rx="17" fill="#2E6DB4"/>
   <text x="1098" y="171" text-anchor="middle" class="t" fill="#FFFFFF">3</text>
   <text x="1134" y="172" text-anchor="start" class="t" fill="#1E3A5F">fraud-memory-agent</text>
-  <text x="1084" y="210" text-anchor="start" class="m">./agent.sh configure</text>
-  <text x="1084" y="232" text-anchor="start" class="m">./agent.sh deploy &amp;&amp; ./agent.sh verify</text>
+  <text x="1084" y="210" text-anchor="start" class="m">./agent.sh deploy</text>
+  <text x="1084" y="232" text-anchor="start" class="m">./agent.sh verify</text>
   <rect x="60" y="330" width="470" height="160" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="295" y="364" text-anchor="middle" class="t" fill="#00594A">Neo4j Aura (fraud database)</text>
   <text x="295" y="388" text-anchor="middle" class="s">NEO4J_* in graph-loader/.env</text>
@@ -66,27 +66,27 @@
   <text x="295" y="662" text-anchor="middle" class="s">copied by scripts/sync-credentials.sh</text>
   <path d="M590,615 L538,625" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
   <rect x="1060" y="300" width="490" height="400" rx="20" fill="#FFFFFF" fill-opacity="0.6" stroke="#7A5AF8" stroke-width="2" stroke-dasharray="9 6"/>
-  <text x="1082" y="330" text-anchor="start" class="lbl" fill="#4A2EB0" font-size="15">AgentCore starter toolkit (agent.sh)</text>
+  <text x="1082" y="330" text-anchor="start" class="lbl" fill="#4A2EB0" font-size="15">AgentCore CLI project (agent.sh)</text>
   <rect x="1090" y="350" width="430" height="90" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1305" y="384" text-anchor="middle" class="t" fill="#4A2EB0">CodeBuild + S3 source bucket</text>
-  <text x="1305" y="408" text-anchor="middle" class="s">bedrock-agentcore-codebuild-sources-*</text>
+  <text x="1305" y="384" text-anchor="middle" class="t" fill="#4A2EB0">AgentCore Identity</text>
+  <text x="1305" y="408" text-anchor="middle" class="s">fraud-gateway, nams-api-key</text>
   <rect x="1090" y="460" width="430" height="100" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1305" y="494" text-anchor="middle" class="t" fill="#4A2EB0">ECR image + AgentCore Runtime</text>
+  <text x="1305" y="494" text-anchor="middle" class="t" fill="#4A2EB0">CodeZip + AgentCore Runtime</text>
   <text x="1305" y="518" text-anchor="middle" class="s">fraud_memory_agent, port 8080</text>
-  <text x="1305" y="540" text-anchor="middle" class="s">MEMORY_* injected at deploy</text>
+  <text x="1305" y="540" text-anchor="middle" class="s">reads both credentials at run time</text>
   <rect x="1090" y="580" width="430" height="90" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
   <text x="1305" y="614" text-anchor="middle" class="t" fill="#4A2EB0">CloudWatch Logs + traces</text>
-  <text x="1305" y="638" text-anchor="middle" class="s">agent.sh logs --errors</text>
+  <text x="1305" y="638" text-anchor="middle" class="s">./agent.sh logs</text>
   <path d="M1295,250 L1295,292" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
   <path d="M1090,510 L1008,505" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
   <rect x="1010.7" y="475" width="78.6" height="21" rx="5" fill="#F7F8FA"/>
   <text x="1050" y="490" text-anchor="middle" class="lbl">MCP + JWT</text>
   <path d="M295,690 L295,862 L1045,862 L1045,540 L1082,540" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
   <rect x="564.1" y="852" width="211.8" height="21" rx="5" fill="#F7F8FA"/>
-  <text x="670" y="867" text-anchor="middle" class="lbl">copied into the agent image</text>
+  <text x="670" y="867" text-anchor="middle" class="lbl">secret stored in AgentCore Identity</text>
   <rect x="1090" y="740" width="430" height="100" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
   <text x="1305" y="774" text-anchor="middle" class="t" fill="#851651">NAMS</text>
   <text x="1305" y="798" text-anchor="middle" class="s">hosted memory, separate from the graph</text>
-  <text x="1305" y="820" text-anchor="middle" class="s">MEMORY_API_KEY only</text>
+  <text x="1305" y="820" text-anchor="middle" class="s">API key from nams-api-key</text>
   <path d="M1305,700 L1305,732" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
 </svg>

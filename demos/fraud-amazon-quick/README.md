@@ -50,7 +50,7 @@ Run the fraud memory agent:
 
 ```bash
 cd demos/fraud-amazon-quick/fraud-memory-agent
-cp .env.sample .env              # set MEMORY_API_KEY=nams_...
+cp ../.env.sample ../.env        # set MEMORY_API_KEY=nams_...
 uv sync
 uv run fraud-server              # Terminal 1
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Terminal 2
@@ -106,14 +106,14 @@ cp .env.sample .env.finance  # set the same NEO4J_URI, NEO4J_USERNAME, NEO4J_PAS
 ```
 
 `sync-credentials.sh` copies `.mcp-credentials.finance.json` to
-`demos/fraud-amazon-quick/fraud-memory-agent/.mcp-credentials.json`.
+`demos/fraud-amazon-quick/.mcp-credentials.json`.
 
 ## Step 4: Run the fraud memory agent
 
 Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
 ```bash
-cp .env.sample .env         # set MEMORY_API_KEY=nams_...
+cp ../.env.sample ../.env   # set MEMORY_API_KEY=nams_...
 uv sync
 uv run fraud-server        # Terminal 1
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Terminal 2
@@ -122,10 +122,12 @@ uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Termina
 Deploy the agent to AgentCore Runtime after the local run works:
 
 ```bash
-./agent.sh configure
-./agent.sh deploy
-./agent.sh verify
+./agent.sh deploy           # needs the AgentCore CLI: npm install -g @aws/agentcore
 ```
+
+`.env` and `.mcp-credentials.json` stay in `demos/fraud-amazon-quick/`.
+Deploy refuses to run when a secrets file sits inside `fraud-memory-agent/`,
+because it zips that folder.
 
 See
 [`demos/fraud-amazon-quick/fraud-memory-agent/README.md`](./fraud-memory-agent/README.md)

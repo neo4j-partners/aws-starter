@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 import unittest
 from unittest.mock import Mock, patch
 
@@ -67,6 +70,72 @@ class SseParsingTests(unittest.TestCase):
             transport._result(content_parts, errors),
             {"status": "error", "errors": ["RuntimeError: boom"]},
         )
+
+
+RUNTIME_ARN = "arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/fraud_memory_agent-AbC"
+
+
+def status_output(resources: list[dict]) -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess([], 0, stdout=json.dumps({"resources": resources}))
+
+
+class AgentConfigTests(unittest.TestCase):
+    def setUp(self) -> None:
+        env = patch.dict(
+            os.environ, {k: v for k, v in os.environ.items() if k != "AGENT_ARN"}, clear=True
+        )
+        env.start()
+        self.addCleanup(env.stop)
+
+    @patch("client.transport.subprocess.run")
+    def test_agent_arn_wins_without_calling_the_cli(self, run: Mock) -> None:
+        os.environ["AGENT_ARN"] = RUNTIME_ARN
+        self.assertEqual(transport.get_agent_config(), (RUNTIME_ARN, "us-west-2"))
+        run.assert_not_called()
+
+    @patch("client.transport.subprocess.run")
+    def test_arn_comes_from_cli_status(self, run: Mock) -> None:
+        run.return_value = status_output(
+            [
+                {"resourceType": "credential", "name": "fraud-gateway", "arn": "x"},
+                {
+                    "resourceType": "runtime",
+                    "name": "fraud_memory_agent",
+                    "deploymentState": "deployed",
+                    "arn": RUNTIME_ARN,
+                },
+            ]
+        )
+        self.assertEqual(transport.get_agent_config(), (RUNTIME_ARN, "us-west-2"))
+        args, kwargs = run.call_args
+        self.assertEqual(args[0], ["agentcore", "status", "--json", "--target", "default"])
+        self.assertEqual(kwargs["cwd"], transport.AGENT_ROOT)
+
+    @patch("client.transport.subprocess.run")
+    def test_undeployed_runtime_exits_with_a_hint(self, run: Mock) -> None:
+        run.return_value = status_output(
+            [
+                {
+                    "resourceType": "runtime",
+                    "name": "fraud_memory_agent",
+                    "deploymentState": "local-only",
+                }
+            ]
+        )
+        with self.assertRaises(SystemExit) as caught:
+            transport.get_agent_config()
+        self.assertIn("./agent.sh deploy", str(caught.exception.code))
+
+    @patch("client.transport.subprocess.run", side_effect=FileNotFoundError)
+    def test_missing_cli_exits_with_a_hint(self, _run: Mock) -> None:
+        with self.assertRaises(SystemExit) as caught:
+            transport.get_agent_config()
+        self.assertIn("AGENT_ARN", str(caught.exception.code))
+
+    def test_a_non_agentcore_arn_is_rejected(self) -> None:
+        os.environ["AGENT_ARN"] = "arn:aws:lambda:us-west-2:123456789012:function:f"
+        with self.assertRaises(ValueError):
+            transport.get_agent_config()
 
 
 if __name__ == "__main__":

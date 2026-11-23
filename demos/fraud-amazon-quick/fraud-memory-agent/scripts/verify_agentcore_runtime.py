@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the configured AgentCore runtime is READY and can answer a graph query.
+"""Verify that an AgentCore runtime is READY and can answer a graph query.
 
 This is deliberately stricter than the control-plane deployment result.  A
 runtime can be ``READY`` while its first invocation still fails because of an
@@ -16,10 +16,8 @@ import sys
 import time
 import uuid
 from collections.abc import Callable, Iterable
-from pathlib import Path
 
 import boto3
-import yaml
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -36,8 +34,11 @@ TERMINAL_STATUSES = frozenset({"CREATE_FAILED", "UPDATE_FAILED", "DELETING", "DE
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--agent", required=True)
+    parser.add_argument(
+        "--runtime-arn",
+        required=True,
+        help="The Runtime ARN, from 'agentcore status --json' or AGENT_ARN.",
+    )
     parser.add_argument("--prompt", default=DEFAULT_PROMPT)
     parser.add_argument(
         "--timeout-seconds",
@@ -63,22 +64,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def configured_runtime(config_path: Path, agent_name: str) -> tuple[str, str, str]:
-    with config_path.open(encoding="utf-8") as handle:
-        config = yaml.safe_load(handle) or {}
-    agent = config.get("agents", {}).get(agent_name)
-    if not isinstance(agent, dict):
-        raise ValueError(f"Agent '{agent_name}' is not configured in {config_path}.")
-    deployment = agent.get("bedrock_agentcore") or {}
-    runtime_id = deployment.get("agent_id")
-    runtime_arn = deployment.get("agent_arn")
-    region = (agent.get("aws") or {}).get("region")
-    if not all(isinstance(value, str) and value for value in (runtime_id, runtime_arn, region)):
-        raise ValueError(
-            "AgentCore runtime binding is incomplete. Run './agent.sh configure' and "
-            "'./agent.sh deploy' first."
-        )
-    return runtime_id, runtime_arn, region
+def parse_runtime_arn(runtime_arn: str) -> tuple[str, str]:
+    """Return ``(runtime_id, region)`` from a Runtime ARN.
+
+    The ARN has the form
+    ``arn:aws:bedrock-agentcore:<region>:<account>:runtime/<runtime_id>``.
+    """
+    parts = runtime_arn.split(":")
+    resource = parts[5] if len(parts) == 6 else ""
+    kind, _, runtime_id = resource.partition("/")
+    if parts[2:3] != ["bedrock-agentcore"] or not parts[3] or kind != "runtime" or not runtime_id:
+        raise ValueError(f"Not an AgentCore Runtime ARN: {runtime_arn}")
+    return runtime_id, parts[3]
 
 
 def wait_for_ready(
@@ -157,12 +154,14 @@ def main() -> int:
     if args.poll_interval_seconds < 1:
         print("--poll-interval-seconds must be positive.", file=sys.stderr)
         return 2
-    if not args.config.exists():
-        print(f"Configuration file not found: {args.config}", file=sys.stderr)
+    try:
+        runtime_id, region = parse_runtime_arn(args.runtime_arn)
+    except ValueError as error:
+        print(error, file=sys.stderr)
         return 2
+    runtime_arn = args.runtime_arn
 
     try:
-        runtime_id, runtime_arn, region = configured_runtime(args.config, args.agent)
         client_config = Config(
             connect_timeout=10,
             read_timeout=args.timeout_seconds,

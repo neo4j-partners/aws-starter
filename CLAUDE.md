@@ -110,15 +110,18 @@ uv run fraud-graph-load          # --reset deletes all graph data first
 uv run fraud-graph-enrich        # GDS risk, community, and similarity signals
 uv run fraud-graph-analyze       # read-only investigation queries
 
-# Fraud memory agent: Strands agent over its own core/. agent.sh and
-# Dockerfile live at the agent root; runtime_app.py is in server/.
+# Fraud memory agent: Strands agent over its own core/. agent.sh and the
+# Runtime entrypoint main.py live at the agent root; runtime_app.py is in
+# server/. Deploys use the AgentCore CLI project in agentcore/ (CodeZip).
+# .env and .mcp-credentials.json sit one level up, outside the zip.
 # Needs ./deploy.py --env finance.
 cd ../fraud-memory-agent
 uv sync
 uv run fraud-server              # Terminal 1 (port 7020)
 uv run fraud-cli "Find circular transfer chains"   # Terminal 2
+uv run pytest                    # all tests (cd agentcore/cdk && npm test for the stack)
 ./agent.sh deploy
-# (start/stop/test/configure/deploy/status/verify/logs/reset-config/destroy)
+# (start/stop/test/deploy/status/verify/logs/invoke-cloud/destroy)
 ```
 
 ### Integrations and Patterns

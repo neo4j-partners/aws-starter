@@ -15,6 +15,8 @@ _SPEC = importlib.util.spec_from_file_location("verify_agentcore_runtime", _SCRI
 verify = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(verify)
 
+RUNTIME_ARN = "arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/fraud_memory_agent-AbC123"
+
 
 class FakeClock:
     """A clock that only advances when the code under test sleeps."""
@@ -128,7 +130,7 @@ class WaitForReadyTests(unittest.TestCase):
 
 class ArgumentTests(unittest.TestCase):
     def run_main(self, *flags: str) -> tuple[int, str]:
-        argv = ["verify", "--config", "missing.yaml", "--agent", "agent", *flags]
+        argv = ["verify", "--runtime-arn", RUNTIME_ARN, *flags]
         stderr = io.StringIO()
         with patch.object(sys, "argv", argv), contextlib.redirect_stderr(stderr):
             code = verify.main()
@@ -145,6 +147,32 @@ class ArgumentTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
         self.assertIn("--poll-interval-seconds must be positive", stderr)
+
+    def test_a_malformed_arn_is_rejected(self) -> None:
+        with patch.object(sys, "argv", ["verify", "--runtime-arn", "not-an-arn"]):
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = verify.main()
+
+        self.assertEqual(code, 2)
+        self.assertIn("Not an AgentCore Runtime ARN", stderr.getvalue())
+
+
+class ParseRuntimeArnTests(unittest.TestCase):
+    def test_id_and_region_come_from_the_arn(self) -> None:
+        self.assertEqual(
+            verify.parse_runtime_arn(RUNTIME_ARN), ("fraud_memory_agent-AbC123", "us-west-2")
+        )
+
+    def test_other_resource_types_are_rejected(self) -> None:
+        for arn in (
+            "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/g-1",
+            "arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/",
+            "arn:aws:lambda:us-west-2:123456789012:runtime/r-1",
+            "arn:aws:bedrock-agentcore::123456789012:runtime/r-1",
+        ):
+            with self.subTest(arn=arn), self.assertRaises(ValueError):
+                verify.parse_runtime_arn(arn)
 
 
 class ConsumeSseTests(unittest.TestCase):

@@ -10,7 +10,7 @@ turn in the hosted Neo4j Agent Memory Service.
 - **NAMS:** The Neo4j Agent Memory Service, called **NAMS** below, holds the agent's memory. The agent reaches it through `Neo4jSessionManager` from `neo4j-agent-memory` 0.8.0.
 - **Sessions:** Each `session_id` is one NAMS conversation. A call that repeats a `session_id` restores that conversation's earlier turns.
 - **Separate stores:** The fraud graph and agent memory stay apart. The MCP server owns graph access. NAMS owns memory storage, embeddings, and its schema.
-- **Credentials:** The agent needs no `NEO4J_*` values. It needs a NAMS API key and the Gateway credentials file `.mcp-credentials.json`.
+- **Credentials:** The agent needs no `NEO4J_*` values. It needs a NAMS API key and the Gateway credentials file `.mcp-credentials.json`. Both live in `demos/fraud-amazon-quick/`, outside the folder that `agent.sh deploy` zips.
 - **Local and cloud:** You can run the agent locally on port 7020 or deploy it to AgentCore Runtime with `agent.sh`.
 - **Traffic generator:** A load client sends synthetic analyst traffic so you can inspect memory in NAMS.
 
@@ -23,15 +23,13 @@ This assumes the graph is loaded and the MCP server is deployed. See
 Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
 ```bash
-cp .env.sample .env              # set MEMORY_API_KEY=nams_...
+cp ../.env.sample ../.env        # set MEMORY_API_KEY=nams_...
 uv sync
 
 uv run fraud-server              # Terminal 1
 uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Terminal 2
 
-./agent.sh configure             # deploy to AgentCore Runtime
-./agent.sh deploy
-./agent.sh verify
+./agent.sh deploy                # deploy to AgentCore Runtime and verify it
 ```
 
 ## Prerequisites
@@ -39,6 +37,7 @@ uv run fraud-cli --user-id analyst-1 "Find circular transfer chains"   # Termina
 - **MCP server:** You need a deployed Neo4j MCP server and AgentCore Gateway. See [`neo4j-mcp-server/`](../../../neo4j-mcp-server/).
 - **AWS credentials:** Your AWS credentials need access to the configured Bedrock model.
 - **NAMS API key:** You can create a key at [NAMS](https://memory.neo4jlabs.com/).
+- **AgentCore CLI:** The cloud commands in `agent.sh` need the AgentCore CLI. Install it with `npm install -g @aws/agentcore`. They also need `jq`.
 
 ## How memory works
 
@@ -105,20 +104,20 @@ from the repo root.
    ```
 
    `sync-credentials.sh` copies `.mcp-credentials.finance.json` to
-   `demos/fraud-amazon-quick/fraud-memory-agent/.mcp-credentials.json`.
+   `demos/fraud-amazon-quick/.mcp-credentials.json`.
 
-4. Go to `demos/fraud-amazon-quick/fraud-memory-agent/` and start or deploy the agent. The agent reads `.mcp-credentials.json`, refreshes the OAuth token in memory, and uses the Gateway URL in that file to find and call the Neo4j MCP tools.
+4. Go to `demos/fraud-amazon-quick/fraud-memory-agent/` and start or deploy the agent. A local run reads `../.mcp-credentials.json`, refreshes the OAuth token in memory, and uses the Gateway URL in that file to find and call the Neo4j MCP tools. Set `MCP_CREDENTIALS_FILE` to read the file from another path.
 
 - **Graph loader settings:** The graph loader keeps its `NEO4J_*` values in `demos/fraud-amazon-quick/graph-loader/.env`. They must point to the same database as the MCP server.
-- **Credentials file:** The file `.mcp-credentials.json` holds the Gateway OAuth client secret. Keep it out of git.
+- **Credentials file:** The file `.mcp-credentials.json` holds the Gateway OAuth client secret. Keep it out of git and out of `fraud-memory-agent/`.
 
 ## Local run
 
 Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
 ```bash
-cp .env.sample .env
-# Set MEMORY_API_KEY=nams_... in .env
+cp ../.env.sample ../.env
+# Set MEMORY_API_KEY=nams_... in ../.env
 uv sync
 
 # Terminal 1
@@ -131,6 +130,7 @@ uv run fraud-invoke --local memory-demo   # two turns in one session
 ./agent.sh test                  # one default question to the local server
 ```
 
+- **`.env` location:** The file `.env` sits in `demos/fraud-amazon-quick/`, one level up. A value exported in the shell wins over the file.
 - **`MEMORY_API_KEY`:** This key is required. Without it, every request returns an error.
 - **`MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID`:** These values are optional. Set `MEMORY_ENDPOINT` for a private or staging NAMS deployment. Set `MEMORY_WORKSPACE_ID` to pick the workspace.
 - **`FRAUD_USER_ID`:** This value is optional. `./agent.sh invoke-cloud` sends it as the `user_id`. The default is `demo-user`, the same default as `fraud-cli`.
@@ -148,66 +148,46 @@ reasoning traces from these runs.
 Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
 
 ```bash
-./agent.sh configure
 ./agent.sh deploy
-./agent.sh verify
 ./agent.sh invoke-cloud "Find circular transfer chains"
 ```
 
-- **Memory settings:** `agent.sh deploy` reads `MEMORY_API_KEY` from `.env` and injects it into the runtime. It also passes `MEMORY_ENDPOINT` and `MEMORY_WORKSPACE_ID` when you set them.
+The AgentCore CLI project lives in `agentcore/`. Its project is `FraudMemory`,
+and its runtime is `fraud_memory_agent`. The runtime is a CodeZip build of this
+folder, and `main.py` is its entrypoint.
+
+- **Code zip:** `agentcore deploy` zips this folder. It leaves out `.git`, `.venv`, `__pycache__`, `.pytest_cache`, `.DS_Store`, `node_modules`, and `agentcore/`. The Runtime installs the dependencies from `uv.lock`. It does not install the `dev` group.
+- **Secret check:** Deploy stops when a secrets file sits in this folder, such as `.env`, `.mcp-credentials.json`, `.mcp.json`, or a `*.pem` file. The zip would upload it with the code. Keep `.env` and `.mcp-credentials.json` in `demos/fraud-amazon-quick/`.
+- **Credentials:** Deploy stores two credentials in AgentCore Identity. `fraud-gateway` holds the Gateway OAuth client secret from `../.mcp-credentials.json`. `nams-api-key` holds `MEMORY_API_KEY` from `../.env`. Each secret goes to the CLI on stdin. Deploy then deletes the secret lines that the CLI writes to `agentcore/.env.local`.
+- **Runtime access:** The Runtime gets its Gateway token from `fraud-gateway`. It reads the NAMS key from `nams-api-key` on its first request. Its IAM role can read only these two credentials.
+- **Memory settings:** Deploy passes `MEMORY_ENDPOINT`, `MEMORY_WORKSPACE_ID`, and `MEMORY_TOOLS` from `../.env` when you set them.
 - **Smoke test:** A deploy counts as verified only after the runtime is `READY` and a one-turn graph test succeeds. This test calls the real NAMS, model, and Neo4j MCP server. The check waits up to 10 minutes for a new runtime to reach `READY`.
-- **`--skip-smoke`:** This flag uploads without the smoke test. Run `./agent.sh verify` before you send traffic to it.
-- **Dependency rebuild:** Deploy records a fingerprint of `pyproject.toml` and `uv.lock`. When either file changes, deploy forces AgentCore to rebuild dependencies. Add `--force-rebuild-deps` to force a rebuild yourself.
+- **`--skip-smoke`:** This flag deploys without the smoke test. Run `./agent.sh verify` before you send traffic to it.
+- **Runtime ARN:** `verify`, `fraud-cli --remote`, and the traffic generator find the runtime with `agentcore status --json`. Set `AGENT_ARN` to use another runtime.
 - **`invoke-cloud` errors:** `invoke-cloud` exits 1 when the response holds an error event, so scripts can check its exit code.
-- **Stale runtime binding:** Deploy clears the saved runtime binding only when the runtime is in another Region or AWS confirms it no longer exists.
 
 Recovery and diagnostics commands:
 
 ```bash
-./agent.sh status                 # control-plane deployment state
+./agent.sh status                 # what the CLI has deployed in the default target
 ./agent.sh verify                 # READY state plus the end-to-end graph smoke test
-./agent.sh logs --errors          # recent failed AgentCore observability traces
-./agent.sh reset-config           # archive only local config; AWS resources stay intact
-./agent.sh configure              # create fresh local config after reset-config
+./agent.sh logs                   # Runtime logs from the last 30 minutes
+./agent.sh logs 2h                # Runtime logs from the last two hours
 ./agent.sh destroy                # remove the agent from AgentCore Runtime
 ```
 
 ### Tear down
 
-`agentcore destroy` leaves four things behind. `./agent.sh destroy` removes them after destroy finishes:
+The AgentCore CLI has no destroy command. `./agent.sh destroy` removes the
+runtime from the project and deploys again. That deploy deletes the
+`AgentCore-FraudMemory-default` stack and both credential providers. The
+tracked `agentcore/agentcore.json` is restored afterward.
 
-- **Source bucket:** It deletes the S3 bucket `bedrock-agentcore-codebuild-sources-<account>-<region>` only when the bucket is empty. Every toolkit agent in that account and Region shares it.
-- **Memory log group:** It deletes `/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/<memory-id>` only when the toolkit created the memory. Destroy keeps a pre-existing memory, so its log group stays too. `./agent.sh configure` passes `--disable-memory`, because the agent's memory is NAMS. A config made that way has no AgentCore memory, so this step prints `Skipped`.
-- **Build cache:** It deletes the local `.bedrock_agentcore/fraud_memory_agent/` folder, which can hold about 50 MB. It deletes `.bedrock_agentcore/` only when nothing else is left in it.
-- **Runtime log groups:** It deletes the log groups under `/aws/bedrock-agentcore/runtimes/<runtime-id>-`, such as the `-DEFAULT` endpoint's group. The runtime ID is the `agent_id` from the config. Destroy does not wait for AgentCore to delete the Runtime, so the cleanup waits up to 10 minutes for the Runtime to disappear first. It stops at once if the Runtime reaches `DELETE_FAILED` and prints the failure reason. If the Runtime is still there, the log groups stay and `agent.sh` exits 1.
-
-It prints `Removed`, `Skipped` or `Not found` for each one. A missing resource is not an error. When destroy is cancelled or ends with errors, the cleanup does not run, and `agent.sh` prints `Destroy did not finish` and exits 3. When an AWS call fails, `agent.sh` exits 1.
-
-If the cleanup fails, remove the leftovers by hand. `destroy` has already deleted `.bedrock_agentcore.yaml`, so take the Region, memory ID and runtime ID from the `Could not remove` lines:
-
-```bash
-REGION=us-east-1
-MEMORY_ID=<memory-id>
-RUNTIME_ID=<runtime-id>
-ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-BUCKET=bedrock-agentcore-codebuild-sources-$ACCOUNT-$REGION
-
-# Delete the bucket only when this lists no versions and no delete markers.
-aws s3api list-object-versions --bucket "$BUCKET" --max-items 1
-aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
-
-aws logs delete-log-group --region "$REGION" \
-    --log-group-name "/aws/vendedlogs/bedrock-agentcore/memory/APPLICATION_LOGS/$MEMORY_ID"
-rm -rf .bedrock_agentcore/fraud_memory_agent/
-
-# Run these only after get-agent-runtime reports that the Runtime is not found.
-aws bedrock-agentcore-control get-agent-runtime --region "$REGION" --agent-runtime-id "$RUNTIME_ID"
-aws logs describe-log-groups --region "$REGION" \
-    --log-group-name-prefix "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-" \
-    --query 'logGroups[].logGroupName' --output text
-aws logs delete-log-group --region "$REGION" \
-    --log-group-name "/aws/bedrock-agentcore/runtimes/$RUNTIME_ID-DEFAULT"
-```
+- **Confirmation:** Destroy asks before it changes anything. Pass `--yes` to skip the question.
+- **Account check:** Destroy first checks that your AWS credentials belong to the account in `agentcore/aws-targets.json`. Run it from the checkout that deployed, because git ignores that file.
+- **No stack:** When the stack does not exist, destroy only deletes leftover secret lines from `agentcore/.env.local`.
+- **Report:** Destroy then checks `agentcore status` and looks up the stack and both providers in AWS by name. It lists anything still deployed and exits 1.
+- **Log groups:** When nothing remains, destroy deletes the runtime's log groups under `/aws/bedrock-agentcore/runtimes/<runtime-id>-`. Neither the CLI nor the stack deletes them. It prints `Removed` or `Not found` for each one.
 
 ## Generate NAMS traffic
 
@@ -289,6 +269,21 @@ The response is a stream of server-sent events:
 - **`tool`:** The event `{"type": "tool", "name": "..."}` arrives once for each MCP tool use.
 - **`complete`:** The event `{"type": "complete"}` follows the last chunk.
 - **Error:** The event `{"error": "...", "error_type": "...", "message": "..."}` reports a failure. `fraud-cli` prints it. `./agent.sh invoke-cloud` exits 1 when it sees it.
+
+## Run the tests
+
+Run from `demos/fraud-amazon-quick/fraud-memory-agent/`:
+
+```bash
+uv sync                           # installs pytest from the dev group
+uv run pytest                     # every suite, about three minutes
+uv run pytest -k "not agent_sh"   # skip the agent.sh suite, about one second
+(cd agentcore/cdk && npm test)    # synth tests for the stack's IAM grants
+```
+
+pytest runs the `unittest` suites and the pytest suite for `agent.sh`. The
+`agent.sh` suite runs the script against stub `agentcore`, `aws`, and `uv`
+commands, so no test calls AWS.
 
 ## Architecture
 

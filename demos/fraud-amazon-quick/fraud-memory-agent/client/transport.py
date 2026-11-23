@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
 import sys
 import uuid
 from collections.abc import Iterable
@@ -34,15 +35,18 @@ from typing import Literal
 
 import boto3
 import httpx
-import yaml
 from botocore.config import Config
 
 logger = logging.getLogger(__name__)
 
-# fraud-memory-agent/ is the parent of client/; .bedrock_agentcore.yaml and the
-# default local URL both anchor here regardless of the caller's cwd.
+# fraud-memory-agent/ is the parent of client/. The AgentCore CLI project
+# lives here, so `agentcore status` runs here regardless of the caller's cwd.
 AGENT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_URL = "http://localhost:7020/invocations"
+# Must match the Runtime name in agentcore/agentcore.json and agent.sh.
+RUNTIME_NAME = "fraud_memory_agent"
+DEPLOY_TARGET = "default"
+STATUS_TIMEOUT_SECONDS = 60
 
 Target = Literal["local", "deployed"]
 
@@ -148,34 +152,50 @@ def _deployed_client(
     )
 
 
-def get_agent_config() -> tuple[str, str]:
-    """Read ``(agent_arn, region)`` from ``.bedrock_agentcore.yaml``.
+def _status_runtime_arn() -> str | None:
+    """Read the deployed Runtime ARN from ``agentcore status --json``.
 
-    The file is created by ``./agent.sh configure``. Resolved against the
-    agent root so it works no matter where the client is invoked from.
+    Returns None when the Runtime is not deployed. Exits with a message when
+    the CLI is missing or fails.
     """
-    config_file = AGENT_ROOT / ".bedrock_agentcore.yaml"
     try:
-        with open(config_file, encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+        result = subprocess.run(
+            ["agentcore", "status", "--json", "--target", DEPLOY_TARGET],
+            cwd=AGENT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=STATUS_TIMEOUT_SECONDS,
+            check=True,
+        )
+        status = json.loads(result.stdout)
     except FileNotFoundError:
-        logger.error("%s not found", config_file)
-        print(f"ERROR: {config_file} not found")
-        print("")
-        print("Run './agent.sh configure' and './agent.sh deploy' first")
-        sys.exit(1)
+        sys.exit("ERROR: the agentcore CLI is not installed. Set AGENT_ARN instead.")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        sys.exit(f"ERROR: 'agentcore status' failed: {error}. Set AGENT_ARN instead.")
+    except json.JSONDecodeError as error:
+        sys.exit(f"ERROR: 'agentcore status --json' printed invalid JSON: {error}")
+    for resource in status.get("resources") or []:
+        if resource.get("resourceType") == "runtime" and resource.get("name") == RUNTIME_NAME:
+            return resource.get("arn") or None
+    return None
 
-    default_agent = config.get("default_agent")
-    if not default_agent:
-        raise ValueError(f"default_agent not found in {config_file}")
 
-    agent_config = config.get("agents", {}).get(default_agent, {})
-    arn = agent_config.get("bedrock_agentcore", {}).get("agent_arn")
-    region = agent_config.get("aws", {}).get("region", "us-west-2")
+def get_agent_config() -> tuple[str, str]:
+    """Return ``(agent_arn, region)`` for the deployed Runtime.
 
+    ``AGENT_ARN`` wins when set. Otherwise the ARN comes from the AgentCore
+    CLI's deployed state. The region is the ARN's region.
+    """
+    arn = os.environ.get("AGENT_ARN", "").strip() or _status_runtime_arn()
     if not arn:
-        raise ValueError(f"agent_arn not found for agent '{default_agent}' in {config_file}")
-    return arn, region
+        sys.exit(
+            f"ERROR: runtime '{RUNTIME_NAME}' is not deployed.\n"
+            "Run './agent.sh deploy' first, or set AGENT_ARN."
+        )
+    parts = arn.split(":")
+    if len(parts) < 6 or parts[2] != "bedrock-agentcore" or not parts[3]:
+        raise ValueError(f"Not an AgentCore Runtime ARN: {arn}")
+    return arn, parts[3]
 
 
 def _handle_sse_event(

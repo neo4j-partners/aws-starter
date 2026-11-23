@@ -170,6 +170,16 @@ Reviewed. The 47 MCP server tests pass.
 
 Cloud Retest 9 shows the fix is not enough. The Runtime called `GET /ping` 29 times, and each call returned 200. In the same 40 minutes it also logged 4,608 `POST /mcp` requests. The rate climbed from 2 per minute at 16:02Z to 794 per minute at 16:16Z. The agent made about 20 tool calls in that window. The source of the rest is still unknown.
 
+**Investigation, 2026-11-23.** The finance MCP stack was deployed by itself, with no agent, and its Runtime log was read per log stream.
+
+- **One session per tool call:** The Gateway opens a new Runtime session for every tool call. One `./cloud.sh test` client session made four tool calls and started four Runtime sessions, four seconds apart.
+- **Health ping:** Each Runtime session calls `GET /ping` once. After that it gets a `POST /mcp` every 2 seconds for as long as it lives. These requests do not keep the session alive.
+- **Idle baseline:** With no client connected, the two sessions from the Gateway's tool sync gave 60 requests per minute. Both shut down exactly 15 minutes later, at the default idle timeout.
+- **Retest 9 explained:** About 20 tool calls, each holding a session for 15 minutes, gives about 600 requests per minute. That matches the 794 seen.
+- **Fix:** `neo4j-mcp-server/cdk/neo4j_mcp_stack.py` sets the Runtime's `idle_runtime_session_timeout` to 60 seconds, the AgentCore minimum. Every call is stateless, so a session holds nothing worth keeping. The change updates the Runtime without interruption.
+- **Verified in the cloud:** After the fix, each of four new sessions lived about 64 seconds and handled 36 or 37 requests. Before it, a session ran about 450. The Gateway test passed 4/4, and the stack was torn down at 17:21Z.
+- **Left for later:** One Runtime session per tool call is Gateway behavior. Session reuse can be revisited when the server moves off the mcp-neo4j-cypher fork.
+
 ### Phase 9: Leftover AWS Resources
 
 This phase covers follow-up 7. Each resource gets a describe call first, then a deletion only with approval.
@@ -226,8 +236,9 @@ Progress:
 
 ## Not Code Fixes
 
-- **Follow-up 5:** The FastMCP move for `neo4j-mcp-server/client/mcp_operations.py` and `patterns/gateway-rbac-interceptor/client/demo.py` is deferred.
+- **Follow-up 5:** The FastMCP move for `neo4j-mcp-server/client/mcp_operations.py` and `patterns/gateway-rbac-interceptor/client/demo.py` was deferred at first. It was done on 2026-11-23. See Decision 13.
 - **Follow-up 10:** The SSO registration expiry is an account setting. Run `aws sso login` before cloud work. The registration expired at 2026-11-23T16:22:21Z.
+- **Supervisor test hang:** Two `supervisor-agent/agent.sh deploy` processes from pytest runs were still alive about 2.5 days later. Both came from the test `test_anything_left_at_the_copy`. They were killed on 2026-11-23. A supervisor `agent.sh` test can leave a deploy hanging. Look into it with the supervisor IAM work.
 
 ## Decisions
 
@@ -235,11 +246,16 @@ Progress:
 2. **OAuth:** Keep `GatewayTokenAuth` and `core/credentials.py`, as the fleet supervisor does.
 3. **Errors:** Let every error propagate to the AgentCore app.
 4. **No user_id:** Reject the request with an error.
-5. **Deploy tooling:** Fix the configure flag only. Keep the starter toolkit.
+5. **Deploy tooling:** Reversed on 2026-11-23. The agent moved from the starter toolkit to the AgentCore CLI. The reasons:
+    - **Build:** The CLI builds a CodeZip from `agentcore/`, with a root `main.py` as the entrypoint. The Dockerfile and both cleanup scripts are gone.
+    - **NAMS key:** The key is the `nams-api-key` Identity API-key credential, not a Runtime environment variable. The Runtime reads it on the first request with the request's workload token.
+    - **Gateway token:** The Runtime gets it from the `fraud-gateway` OAuth2 credential provider. Local runs keep `.mcp-credentials.json`.
+    - **IAM:** The CDK stack grants exactly the two credential providers and their two secrets, with no wildcards.
+    - **Secret files:** `.env` and `.mcp-credentials.json` live in `demos/fraud-amazon-quick/`, one level above the zip folder. `./agent.sh deploy` refuses to run if a secret file is inside it.
 6. **Model:** Add the prompt rules. After Cloud Retest 9 miscounted transfers, the default moved from Haiku 4.5 to Sonnet 4.5. The next retest compares accuracy.
 7. **Graph loader:** Fix the query and add tests.
 8. **AWS cleanup:** Delete the leftover log groups and the workload identity. Leave the secret `neo4j-mcp/default` and the bucket `neo4j-finance-demo`.
-9. **MCP request noise:** A separate agent investigates and fixes it.
+9. **MCP request noise:** A separate agent investigates and fixes it. The fix is a 60-second Runtime idle timeout. See Phase 8.
 10. **Cloud retest:** Run Retest 9 now, then again after the OTel relock on 2026-11-25.
 11. **Recall:** Adopt the NAMS Memory Scope design, with workspace entity injection through `retrieval_config`. The reasons:
     - The NAMS docs name the workspace as the only tenancy boundary. A `user_id` filter is a label, so the old user-scoped recall promised an isolation it did not have.
@@ -248,6 +264,7 @@ Progress:
     - Fraud investigation is team work. Accounts and merchants found in one investigation help the next one, so workspace sharing is the behavior the demo wants.
     - Message search on NAMS covers one conversation. Searching other conversations meant one call per conversation and a hand-made cap.
 12. **Docs:** Refresh all fraud docs and add SVG diagrams like the fleet demo. See Phase 11.
+13. **FastMCP client:** The MCP server clients moved to `fastmcp-slim[client]` 4.2. They use `mode="legacy"`, because the deployed server runs mcp 1.22 and answers the newer discover probe with a 400. Moving the server off the mcp-neo4j-cypher fork comes later.
 
 ## Open Questions
 

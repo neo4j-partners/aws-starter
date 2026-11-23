@@ -22,6 +22,11 @@ ACCOUNT = "111122223333"
 RUNTIME_ID = "fleetsupervisor_default_supervisor-AbCdE12345"
 LOG_PREFIX = f"/aws/bedrock-agentcore/runtimes/{RUNTIME_ID}-"
 LOG_GROUP = f"{LOG_PREFIX}DEFAULT"
+STACK = "AgentCore-fleetsupervisor-default"
+RUNTIME_TYPE = "AWS::BedrockAgentCore::Runtime"
+# The logical ID the synthesized stack gives the Runtime.
+RUNTIME_LOGICAL_ID = "ApplicationRuntimeSupervisorRuntime1B54FC56"
+RUNTIME_ARN = f"arn:aws:bedrock-agentcore:us-west-2:{ACCOUNT}:runtime/{RUNTIME_ID}"
 
 STUB_AGENTCORE = r"""#!/bin/bash
 echo "agentcore $*" >> "$STUB_LOG"
@@ -61,6 +66,11 @@ case "$1 $2" in
     "sts get-caller-identity")
         if [ -n "$STUB_STS_ERROR" ]; then echo "$STUB_STS_ERROR" >&2; exit 254; fi
         echo "${STUB_CALLER_ACCOUNT:-111122223333}"
+        ;;
+    "cloudformation describe-stack-resources")
+        # Prints STUB_STACK_RESOURCES, or fails with STUB_STACK_RESOURCES_ERROR.
+        if [ -n "$STUB_STACK_RESOURCES_ERROR" ]; then echo "$STUB_STACK_RESOURCES_ERROR" >&2; exit 254; fi
+        printf '%s\n' "$STUB_STACK_RESOURCES"
         ;;
     "cloudformation describe-stacks")
         # destroy checks the stack before it deploys. While
@@ -226,12 +236,24 @@ CLEAN_STATUS = json.dumps(
 )
 
 
-def write_deployed_state(root: Path, runtime_id: object) -> None:
-    runtime = {"runtimeId": runtime_id, "runtimeArn": "arn", "roleArn": "arn"}
-    state = {"targets": {"default": {"resources": {"runtimes": {"supervisor": runtime}}}}}
-    path = root / "agentcore" / ".cli" / "deployed-state.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state))
+def _stack_resources(*resources: tuple[object, object, object]) -> str:
+    """The describe-stack-resources output for (type, logical ID, physical ID) triples."""
+    return json.dumps(
+        {
+            "StackResources": [
+                {"ResourceType": kind, "LogicalResourceId": logical, "PhysicalResourceId": physical}
+                for kind, logical, physical in resources
+            ]
+        }
+    )
+
+
+# The stack as the deploy leaves it: the Runtime, its role, and a resource
+# of another type.
+DEPLOYED_RESOURCES = _stack_resources(
+    (RUNTIME_TYPE, RUNTIME_LOGICAL_ID, RUNTIME_ARN),
+    ("AWS::IAM::Role", "ApplicationRuntimeSupervisorRuntimeRole1A2B3C4D", "role"),
+)
 
 
 @pytest.fixture
@@ -244,8 +266,6 @@ def project(tmp_path: Path) -> Path:
     (root / "agentcore" / "aws-targets.json").write_text(
         json.dumps([{"name": "default", "account": ACCOUNT, "region": "us-west-2"}])
     )
-    # The deploy records the Runtime ID here. Git ignores it too.
-    write_deployed_state(root, RUNTIME_ID)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for name, body in (
@@ -294,6 +314,7 @@ def run_agent(
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
         "STUB_STATUS_JSON": CLEAN_STATUS,
+        "STUB_STACK_RESOURCES": DEPLOYED_RESOURCES,
         **stub_env,
     }
     return subprocess.run(
@@ -1217,23 +1238,78 @@ def test_a_failed_log_group_listing_fails(project: Path) -> None:
     assert not list((project.parent / "tmp").iterdir())
 
 
-@pytest.mark.parametrize(
-    "runtime_id", [None, "", "supervisor", "fleetsupervisor_default_supervisor-*", 12345]
-)
-def test_destroy_without_a_runtime_id_skips_the_log_groups(
-    project: Path, runtime_id: object
-) -> None:
-    if runtime_id is None:
-        (project / "agentcore" / ".cli" / "deployed-state.json").unlink()
-    else:
-        write_deployed_state(project, runtime_id)
-
+def test_destroy_reads_the_runtime_id_from_the_stack_before_the_deploy(project: Path) -> None:
     result = run_destroy(project, STUB_LOG_GROUPS=LOG_GROUP)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "No Runtime ID is recorded" in result.stdout
+    logged = calls(project)
+    read = (
+        f"aws cloudformation describe-stack-resources --stack-name {STACK} "
+        "--region us-west-2 --output json"
+    )
+    assert read in logged
+    assert logged.index(read) < logged.index("agentcore remove runtime --name supervisor")
+    assert f"Removed: log group {LOG_GROUP}" in result.stdout
+
+
+def test_a_bare_runtime_id_as_the_physical_id_is_used(project: Path) -> None:
+    resources = _stack_resources((RUNTIME_TYPE, RUNTIME_LOGICAL_ID, RUNTIME_ID))
+
+    result = run_destroy(project, STUB_LOG_GROUPS=LOG_GROUP, STUB_STACK_RESOURCES=resources)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"Removed: log group {LOG_GROUP}" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "resources",
+    [
+        # No Runtime in the stack.
+        _stack_resources(("AWS::IAM::Role", "Role", "role")),
+        # Another Runtime only.
+        _stack_resources((RUNTIME_TYPE, "ApplicationRuntimeOtherRuntime1B54FC56", RUNTIME_ARN)),
+        # A resource of another type with the Runtime's logical ID.
+        _stack_resources(("AWS::IAM::Role", RUNTIME_LOGICAL_ID, RUNTIME_ARN)),
+        # Two matches, so destroy does not guess.
+        _stack_resources(
+            (RUNTIME_TYPE, RUNTIME_LOGICAL_ID, RUNTIME_ARN),
+            (RUNTIME_TYPE, "ApplicationRuntimeSupervisorRuntime12345678", RUNTIME_ARN),
+        ),
+        # No physical ID, or one that is not this Runtime's ARN or ID.
+        _stack_resources((RUNTIME_TYPE, RUNTIME_LOGICAL_ID, None)),
+        _stack_resources((RUNTIME_TYPE, RUNTIME_LOGICAL_ID, "")),
+        _stack_resources((RUNTIME_TYPE, RUNTIME_LOGICAL_ID, "supervisor")),
+        _stack_resources((RUNTIME_TYPE, RUNTIME_LOGICAL_ID, f"{RUNTIME_ARN}*")),
+        _stack_resources(
+            (RUNTIME_TYPE, RUNTIME_LOGICAL_ID, f"arn:aws:iam::{ACCOUNT}:runtime/{RUNTIME_ID}")
+        ),
+        # Output that is not the expected JSON.
+        "not json",
+        json.dumps({"Stacks": []}),
+    ],
+)
+def test_destroy_without_a_runtime_id_skips_the_log_groups(project: Path, resources: str) -> None:
+    result = run_destroy(project, STUB_LOG_GROUPS=LOG_GROUP, STUB_STACK_RESOURCES=resources)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "No Runtime ID was found in the stack" in result.stdout
     assert "Cleanup complete. Nothing is deployed in target 'default'." in result.stdout
     assert logs_calls(project) == []
+
+
+def test_a_failed_stack_resource_read_skips_the_log_groups(project: Path) -> None:
+    result = run_destroy(
+        project,
+        STUB_LOG_GROUPS=LOG_GROUP,
+        STUB_STACK_RESOURCES_ERROR="An error occurred (AccessDenied) when calling DescribeStackResources",
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "AccessDenied" in result.stderr
+    assert "No Runtime ID was found in the stack" in result.stdout
+    assert "agentcore deploy --target default --yes" in calls(project)
+    assert logs_calls(project) == []
+    assert not list((project.parent / "tmp").iterdir())
 
 
 @pytest.mark.parametrize(

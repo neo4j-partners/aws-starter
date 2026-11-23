@@ -43,8 +43,6 @@ CDK_DIR="agentcore/cdk"
 TARGET="default"
 # The deploy targets. The first deploy writes this file, and git ignores it.
 TARGETS_FILE="agentcore/aws-targets.json"
-# The CLI records each deployed Runtime's ID here. Git ignores it.
-DEPLOYED_STATE="agentcore/.cli/deployed-state.json"
 # AgentCore writes each Runtime's logs to <prefix><runtime-id>-<endpoint>.
 RUNTIME_LOG_PREFIX="/aws/bedrock-agentcore/runtimes/"
 # The AgentCore Identity OAuth2 credential that holds the Gateway client
@@ -561,15 +559,36 @@ aws_lookup() {
     exit 1
 }
 
-# Print the ID of $RUNTIME_NAME in $TARGET from the CLI's deployed state, or
-# fail. The deploy that destroy runs drops the Runtime from that file, so
-# destroy reads it first. The ID must match the AgentCore pattern, so the
-# log group prefix built from it can only match this Runtime.
+# Print the ID of $RUNTIME_NAME's Runtime from $STACK_NAME, or fail. CLI
+# 1.2.0 does not record the ID in its deployed state. The stack names the
+# Runtime ApplicationRuntime<Name>Runtime<hash>: the 'Application' construct
+# in agentcore/cdk/lib/cdk-stack.ts, the RuntimeEnvironment and
+# AgentCoreRuntime construct IDs from @aws/agentcore-cdk, and the
+# 8-character hash CDK adds. Its physical ID is the Runtime ARN. Exactly one
+# resource must match, and the ID must match the AgentCore pattern, so the
+# log group prefix built from it can only match this Runtime. The stack
+# delete removes the resource, so destroy reads it first. destroy calls this
+# inside if, where set -e is off, so every step is checked.
 runtime_id() {
-    jq -r -e --arg t "$TARGET" --arg n "$RUNTIME_NAME" '
-        .targets[$t].resources.runtimes[$n].runtimeId
-        | if type == "string" and test("\\A[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}\\z") then .
-          else error("no valid runtimeId") end' "$DEPLOYED_STATE" 2>/dev/null
+    local region resources
+    region=$(target_region) || return 1
+    resources=$(aws cloudformation describe-stack-resources --stack-name "$STACK_NAME" \
+        --region "$region" --output json) || return 1
+    jq -r -e --arg n "$RUNTIME_NAME" '
+        def pascal: [splits("[-_]")] | map((.[:1] | ascii_upcase) + .[1:]) | join("");
+        "[a-zA-Z][a-zA-Z0-9_]{0,99}-[a-zA-Z0-9]{10}" as $id
+        | "\\AApplicationRuntime\($n | pascal)Runtime[0-9A-F]{8}\\z" as $logical
+        | [.StackResources[]
+            | select(.ResourceType == "AWS::BedrockAgentCore::Runtime"
+                and (.LogicalResourceId | type) == "string"
+                and (.LogicalResourceId | test($logical)))]
+        | if length == 1 then .[0].PhysicalResourceId
+          else error("the stack has \(length) Runtime resources for \($n), not 1") end
+        | if type != "string" then error("the \($n) Runtime has no physical ID")
+          elif test("\\Aarn:aws[a-z-]*:bedrock-agentcore:[a-z0-9-]+:[0-9]{12}:runtime/\($id)\\z")
+            then sub("\\A.*:runtime/"; "")
+          elif test("\\A\($id)\\z") then .
+          else error("the \($n) Runtime has an invalid ID: \(.)") end' <<<"$resources"
 }
 
 # Delete the CloudWatch log groups of Runtime $1 in region $2. Neither the
@@ -878,11 +897,11 @@ case "${1:-help}" in
         # so a failed install stops with nothing changed.
         ensure_cdk_deps
         # The Runtime's log groups outlive the stack. Read its ID now, while
-        # the deployed state still records it, and delete them once the
+        # the stack still holds the Runtime, and delete them once the
         # report confirms nothing remains.
         if ! RUNTIME_ID=$(runtime_id); then
             RUNTIME_ID=""
-            echo -e "${YELLOW}No Runtime ID is recorded, so destroy will not remove the Runtime's log groups.${NC}"
+            echo -e "${YELLOW}No Runtime ID was found in the stack, so destroy will not remove the Runtime's log groups.${NC}"
         fi
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""

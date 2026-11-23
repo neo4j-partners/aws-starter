@@ -7,7 +7,6 @@ re-exports :mod:`core.config` (model id, region, system prompt) and
 The remaining submodules carry heavier dependencies and are imported only
 where needed, never from this ``__init__``:
 
-- :mod:`core.transport` — MCP transport factory (depends on ``mcp``)
 - :mod:`core.factory`  — Bedrock model + MCP client factories (Strands)
 """
 

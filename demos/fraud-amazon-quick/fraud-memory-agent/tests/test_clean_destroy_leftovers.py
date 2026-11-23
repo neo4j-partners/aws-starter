@@ -323,6 +323,67 @@ class CleanLeftoversTests(unittest.TestCase):
         sleep.assert_not_called()
         self.clients.logs.get_paginator.assert_not_called()
 
+    def test_a_delete_failed_runtime_stops_the_wait_and_keeps_its_log_groups(self) -> None:
+        cases = [
+            ({"status": "DELETE_FAILED", "failureReason": "Role is missing"}, "Role is missing"),
+            ({"status": "DELETE_FAILED"}, "no failure reason supplied"),
+            ({"status": "DELETE_FAILED", "failureReason": ""}, "no failure reason supplied"),
+        ]
+        for response, reason in cases:
+            with self.subTest(response=response):
+                self.clients = FakeClients()
+                self.clients.control.get_agent_runtime.side_effect = [
+                    {"status": "DELETING"},
+                    response,
+                ]
+
+                with patch.object(clean.time, "sleep") as sleep:
+                    report, failures = self.run_clean(agent_config())
+
+                self.assertEqual(len(report), 3)
+                self.assertEqual(
+                    failures,
+                    [
+                        f"Runtime {RUNTIME_ID} is DELETE_FAILED ({reason}), so its log groups "
+                        f"under {RUNTIME_PREFIX} in {REGION} stay in place"
+                    ],
+                )
+                # One sleep after DELETING, then the DELETE_FAILED poll ends the wait.
+                sleep.assert_called_once_with(clean.RUNTIME_DELETE_POLL)
+                self.assertEqual(self.clients.control.get_agent_runtime.call_count, 2)
+                self.clients.logs.get_paginator.assert_not_called()
+
+    def test_a_delete_failed_runtime_makes_main_exit_1(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        snapshot = Path(temp.name) / "snapshot.yaml"
+        snapshot.write_text(yaml.safe_dump({"agents": {AGENT: agent_config()}}))
+        self.clients.control.get_agent_runtime.side_effect = None
+        self.clients.control.get_agent_runtime.return_value = {"status": "DELETE_FAILED"}
+        argv = [
+            "clean",
+            *("--snapshot", str(snapshot)),
+            *("--config", str(Path(temp.name) / ".bedrock_agentcore.yaml")),
+            *("--agent", AGENT),
+            *("--cache-dir", str(self.cache_dir)),
+        ]
+        stderr = io.StringIO()
+        real_clean = clean.clean_leftovers
+
+        def clean_with_fakes(agent: dict, agent_name: str, cache_dir: Path) -> tuple:
+            return real_clean(agent, agent_name, cache_dir, self.clients)
+
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(clean, "clean_leftovers", clean_with_fakes),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = clean.main()
+
+        self.assertEqual(code, 1)
+        self.assertIn("DELETE_FAILED (no failure reason supplied)", stderr.getvalue())
+
     def test_a_failed_runtime_check_or_listing_is_a_failure(self) -> None:
         for target in ("get_agent_runtime", "paginate"):
             with self.subTest(target=target):

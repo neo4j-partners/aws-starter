@@ -121,8 +121,12 @@ def remove_memory_log_group(logs, memory: dict) -> str:
     return f"Removed: log group {log_group}"
 
 
-def runtime_is_gone(control, runtime_id: str) -> bool:
-    """Wait for the runtime to disappear. Return False if it outlasts the timeout."""
+def wait_for_runtime_deletion(control, runtime_id: str) -> str | None:
+    """Wait for the runtime to disappear.
+
+    Return None once it is gone. Otherwise return why it is still there: the
+    delete failed, which ends the wait at once, or it outlasted the timeout.
+    """
     # Say so up front, so a long wait does not look like a hang.
     print(
         f"Waiting for Runtime {runtime_id} to be deleted "
@@ -132,13 +136,16 @@ def runtime_is_gone(control, runtime_id: str) -> bool:
     deadline = time.monotonic() + RUNTIME_DELETE_TIMEOUT
     while True:
         try:
-            control.get_agent_runtime(agentRuntimeId=runtime_id)
+            runtime = control.get_agent_runtime(agentRuntimeId=runtime_id)
         except ClientError as error:
             if error_code(error) == "ResourceNotFoundException":
-                return True
+                return None
             raise
+        if runtime.get("status") == "DELETE_FAILED":
+            reason = runtime.get("failureReason") or "no failure reason supplied"
+            return f"Runtime {runtime_id} is DELETE_FAILED ({reason})"
         if time.monotonic() >= deadline:
-            return False
+            return f"Runtime {runtime_id} is still present after {RUNTIME_DELETE_TIMEOUT}s"
         time.sleep(RUNTIME_DELETE_POLL)
 
 
@@ -184,10 +191,10 @@ def clean_runtime_log_groups(
     prefix = f"{RUNTIME_LOG_GROUP_PREFIX}{runtime_id}-"
     try:
         control = client_factory("bedrock-agentcore-control", region_name=region)
-        if not runtime_is_gone(control, runtime_id):
+        still_there = wait_for_runtime_deletion(control, runtime_id)
+        if still_there:
             return [], [
-                f"Runtime {runtime_id} is still present after {RUNTIME_DELETE_TIMEOUT}s, "
-                f"so its log groups under {prefix} in {region} stay in place"
+                f"{still_there}, so its log groups under {prefix} in {region} stay in place"
             ]
         logs = client_factory("logs", region_name=region)
         return remove_runtime_log_groups(logs, runtime_id, region)

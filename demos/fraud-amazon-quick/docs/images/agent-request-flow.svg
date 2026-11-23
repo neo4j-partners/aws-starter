@@ -25,8 +25,9 @@
   <rect x="352" y="150" width="280" height="150" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
   <text x="372" y="184" text-anchor="start" class="t" fill="#851651">2  Open memory</text>
   <text x="372" y="208" text-anchor="start" class="s">for_nams(session_id, user_id)</text>
-  <text x="372" y="230" text-anchor="start" class="s">reads MEMORY_API_KEY, MEMORY_</text>
-  <text x="372" y="252" text-anchor="start" class="s">ENDPOINT, MEMORY_WORKSPACE_ID</text>
+  <text x="372" y="230" text-anchor="start" class="s">key: Identity nams-api-key</text>
+  <text x="372" y="252" text-anchor="start" class="s">env: MEMORY_ENDPOINT,</text>
+  <text x="372" y="274" text-anchor="start" class="s">MEMORY_WORKSPACE_ID</text>
   <path d="M632,225 L652,225" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
   <rect x="654" y="150" width="280" height="150" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
   <text x="674" y="184" text-anchor="start" class="t" fill="#4A2EB0">3  Build agent</text>
@@ -59,7 +60,7 @@
   <path d="M492,308 L492,412" fill="none" stroke="#C11574" stroke-width="2.5" marker-start="url(#a-pink)" marker-end="url(#a-pink)"/>
   <rect x="654" y="420" width="580" height="110" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="944" y="454" text-anchor="middle" class="t" fill="#00594A">Bedrock + AgentCore Gateway</text>
-  <text x="944" y="478" text-anchor="middle" class="s">Claude Haiku 4.5 via ConverseStream</text>
+  <text x="944" y="478" text-anchor="middle" class="s">Claude Sonnet 5.5 via ConverseStream</text>
   <text x="944" y="500" text-anchor="middle" class="s">Gateway -&gt; Neo4j MCP server -&gt; fraud graph</text>
   <path d="M794,308 L794,412" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-start="url(#a-purple)" marker-end="url(#a-purple)"/>
   <path d="M1096,308 L1096,412" fill="none" stroke="#008C72" stroke-width="2.5" marker-start="url(#a-teal)" marker-end="url(#a-teal)"/>

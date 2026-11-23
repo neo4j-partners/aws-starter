@@ -44,6 +44,20 @@ class DeployedTransportTests(unittest.TestCase):
         self.assertEqual(config.retries, {"mode": "standard", "total_max_attempts": 1})
         self.assertTrue(config.tcp_keepalive)
 
+    @patch("client.transport.get_agent_config", return_value=("runtime-arn", "us-east-1"))
+    @patch("client.transport.boto3.client")
+    def test_the_payload_user_id_is_sent_as_the_runtime_user(
+        self, create_client: Mock, _: Mock
+    ) -> None:
+        fake_client = Mock()
+        fake_client.invoke_agent_runtime.return_value = {"response": []}
+        create_client.return_value = fake_client
+
+        transport.invoke_deployed({"prompt": "test", "user_id": "analyst-1"}, stream=False)
+
+        kwargs = fake_client.invoke_agent_runtime.call_args.kwargs
+        self.assertEqual(kwargs["runtimeUserId"], "analyst-1")
+
     def test_invalid_attempt_count_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "at least 1"):
             transport._deployed_settings(max_attempts=0)

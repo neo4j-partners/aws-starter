@@ -293,11 +293,16 @@ def invoke_deployed(
         resolved_max_attempts,
         max_pool_connections,
     )
+    # The runtime user ID makes the Runtime fetch a workload access token for
+    # the request. The agent needs it to read its credentials from AgentCore
+    # Identity. A payload with no user_id gets HTTP 400 from the runtime.
+    extra = {"runtimeUserId": payload["user_id"]} if payload.get("user_id") else {}
     response = client.invoke_agent_runtime(
         agentRuntimeArn=agent_arn,
         runtimeSessionId=str(uuid.uuid4()),
         payload=json.dumps(payload).encode(),
         qualifier="DEFAULT",
+        **extra,
     )
     content_parts, errors = _consume_sse(response.get("response", []), stream)
     return _result(content_parts, errors)

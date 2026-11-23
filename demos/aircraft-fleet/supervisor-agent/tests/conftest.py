@@ -1,9 +1,9 @@
-"""Shared test helpers. Tests run offline: no Bedrock, Gateway, or Neo4j.
+"""Shared test helpers. Tests run offline: no Bedrock and no Neo4j.
 
 This runs before any test module imports ``fleet_supervisor``. It points
 ``FLEET_ENV_FILE`` at an empty file so the real aircraft-fleet .env is never
-loaded, and clears the memory variables so a developer's shell cannot change
-what the tests see.
+loaded. It also clears the fleet graph, graph settings, and memory variables,
+so a developer's shell cannot change what the tests see.
 """
 
 import asyncio
@@ -15,7 +15,20 @@ from typing import Any
 # injection runs first, as it does in the console scripts and the Runtime.
 import fleet_supervisor  # noqa: F401
 
-_MEMORY_VARS = (
+_CLEARED_VARS = (
+    "NEO4J_URI",
+    "NEO4J_USERNAME",
+    "NEO4J_PASSWORD",
+    "NEO4J_DATABASE",
+    "NEO4J_PASSWORD_SECRET_ARN",
+    "VECTOR_INDEX_NAME",
+    "FULLTEXT_INDEX_NAME",
+    "SCHEMA_TTL_S",
+    "TEXT2CYPHER_TIMEOUT_S",
+    "TEXT2CYPHER_MAX_ROWS",
+    "TEXT2CYPHER_MAX_TOKENS",
+    "EMBED_MODEL_ID",
+    "EMBED_DIMENSIONS",
     "MEM_NEO4J_URI",
     "MEM_NEO4J_USERNAME",
     "MEM_NEO4J_PASSWORD",
@@ -25,7 +38,7 @@ _MEMORY_VARS = (
 )
 
 os.environ["FLEET_ENV_FILE"] = os.devnull
-for _name in _MEMORY_VARS:
+for _name in _CLEARED_VARS:
     os.environ.pop(_name, None)
 
 

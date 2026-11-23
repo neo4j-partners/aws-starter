@@ -29,6 +29,9 @@ from fleet_supervisor.core.config import ConfigError
 
 logger = logging.getLogger(__name__)
 
+# The env var that holds the fleet graph's password secret ARN.
+NEO4J_PASSWORD_SECRET_ARN = "NEO4J_PASSWORD_SECRET_ARN"
+
 
 class Neo4jLogin(NamedTuple):
     """A Neo4j user name and password."""
@@ -63,6 +66,16 @@ def login_from(secret_arn_var: str, username_var: str, password_var: str) -> Neo
         f"Set {secret_arn_var} to a Secrets Manager secret ARN, or set "
         f"{password_var} for a local run."
     )
+
+
+def neo4j_login() -> Neo4jLogin:
+    """Return the login for the fleet graph that the graph tools query.
+
+    Reads ``NEO4J_PASSWORD_SECRET_ARN``, then ``NEO4J_USERNAME`` and
+    ``NEO4J_PASSWORD``. Raises :class:`ConfigError` when neither the ARN nor
+    the password is set.
+    """
+    return login_from(NEO4J_PASSWORD_SECRET_ARN, "NEO4J_USERNAME", "NEO4J_PASSWORD")
 
 
 @cache

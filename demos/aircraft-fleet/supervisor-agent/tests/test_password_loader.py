@@ -230,3 +230,32 @@ def test_forget_secrets_reads_the_secret_again(monkeypatch: pytest.MonkeyPatch) 
     secrets.forget_secrets()
     login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR)
     assert [c for c in calls if "secret_id" in c] == [{"secret_id": ARN}, {"secret_id": ARN}]
+
+
+def test_neo4j_login_reads_the_fleet_password_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEO4J_USERNAME", "fleet-user")
+    monkeypatch.setenv("NEO4J_PASSWORD", "fleet-pw")
+    assert secrets.neo4j_login() == Neo4jLogin("fleet-user", "fleet-pw")
+
+
+def test_neo4j_login_prefers_the_fleet_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEO4J_PASSWORD_SECRET_ARN", ARN)
+    monkeypatch.setenv("NEO4J_PASSWORD", "local-pw")
+    calls = _fake_secrets_manager(monkeypatch)
+    assert secrets.neo4j_login() == Neo4jLogin("reader", "s3cret")
+    assert {"secret_id": ARN} in calls
+
+
+def test_neo4j_login_names_both_fleet_vars() -> None:
+    with pytest.raises(ConfigError, match="NEO4J_PASSWORD_SECRET_ARN.*NEO4J_PASSWORD"):
+        secrets.neo4j_login()
+
+
+def test_forget_secrets_drops_the_fleet_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEO4J_PASSWORD_SECRET_ARN", ARN)
+    calls = _fake_secrets_manager(monkeypatch)
+    secrets.neo4j_login()
+    secrets.neo4j_login()
+    secrets.forget_secrets()
+    secrets.neo4j_login()
+    assert [c for c in calls if "secret_id" in c] == [{"secret_id": ARN}, {"secret_id": ARN}]

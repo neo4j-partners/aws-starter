@@ -782,11 +782,15 @@ verify_deployment() {
 # 0 even when the runtime sends an error event. That event is
 # BedrockAgentCoreApp's `data: {"error": ..., "error_type": ...}`. Show the
 # response as it arrives, then fail when it holds an error event.
+#
+# --user-id makes the Runtime fetch a workload access token for the request.
+# The agent needs it to read its credentials from AgentCore Identity. It is
+# the same user ID the payload carries.
 invoke_deployed() {
     local output status
     output=$(make_temp) || exit 1
     set +e
-    agentcore invoke --runtime "$RUNTIME_NAME" --payload "$1" | tee "$output"
+    agentcore invoke --runtime "$RUNTIME_NAME" --user-id "$INVOKE_USER_ID" --payload "$1" | tee "$output"
     status=${PIPESTATUS[0]}
     set -e
     if [ "$status" -ne 0 ]; then

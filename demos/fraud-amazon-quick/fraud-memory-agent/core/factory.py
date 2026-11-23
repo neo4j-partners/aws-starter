@@ -174,7 +174,10 @@ def workload_access_token() -> str:
 
     token = BedrockAgentCoreContext.get_workload_access_token()
     if not token:
-        raise RuntimeError("The request has no workload access token for AgentCore Identity")
+        raise RuntimeError(
+            "The request has no workload access token for AgentCore Identity. "
+            "Invoke with a runtime user ID (runtimeUserId, or agentcore invoke --user-id)."
+        )
     return token
 
 

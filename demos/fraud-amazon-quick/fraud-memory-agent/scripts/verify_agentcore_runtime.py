@@ -188,9 +188,13 @@ def main() -> int:
             "session_id": f"agentcore-smoke-{int(time.time())}-{session_suffix}",
         }
         runtime_client = boto3.client("bedrock-agentcore", region_name=region, config=client_config)
+        # The runtime user ID makes the Runtime fetch a workload access token
+        # for the request. The agent needs it to read its credentials from
+        # AgentCore Identity.
         response = runtime_client.invoke_agent_runtime(
             agentRuntimeArn=runtime_arn,
             runtimeSessionId=str(uuid.uuid4()),
+            runtimeUserId=payload["user_id"],
             payload=json.dumps(payload).encode("utf-8"),
             qualifier="DEFAULT",
         )

@@ -1661,7 +1661,7 @@ def test_a_cancelled_destroy_keeps_the_log_groups(project: Path) -> None:
 
 def invoke_call(prompt: str, user_id: str = "demo-user") -> str:
     payload = json.dumps({"prompt": prompt, "user_id": user_id}, separators=(",", ":"))
-    return f"agentcore invoke --runtime {RUNTIME_NAME} --payload {payload}"
+    return f"agentcore invoke --runtime {RUNTIME_NAME} --user-id {user_id} --payload {payload}"
 
 
 def test_a_successful_response_is_printed_and_exits_0(project: Path) -> None:

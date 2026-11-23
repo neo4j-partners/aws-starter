@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -156,6 +157,33 @@ class ArgumentTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
         self.assertIn("Not an AgentCore Runtime ARN", stderr.getvalue())
+
+
+class SmokeInvocationTests(unittest.TestCase):
+    def test_the_smoke_request_sends_its_user_id_as_the_runtime_user(self) -> None:
+        control = control_returning({"status": "READY"})
+        runtime = Mock()
+        runtime.invoke_agent_runtime.return_value = {
+            "statusCode": 200,
+            "response": [
+                b'data: {"type": "chunk", "data": "ok"}\n\n',
+                b'data: {"type": "complete"}\n\n',
+            ],
+        }
+        clients = {"bedrock-agentcore-control": control, "bedrock-agentcore": runtime}
+        argv = ["verify", "--runtime-arn", RUNTIME_ARN]
+        with (
+            patch.object(sys, "argv", argv),
+            patch.object(verify.boto3, "client", side_effect=lambda name, **_: clients[name]),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            code = verify.main()
+
+        self.assertEqual(code, 0)
+        kwargs = runtime.invoke_agent_runtime.call_args.kwargs
+        payload = json.loads(kwargs["payload"])
+        self.assertTrue(payload["user_id"].startswith("agentcore-smoke-"))
+        self.assertEqual(kwargs["runtimeUserId"], payload["user_id"])
 
 
 class ParseRuntimeArnTests(unittest.TestCase):

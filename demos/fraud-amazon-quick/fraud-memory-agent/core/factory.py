@@ -186,7 +186,6 @@ def build_model() -> BedrockModel:
     return BedrockModel(
         model_id=MODEL_ID,
         region_name=AWS_REGION,
-        temperature=0.0,
         max_tokens=4096,
         streaming=True,
     )

@@ -1,6 +1,6 @@
 """Tests for agent.sh with stub ``agentcore``, ``aws``, ``npm``, and ``uv`` commands.
 
-Each test copies agent.sh and the tracked agentcore.json into a temporary
+Each test copies agent.sh and the committed agentcore.json into a temporary
 folder and puts stub scripts first on PATH, so nothing reaches AWS. The stubs
 log every call to calls.log and act on STUB_* environment variables. The uv
 stub runs the helper scripts agent.sh feeds to ``uv run --quiet python -``
@@ -361,7 +361,15 @@ def project(tmp_path: Path) -> Path:
     root = tmp_path / "fraud-memory-agent"
     (root / "agentcore" / "cdk").mkdir(parents=True)
     shutil.copy2(AGENT_ROOT / "agent.sh", root / "agent.sh")
-    shutil.copy2(AGENT_ROOT / "agentcore" / "agentcore.json", root / "agentcore" / "agentcore.json")
+    # A running deploy edits the working copy of agentcore.json, so the tests
+    # read the committed one.
+    committed_spec = subprocess.run(
+        ["git", "-C", str(AGENT_ROOT), "show", "HEAD:./agentcore/agentcore.json"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    (root / "agentcore" / "agentcore.json").write_text(committed_spec)
     # The first deploy writes this file. Git ignores it, so the test writes its own.
     (root / "agentcore" / "aws-targets.json").write_text(
         json.dumps([{"name": "default", "account": ACCOUNT, "region": "us-west-2"}])

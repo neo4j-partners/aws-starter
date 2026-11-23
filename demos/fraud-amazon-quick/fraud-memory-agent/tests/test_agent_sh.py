@@ -122,7 +122,12 @@ case "$1" in
     invoke)
         [ -z "${STUB_INVOKE_OUTPUT:-}" ] || printf '%s\n' "$STUB_INVOKE_OUTPUT"
         # Ctrl+C reaches the whole foreground group, so the stub dies too.
-        if [ -n "${STUB_INVOKE_SIGNAL:-}" ]; then kill -s "$STUB_INVOKE_SIGNAL" "$(agent_pid)" "$$"; fi
+        # So does the tee that agent.sh pipes the response through. Bash 5
+        # keeps running when the pipeline's last command does not die.
+        if [ -n "${STUB_INVOKE_SIGNAL:-}" ]; then
+            pkill "-$STUB_INVOKE_SIGNAL" -P "$(agent_pid)" -x tee
+            kill -s "$STUB_INVOKE_SIGNAL" "$(agent_pid)" "$$"
+        fi
         exit "${STUB_INVOKE_EXIT:-0}"
         ;;
     logs) ;;

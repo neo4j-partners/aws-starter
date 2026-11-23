@@ -1,7 +1,7 @@
 [project]
 name = "aircraft-fleet-supervisor-agent"
 version = "0.1.0"
-description = "Strands supervisor for the Neo4j MCP server with Maintenance and Operations specialists"
+description = "Strands supervisor with Maintenance and Operations specialists over direct Neo4j GraphRAG tools"
 requires-python = ">=3.12"
 dependencies = [
     "strands-agents>=1.65",

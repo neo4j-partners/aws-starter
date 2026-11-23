@@ -7,17 +7,31 @@ this process, and then runs the server in the same process.
 
 When NEO4J_PASSWORD_SECRET_ARN is unset, as with local.sh, the server reads
 NEO4J_PASSWORD from the environment as before.
+
+The script also adds a GET /ping route to the server. AgentCore Runtime
+health-checks every live session. Without /ping it falls back to an MCP
+``ping`` POST to /mcp every two seconds per session, and each of those runs
+a full stateless MCP request. With /ping it uses that route instead.
 """
 
 import json
 import os
 import sys
+from collections.abc import Callable
+from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 SECRET_ARN_VAR = "NEO4J_PASSWORD_SECRET_ARN"
 PASSWORD_VAR = "NEO4J_PASSWORD"
+
+# AgentCore Runtime looks for /ping at the root path on the serving port,
+# whatever the MCP path is. See "MCP protocol contract" in the AgentCore
+# developer guide.
+PING_PATH = "/ping"
 
 
 class SecretError(RuntimeError):
@@ -86,6 +100,31 @@ def load_password() -> bool:
     return True
 
 
+async def ping(request: Request) -> JSONResponse:
+    """Report the server as healthy to the AgentCore Runtime health check.
+
+    The body follows the Runtime's /ping contract. It leaves out
+    ``time_of_last_update``, so the platform tracks status changes itself and
+    idle sessions still time out.
+    """
+    return JSONResponse({"status": "Healthy"})
+
+
+def add_ping_route(server: Any) -> Any:
+    """Register GET /ping on a FastMCP server and return the same server."""
+    server.custom_route(PING_PATH, methods=["GET"], include_in_schema=False)(ping)
+    return server
+
+
+def with_ping_route(create_server: Callable[..., Any]) -> Callable[..., Any]:
+    """Wrap a server factory so that every server it builds serves GET /ping."""
+
+    def create_server_with_ping(*args: Any, **kwargs: Any) -> Any:
+        return add_ping_route(create_server(*args, **kwargs))
+
+    return create_server_with_ping
+
+
 def main() -> None:
     try:
         from_secret = load_password()
@@ -96,7 +135,11 @@ def main() -> None:
 
     # Imported here because only the image installs the server package.
     from mcp_neo4j_cypher import main as server_main
+    from mcp_neo4j_cypher import server as server_module
 
+    # server.main builds its FastMCP instance through this module-level
+    # factory, so wrapping it adds /ping without changing the upstream server.
+    server_module.create_mcp_server = with_ping_route(server_module.create_mcp_server)
     server_main()
 
 

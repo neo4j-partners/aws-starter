@@ -1,9 +1,17 @@
 """Tests for the image entrypoint that reads the Neo4j password secret."""
 
 import json
+import sys
+import types
+from collections.abc import Awaitable, Callable
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Route
+from starlette.testclient import TestClient
 
 import secret_entrypoint as entrypoint
 
@@ -182,3 +190,77 @@ def test_main_exits_cleanly_when_access_is_denied(monkeypatch: pytest.MonkeyPatc
         entrypoint.main()
     assert "AccessDeniedException" in str(exit_info.value.code)
     assert "assumed-role" not in str(exit_info.value.code)
+
+
+Handler = Callable[[Request], Awaitable[Response]]
+
+
+class FakeServer:
+    """Stands in for FastMCP, whose custom_route appends a Starlette Route."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.args = args
+        self.kwargs = kwargs
+        self.routes: list[Route] = []
+
+    def custom_route(
+        self, path: str, methods: list[str], include_in_schema: bool = True
+    ) -> Callable[[Handler], Handler]:
+        def register(handler: Handler) -> Handler:
+            self.routes.append(
+                Route(path, handler, methods=methods, include_in_schema=include_in_schema)
+            )
+            return handler
+
+        return register
+
+
+def test_ping_route_answers_healthy() -> None:
+    server = entrypoint.add_ping_route(FakeServer())
+
+    with TestClient(Starlette(routes=server.routes)) as client:
+        response = client.get("/ping")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+    # No time_of_last_update: a timestamp that moves on every ping would keep
+    # idle Runtime sessions alive until their maximum lifetime.
+    assert response.json() == {"status": "Healthy"}
+
+
+def test_ping_route_is_get_only() -> None:
+    server = entrypoint.add_ping_route(FakeServer())
+
+    with TestClient(Starlette(routes=server.routes)) as client:
+        assert client.post("/ping").status_code == 405
+
+
+def test_wrapped_factory_passes_arguments_and_adds_ping() -> None:
+    create = entrypoint.with_ping_route(FakeServer)
+
+    server = create("driver", "neo4j", read_only=True)
+
+    assert server.args == ("driver", "neo4j")
+    assert server.kwargs == {"read_only": True}
+    assert [route.path for route in server.routes] == [entrypoint.PING_PATH]
+
+
+def test_main_serves_ping_from_the_server_it_starts(monkeypatch: pytest.MonkeyPatch) -> None:
+    built: list[FakeServer] = []
+    server_module = types.ModuleType("mcp_neo4j_cypher.server")
+    server_module.create_mcp_server = FakeServer
+
+    def fake_server_main() -> None:
+        # Like mcp_neo4j_cypher.server.main, look the factory up at call time.
+        built.append(server_module.create_mcp_server("driver"))
+
+    package = types.ModuleType("mcp_neo4j_cypher")
+    package.main = fake_server_main
+    package.server = server_module
+    monkeypatch.setitem(sys.modules, "mcp_neo4j_cypher", package)
+    monkeypatch.setitem(sys.modules, "mcp_neo4j_cypher.server", server_module)
+
+    entrypoint.main()
+
+    assert len(built) == 1
+    assert [route.path for route in built[0].routes] == [entrypoint.PING_PATH]

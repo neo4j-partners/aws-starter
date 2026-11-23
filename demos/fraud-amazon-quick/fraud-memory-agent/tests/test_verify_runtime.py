@@ -147,5 +147,18 @@ class ArgumentTests(unittest.TestCase):
         self.assertIn("--poll-interval-seconds must be positive", stderr)
 
 
+class ConsumeSseTests(unittest.TestCase):
+    def test_app_error_event_is_an_error(self) -> None:
+        chunks = [
+            b'data: {"type": "chunk", "data": "partial"}\n\n',
+            b'data: {"error": "boom", "error_type": "RuntimeError",'
+            b' "message": "An error occurred during streaming"}\n\n',
+        ]
+        answer, errors, completed = verify.consume_sse(chunks)
+        self.assertEqual(answer, "partial")
+        self.assertEqual(errors, ["RuntimeError: boom"])
+        self.assertFalse(completed)
+
+
 if __name__ == "__main__":
     unittest.main()

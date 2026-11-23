@@ -2,11 +2,10 @@
 name = "fraud-memory-agent"
 version = "0.1.0"
 description = "Fraud Memory Agent (Strands) for Neo4j MCP via AgentCore Gateway over a shared core/ package"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     # Shared core
     "httpx>=0.28.1",
-    "httpx2>=2.14.0",
     "boto3>=1.43.9",
     # client/transport.py reads .bedrock_agentcore.yaml; declare pyyaml
     # explicitly rather than rely on it arriving transitively via the toolkit.
@@ -15,17 +14,18 @@ dependencies = [
     # 2.2.0 fixes the advisories in 2.1.1. uv.lock pins the tested release,
     # and the Dockerfile installs from it, so cloud and local runs match.
     "mcp>=2.2.0,<3",
-    "bedrock-agentcore>=1.9.1",
+    "bedrock-agentcore>=1.26",
     "bedrock-agentcore-starter-toolkit>=0.3.9",
     # Observability — ADOT auto-instrumentation for AgentCore CloudWatch traces
     "aws-opentelemetry-distro>=0.17.0",
     # Agent framework
     # NAMS-backed memory capture for the Strands runtime. NAMS captures
     # every agent turn without a direct Neo4j driver or embedding setup.
-    "strands-agents>=1.52,<2",
-    # 0.5 is the tested line. Later releases change the NAMS short-term
-    # memory API this agent uses, so move the cap only after retesting.
-    "neo4j-agent-memory[nams,strands]>=0.5.0,<0.6",
+    "strands-agents>=1.65,<2",
+    # The Strands session manager (Neo4jSessionManager.for_nams) persists
+    # and restores each conversation and injects workspace entities. 0.8 is
+    # the tested line; move the cap only after retesting.
+    "neo4j-agent-memory[nams,strands]>=0.8.0,<0.9",
     # server/runtime_app.py loads the local .env for development runs.
     "python-dotenv>=1.2.2",
 ]
@@ -52,7 +52,7 @@ build-backend = "hatchling.build"
 packages = ["core", "client", "server"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 src = ["."]
 # Leave the Python blocks in Markdown docs as written.

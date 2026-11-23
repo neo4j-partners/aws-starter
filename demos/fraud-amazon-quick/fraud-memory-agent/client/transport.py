@@ -1,9 +1,12 @@
 """One wire, two transports — the only place clients touch the network.
 
-``server/runtime_app.py`` serves ``/invocations`` and emits four SSE event
+``server/runtime_app.py`` serves ``/invocations`` and emits three SSE event
 shapes: ``{"type": "chunk", "data": ...}``, ``{"type": "tool", "name": ...}``,
-``{"type": "error", "error": ...}``, ``{"type": "complete"}``. Both transports
-below produce that same byte stream, so a single parser handles them:
+and ``{"type": "complete"}``. When the stream fails, ``BedrockAgentCoreApp``
+sends ``{"error": ..., "error_type": ..., "message": ...}`` instead. A request
+with no prompt or no ``user_id`` gets HTTP 400 before any event. Both
+transports below produce the same byte stream, so a single parser handles
+them:
 
 - :func:`invoke_local`    — HTTP POST to a locally running runtime (port 7020).
 - :func:`invoke_deployed` — boto3 ``bedrock-agentcore`` data plane (deployed).
@@ -184,7 +187,7 @@ def _handle_sse_event(
     """Dispatch one SSE event, printing ``chunk`` text live when streaming.
 
     ``json.loads`` already yields real newlines, so no unescaping is needed;
-    anything that is not one of the three known shapes is ignored.
+    any other event shape is ignored.
     """
     event = event.strip()
     if not event:
@@ -207,8 +210,10 @@ def _handle_sse_event(
         if stream:
             name = data.get("name", "")
             print(f"\n\n  → {name}\n", end="\n", flush=True)
-    elif data.get("type") == "error":
-        errors.append(data.get("error", "Unknown error"))
+    elif "error" in data:
+        # BedrockAgentCoreApp's event when the runtime's stream raises.
+        error_type = data.get("error_type")
+        errors.append(f"{error_type}: {data['error']}" if error_type else str(data["error"]))
 
 
 def _consume_sse(chunks: Iterable[bytes], stream: bool) -> tuple[list[str], list[str]]:

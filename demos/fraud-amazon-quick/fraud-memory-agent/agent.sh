@@ -24,7 +24,7 @@
 #   ./agent.sh verify             Check READY state and run an end-to-end smoke test
 #   ./agent.sh logs [options]     Inspect AgentCore observability traces
 #   ./agent.sh reset-config       Archive local AgentCore config and start fresh
-#   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent
+#   ./agent.sh invoke-cloud "prompt"  Invoke deployed agent (FRAUD_USER_ID, default demo-user)
 #   ./agent.sh destroy            Remove from AgentCore
 #
 # Prerequisites:
@@ -39,6 +39,8 @@ set -e
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="server/runtime_app.py"
 AGENT_NAME="fraud_memory_agent"
+# The NAMS user that invoke-cloud sends. The runtime requires one.
+INVOKE_USER_ID="${FRAUD_USER_ID:-demo-user}"
 CONFIG_FILE="$ROOT_DIR/.bedrock_agentcore.yaml"
 # Keep wrapper state beside the toolkit's per-agent dependency cache.  The
 # parent directory is already ignored and is safe to remove at any time.
@@ -146,7 +148,8 @@ verify_deployment() {
 
 invoke_deployed() {
     # `agentcore invoke` prints each streamed event as one JSON object per
-    # line and exits 0 even when the runtime sends an error event. Show the
+    # line and exits 0 even when the runtime sends an error event. That event
+    # is BedrockAgentCoreApp's {"error": ..., "error_type": ...}. Show the
     # response as it arrives, then fail when it holds an error event. The
     # pipe makes the CLI wrap at 80 columns, so pass the terminal width on.
     local output status columns="${COLUMNS:-}"
@@ -164,7 +167,7 @@ invoke_deployed() {
     fi
     # Strip any color codes first, in case FORCE_COLOR is set.
     if sed $'s/\x1b\\[[0-9;]*m//g' "$output" \
-        | grep -Eq '^[[:space:]]*\{"type": ?"error"'; then
+        | grep -Eq '^[[:space:]]*\{"error":'; then
         rm -f "$output"
         echo -e "${RED}The agent returned an error event. See the response above.${NC}"
         return 1
@@ -290,7 +293,8 @@ case "${1:-help}" in
         ensure_deps
         echo -e "${GREEN}Configuring agent for AWS deployment...${NC}"
         echo ""
-        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME"
+        # The agent's memory is NAMS, so no AgentCore memory is created.
+        uv run agentcore configure -e "$ENTRYPOINT" -n "$AGENT_NAME" --disable-memory
         echo ""
         echo -e "${GREEN}Configuration complete!${NC}"
         echo "Run './agent.sh deploy' to deploy to AgentCore Runtime"
@@ -398,7 +402,8 @@ case "${1:-help}" in
         fi
         echo "Prompt: $PROMPT"
         echo ""
-        invoke_deployed "{\"prompt\": \"$PROMPT\"}"
+        # The runtime rejects a request with no user_id.
+        invoke_deployed "{\"prompt\": \"$PROMPT\", \"user_id\": \"$INVOKE_USER_ID\"}"
         ;;
 
     destroy)

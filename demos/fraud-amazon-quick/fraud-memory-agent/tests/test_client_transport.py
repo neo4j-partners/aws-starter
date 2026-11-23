@@ -53,5 +53,21 @@ class DeployedTransportTests(unittest.TestCase):
         self.assertEqual(max_attempts, 1)
 
 
+class SseParsingTests(unittest.TestCase):
+    def test_app_error_event_is_reported(self) -> None:
+        events = [
+            b'data: {"type": "chunk", "data": "partial"}\n\n',
+            b'data: {"error": "boom", "error_type": "RuntimeError",'
+            b' "message": "An error occurred during streaming"}\n\n',
+        ]
+        content_parts, errors = transport._consume_sse(events, stream=False)
+        self.assertEqual(content_parts, ["partial"])
+        self.assertEqual(errors, ["RuntimeError: boom"])
+        self.assertEqual(
+            transport._result(content_parts, errors),
+            {"status": "error", "errors": ["RuntimeError: boom"]},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

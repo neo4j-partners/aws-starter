@@ -136,8 +136,11 @@ def consume_sse(chunks: Iterable[bytes]) -> tuple[str, list[str], bool]:
             event_type = message.get("type")
             if event_type == "chunk":
                 content.append(str(message.get("data", "")))
-            elif event_type == "error":
-                errors.append(str(message.get("error", "Unknown runtime error")))
+            elif "error" in message:
+                # BedrockAgentCoreApp's event when the runtime's stream raises.
+                error_type = message.get("error_type")
+                text = str(message["error"])
+                errors.append(f"{error_type}: {text}" if error_type else text)
             elif event_type == "complete":
                 completed = True
     return "".join(content), errors, completed

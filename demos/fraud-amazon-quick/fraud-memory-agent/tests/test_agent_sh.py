@@ -82,6 +82,20 @@ class AgentShTestCase(unittest.TestCase):
         return self.log.read_text().splitlines()
 
 
+class ConfigureTests(AgentShTestCase):
+    def test_configure_disables_agentcore_memory(self) -> None:
+        result = self.run_agent("configure")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self.calls(),
+            [
+                "run agentcore configure -e server/runtime_app.py -n fraud_memory_agent"
+                " --disable-memory"
+            ],
+        )
+
+
 class InvokeCloudTests(AgentShTestCase):
     def test_a_successful_response_is_printed_and_exits_0(self) -> None:
         output = '{"type": "chunk", "data": "Two chains found."}\n{"type": "complete"}'
@@ -90,10 +104,22 @@ class InvokeCloudTests(AgentShTestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('{"type": "chunk", "data": "Two chains found."}', result.stdout)
-        self.assertEqual(self.calls(), ['run agentcore invoke {"prompt": "Find chains"}'])
+        self.assertEqual(
+            self.calls(),
+            ['run agentcore invoke {"prompt": "Find chains", "user_id": "demo-user"}'],
+        )
+
+    def test_fraud_user_id_sets_the_user(self) -> None:
+        result = self.run_agent("invoke-cloud", "Find chains", FRAUD_USER_ID="analyst-1")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"user_id": "analyst-1"', self.calls()[0])
 
     def test_an_error_event_is_printed_and_exits_1(self) -> None:
-        output = '{"type": "error", "error": "NAMS GET → 424: external_database_error"}'
+        output = (
+            '{"error": "NAMS GET → 424: external_database_error", "error_type": "MemoryError",'
+            ' "message": "An error occurred during streaming"}'
+        )
 
         result = self.run_agent("invoke-cloud", "Find chains", STUB_UV_OUTPUT=output)
 
@@ -102,14 +128,14 @@ class InvokeCloudTests(AgentShTestCase):
         self.assertIn("The agent returned an error event", result.stdout)
 
     def test_a_colored_error_event_is_still_detected(self) -> None:
-        output = '\x1b[1m{\x1b[0m\x1b[32m"type"\x1b[0m: \x1b[32m"error"\x1b[0m, "error": "x"}'
+        output = '\x1b[1m{\x1b[0m\x1b[32m"error"\x1b[0m: \x1b[32m"x"\x1b[0m}'
 
         result = self.run_agent("invoke-cloud", "Find chains", STUB_UV_OUTPUT=output)
 
         self.assertEqual(result.returncode, 1)
 
     def test_the_word_error_inside_an_answer_is_not_an_error_event(self) -> None:
-        output = '{"type": "chunk", "data": "{\\"type\\": \\"error\\"} is a JSON example."}'
+        output = '{"type": "chunk", "data": "{\\"error\\": 1} is a JSON example."}'
 
         result = self.run_agent("invoke-cloud", "Find chains", STUB_UV_OUTPUT=output)
 
@@ -131,7 +157,7 @@ class InvokeCloudTests(AgentShTestCase):
         self.assertIn("highest risk scores", self.calls()[0])
 
     def test_the_response_file_is_removed_on_every_exit(self) -> None:
-        for env in ({}, {"STUB_UV_STATUS": "3"}, {"STUB_UV_OUTPUT": '{"type": "error"}'}):
+        for env in ({}, {"STUB_UV_STATUS": "3"}, {"STUB_UV_OUTPUT": '{"error": "x"}'}):
             with self.subTest(env=env):
                 self.run_agent("invoke-cloud", "Find chains", **env)
 

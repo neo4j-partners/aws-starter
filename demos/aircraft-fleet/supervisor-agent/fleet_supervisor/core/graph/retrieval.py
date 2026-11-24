@@ -228,8 +228,8 @@ MAX_ENTITIES_PER_CHUNK = 10
 # each index before the type filter. neo4j-graphrag rejects filters on
 # hybrid search, so the filter runs after the hits are ranked. Each index
 # returns only ``top_k`` hits, and other types' chunks would otherwise take
-# most of them. A probe of 12 EGT queries gave the same results from a pool
-# of 4x top_k up.
+# most of them. A probe of 11 per-type EGT queries gave the same results
+# from a pool of 4x top_k up.
 TYPE_FILTER_POOL_FACTOR = 4
 
 _PROVENANCE_KEYS = (

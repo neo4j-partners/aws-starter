@@ -17,7 +17,12 @@ import pytest
 from neo4j import Driver, GraphDatabase
 
 from populate_aircraft_db import loader
-from populate_aircraft_db.pipeline import LimitSource, check_limit_nodes, link_limits_to_chunks
+from populate_aircraft_db.pipeline import (
+    LimitSource,
+    check_limit_nodes,
+    clear_enrichment_data,
+    link_limits_to_chunks,
+)
 
 TEST_URI = os.environ.get("NEO4J_TEST_URI", "")
 LOCAL_HOSTS = {"localhost", "127.0.0.1"}
@@ -45,10 +50,14 @@ CREATE (:OperatingLimit {name: name, aircraftType: $model})
 _SOURCES = [
     # Two chunks hold it whole, in their overlap.
     LimitSource("Held Twice", DOC, 85, 95),
+    # c0 and c1 overlap it, but only c1 holds it, so only c1 links.
+    LimitSource("Held Once", DOC, 85, 150),
     # No chunk holds it whole, so both chunks it overlaps link.
     LimitSource("Split", DOC, 50, 150),
     # Only c1 holds it. c2 repeats the header above it, outside its range.
     LimitSource("Under Header", DOC, 150, 170),
+    # It starts where c1 ends and runs past c2, so only c2 overlaps it.
+    LimitSource("Past The End", DOC, 200, 310),
     # Past the last chunk, as in a sampled run.
     LimitSource("Unchunked", DOC, 400, 410),
 ]
@@ -118,7 +127,9 @@ def test_limits_link_to_the_chunks_that_hold_their_source(driver: Driver, databa
     link_limits_to_chunks(driver, database, _SOURCES)
 
     assert _links(driver, database) == {
+        "Held Once": [f"{DOC}-c1"],
         "Held Twice": [f"{DOC}-c0", f"{DOC}-c1"],
+        "Past The End": [f"{DOC}-c2"],
         "Split": [f"{DOC}-c0", f"{DOC}-c1"],
         "Under Header": [f"{DOC}-c1"],
         "Unchunked": [],
@@ -127,7 +138,7 @@ def test_limits_link_to_the_chunks_that_hold_their_source(driver: Driver, databa
         "MATCH (:OperatingLimit)-[r:FROM_CHUNK]->() RETURN count(r) AS count",
         database_=database,
     )
-    assert records[0]["count"] == 5
+    assert records[0]["count"] == 7
 
     result = loader._VerifyResult(strict=True)
     loader._check_limit_chunks(driver, database, {"OperatingLimit", "Chunk"}, result)
@@ -155,3 +166,41 @@ def test_an_extracted_limit_does_not_count_as_loaded(driver: Driver, database: s
         driver.execute_query(
             f"MATCH (ol:OperatingLimit {{name: 'Split'}}) REMOVE ol:{label}", database_=database
         )
+
+
+def test_the_clear_keeps_loaded_limits_and_deletes_extracted_nodes(
+    driver: Driver, database: str
+) -> None:
+    _setup(driver, database)
+    link_limits_to_chunks(driver, database, _SOURCES)
+    driver.execute_query(
+        """
+        MATCH (ol:OperatingLimit {name: 'Split'})
+        CREATE (:Sensor {sensor_id: $model + '-SN1', aircraftType: $model})-[:HAS_LIMIT]->(ol)
+        CREATE (:SystemReference {name: 'Engine', aircraftType: $model})
+        CREATE (:__Entity__ {name: 'Entity', aircraftType: $model})
+        CREATE (:__KGBuilder__ {name: 'Builder', aircraftType: $model})
+        """,
+        model=MODEL,
+        database_=database,
+    )
+
+    clear_enrichment_data(driver, database)
+
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (n {aircraftType: $model})
+        WITH n ORDER BY n.name
+        RETURN collect(n.name) AS names,
+               COUNT { (:Sensor)-[:HAS_LIMIT]->(:OperatingLimit) } AS limit_links,
+               COUNT { ()-[:FROM_CHUNK]->() } AS chunk_links
+        """,
+        model=MODEL,
+        database_=database,
+    )
+    assert dict(records[0]) == {
+        # The Sensor has no name, and collect skips nulls.
+        "names": sorted(s.name for s in _SOURCES),
+        "limit_links": 1,
+        "chunk_links": 0,
+    }

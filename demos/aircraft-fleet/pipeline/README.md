@@ -119,7 +119,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **Staleness:** `generated/` is stale when its stamp does not match the `GEN_*` values, the code, or the installed versions. `load` and `load-operational` regenerate it then and print the reason.
 - **Atomic writes:** Each run writes into a `generated/.generating-*` temp directory first. The new stamp goes in last, after every CSV has moved.
 - **Interrupted runs:** A run stopped before the move keeps the previous CSVs and stamp. A run stopped during the move leaves no stamp, so the next `load` regenerates.
-- **Lock:** A second `generate` on the same folder stops at once with `another generate is running in generated`.
+- **Lock:** A `generate` stops at once while another generate or a load holds the folder's lock. It prints `another generate or a load is running in` and the folder path.
 - **Your files:** Files you add to `generated/` are kept.
 - **Graph check:** `verify` compares the graph's `Dataset` node with the stamp, and the stamp with the current code. It also compares each operational label's node count with its CSV row count.
 - **Strict mode:** `verify --strict` fails on any mismatch, or when the stamp is missing.
@@ -132,7 +132,7 @@ this pipeline.
 
 - **The need:** The `neo4j-graphrag` entity extractor asks its LLM for JSON that matches a schema through `response_format`.
 - **The class:** `StructuredBedrockLLM` is a small subclass of `BedrockLLM`. It answers that request through Bedrock Converse tool use.
-- **How it works:** It declares the target schema as a tool and forces `toolChoice`. It returns the tool input as the structured result.
+- **How it works:** It declares the target schema as a tool and offers it with `toolChoice` set to `auto`. Claude Sonnet 5.5 rejects a forced tool choice. A reply with no valid tool call is retried once. The tool input is the structured result.
 - **Reuse:** You can copy this subclass into any Bedrock and `neo4j-graphrag` pipeline.
 
 ## Keep document context in every chunk

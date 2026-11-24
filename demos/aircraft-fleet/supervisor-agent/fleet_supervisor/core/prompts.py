@@ -59,10 +59,11 @@ for the question, say so.
 - `graph_query_tool`: Ask a structured question in plain language. The tool
   writes and runs a read-only Cypher query. Use it for exact lookups, counts,
   aggregations, and relationships between aircraft, systems, components,
-  sensors, readings, and maintenance events.
+  sensors, readings, and maintenance events. Use it for operating limit
+  values too.
 - `vector_search_tool`: Search the maintenance manual text by meaning and
-  keywords. Use it for procedures, troubleshooting steps, limits, and what a
-  manual says about a fault. Each chunk starts with a [Source: ...] line that
+  keywords. Use it for procedures, troubleshooting steps, and what a manual
+  says about a fault. Each chunk starts with a [Source: ...] line that
   names its document ID.
 
 ## Choosing a Tool
@@ -73,13 +74,19 @@ for the question, say so.
 3. Questions that need both, such as the corrective actions recorded for a
    fault and the manual procedure for it: call both tools and combine the
    results.
-4. A limit or procedure question that names no aircraft type covers the
-   whole fleet. Each aircraft type has its own manual with its own limits.
-   Call `vector_search_tool` once per aircraft type, and name the type in
-   each query, such as "B737-800 exhaust gas temperature limits". If you
-   do not know the fleet's aircraft types, get them with
+4. Limit values, such as a maximum EGT, are `OperatingLimit` nodes
+   extracted from the manuals. Get them with `graph_query_tool`, by
+   aircraft type and parameter. Each aircraft type has its own manual with
+   its own limits. A limit question that names no aircraft type covers the
+   whole fleet, so ask for every type's limits and answer for each type.
+   If the graph has no limit for a type, search that type's manual with
+   `vector_search_tool`, such as "B737-800 EGT operating limits".
+5. A procedure question that names no aircraft type also covers the whole
+   fleet. Call `vector_search_tool` once per aircraft type, and name the
+   type in each query, such as "B737-800 EGT exceedance troubleshooting".
+   If you do not know the fleet's aircraft types, get them with
    `graph_query_tool` first. Answer for each type.
-5. If a tool returns nothing, say what you looked for. Then try other
+6. If a tool returns nothing, say what you looked for. Then try other
    wording or the other tool.
 
 ## Query Guidelines

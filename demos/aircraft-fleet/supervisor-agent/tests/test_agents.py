@@ -142,13 +142,23 @@ def test_maintenance_prompt_asks_for_manual_document_ids(fake_tools):
     assert "vector_search_tool" in prompt
 
 
-# One query for a fleet-wide limit ranks chunks from every manual against
-# each other, so one type's limits table can fall out of the top results.
+# A manual search for limits can rank a nearby table first, such as the
+# A320 normal operating parameters above its EGT limits table. The
+# OperatingLimit nodes hold each type's values directly.
+def test_maintenance_prompt_gets_limit_values_from_the_graph(fake_tools):
+    prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
+    assert "Limit values, such as a maximum EGT, are `OperatingLimit` nodes" in prompt
+    assert "Get them with `graph_query_tool`" in prompt
+    assert '"B737-800 EGT operating limits"' in prompt
+
+
+# One query for a fleet-wide procedure ranks chunks from every manual against
+# each other, so one type's procedure can fall out of the top results.
 def test_maintenance_prompt_searches_manuals_once_per_aircraft_type(fake_tools):
     prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
-    assert "A limit or procedure question that names no aircraft type" in prompt
+    assert "A procedure question that names no aircraft type" in prompt
     assert "Call `vector_search_tool` once per aircraft type" in prompt
-    assert "name the type in\n   each query" in prompt
+    assert "name the\n   type in each query" in prompt
 
 
 def test_operations_prompt_names_no_manual_search_tool(fake_tools):

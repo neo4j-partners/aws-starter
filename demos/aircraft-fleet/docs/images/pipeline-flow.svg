@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="780" viewBox="0 0 1600 780" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Pipeline Flow</title>
-  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Stages 2 to 4 write the Neo4j fleet graph and stage 5 reads it.</desc>
+  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -76,6 +76,7 @@
   <text x="680" y="380" class="s">Embeds each chunk</text>
   <text x="680" y="406" class="s">Extracts faults, limits,</text>
   <text x="680" y="426" class="s">and procedures</text>
+  <text x="680" y="452" class="s">Merges same-name entities</text>
 
   <circle cx="1006" cy="256" r="18" fill="#2E6DB4"/><text x="1006" y="262" text-anchor="middle" class="num">4</text>
   <text x="1034" y="263" class="t">Index and fuse</text>
@@ -92,8 +93,9 @@
   <text x="1300" y="334" class="s">Node counts match CSVs</text>
   <text x="1300" y="360" class="s">Graph stamp matches</text>
   <text x="1300" y="380" class="s">the CSV stamp</text>
-  <text x="1300" y="406" class="s">--strict exits nonzero</text>
-  <text x="1300" y="426" class="s">on any warning</text>
+  <text x="1300" y="406" class="s">Cross links exist</text>
+  <text x="1300" y="432" class="s">--strict exits nonzero</text>
+  <text x="1300" y="452" class="s">on any warning</text>
 
   <!-- Stage arrows -->
   <path d="M310,345 H346" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
@@ -104,7 +106,7 @@
   <!-- Neo4j fleet graph -->
   <rect x="350" y="550" width="1200" height="90" rx="18" fill="#E8F6F2" stroke="#008C72" stroke-width="2.5" filter="url(#shadow)"/>
   <text x="950" y="590" text-anchor="middle" font-size="21" font-weight="700" fill="#00594A">Neo4j fleet graph</text>
-  <text x="950" y="616" text-anchor="middle" class="s">Operational graph + knowledge graph + indexes, ready for both agents</text>
+  <text x="950" y="616" text-anchor="middle" class="s">Operational graph + knowledge graph + indexes, ready for the supervisor agent and the UI</text>
   <path d="M485,470 V546" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
   <text x="495" y="516" class="lbl" fill="#00594A">writes</text>
   <path d="M795,470 V546" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>

@@ -343,15 +343,9 @@ def setup_cmd() -> None:
             print("  uv run populate-aircraft-db setup")
             raise typer.Exit(code=1) from exc
 
-        verify(
-            driver,
-            settings.neo4j_database,
-            expected_embedding_dimensions=creds.embedding_dims,
-            data_dir=settings.data_dir,
-        )
-
     elapsed = time.monotonic() - start
     print(f"\nDone in {_fmt_elapsed(elapsed)}.")
+    print("Check the graph with: uv run populate-aircraft-db verify --strict")
 
 
 @app.command("verify")
@@ -431,7 +425,11 @@ def clean_enrichment_cmd() -> None:
 
 @app.command("load-operational")
 def load_operational_cmd() -> None:
-    """Load only CSV operational data and relink existing enrichment."""
+    """Load only CSV operational data and relink existing enrichment.
+
+    It reads manuals/ for the limit sources. ./setup.sh load-operational
+    runs clean first, so that graph has no enrichment to relink.
+    """
     from .pipeline import (
         limit_sources,
         link_limits_to_chunks,

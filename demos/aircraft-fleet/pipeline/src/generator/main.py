@@ -6,6 +6,7 @@ import difflib
 import errno
 import fcntl
 import json
+import math
 import os
 import random
 import shutil
@@ -339,7 +340,7 @@ def _write_dataset(
         f"{limit_count} operating limits"
     )
 
-    # ── 2. Sensor readings + maintenance events ─────────────────────────────
+    # ── 2-3. Sensor readings + maintenance events ───────────────────────────
     console.print("[cyan]Generating sensor readings and maintenance events…[/cyan]")
 
     reading_fields = ["reading_id", "sensor_id", "ts", "value"]
@@ -409,7 +410,7 @@ def _write_dataset(
     write_csv(rels_event_system, work / "rels_event_system.csv")
     write_csv(rels_event_aircraft, work / "rels_event_aircraft.csv")
 
-    # ── 3. Flight operations ────────────────────────────────────────────────
+    # ── 4. Flight operations ────────────────────────────────────────────────
     console.print("[cyan]Generating flights, airports, and delays…[/cyan]")
     (
         airport_rows,
@@ -434,7 +435,7 @@ def _write_dataset(
         f"{len(delay_rows):,} delays"
     )
 
-    # ── 4. Component removals ───────────────────────────────────────────────
+    # ── 5. Component removals ───────────────────────────────────────────────
     console.print("[cyan]Generating component removals…[/cyan]")
     removal_rows, rels_ac_removal, rels_comp_removal = generate_removals(
         fleet, maintenance_rows, config, rng
@@ -444,6 +445,7 @@ def _write_dataset(
     write_csv(rels_comp_removal, work / "rels_component_removal.csv")
     console.print(f"  [green]✓[/green] {len(removal_rows)} removals")
 
+    # ── 6. Stamp ────────────────────────────────────────────────────────────
     write_stamp(work, stamp)
 
     summary = (fleet, total_readings, maintenance_rows, flight_rows, delay_rows)
@@ -575,7 +577,11 @@ def validate(
         Path, typer.Argument(help="Directory containing generated CSV files.")
     ] = Path("."),
 ) -> None:
-    """Check referential integrity of generated CSV files."""
+    """Check referential integrity of generated CSV files.
+
+    Also check that operating_limits.csv has the expected header and row
+    count, and that each row has a numeric minValue or maxValue.
+    """
     import csv as _csv
 
     console.print(f"\n[bold]Validating CSV files in:[/bold] {directory.resolve()}\n")
@@ -612,6 +618,34 @@ def validate(
                 val = row.get(col)
                 if val and val not in valid_ids:
                     errors.append(f"{filename}:{i}: {col}={val!r} not in {label}")
+
+    def check_limits() -> None:
+        path = directory / LIMITS_FILE
+        if not path.exists():
+            errors.append(f"Missing file: {LIMITS_FILE}")
+            return
+        with path.open(newline="", encoding="utf-8") as f:
+            reader = _csv.DictReader(f)
+            expected = CSV_COLUMNS[LIMITS_FILE]
+            if reader.fieldnames != expected:
+                errors.append(f"{LIMITS_FILE}: header {reader.fieldnames} != {expected}")
+                return
+            rows = list(reader)
+        expected_rows = len(operating_limit_rows())
+        if len(rows) != expected_rows:
+            errors.append(f"{LIMITS_FILE}: {len(rows)} rows, expected {expected_rows}")
+        for i, row in enumerate(rows, start=2):
+            if not (row["minValue"] or row["maxValue"]):
+                errors.append(f"{LIMITS_FILE}:{i}: no minValue or maxValue")
+            for col in ("minValue", "maxValue"):
+                if not (val := row[col]):
+                    continue
+                try:
+                    numeric = math.isfinite(float(val))
+                except ValueError:
+                    numeric = False
+                if not numeric:
+                    errors.append(f"{LIMITS_FILE}:{i}: {col}={val!r} is not a number")
 
     aircraft_ids = load_ids("nodes_aircraft.csv", ":ID(Aircraft)")
     system_ids = load_ids("nodes_systems.csv", ":ID(System)")
@@ -652,9 +686,10 @@ def validate(
     check_fk("rels_aircraft_removal.csv", ":END_ID(Removal)", removal_ids, "Removal")
     check_fk("rels_component_removal.csv", ":START_ID(Removal)", removal_ids, "Removal")
     check_fk("rels_component_removal.csv", ":END_ID(Component)", component_ids, "Component")
+    check_limits()
 
     if errors:
-        console.print(f"[red]Found {len(errors)} referential integrity error(s):[/red]")
+        console.print(f"[red]Found {len(errors)} validation error(s):[/red]")
         for e in errors[:20]:
             console.print(f"  [red]✗[/red] {e}")
         if len(errors) > 20:

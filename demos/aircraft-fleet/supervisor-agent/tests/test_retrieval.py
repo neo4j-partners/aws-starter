@@ -173,6 +173,13 @@ def test_the_chunk_query_filters_by_type_before_its_limit() -> None:
     assert where < query.index("ORDER BY score DESC") < query.index("LIMIT $result_k")
 
 
+# The entity collect runs after the LIMIT and does not keep row order.
+def test_the_chunk_query_returns_hits_in_score_order() -> None:
+    query = retrieval.CHUNK_RETRIEVAL_QUERY
+    assert query.rstrip().endswith("ORDER BY score DESC")
+    assert query.rindex("ORDER BY score DESC") > query.index("RETURN ")
+
+
 def test_schema_cache_honors_ttl(monkeypatch) -> None:
     clock = [1000.0]
     fetches: list[int] = []

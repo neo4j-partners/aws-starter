@@ -196,6 +196,9 @@ def _embedder() -> BedrockEmbeddings:
 #
 # With ``$aircraft_type`` set, it keeps only that type's chunks and then the
 # ``$result_k`` best. A null ``$aircraft_type`` keeps every chunk.
+#
+# The entity ``collect`` does not keep row order, so the final ORDER BY puts
+# the hits back in score order.
 CHUNK_RETRIEVAL_QUERY = """
 OPTIONAL MATCH (node)-[:FROM_DOCUMENT]->(doc:Document)
 WITH node, score, doc
@@ -214,6 +217,7 @@ RETURN node.text AS text,
        [e IN entities |
            coalesce(head([l IN labels(e) WHERE NOT l STARTS WITH '__']), 'Entity')
            + ': ' + coalesce(e.name, '?')] AS entities
+ORDER BY score DESC
 """
 
 # Entities listed per chunk. Enough to show what the chunk is about without

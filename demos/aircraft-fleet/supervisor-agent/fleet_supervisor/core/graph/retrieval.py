@@ -42,7 +42,12 @@ from neo4j_graphrag.types import RetrieverResultItem
 
 from fleet_supervisor.core.config import AWS_REGION, MODEL_ID, ConfigError, graph_settings
 from fleet_supervisor.core.graph.text2cypher import BoundedText2CypherRetriever
-from fleet_supervisor.core.secrets import NEO4J_PASSWORD_SECRET_ARN, forget_secret, neo4j_login
+from fleet_supervisor.core.secrets import (
+    NEO4J_PASSWORD_SECRET_ARN,
+    Neo4jLogin,
+    forget_secret,
+    neo4j_login,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,24 +70,15 @@ _driver_lock = threading.Lock()
 _UNAUTHORIZED = "Neo.ClientError.Security.Unauthorized"
 
 
-def _login() -> neo4j.Auth:
-    """Return the fleet graph login, from the secrets cache when it holds it."""
-    login = neo4j_login()
-    return neo4j.basic_auth(login.username, login.password)
-
-
-def _fresh_login() -> neo4j.Auth:
-    """Read the fleet graph login again, skipping the secrets cache.
-
-    Only the fleet secret is dropped first, so a password rotated in Secrets
-    Manager is read again and the memory secret stays cached.
-    """
-    forget_secret(NEO4J_PASSWORD_SECRET_ARN)
-    return _login()
-
-
 class RotatingLoginAuthManager(AuthManager):
-    """Give the driver the fleet graph login, and follow a rotated password.
+    """Give the driver a Neo4j login, and follow a rotated password.
+
+    The login is the fleet graph's unless ``login`` and ``secret_arn_var``
+    name another one. ``login`` returns the login, from the secrets cache
+    when it holds it. ``secret_arn_var`` names the variable that holds its
+    secret ARN. A fresh read drops only that secret from the cache, so a
+    password rotated in Secrets Manager is read again and every other secret
+    stays cached.
 
     The manager takes the login from the secrets cache once and keeps it, so
     the first query reads no secret that startup already read. ``reload``
@@ -101,23 +97,40 @@ class RotatingLoginAuthManager(AuthManager):
     backoff until ``max_transaction_retry_time``, about 30 s per query, and
     read the secret on each attempt.
 
-    The memory path recovers from a rotation in ``server._build_agent``.
+    The memory client uses one through ``core.memory``. Its late writes
+    recover from a rotation in ``server.invoke``.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        login: Callable[[], Neo4jLogin] = neo4j_login,
+        secret_arn_var: str = NEO4J_PASSWORD_SECRET_ARN,
+    ) -> None:
+        self._read_login = login
+        self._secret_arn_var = secret_arn_var
         self._lock = threading.Lock()
         self._auth: neo4j.Auth | None = None
+
+    def _login(self) -> neo4j.Auth:
+        """Return the login, from the secrets cache when it holds it."""
+        login = self._read_login()
+        return neo4j.basic_auth(login.username, login.password)
+
+    def _fresh_login(self) -> neo4j.Auth:
+        """Read the login again, skipping the secrets cache for this secret only."""
+        forget_secret(self._secret_arn_var)
+        return self._login()
 
     def get_auth(self) -> neo4j.Auth:
         with self._lock:
             if self._auth is None:
-                self._auth = _login()
+                self._auth = self._login()
             return self._auth
 
     def reload(self) -> bool:
         """Read the login again, skipping the secrets cache. Return True if it changed."""
         with self._lock:
-            login = _fresh_login()
+            login = self._fresh_login()
             changed = login != self._auth
             self._auth = login
             return changed
@@ -132,7 +145,7 @@ class RotatingLoginAuthManager(AuthManager):
             if self._auth is not None and self._auth != auth:
                 # Another connection already read the new login.
                 return True
-            login = _fresh_login()
+            login = self._fresh_login()
             if login == auth:
                 return False
             self._auth = login

@@ -9,6 +9,7 @@ import anyio
 import pytest
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
+from strands.types.exceptions import SessionException
 
 from fleet_supervisor import server
 from fleet_supervisor.core.config import ConfigError
@@ -193,6 +194,94 @@ def test_a_flush_error_on_a_disconnect_still_closes_the_manager(supervisor, mana
     assert closed_after_aclose == [1]
     assert "The agent stream failed while closing" in caplog.text
     assert "flush failed" in caplog.text
+
+
+def late_write_error(rejected: bool = True) -> SessionException:
+    """The chain a failed end-of-turn memory write raises from the stream."""
+    error = SessionException(
+        "Failed to persist message for session 's1'; the message stays queued for the next flush"
+    )
+    if rejected:
+        error.__cause__ = AuthError("The client is unauthorized due to authentication failure.")
+    else:
+        error.__cause__ = MemoryConnectionError("Neo4j service unavailable")
+    return error
+
+
+@pytest.fixture
+def reloads(monkeypatch) -> list[object]:
+    """Record the settings each memory login reload gets."""
+    reloaded: list[object] = []
+
+    def reload(settings) -> bool:
+        reloaded.append(settings)
+        return True
+
+    monkeypatch.setattr(server, "reload_memory_login", reload)
+    return reloaded
+
+
+def test_a_rejected_late_write_reloads_the_login_and_completes(
+    supervisor, manager, reloads, caplog
+):
+    manager.settings = object()
+    supervisor.error = late_write_error()
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert [e["type"] for e in events] == ["agent", "chunk", "complete"]
+    assert reloads == [manager.settings]
+    assert manager.closed == 1
+    [warning] = [r for r in caplog.records if "late write" in r.getMessage()]
+    assert warning.levelname == "WARNING"
+    assert "read the rotated password" in warning.getMessage()
+    assert "Request failed" not in caplog.text
+
+
+def test_other_late_write_failures_still_fail_the_request(supervisor, manager, reloads):
+    supervisor.error = late_write_error(rejected=False)
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert reloads == []
+    assert manager.closed == 1
+
+
+def test_a_rejected_login_outside_a_memory_write_still_fails(supervisor, manager, reloads):
+    supervisor.error = password_rejected_error()
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert reloads == []
+
+
+def test_a_rejected_late_write_without_memory_still_fails(supervisor, reloads):
+    supervisor.error = late_write_error()
+    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert events[-1] == {"type": "error", "error": server.GENERIC_ERROR}
+    assert reloads == []
+
+
+def test_a_rejected_late_write_on_a_disconnect_is_a_warning(supervisor, manager, reloads, caplog):
+    manager.settings = object()
+
+    async def stream_with_rejected_flush(prompt):
+        try:
+            for i in range(1000):
+                yield {"data": f"t{i}"}
+                await asyncio.sleep(0)
+        finally:
+            raise late_write_error()
+
+    supervisor.stream_async = stream_with_rejected_flush
+
+    async def disconnect_mid_answer():
+        stream = server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1"))
+        for _ in range(3):
+            await anext(stream)
+        await stream.aclose()
+
+    asyncio.run(disconnect_mid_answer())
+    assert reloads == [manager.settings]
+    assert manager.closed == 1
+    assert "The agent stream failed while closing" not in caplog.text
+    assert "late write" in caplog.text
 
 
 def test_memory_manager_is_closed_when_the_request_is_cancelled(supervisor, manager):

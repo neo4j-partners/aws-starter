@@ -60,7 +60,7 @@ def test_a_generated_dataset_passes(dataset: Path) -> None:
     result = runner.invoke(app, ["validate", str(dataset)])
 
     assert result.exit_code == 0, result.output
-    assert "All referential integrity checks passed" in result.output
+    assert "✓ All validation checks passed." in result.output
 
 
 def test_every_relationship_column_is_covered() -> None:

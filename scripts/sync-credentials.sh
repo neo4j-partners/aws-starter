@@ -9,7 +9,6 @@ MCP_SERVER_DIR="$SCRIPT_DIR/../neo4j-mcp-server"
 # Each entry is "target directory:source credentials file".
 TARGETS=(
     "../quickstart:.mcp-credentials.json"
-    "../demos/aircraft-fleet:.mcp-credentials.fleet.json"
     "../demos/fraud-amazon-quick:.mcp-credentials.finance.json"
 )
 

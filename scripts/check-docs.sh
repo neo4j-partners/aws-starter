@@ -69,9 +69,16 @@ GATEWAY_PATTERN_PATHS=(
 )
 
 # Retired everywhere except the end-to-end test plan, whose run history
-# records the old fleet_agent Runtime and the old fleet-agent/ folder.
+# records the old fleet_agent Runtime and the old fleet-agent/ folder. The
+# history also records the graphrag-agent/ project, its fleet_graphrag
+# package, and its fleet-* commands, which supervisor-agent/ replaced. The
+# lookbehind on graphrag-agent passes blog URLs that end in
+# context-aware-graphrag-agent.
 RETIRED_OUTSIDE_E2E_HISTORY=(
     "fleet[-_]agent"
+    "(?<![-\\w])graphrag[-_]agent"
+    "fleet_graphrag"
+    "(?<![-\\w])fleet-(server|cli|demo|invoke)(?![-\\w])"
 )
 E2E_HISTORY_PATHS=(
     "demos/aircraft-fleet/docs/e2e-test-plan.md"

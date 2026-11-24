@@ -7,10 +7,10 @@ log every call to calls.log and act on STUB_* environment variables.
 
 import json
 import os
-import re
 import shutil
 import stat
 import subprocess
+import sys
 import time
 from pathlib import Path
 from signal import SIGHUP, SIGINT, SIGTERM
@@ -32,27 +32,18 @@ STUB_AGENTCORE = r"""#!/bin/bash
 echo "agentcore $*" >> "$STUB_LOG"
 case "$1" in
     status) printf '%s\n' "$STUB_STATUS_JSON" ;;
-    add)
-        # The CLI reads the secret on stdin and writes it to .env.local.
-        cat > /dev/null
-        printf '%s\n' "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=encrypted" \
-            >> agentcore/.env.local
-        ;;
     remove)
         jq --arg n "$4" 'del(.runtimes[] | select(.name == $n))' \
             agentcore/agentcore.json > agentcore/agentcore.json.stub
         mv agentcore/agentcore.json.stub agentcore/agentcore.json
         ;;
     deploy)
+        # Record the deploy settings the CDK app would read.
+        env | grep -E '^(NEO4J_|MEM_NEO4J_|GATEWAY_)' | sort > "${STUB_LOG%/*}/deploy-env"
         if [ -n "$STUB_DEPLOY_TARGETS" ]; then
             printf '%s\n' "$STUB_DEPLOY_TARGETS" > agentcore/aws-targets.json
         fi
         if [ -n "$STUB_DEPLOY_LOCK_SPEC" ]; then chmod 0444 agentcore/agentcore.json; fi
-        # Replace .env.local with a link after agent.sh checked it.
-        if [ -n "$STUB_DEPLOY_LINK_ENV_LOCAL" ]; then
-            rm -f agentcore/.env.local
-            ln -s "$STUB_DEPLOY_LINK_ENV_LOCAL" agentcore/.env.local
-        fi
         if [ -n "$STUB_DEPLOY_SIGNAL" ]; then kill -s "$STUB_DEPLOY_SIGNAL" "$PPID"; fi
         exit "${STUB_DEPLOY_EXIT:-0}"
         ;;
@@ -82,11 +73,6 @@ case "$1 $2" in
         if [ -n "${STUB_STACK_BEFORE_DEPLOY+set}" ] && ! grep -q "^agentcore deploy" "$STUB_LOG"; then
             if [ -n "${STUB_PRECHECK_SIGNAL:-}" ]; then kill -s "$STUB_PRECHECK_SIGNAL" "$PPID" "$$"; fi
             if [ -n "${STUB_PRECHECK_ERROR:-}" ]; then echo "$STUB_PRECHECK_ERROR" >&2; exit 254; fi
-            # Replace .env.local with a link after agent.sh checked it.
-            if [ -n "${STUB_PRECHECK_LINK_ENV_LOCAL:-}" ]; then
-                rm -f agentcore/.env.local
-                ln -s "$STUB_PRECHECK_LINK_ENV_LOCAL" agentcore/.env.local
-            fi
             if [ -n "$STUB_STACK_BEFORE_DEPLOY" ]; then echo "$STUB_STACK_BEFORE_DEPLOY"; exit 0; fi
             echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
             exit 254
@@ -106,12 +92,6 @@ case "$1 $2" in
         if [ -n "${STUB_LOOKUP_SIGNAL_SCRIPT:-}" ]; then
             kill -s "$STUB_LOOKUP_SIGNAL_SCRIPT" "$owner"
         fi
-        # Leave a file that is not this run's copy: one at the old fixed
-        # name, or another run's copy whose PID starts with this run's.
-        case "${STUB_LOOKUP_PLANT_STRIP:-}" in
-            old) printf 'OLD=1\n' > "agentcore/.env.local.strip.$owner" ;;
-            other) printf 'OTHER=1\n' > "agentcore/.env.local.strip.${owner}0.AbC123" ;;
-        esac
         if [ -n "$STUB_AWS_ERROR" ]; then echo "$STUB_AWS_ERROR" >&2; exit 254; fi
         if [ -n "$STUB_STACK_STATUS" ]; then echo "$STUB_STACK_STATUS"; exit 0; fi
         echo "An error occurred (ValidationError) when calling the DescribeStacks operation: Stack with id x does not exist" >&2
@@ -135,11 +115,6 @@ case "$1 $2" in
             *" $4 "*) echo "An error occurred (ResourceNotFoundException) when calling the DeleteLogGroup operation" >&2; exit 254 ;;
         esac
         ;;
-    "bedrock-agentcore-control get-oauth2-credential-provider")
-        if [ -n "$STUB_PROVIDER_EXISTS" ]; then echo '{}'; exit 0; fi
-        echo "An error occurred (ResourceNotFoundException) when calling the GetOauth2CredentialProvider operation: CredentialProvider not found" >&2
-        exit 254
-        ;;
     *) exit 99 ;;
 esac
 """
@@ -147,10 +122,6 @@ esac
 # rm, cp, mv, and awk pass through to the real command.
 # STUB_INTERRUPT_AFTER=cmd:N sends SIGINT to agent.sh right after the Nth
 # call of cmd, the same as a Ctrl+C, or STUB_INTERRUPT_SIGNAL instead.
-# STUB_RECORD_STRIP_MODE records the strip copy's mode and size in bytes
-# while it holds the lines: awk's after awk writes them to its standard
-# output, which is the copy, and mv's before mv moves the copy. mv also
-# records the copy's name and agent.sh's PID.
 STUB_PASSTHROUGH = r"""#!/bin/bash
 name="${0##*/}"
 real=/bin/"$name"
@@ -164,26 +135,8 @@ agent_pid() {
     done
     echo "$owner"
 }
-# stat's flags differ between macOS and Linux, so Python reads the mode. It
-# reads its own standard output when no file is named.
-record_strip() {
-    python3 -c 'import os, stat, sys
-st = os.stat(sys.argv[3]) if len(sys.argv) > 3 else os.fstat(1)
-named = [os.path.basename(sys.argv[3]), sys.argv[4]] if len(sys.argv) > 3 else []
-with open(sys.argv[1], "a") as log:
-    print(sys.argv[2], format(stat.S_IMODE(st.st_mode), "o"), st.st_size, *named, file=log)' \
-        "${STUB_LOG%/*}/strip-modes" "$@"
-}
-if [ -n "${STUB_RECORD_STRIP_MODE:-}" ] && [ "$name" = mv ]; then
-    case "${@: -2:1}" in
-        *.env.local.strip.*) record_strip mv "${@: -2:1}" "$(agent_pid)" ;;
-    esac
-fi
 "$real" "$@"
 status=$?
-if [ -n "${STUB_RECORD_STRIP_MODE:-}" ] && [ "$name" = awk ]; then
-    record_strip awk
-fi
 counter="${STUB_LOG%/*}/$name-calls"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
@@ -225,6 +178,18 @@ fi
 if [ "$1" = install ]; then echo "{}" > package-lock.json; fi
 mkdir -p node_modules
 echo "{}" > node_modules/.package-lock.json
+"""
+
+# uv logs its arguments to uv-calls, not calls.log, so the order of the
+# other calls stays as the tests expect. `uv run --quiet python` runs
+# STUB_PYTHON, the interpreter running the tests, which has python-dotenv.
+# Anything else, such as the local server, exits at once.
+STUB_UV = r"""#!/bin/bash
+echo "uv $*" >> "${STUB_LOG%/*}/uv-calls"
+if [ "$1 $2 $3" = "run --quiet python" ]; then
+    shift 3
+    exec "$STUB_PYTHON" "$@"
+fi
 """
 
 CLEAN_STATUS = json.dumps(
@@ -277,7 +242,7 @@ def project(tmp_path: Path) -> Path:
         ("cp", STUB_PASSTHROUGH),
         ("mv", STUB_PASSTHROUGH),
         ("awk", STUB_PASSTHROUGH),
-        ("uv", "#!/bin/bash\n"),
+        ("uv", STUB_UV),
     ):
         stub = bin_dir / name
         stub.write_text(body)
@@ -313,6 +278,7 @@ def run_agent(
         "PATH": f"{project.parent / 'bin'}:{os.environ['PATH']}",
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
+        "STUB_PYTHON": sys.executable,
         "STUB_STATUS_JSON": CLEAN_STATUS,
         "STUB_STACK_RESOURCES": DEPLOYED_RESOURCES,
         **stub_env,
@@ -348,11 +314,6 @@ def test_clean_destroy_checks_aws_by_name_and_succeeds(project: Path) -> None:
     logged = calls(project)
     assert any(
         "describe-stacks --region us-west-2 --stack-name AgentCore-fleetsupervisor-default" in c
-        for c in logged
-    )
-    assert any(
-        "get-oauth2-credential-provider --region us-west-2 "
-        "--name fleetsupervisor_default_fleet-gateway" in c
         for c in logged
     )
     # The account is checked before the first agentcore call and again
@@ -473,15 +434,6 @@ def test_a_stack_left_in_aws_fails_even_when_status_reads_clean(project: Path) -
     assert "Cleanup complete" not in result.stdout
 
 
-def test_a_provider_left_in_aws_fails_and_names_the_delete_command(project: Path) -> None:
-    result = run_destroy(project, STUB_PROVIDER_EXISTS="1")
-
-    assert result.returncode == 1
-    assert "credential provider fleetsupervisor_default_fleet-gateway" in result.stdout
-    assert "delete-oauth2-credential-provider --region us-west-2" in result.stdout
-
-
-SECRET_LINE = "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
 ABSENT_MESSAGE = (
     "Stack AgentCore-fleetsupervisor-default does not exist in us-west-2, "
     "so there is nothing to remove."
@@ -503,42 +455,10 @@ def test_an_absent_stack_skips_the_deploy_and_succeeds(project: Path) -> None:
     assert "Continue?" not in result.stdout
     logged = calls(project)
     assert not any(c.startswith(("agentcore remove", "agentcore deploy", "npm")) for c in logged)
-    assert any("get-oauth2-credential-provider" in c for c in logged)
+    # The check before the deploy and the report each look up the stack.
+    assert sum("cloudformation describe-stacks" in c for c in logged) == 2
     assert spec.read_bytes() == tracked
     assert not list((project.parent / "tmp").iterdir())
-
-
-# An interrupted deploy can leave the secret line in .env.local with no
-# stack deployed. The restore after a deploy removes it, and so does this.
-def test_an_absent_stack_still_strips_a_left_secret_line(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text(SECRET_LINE + "A=1\n")
-    env_local.chmod(0o600)
-
-    result = run_destroy(project, STUB_STACK_BEFORE_DEPLOY="")
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert ABSENT_MESSAGE in result.stdout
-    assert env_local.read_text() == "A=1\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
-    assert not list(env_local.parent.glob(".env.local.*"))
-    assert not any(c.startswith("agentcore deploy") for c in calls(project))
-
-
-def test_an_absent_stack_with_a_provider_left_fails_and_names_the_delete_command(
-    project: Path,
-) -> None:
-    result = run_destroy(project, STUB_STACK_BEFORE_DEPLOY="", STUB_PROVIDER_EXISTS="1")
-
-    assert result.returncode == 1
-    assert ABSENT_MESSAGE in result.stdout
-    assert "credential provider fleetsupervisor_default_fleet-gateway" in result.stdout
-    assert (
-        "aws bedrock-agentcore-control delete-oauth2-credential-provider --region us-west-2 "
-        "--name fleetsupervisor_default_fleet-gateway"
-    ) in result.stdout
-    assert "Cleanup complete" not in result.stdout
-    assert not any(c.startswith(("agentcore remove", "agentcore deploy")) for c in calls(project))
 
 
 def test_an_aws_error_in_the_stack_check_fails_before_any_change(project: Path) -> None:
@@ -562,34 +482,6 @@ def test_an_aws_error_in_the_stack_check_fails_before_any_change(project: Path) 
     assert not any(c.startswith("agentcore") for c in calls(project))
     assert spec.read_bytes() == tracked
     assert not list((project.parent / "tmp").iterdir())
-
-
-# The start check passed, then .env.local became a link before the strip on
-# the path with no stack. The strip refuses, and no later step retries it.
-def test_an_absent_stack_with_a_failed_strip_fails_and_says_to_delete_by_hand(
-    project: Path,
-) -> None:
-    target = project.parent / "shared.env"
-    target.write_text(SECRET_LINE + "A=1\n")
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("A=1\n")
-
-    result = run_destroy(
-        project, STUB_STACK_BEFORE_DEPLOY="", STUB_PRECHECK_LINK_ENV_LOCAL=str(target)
-    )
-
-    assert result.returncode == 1
-    assert ABSENT_MESSAGE in result.stdout
-    assert "agentcore/.env.local is a symbolic link" in result.stderr
-    assert (
-        "Delete the AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET line "
-        "from agentcore/.env.local by hand." in result.stderr
-    )
-    assert env_local.is_symlink()
-    assert target.read_text() == SECRET_LINE + "A=1\n"
-    assert not list(env_local.parent.glob(".env.local.*"))
-    assert "Cleanup complete" not in result.stdout
-    assert not any(c.startswith(("agentcore remove", "agentcore deploy")) for c in calls(project))
 
 
 def test_an_interrupt_during_the_stack_check_leaves_no_temporary_file(project: Path) -> None:
@@ -650,184 +542,89 @@ def test_an_interrupt_during_deploy_restores_the_spec_once(
     assert "Cleanup complete" not in result.stdout
 
 
-def test_destroy_strips_a_left_secret_line_and_keeps_the_file_mode(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text(
-        "# OAuth client secret for credential provider 'fleet-gateway' (set before deploy)\n"
-        "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=encrypted-value\n"
-        "OTHER_SETTING=kept\n"
-    )
-    env_local.chmod(0o600)
-
-    result = run_destroy(project)
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert env_local.read_text() == "OTHER_SETTING=kept\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
-    assert not list(env_local.parent.glob(".env.local.*"))
-
-
-def test_destroy_strips_only_the_exact_secret_variable(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    kept = (
-        "OLD_AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=other\n"
-        "# AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET= is set by deploy\n"
-    )
-    # The CLI reads these forms too, so each one is removed.
-    removed = (
-        "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
-        "export AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
-        "  AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
-        "\texport\tAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET = value\n"
-        # The CLI's \s also matches a vertical tab and a form feed.
-        "\x0bAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\n"
-        "export\x0cAGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET\x0b=value\n"
-    )
-    env_local.write_text(kept + removed)
-
-    result = run_destroy(project)
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert env_local.read_text() == kept
-
-
-# The CLI writes .env.local with mode 0600, so the rewrite does the same.
-def test_destroy_narrows_a_wider_file_mode_to_0600(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o644)
-
-    result = run_destroy(project)
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert env_local.read_text() == "A=1\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
-
-
-# mv would replace the link with a regular file and leave the secret in the
-# link's target, so a linked .env.local stops the run before anything changes.
-@pytest.mark.parametrize(
-    ("args", "stdin"), [(("destroy", "--yes"), ""), (("destroy",), "y\n"), (("deploy",), "")]
-)
-def test_a_linked_env_local_is_refused_before_any_change(
-    project: Path, args: tuple[str, ...], stdin: str
-) -> None:
-    spec = project / "agentcore" / "agentcore.json"
-    tracked = spec.read_bytes()
-    target = project.parent / "shared.env"
-    target.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local = project / "agentcore" / ".env.local"
-    env_local.symlink_to(target)
-
-    result = run_agent(project, *args, stdin=stdin)
-
-    assert result.returncode == 1
-    assert "agentcore/.env.local is a symbolic link" in result.stdout
-    assert "Continue?" not in result.stdout
-    assert env_local.is_symlink()
-    assert target.read_text() == "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n"
-    assert spec.read_bytes() == tracked
-    assert not any("deploy" in call or "remove" in call or "add" in call for call in calls(project))
-
-
-# The start check passed, then .env.local became a link. mv would replace
-# the link and leave the secret in its target, so the strip refuses.
-def test_a_link_made_after_the_start_check_is_not_replaced(project: Path) -> None:
-    target = project.parent / "shared.env"
-    target.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("A=1\n")
-
-    result = run_destroy(project, STUB_DEPLOY_LINK_ENV_LOCAL=str(target))
-
-    assert result.returncode == 1
-    assert "agentcore/.env.local is a symbolic link" in result.stderr
-    # The restore was the last try, so the line is left to delete by hand.
-    assert (
-        "Delete the AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET line "
-        "from agentcore/.env.local by hand." in result.stderr
-    )
-    assert env_local.is_symlink()
-    assert target.read_text() == "AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n"
-    assert not list(env_local.parent.glob(".env.local.*"))
+# The deploy settings in ../.env, which agent.sh exports for the CDK app.
+DEPLOY_SETTINGS = {
+    "NEO4J_URI": "neo4j+s://fleet1234.databases.neo4j.io",
+    "NEO4J_USERNAME": "neo4j",
+    "NEO4J_DATABASE": "neo4j",
+    "NEO4J_PASSWORD_SECRET_ARN": (
+        f"arn:aws:secretsmanager:us-west-2:{ACCOUNT}:secret:fleet-neo4j-AbC123"
+    ),
+    "MEM_NEO4J_URI": "neo4j+s://memory12.databases.neo4j.io",
+    "MEM_NEO4J_USERNAME": "neo4j",
+    "MEM_NEO4J_DATABASE": "memory",
+    "MEM_NEO4J_PASSWORD_SECRET_ARN": (
+        f"arn:aws:secretsmanager:us-west-2:{ACCOUNT}:secret:fleet-memory-XyZ789"
+    ),
+}
+# Other ../.env lines that deploy must not export. GATEWAY_URL stands for a
+# line left over from the MCP Gateway setup.
+LOCAL_ONLY_SETTINGS = {
+    "NEO4J_PASSWORD": "fleet-password",
+    "MEM_NEO4J_PASSWORD": "memory-password",
+    "GATEWAY_URL": "https://gateway.example.com/mcp",
+}
 
 
 def ready_to_deploy(project: Path) -> None:
-    """Add what deploy reads before the strip: a venv, ../.env, and credentials."""
+    """Add what deploy reads before the CDK install: a venv and ../.env."""
     (project / ".venv").mkdir()
-    (project.parent / ".env").write_text("")
-    (project.parent / ".mcp-credentials.json").write_text(
-        json.dumps(
-            {
-                "client_id": "id",
-                "client_secret": "secret",
-                "scope": "fleet/invoke",
-                "stack_name": "neo4j-mcp-server-fleet",
-            }
-        )
+    settings = {**DEPLOY_SETTINGS, **LOCAL_ONLY_SETTINGS}
+    (project.parent / ".env").write_text(
+        "".join(f"{name}={value}\n" for name, value in settings.items())
     )
 
 
-# The copy's name is this run's PID plus a random suffix, so on_exit removes
-# only this run's copies. A file at the old fixed name, or another run's copy
-# whose PID starts with this run's digits, is left as it is.
-@pytest.mark.parametrize(
-    ("planted", "name", "content"),
-    [
-        ("old", r"\.env\.local\.strip\.\d+", "OLD=1\n"),
-        ("other", r"\.env\.local\.strip\.\d+0\.AbC123", "OTHER=1\n"),
-    ],
-)
-def test_on_exit_leaves_a_strip_copy_name_that_is_not_this_runs(
-    project: Path, planted: str, name: str, content: str
-) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o600)
+def deploy_env(project: Path) -> dict[str, str]:
+    """The NEO4J_*, MEM_NEO4J_*, and GATEWAY_* settings agentcore deploy got."""
+    lines = (project.parent / "deploy-env").read_text().splitlines()
+    return dict(line.split("=", 1) for line in lines)
 
-    result = run_destroy(project, STUB_LOOKUP_PLANT_STRIP=planted)
+
+def test_deploy_exports_only_the_deploy_settings_from_the_shared_env(project: Path) -> None:
+    ready_to_deploy(project)
+
+    result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert env_local.read_text() == "A=1\n"
-    left = list(env_local.parent.glob(".env.local.*"))
-    assert len(left) == 1, left
-    assert re.fullmatch(name, left[0].name)
-    assert left[0].read_text() == content
+    assert deploy_env(project) == DEPLOY_SETTINGS
 
 
-# mktemp creates the copy with mode 0600, under umask 077 as well. The copy
-# holds the lines only after awk writes them and until mv moves it, and it
-# is 0600 at both points. Its name is the PID prefix plus mktemp's six
-# random characters, so a fixed name that a umask alone made 0600 fails.
-def test_the_copy_is_0600_while_it_holds_data_under_a_wide_umask(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o600)
+def test_deploy_needs_no_credentials_file_and_leaves_the_spec_unchanged(project: Path) -> None:
+    ready_to_deploy(project)
+    spec = project / "agentcore" / "agentcore.json"
+    tracked = spec.read_bytes()
+    assert not (project.parent / ".mcp-credentials.json").exists()
 
-    result = run_destroy(project, umask=0o022, STUB_RECORD_STRIP_MODE="1")
+    result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    awk_line, mv_line = (project.parent / "strip-modes").read_text().splitlines()
-    assert awk_line == "awk 600 4"
-    tool, mode, size, copy, pid = mv_line.split()
-    assert (tool, mode, size) == ("mv", "600", "4")
-    assert re.fullmatch(rf"\.env\.local\.strip\.{pid}\.\w{{6}}", copy)
-    assert env_local.read_text() == "A=1\n"
-    assert stat.S_IMODE(env_local.stat().st_mode) == 0o600
-
-
-def test_an_interrupt_during_the_secret_strip_leaves_no_copy(project: Path) -> None:
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
-    env_local.chmod(0o600)
-
-    # The strip's awk has written the copy, and mv has not replaced the file.
-    result = run_destroy(project, STUB_INTERRUPT_AFTER="awk:1")
-
-    assert result.returncode == -SIGINT, result.stdout + result.stderr
-    assert env_local.read_text() == "A=1\n"
-    assert not list(env_local.parent.glob(".env.local.*"))
+    # No credential is declared and nothing is looked up in AWS.
+    assert calls(project) == ["agentcore deploy"]
+    assert spec.read_bytes() == tracked
+    assert not (project / "agentcore" / ".env.local").exists()
     assert not list((project.parent / "tmp").iterdir())
+
+
+def test_a_value_exported_in_the_shell_wins_over_the_shared_env(project: Path) -> None:
+    ready_to_deploy(project)
+
+    result = run_agent(project, "deploy", MEM_NEO4J_DATABASE="exported")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert deploy_env(project) == {**DEPLOY_SETTINGS, "MEM_NEO4J_DATABASE": "exported"}
+
+
+def test_start_runs_without_a_credentials_file(project: Path) -> None:
+    (project / ".venv").mkdir()
+    assert not (project.parent / ".mcp-credentials.json").exists()
+
+    result = run_agent(project, "start")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Starting Aircraft Fleet Supervisor Agent on port 7071" in result.stdout
+    uv_calls = (project.parent / "uv-calls").read_text().splitlines()
+    assert uv_calls == ["uv run fleet-supervisor-server"]
 
 
 def test_a_failed_configure_leaves_no_temporary_project(project: Path) -> None:
@@ -863,8 +660,6 @@ def test_configure_without_a_package_lock_installs_with_npm_install(project: Pat
     assert lock.is_file()
 
 
-DISCOVERY_URL = "https://cognito-idp.example/.well-known/openid-configuration"
-
 # The system tools agent.sh runs before it installs the CDK dependencies.
 # make_temp hides mkdir's errors, so a missing tool does not always print
 # "command not found". The no-npm test checks that the run got as far as
@@ -897,7 +692,7 @@ def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
     ready_to_deploy(project)
     remove_cdk_install(project)
 
-    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+    result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
     logged = calls(project)
@@ -909,7 +704,7 @@ def test_deploy_installs_missing_cdk_dependencies_first(project: Path) -> None:
 def test_deploy_skips_npm_when_cdk_dependencies_are_installed(project: Path) -> None:
     ready_to_deploy(project)
 
-    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+    result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert not any(call.startswith("npm") for call in calls(project))
@@ -921,7 +716,7 @@ def test_deploy_without_a_package_lock_installs_with_npm_install(project: Path) 
     lock = project / "agentcore" / "cdk" / "package-lock.json"
     lock.unlink()
 
-    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+    result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(project)[0] == "npm install in agentcore/cdk"
@@ -935,7 +730,7 @@ def test_a_failed_cdk_install_without_a_package_lock_names_npm_install(
     remove_cdk_install(project)
     (project / "agentcore" / "cdk" / "package-lock.json").unlink()
 
-    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL, STUB_NPM_EXIT="1")
+    result = run_agent(project, "deploy", STUB_NPM_EXIT="1")
 
     assert result.returncode == 1
     assert "npm install failed in agentcore/cdk" in result.stdout
@@ -944,12 +739,11 @@ def test_a_failed_cdk_install_without_a_package_lock_names_npm_install(
 
 # A pull that changes package-lock.json leaves it newer than the install,
 # which then has the old CDK libraries.
-# destroy reads the stack status as a stack that is still deployed, so only
-# deploy gets one. destroy gets a stack that exists before its deploy.
+# destroy gets a stack that exists before its deploy.
 @pytest.mark.parametrize(
     ("args", "stub_env"),
     [
-        (("deploy",), {"STUB_STACK_STATUS": DISCOVERY_URL}),
+        (("deploy",), {}),
         (("destroy", "--yes"), {"STUB_STACK_BEFORE_DEPLOY": "CREATE_COMPLETE"}),
     ],
 )
@@ -975,22 +769,29 @@ def test_a_partial_cdk_install_is_installed_again(project: Path) -> None:
     ready_to_deploy(project)
     (project / "agentcore" / "cdk" / "node_modules" / ".package-lock.json").unlink()
 
-    result = run_agent(project, "deploy", STUB_STACK_STATUS=DISCOVERY_URL)
+    result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(project)[0] == "npm ci in agentcore/cdk"
 
 
-@pytest.mark.parametrize("args", [("deploy",), ("destroy", "--yes")])
+# destroy gets a stack that exists before its deploy.
+@pytest.mark.parametrize(
+    ("args", "stub_env"),
+    [
+        (("deploy",), {}),
+        (("destroy", "--yes"), {"STUB_STACK_BEFORE_DEPLOY": "CREATE_COMPLETE"}),
+    ],
+)
 def test_a_failed_cdk_install_stops_before_the_spec_changes(
-    project: Path, args: tuple[str, ...]
+    project: Path, args: tuple[str, ...], stub_env: dict[str, str]
 ) -> None:
     ready_to_deploy(project)
     remove_cdk_install(project)
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
 
-    result = run_agent(project, *args, STUB_STACK_STATUS=DISCOVERY_URL, STUB_NPM_EXIT="1")
+    result = run_agent(project, *args, STUB_NPM_EXIT="1", **stub_env)
 
     assert result.returncode == 1
     assert "npm ci failed in agentcore/cdk" in result.stdout
@@ -1031,23 +832,19 @@ def test_destroy_installs_missing_cdk_dependencies_before_removing(project: Path
     )
 
 
-# destroy makes nine temporary files: an output and an errors file for the
-# stack check before the deploy, the spec backup, the strip copy, the status
-# errors, and an output and an errors file for each of the two AWS lookups
-# after the deploy.
-@pytest.mark.parametrize("lost", range(1, 10))
+# destroy makes six temporary files: an output and an errors file for the
+# stack check before the deploy, the spec backup, the status errors, and an
+# output and an errors file for the stack lookup after the deploy.
+@pytest.mark.parametrize("lost", range(1, 7))
 def test_a_temporary_file_whose_name_was_lost_is_still_removed(project: Path, lost: int) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
 
     result = run_destroy(project, STUB_MKTEMP_LOSE=str(lost))
 
     assert result.returncode != 0
     assert (project.parent / "mktemp-calls").read_text() == f"{lost}\n"
     assert spec.read_bytes() == tracked
-    assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
 
 
@@ -1115,8 +912,8 @@ def test_an_interrupt_right_after_the_backup_is_removed_reports_no_failure(
     tracked = spec.read_bytes()
 
     # The stack check before the deploy makes rm calls 1 and 2. The restore
-    # then removes any strip copy with rm 3 and the spec backup with rm 4.
-    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:4")
+    # then removes the spec backup with rm 3.
+    result = run_destroy(project, STUB_INTERRUPT_AFTER="rm:3")
 
     assert result.returncode == -SIGINT
     assert spec.read_bytes() == tracked
@@ -1132,8 +929,6 @@ def test_an_interrupt_during_the_restore_after_a_failed_deploy_still_finishes_it
 ) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
 
     # The failed deploy exits through set -e while the INT trap still exits
     # 130. cp 1 backs up the spec and cp 2 restores it, so the Ctrl+C lands
@@ -1144,17 +939,13 @@ def test_an_interrupt_during_the_restore_after_a_failed_deploy_still_finishes_it
 
     assert result.returncode == 1
     assert spec.read_bytes() == tracked
-    assert env_local.read_text() == "A=1\n"
     assert "Could not restore" not in result.stderr
-    assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
 
 
 def test_a_second_interrupt_during_the_restore_still_finishes_it(project: Path) -> None:
     spec = project / "agentcore" / "agentcore.json"
     tracked = spec.read_bytes()
-    env_local = project / "agentcore" / ".env.local"
-    env_local.write_text("AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET=value\nA=1\n")
 
     # The first Ctrl+C lands during deploy. cp 1 backs up the spec and cp 2
     # restores it from the EXIT trap, so the second lands mid-restore.
@@ -1162,9 +953,7 @@ def test_a_second_interrupt_during_the_restore_still_finishes_it(project: Path) 
 
     assert result.returncode == -SIGINT
     assert spec.read_bytes() == tracked
-    assert env_local.read_text() == "A=1\n"
     assert "Could not restore" not in result.stderr
-    assert not list(env_local.parent.glob(".env.local.*"))
     assert not list((project.parent / "tmp").iterdir())
 
 

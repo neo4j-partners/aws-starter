@@ -25,8 +25,8 @@ set -e
 
 # This script, the uv project (pyproject.toml, uv.lock, .venv), and the
 # runtime entrypoint main.py live at the agent root. All the code is in the
-# fleet_supervisor/ package next to main.py. The local Gateway credentials
-# file sits one level up, in demos/aircraft-fleet/, outside the code zip.
+# fleet_supervisor/ package next to main.py. The shared .env sits one level
+# up, in demos/aircraft-fleet/, outside the code zip.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENTRYPOINT="main.py"
 # The deployed runtime name is <project>_<target>_<runtime> and must be at
@@ -45,23 +45,10 @@ TARGET="default"
 TARGETS_FILE="agentcore/aws-targets.json"
 # AgentCore writes each Runtime's logs to <prefix><runtime-id>-<endpoint>.
 RUNTIME_LOG_PREFIX="/aws/bedrock-agentcore/runtimes/"
-# The AgentCore Identity OAuth2 credential that holds the Gateway client
-# secret. deploy and destroy declare it for the one CLI run, then restore the
-# tracked agentcore.json. The construct then sets CREDENTIAL_FLEET_GATEWAY_NAME
-# on the Runtime, which selects the cloud auth path in credentials.py.
-GATEWAY_CREDENTIAL="fleet-gateway"
-# `agentcore add credentials` writes the client secret, encrypted with a key
-# in ~/.agentcore or the keychain, to this variable in agentcore/.env.local.
-GATEWAY_SECRET_VAR="AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET"
-ENV_LOCAL="agentcore/.env.local"
-# The stack and the credential provider names the CLI derives, so destroy
-# can check AWS for them directly. From resolveTargetStacks in
-# @aws/agentcore-cdk 1.2.0 (underscores become hyphens) and providerName in
-# @aws/agentcore 1.2.0.
+# The stack name the CLI derives, so destroy can check AWS for it directly.
+# From resolveTargetStacks in @aws/agentcore-cdk 1.2.0, where underscores
+# become hyphens.
 STACK_NAME="AgentCore-${PROJECT_NAME//_/-}-${TARGET//_/-}"
-GATEWAY_PROVIDER="${PROJECT_NAME}_${TARGET}_${GATEWAY_CREDENTIAL}"
-# Local Gateway credentials, written by neo4j-mcp-server/deploy.py.
-CREDENTIALS_FILE="${MCP_CREDENTIALS_FILE:-$ROOT_DIR/../.mcp-credentials.json}"
 # AgentCore deployment region. AgentCore's primary region is us-east-1
 # (also supported in us-west-2). Set AWS_REGION to override. The CLI creates
 # the default deploy target from this region on the first deploy.
@@ -69,14 +56,14 @@ REGION="${AWS_REGION:-us-east-1}"
 export AWS_REGION="$REGION"
 # The settings agentcore/cdk/lib/cdk-stack.ts copies into the Runtime
 # environment. Synth fails and names any that are missing or malformed.
-# GATEWAY_URL and GATEWAY_SCOPES come from gateway_url and scope in the
-# credentials file. The MEM_NEO4J_* settings come from the shared ../.env.
+# All of them come from the shared ../.env. The NEO4J_* settings name the
+# fleet graph, and the MEM_NEO4J_* settings name the memory database.
 DEPLOY_VARS=(
-    GATEWAY_URL GATEWAY_SCOPES
+    NEO4J_URI NEO4J_USERNAME NEO4J_DATABASE NEO4J_PASSWORD_SECRET_ARN
     MEM_NEO4J_URI MEM_NEO4J_USERNAME MEM_NEO4J_DATABASE MEM_NEO4J_PASSWORD_SECRET_ARN
 )
 SHARED_ENV="$ROOT_DIR/../.env"
-# Local server port. graphrag-agent uses 7070; AgentCore Runtime uses 8080.
+# Local server port. AgentCore Runtime uses 8080.
 LOCAL_PORT="${AGENT_PORT:-7071}"
 cd "$ROOT_DIR"
 
@@ -200,7 +187,7 @@ ensure_no_secrets_in_zip() {
         echo "$found"
         echo ""
         echo "agentcore deploy would upload them with the code. Move them out first."
-        echo "The local credentials file belongs in demos/aircraft-fleet/.mcp-credentials.json."
+        echo "The deploy settings belong in demos/aircraft-fleet/.env."
         exit 1
     fi
 }
@@ -242,55 +229,6 @@ create_project() {
     mv "$PROJECT_SPEC.tmp" "$PROJECT_SPEC"
     trap on_exit EXIT
     rm -rf "${CREATE_TMP:?}"
-}
-
-# The runtime gets its Gateway token from the fleet-gateway OAuth provider.
-# The AgentCore CLI creates or updates that provider from the credentials
-# entry in agentcore.json before CDK runs, and the construct grants the
-# runtime access to it only while the entry exists. A deploy without the entry
-# deletes the provider, so the entry is added for every deploy. destroy does
-# not add it: see the destroy command. The tracked agentcore.json never holds
-# it, so it carries no account details.
-#
-# The client ID and scope come from the fleet credentials file, and the
-# discovery URL from the MCP server stack. The secret goes to the CLI on
-# stdin, never in argv, and the CLI stores it in agentcore/.env.local. The
-# EXIT trap removes that line and restores the tracked agentcore.json.
-add_gateway_credential() {
-    ensure_credentials
-    if jq -e --arg name "$GATEWAY_CREDENTIAL" \
-        '.credentials // [] | any(.name == $name)' "$PROJECT_SPEC" >/dev/null; then
-        echo -e "${RED}ERROR: $PROJECT_SPEC already declares the $GATEWAY_CREDENTIAL credential${NC}"
-        echo "An earlier run did not restore it. Restore the tracked spec, then run this again:"
-        echo "  git checkout -- $PROJECT_SPEC"
-        exit 1
-    fi
-    local client_id scope stack_name discovery_url
-    client_id=$(jq -r '.client_id // empty' "$CREDENTIALS_FILE")
-    scope=$(jq -r '.scope // empty' "$CREDENTIALS_FILE")
-    stack_name=$(jq -r '.stack_name // empty' "$CREDENTIALS_FILE")
-    if [ -z "$client_id" ] || [ -z "$scope" ] || [ -z "$stack_name" ] \
-        || ! jq -e '.client_secret | type == "string" and length > 0' "$CREDENTIALS_FILE" >/dev/null; then
-        echo -e "${RED}ERROR: $CREDENTIALS_FILE needs client_id, client_secret, scope, and stack_name${NC}"
-        echo "Regenerate it with: cd neo4j-mcp-server && ./deploy.py --env fleet credentials"
-        exit 1
-    fi
-    discovery_url=$(aws cloudformation describe-stacks --region "$REGION" \
-        --stack-name "$stack_name" \
-        --query "Stacks[0].Outputs[?OutputKey=='CognitoDiscoveryUrl'].OutputValue" \
-        --output text)
-    if [[ "$discovery_url" != https://* ]]; then
-        echo -e "${RED}ERROR: stack $stack_name has no CognitoDiscoveryUrl output in $REGION${NC}"
-        exit 1
-    fi
-    # Drop a line a killed run may have left, so the CLI writes a fresh one.
-    strip_gateway_secret
-    jq -r '.client_secret' "$CREDENTIALS_FILE" | agentcore add credentials oauth \
-        --name "$GATEWAY_CREDENTIAL" \
-        --client-id "$client_id" \
-        --discovery-url "$discovery_url" \
-        --scopes "$scope" \
-        --client-secret -
 }
 
 # Temporary files go in one folder per run, which on_exit removes, so Ctrl+C
@@ -337,7 +275,6 @@ on_exit() {
     if [ -n "$RESTORE_ARMED" ]; then
         restore_project || failed=1
     fi
-    remove_strip_copy
     if [ -z "$KEEP_TMP_ROOT" ] && [ -d "$TMP_ROOT" ] && [ ! -L "$TMP_ROOT" ] && [ -O "$TMP_ROOT" ]; then
         rm -rf "${TMP_ROOT:?}"
     fi
@@ -350,75 +287,10 @@ on_exit() {
     fi
 }
 
-# The copy strip_gateway_secret writes before it replaces .env.local holds
-# the file's other lines. Its name is this prefix, which ends in the PID,
-# plus a random suffix from mktemp. on_exit removes every name with this
-# prefix, so a copy whose name an interrupt lost inside $(mktemp) is removed
-# too, and another run's copy is not.
-ENV_STRIP_PREFIX="$ENV_LOCAL.strip.$$"
-ENV_STRIP_TMP=""
-
-# Remove the client secret line, and the comment the CLI writes above it,
-# from agentcore/.env.local. Every other line is kept. The secret line is
-# matched in each form the CLI reads: optional leading space, an optional
-# export, the exact variable name, then optional space before the =. Space
-# is [[:space:]], which covers the ASCII characters that \s matches in the
-# CLI's pattern. The comment must match the whole line. A failure before a
-# deploy is tried again by the restore, so only restore_project, the last
-# try, says to delete the line by hand.
-strip_gateway_secret() {
-    [ -f "$ENV_LOCAL" ] || return 0
-    local comment="# OAuth client secret for credential provider '$GATEWAY_CREDENTIAL' (set before deploy)"
-    # The copy sits next to the file, so mv replaces the file in one step.
-    # mktemp makes the copy with a random suffix, refuses a name that
-    # already exists, and creates it with mode 0600, the mode the CLI writes
-    # .env.local with. Nothing can be planted at the name ahead of time. The
-    # umask 077 subshells keep the copy 0600 even so. The copy must then be
-    # a regular file, not a link. .env.local is checked for a link again
-    # right before mv, which would replace the link and leave the secret in
-    # its target.
-    # awk's redirect would follow a link swapped in after mktemp. Only someone
-    # who can write to agentcore/ could do that, and they could replace
-    # .env.local anyway.
-    if ! ENV_STRIP_TMP=$(umask 077 && mktemp "$ENV_STRIP_PREFIX.XXXXXX") \
-        || ! (umask 077 \
-                && awk -v name="$GATEWAY_SECRET_VAR" -v comment="$comment" \
-                    '$0 !~ ("^[[:space:]]*(export[[:space:]]+)?" name "[[:space:]]*=") && $0 != comment' \
-                    "$ENV_LOCAL" > "$ENV_STRIP_TMP") \
-        || [ ! -f "$ENV_STRIP_TMP" ] || [ -L "$ENV_STRIP_TMP" ] \
-        || [ -L "$ENV_LOCAL" ] \
-        || ! mv -f "$ENV_STRIP_TMP" "$ENV_LOCAL"; then
-        remove_strip_copy
-        if [ -L "$ENV_LOCAL" ]; then
-            echo -e "${RED}$ENV_LOCAL is a symbolic link, so it was not replaced.${NC}" >&2
-        fi
-        echo -e "${RED}Could not remove $GATEWAY_SECRET_VAR from $ENV_LOCAL.${NC}" >&2
-        return 1
-    fi
-}
-
-# Exit if .env.local is a symbolic link. mv would replace the link with a
-# regular file and leave the secret in the link's target, so deploy and
-# destroy check this before anything changes.
-refuse_linked_env_local() {
-    if [ -L "$ENV_LOCAL" ]; then
-        echo -e "${RED}$ENV_LOCAL is a symbolic link. Replace it with a regular file and run again.${NC}"
-        exit 1
-    fi
-}
-
-# Remove this run's copies by their prefix. The dot after the PID keeps out
-# a run whose PID starts with the same digits. A copy that is already gone
-# leaves the pattern unmatched, and rm -f ignores it.
-remove_strip_copy() {
-    rm -f "$ENV_STRIP_PREFIX".*
-}
-
-# Put back the tracked agentcore.json and remove the secret line. Returns
-# nonzero if either step fails, and says what to do by hand.
+# Put back the tracked agentcore.json. Returns nonzero if the copy fails,
+# and says where the backup is.
 restore_project() {
     local failed=0
-    remove_strip_copy
     if [ -n "${SPEC_BACKUP:-}" ]; then
         if cp "$SPEC_BACKUP" "$PROJECT_SPEC"; then
             # Clear the name before removing the file. A second run, from the
@@ -432,10 +304,6 @@ restore_project() {
             KEEP_TMP_ROOT=1
             failed=1
         fi
-    fi
-    if ! strip_gateway_secret; then
-        echo -e "${RED}Delete the $GATEWAY_SECRET_VAR line from $ENV_LOCAL by hand.${NC}" >&2
-        failed=1
     fi
     return "$failed"
 }
@@ -470,7 +338,7 @@ end_spec_restore() {
 # non-interactive shell, cancels. `destroy --yes` skips the question.
 confirm_destroy() {
     local reply=""
-    echo -e "${YELLOW}This deletes the $RUNTIME_NAME Runtime, the $GATEWAY_CREDENTIAL credential provider, and the stack in target '$TARGET'.${NC}"
+    echo -e "${YELLOW}This deletes the $RUNTIME_NAME Runtime and the stack in target '$TARGET'.${NC}"
     read -r -p "Continue? [y/N] " reply || true
     case "$reply" in
         y|Y|yes|YES) ;;
@@ -636,9 +504,8 @@ delete_runtime_logs() {
 
 # Report everything destroy may have left. `agentcore status` reads the
 # CLI's deployed-state.json, so a lost state file would read as clean. The
-# stack and the credential provider are also looked up in AWS by name. When
-# $1 holds a Runtime ID and nothing remains, delete that Runtime's log
-# groups too.
+# stack is also looked up in AWS by name. When $1 holds a Runtime ID and
+# nothing remains, delete that Runtime's log groups too.
 report_remaining() {
     local status errors remaining region
     local failure="Could not check AWS for remaining resources:"
@@ -673,11 +540,6 @@ report_remaining() {
         remaining+="${remaining:+$'\n'}  stack $STACK_NAME: $AWS_LOOKUP_OUTPUT"
         remaining+=$'\n'"    Delete it with: aws cloudformation delete-stack --region $region --stack-name $STACK_NAME"
     fi
-    if aws_lookup "$failure" "ResourceNotFoundException" aws bedrock-agentcore-control \
-        get-oauth2-credential-provider --region "$region" --name "$GATEWAY_PROVIDER"; then
-        remaining+="${remaining:+$'\n'}  credential provider $GATEWAY_PROVIDER"
-        remaining+=$'\n'"    Delete it with: aws bedrock-agentcore-control delete-oauth2-credential-provider --region $region --name $GATEWAY_PROVIDER"
-    fi
     if [ -n "$remaining" ]; then
         echo -e "${RED}Still deployed in target '$TARGET':${NC}"
         echo "$remaining"
@@ -689,33 +551,26 @@ report_remaining() {
     echo -e "${GREEN}Cleanup complete. Nothing is deployed in target '$TARGET'.${NC}"
 }
 
-# Export DEPLOY_VARS from ../.env and the credentials file, which both sit
-# outside the code zip. A value exported in the shell wins. The files are
-# parsed, not sourced, and only these names are exported, so the passwords
-# and the client secret in them stay out of the CDK process.
+# Export DEPLOY_VARS from ../.env, which sits outside the code zip. A value
+# exported in the shell wins. The file is parsed, not sourced, and only these
+# names are exported, so the passwords in it stay out of the CDK process.
 load_deploy_env() {
     ensure_deps
-    ensure_credentials
     if [ ! -f "$SHARED_ENV" ]; then
         echo -e "${RED}ERROR: $SHARED_ENV not found${NC}"
         echo "Copy ../.env.sample to ../.env and set the deploy settings."
         exit 1
     fi
     local exports
-    exports=$(uv run --quiet python - "$SHARED_ENV" "$CREDENTIALS_FILE" "${DEPLOY_VARS[@]}" <<'PY'
-import json
+    exports=$(uv run --quiet python - "$SHARED_ENV" "${DEPLOY_VARS[@]}" <<'PY'
 import os
 import shlex
 import sys
-from pathlib import Path
 
 from dotenv import dotenv_values
 
-env_file, credentials_file, *names = sys.argv[1:]
+env_file, *names = sys.argv[1:]
 values = dotenv_values(env_file)
-credentials = json.loads(Path(credentials_file).read_text(encoding="utf-8"))
-values["GATEWAY_URL"] = credentials.get("gateway_url")
-values["GATEWAY_SCOPES"] = credentials.get("scope")
 for name in names:
     value = values.get(name)
     if not os.environ.get(name) and value:
@@ -733,22 +588,11 @@ ensure_deps() {
     fi
 }
 
-ensure_credentials() {
-    if [ ! -f "$CREDENTIALS_FILE" ]; then
-        echo -e "${RED}ERROR: $CREDENTIALS_FILE not found${NC}"
-        echo ""
-        echo "Copy it from the MCP server deployment:"
-        echo "  cp \"$ROOT_DIR/../../../neo4j-mcp-server/.mcp-credentials.fleet.json\" \"$CREDENTIALS_FILE\""
-        exit 1
-    fi
-}
-
 trap on_exit EXIT
 
 case "${1:-help}" in
     start)
         ensure_deps
-        ensure_credentials
         echo -e "${GREEN}Starting Aircraft Fleet Supervisor Agent on port ${LOCAL_PORT}...${NC}"
         echo -e "${BLUE}Agents: Maintenance (faults/components) + Operations (flights/delays)${NC}"
         echo ""
@@ -807,17 +651,13 @@ case "${1:-help}" in
 
     deploy)
         ensure_project
-        refuse_linked_env_local
         ensure_no_secrets_in_zip
         load_deploy_env
         ensure_cdk_deps
-        begin_spec_restore
-        add_gateway_credential
         echo -e "${GREEN}Deploying Aircraft Fleet Supervisor Agent to AgentCore Runtime...${NC}"
         echo "This may take several minutes..."
         echo ""
         agentcore deploy "${@:2}"
-        end_spec_restore
         echo ""
         echo -e "${GREEN}Deployment complete!${NC}"
         echo "Run './agent.sh status' to check status"
@@ -867,25 +707,18 @@ case "${1:-help}" in
 
     destroy)
         ensure_project
-        refuse_linked_env_local
         # Check the account before anything changes, so credentials for
         # another account cannot deploy the empty project there.
         require_target_account
         # The deploy below fails when the target has no stack. With no stack
-        # there is nothing to remove, so skip the prompt and the deploy. A
-        # secret line an interrupted deploy left in .env.local is still
-        # removed, as the restore after a deploy does. The report still looks
-        # up the stack and the provider, so a leftover fails the run.
+        # there is nothing to remove, so skip the prompt and the deploy. The
+        # report still looks up the stack, so a leftover fails the run.
         stack_region=$(target_region)
         if ! aws_lookup "Could not check stack $STACK_NAME in $stack_region with CloudFormation:" \
             "does not exist" aws cloudformation describe-stacks \
             --region "$stack_region" --stack-name "$STACK_NAME" \
             --query 'Stacks[0].StackStatus' --output text; then
             echo -e "${YELLOW}Stack $STACK_NAME does not exist in $stack_region, so there is nothing to remove.${NC}"
-            if ! strip_gateway_secret; then
-                echo -e "${RED}Delete the $GATEWAY_SECRET_VAR line from $ENV_LOCAL by hand.${NC}" >&2
-                exit 1
-            fi
             echo ""
             report_remaining
             exit 0
@@ -906,14 +739,10 @@ case "${1:-help}" in
         echo -e "${YELLOW}Removing supervisor from AgentCore Runtime...${NC}"
         echo ""
         # The CLI has no destroy command. A deploy of a project that declares
-        # nothing deployable removes the target's stack. The same deploy
-        # deletes every credential provider that deployed-state.json records
-        # and the spec no longer declares, so the fleet-gateway provider goes
-        # without being declared. So remove the Runtime from the spec and
-        # deploy. That deploy fails when the target has no stack, which the
-        # check above rules out. With no Runtime, the stack reads no deploy
-        # settings, so destroy needs neither the credentials file nor the MCP
-        # server stack.
+        # nothing deployable removes the target's stack. So remove the
+        # Runtime from the spec and deploy. That deploy fails when the target
+        # has no stack, which the check above rules out. With no Runtime, the
+        # stack reads no deploy settings, so destroy does not need ../.env.
         begin_spec_restore
         agentcore remove runtime --name "$RUNTIME_NAME"
         agentcore deploy --target "$TARGET" --yes

@@ -12,7 +12,7 @@ from uuid import UUID
 # Import the supervisor package before TLS clients so it can set up truststore.
 from fleet_supervisor.client.transport import READ_TIMEOUT_S, iter_events
 from fleet_supervisor.core.config import ConfigError
-from fleet_supervisor.core.secrets import neo4j_login
+from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager
 
 # isort: split
 
@@ -45,21 +45,25 @@ class ChatRequest(BaseModel):
 async def lifespan(app: Starlette) -> AsyncIterator[None]:
     load_dotenv(os.environ.get("FLEET_ENV_FILE") or ROOT.parent / ".env")
     driver = None
-    login = None
     if uri := os.getenv("NEO4J_URI"):
+        # The supervisor's graph tools use the same manager. It reads the
+        # secret again when Neo4j rejects the login, so a rotated password
+        # is picked up without restarting the UI.
+        auth = RotatingLoginAuthManager()
         try:
-            login = neo4j_login()
+            # Read the login now, so a missing one turns evidence off at startup.
+            auth.get_auth()
         except ConfigError as error:
             # The page still works without the evidence graph.
             logger.warning("Fleet graph evidence is off: %s", error)
-    if login:
-        driver = GraphDatabase.driver(
-            uri,
-            auth=login,
-            connection_timeout=5,
-            connection_acquisition_timeout=8,
-            max_transaction_retry_time=0,
-        )
+        else:
+            driver = GraphDatabase.driver(
+                uri,
+                auth=auth,
+                connection_timeout=5,
+                connection_acquisition_timeout=8,
+                max_transaction_retry_time=0,
+            )
     app.state.driver = driver
     try:
         yield

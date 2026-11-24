@@ -31,7 +31,10 @@ The UI server logs in to the fleet graph the same way the supervisor's graph
 tools do, using the shared fleet `.env`. It reads `NEO4J_PASSWORD_SECRET_ARN`
 when that is set, and `NEO4J_USERNAME` and `NEO4J_PASSWORD` otherwise. It
 also reads `NEO4J_URI` and `NEO4J_DATABASE`. It uses the login for bounded,
-read-only evidence lookups. Use a read-only fleet login for the UI. The
+read-only evidence lookups. When Neo4j rejects the login, the server reads the
+secret again, so a rotated password takes effect without a restart. The lookup
+that met the rejected login shows the graph as unavailable, and later lookups
+use the new password. Use a read-only fleet login for the UI. The
 [Neo4j Visualization Library
 license](https://www.npmjs.com/package/@neo4j-nvl/base) covers use with Neo4j
 Aura or a commercial Neo4j product.

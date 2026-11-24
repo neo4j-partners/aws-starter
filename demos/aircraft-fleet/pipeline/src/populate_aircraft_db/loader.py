@@ -1016,7 +1016,11 @@ def _check_sensor_limit_coverage(
         exempt=list(SENSOR_TYPES_WITHOUT_LIMITS),
         database_=database,
     )
-    unlinked = {row["type"] or "(no type)": row["count"] for row in records}
+    # A missing or empty type shares one label, so add their counts.
+    unlinked: dict[str, int] = {}
+    for row in records:
+        label = row["type"] or "(no type)"
+        unlinked[label] = unlinked.get(label, 0) + row["count"]
     total = sum(unlinked.values())
     print(f"\nSensors without OperatingLimit: {total:,}")
     for sensor_type, count in unlinked.items():

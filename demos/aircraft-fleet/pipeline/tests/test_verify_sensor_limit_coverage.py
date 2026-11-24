@@ -70,6 +70,12 @@ def test_sensors_with_no_type_are_labeled_no_type(
     assert "(no type): 2" in capsys.readouterr().out
 
 
+def test_empty_and_missing_types_add_into_one_label() -> None:
+    result = _check(FakeDriver({"": 1, None: 2}))
+
+    assert result.failures == ["Sensors without OperatingLimit: 3 ((no type) 3)"]
+
+
 def test_skip_enrichment_keeps_unlinked_sensors_a_warning() -> None:
     result = _check(FakeDriver({"EGT": 2}), skip_enrichment=True)
 

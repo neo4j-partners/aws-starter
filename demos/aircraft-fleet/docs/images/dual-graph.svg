@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1010" viewBox="0 0 1600 1010" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>The Dual Graph</title>
-  <desc>The operational graph from the CSVs holds aircraft, systems, components, sensors, readings, flights, delays, and maintenance events. The knowledge graph from the manuals holds aircraft models, system and component references, faults, procedures, and operating limits. Stage 3 extracts all of it except the limits. The generator writes the limits to a CSV, and stage 2 loads them with their Sensor HAS_LIMIT links. Stage 4 links the rest with DESCRIBES_MODEL, DESCRIBES_SYSTEM, DESCRIBES_COMPONENT, and APPLIES_TO relationships. Each operating limit is named for its parameter, regime, and aircraft type, so a sensor links to one limit per regime.</desc>
+  <desc>The operational graph panel shows aircraft, systems, components, sensors, readings, flights, delays, maintenance events, and operating limits. Stage 1 generates the CSVs for it. Stage 2 loads them. Stage 2 also adds a HAS_LIMIT link from each Sensor to the operating limits for its aircraft model and sensor type. Each limit is named for its parameter, regime, and aircraft type, such as EGT Takeoff - A320-200. The knowledge graph panel shows documents, chunks, aircraft models, system and component references, faults, and maintenance procedures. Stage 3 builds it from the manuals. Stage 4 links the two graphs with APPLIES_TO, DESCRIBES_MODEL, DESCRIBES_SYSTEM, and DESCRIBES_COMPONENT relationships. Stage 4 also adds a FROM_CHUNK link from each operating limit to the chunks that state it. One query can walk from a sensor to its limit, then to the manual chunks.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -20,20 +20,20 @@
     <marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker>
   </defs>
 
-  <rect width="1600" height="880" fill="#F7F8FA"/>
+  <rect width="1600" height="1010" fill="#F7F8FA"/>
   <text x="800" y="54" text-anchor="middle" class="h1">The Dual Graph</text>
-  <text x="800" y="84" text-anchor="middle" class="sub">The pipeline links what the manuals say to the real aircraft, so one query can walk from a sensor to its limit.</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">One query can walk from a sensor to its limit, then to the manual chunks that state it.</text>
 
   <!-- Panels -->
-  <rect x="40" y="150" width="540" height="590" rx="20" fill="#E8F6F2" stroke="#9AD3C5" stroke-width="1.5"/>
+  <rect x="40" y="150" width="540" height="730" rx="20" fill="#E8F6F2" stroke="#9AD3C5" stroke-width="1.5"/>
   <text x="70" y="186" class="ph" fill="#00594A">Operational graph</text>
-  <text x="70" y="208" class="ps">Loaded from the CSVs in stage 2</text>
-  <rect x="1000" y="150" width="560" height="590" rx="20" fill="#F3F0FF" stroke="#C9BDFB" stroke-width="1.5"/>
+  <text x="70" y="208" class="ps">Generated in stage 1 and loaded in stage 2</text>
+  <rect x="1000" y="150" width="560" height="730" rx="20" fill="#F3F0FF" stroke="#C9BDFB" stroke-width="1.5"/>
   <text x="1030" y="186" class="ph" fill="#4A2EB0">Knowledge graph</text>
-  <text x="1030" y="208" class="ps">Extracted from the manuals in stage 3. Limits load in stage 2.</text>
+  <text x="1030" y="208" class="ps">Built from the manuals in stage 3</text>
 
   <!-- APPLIES_TO over the top -->
-  <path d="M1425,254 V118 H430 V250" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M1410,254 V118 H430 V250" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
   <rect x="728" y="106" width="104" height="24" rx="6" fill="#F7F8FA"/>
   <text x="780" y="123" text-anchor="middle" class="fuse">APPLIES_TO</text>
 
@@ -43,6 +43,7 @@
     <rect x="330" y="394" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
     <rect x="330" y="534" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
     <rect x="330" y="664" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
+    <rect x="330" y="794" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#008C72" stroke-width="2.5"/>
     <rect x="70" y="254" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
     <rect x="70" y="394" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
     <rect x="70" y="534" width="180" height="52" rx="26" fill="#FFFFFF" stroke="#3FB39A" stroke-width="2"/>
@@ -52,10 +53,12 @@
   <text x="430" y="425" text-anchor="middle" class="op">System</text>
   <text x="430" y="565" text-anchor="middle" class="op">Component</text>
   <text x="430" y="695" text-anchor="middle" class="op">Sensor</text>
+  <text x="430" y="825" text-anchor="middle" class="op">OperatingLimit</text>
   <text x="160" y="285" text-anchor="middle" class="op">Flight</text>
   <text x="160" y="425" text-anchor="middle" class="op">Delay</text>
   <text x="160" y="565" text-anchor="middle" class="op">MaintenanceEvent</text>
   <text x="160" y="695" text-anchor="middle" class="op">Reading</text>
+  <text x="430" y="866" text-anchor="middle" class="rel">per regime: EGT Takeoff - A320-200</text>
 
   <!-- Operational edges -->
   <path d="M430,306 V390" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
@@ -73,47 +76,46 @@
   <path d="M330,690 H254" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
   <text x="160" y="610" text-anchor="middle" class="rel">HAS_EVENT</text>
   <text x="160" y="732" text-anchor="middle" class="rel">HAS_READING</text>
+  <path d="M430,716 V790" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="440" y="757" class="rel">HAS_LIMIT</text>
 
   <!-- Knowledge nodes -->
   <g filter="url(#shadow)">
     <rect x="1030" y="254" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
     <rect x="1030" y="394" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
     <rect x="1030" y="534" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
-    <rect x="1030" y="664" width="220" height="52" rx="26" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2.5"/>
-    <rect x="1320" y="254" width="210" height="52" rx="10" fill="#FFFFFF" stroke="#98A2B3" stroke-width="2"/>
-    <rect x="1320" y="394" width="210" height="52" rx="10" fill="#FFFFFF" stroke="#98A2B3" stroke-width="2"/>
-    <rect x="1320" y="534" width="210" height="52" rx="26" fill="#FFFFFF" stroke="#A48AFB" stroke-width="2"/>
-    <rect x="1320" y="664" width="210" height="52" rx="26" fill="#FFFFFF" stroke="#A48AFB" stroke-width="2"/>
+    <rect x="1310" y="254" width="200" height="52" rx="10" fill="#FFFFFF" stroke="#98A2B3" stroke-width="2"/>
+    <rect x="1310" y="394" width="200" height="52" rx="10" fill="#FFFFFF" stroke="#98A2B3" stroke-width="2"/>
+    <rect x="1310" y="534" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#A48AFB" stroke-width="2"/>
+    <rect x="1310" y="664" width="200" height="52" rx="26" fill="#FFFFFF" stroke="#A48AFB" stroke-width="2"/>
   </g>
   <text x="1140" y="285" text-anchor="middle" class="kg">AircraftModel</text>
   <text x="1140" y="425" text-anchor="middle" class="kg">SystemReference</text>
   <text x="1140" y="565" text-anchor="middle" class="kg">ComponentReference</text>
-  <text x="1140" y="695" text-anchor="middle" class="kg">OperatingLimit</text>
-  <text x="1425" y="285" text-anchor="middle" class="dc">Document</text>
-  <text x="1425" y="425" text-anchor="middle" class="dc">Chunk</text>
-  <text x="1425" y="565" text-anchor="middle" class="kg">Fault</text>
-  <text x="1425" y="695" text-anchor="middle" class="kg">MaintenanceProcedure</text>
-  <text x="1140" y="732" text-anchor="middle" class="rel">per regime: EGT Takeoff - A320-200</text>
+  <text x="1410" y="285" text-anchor="middle" class="dc">Document</text>
+  <text x="1410" y="425" text-anchor="middle" class="dc">Chunk</text>
+  <text x="1410" y="565" text-anchor="middle" class="kg">Fault</text>
+  <text x="1410" y="695" text-anchor="middle" class="kg">MaintenanceProcedure</text>
 
   <!-- Knowledge edges -->
   <path d="M1140,306 V390" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
   <text x="1150" y="352" class="rel">HAS_SYSTEM</text>
   <path d="M1140,446 V530" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
   <text x="1150" y="492" class="rel">HAS_COMPONENT</text>
-  <path d="M1250,560 H1316" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
-  <text x="1285" y="550" class="rel" text-anchor="middle">HAS_</text>
-  <text x="1285" y="580" class="rel" text-anchor="middle">FAULT</text>
-  <path d="M1425,586 V660" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
-  <text x="1435" y="628" class="rel">CORRECTED_BY</text>
-  <path d="M1425,394 V310" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
-  <text x="1435" y="352" class="rel">FROM_DOCUMENT</text>
+  <path d="M1250,560 H1306" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1280" y="550" class="rel" text-anchor="middle">HAS_</text>
+  <text x="1280" y="580" class="rel" text-anchor="middle">FAULT</text>
+  <path d="M1410,586 V660" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1420" y="628" class="rel">CORRECTED_BY</text>
+  <path d="M1410,394 V310" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
+  <text x="1420" y="352" class="rel">FROM_DOCUMENT</text>
 
-  <!-- Fusion links -->
+  <!-- Links between the graphs -->
   <g stroke="#D97706" stroke-width="3" fill="none">
     <path d="M1030,280 H534" marker-end="url(#a-orange)"/>
     <path d="M1030,420 H534" marker-end="url(#a-orange)"/>
     <path d="M1030,560 H534" marker-end="url(#a-orange)"/>
-    <path d="M530,690 H1026" marker-end="url(#a-orange)"/>
+    <path d="M530,820 H1538 V420 H1514" marker-end="url(#a-orange)"/>
   </g>
   <g>
     <rect x="690" y="264" width="180" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
@@ -122,14 +124,15 @@
     <text x="780" y="424" text-anchor="middle" class="fuse">DESCRIBES_SYSTEM</text>
     <rect x="675" y="544" width="210" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
     <text x="780" y="564" text-anchor="middle" class="fuse">DESCRIBES_COMPONENT</text>
-    <rect x="720" y="674" width="120" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
-    <text x="780" y="694" text-anchor="middle" class="fuse">HAS_LIMIT</text>
+    <rect x="715" y="805" width="130" height="30" rx="8" fill="#FFF7ED" stroke="#F5C27A"/>
+    <text x="780" y="825" text-anchor="middle" class="fuse">FROM_CHUNK</text>
   </g>
-  <text x="780" y="232" text-anchor="middle" font-size="15" font-weight="700" fill="#8A4B08">Links to the fleet</text>
-  <text x="780" y="252" text-anchor="middle" class="ps">Stage 4, except HAS_LIMIT from stage 2</text>
+  <text x="780" y="232" text-anchor="middle" font-size="15" font-weight="700" fill="#8A4B08">Links between the graphs</text>
+  <text x="780" y="252" text-anchor="middle" class="ps">Stage 4 makes all of them</text>
+  <text x="1270" y="806" text-anchor="middle" class="rel">to the chunks that state each limit</text>
 
   <!-- Footer -->
-  <rect x="40" y="770" width="1520" height="84" rx="16" fill="#FFFFFF" stroke="#E4E7EC"/>
-  <text x="70" y="806" font-size="15" fill="#344054">An agent can start at a sensor on one aircraft, follow HAS_LIMIT to the limits the manual sets for that model, one per regime,</text>
-  <text x="70" y="830" font-size="15" fill="#344054">then use vector search over the linked chunks to pull the repair procedure. Every extracted entity and every limit also links to its chunks.</text>
+  <rect x="40" y="900" width="1520" height="84" rx="16" fill="#FFFFFF" stroke="#E4E7EC"/>
+  <text x="70" y="936" font-size="15" fill="#344054">An agent can start at a sensor on one aircraft and follow HAS_LIMIT to the limits for that model. FROM_CHUNK then leads to the manual chunks that state each limit.</text>
+  <text x="70" y="960" font-size="15" fill="#344054">Vector search over the same chunks finds the repair procedure. Every extracted entity also links to the chunks it came from.</text>
 </svg>

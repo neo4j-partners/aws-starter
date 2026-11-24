@@ -26,7 +26,7 @@ The [`pipeline/`](./pipeline/) project builds the Aircraft Digital Twin graph.
 - **Manual enrichment:** It chunks the maintenance manuals, embeds each chunk with Bedrock Titan, and extracts faults and procedures with Bedrock Claude. It links each operating limit to the chunks that state it.
 - **Graph fusion:** It links the extracted knowledge to the real aircraft, systems, and components.
 - **Indexes:** It creates the vector and fulltext chunk indexes that the Maintenance specialist searches.
-- **Checks:** It stamps each dataset and verifies node counts and stamps after every load.
+- **Checks:** It stamps each dataset and verifies node counts and stamps after every load. It also checks that every sensor has its limits and that every limit links to a manual chunk.
 
 ### Supervisor agent
 
@@ -164,7 +164,7 @@ The diagrams live in [`docs/images/`](./docs/images/) as SVG files.
 | [`dual-graph.svg`](docs/images/dual-graph.svg) | The operational graph, the knowledge graph, and the links between them |
 | [`supervisor-request-flow.svg`](docs/images/supervisor-request-flow.svg) | One request through the supervisor, a specialist, and its graph tools |
 | [`memory-lifecycle.svg`](docs/images/memory-lifecycle.svg) | How the supervisor opens, uses, and closes conversation memory |
-| [`data-model.svg`](docs/images/data-model.svg) | The operational node labels and relationship types |
+| [`data-model.svg`](docs/images/data-model.svg) | The operational node labels and relationship types, including the operating limits |
 | [`generator-flow.svg`](docs/images/generator-flow.svg) | The six data generator stages, atomic publish, and the output checks |
 | [`end-to-end-sequence.svg`](docs/images/end-to-end-sequence.svg) | One question through the Maintenance specialist, Text2Cypher, and Neo4j |
 | [`deployment-topology.svg`](docs/images/deployment-topology.svg) | The one stack, the AWS services, and the two Neo4j databases |

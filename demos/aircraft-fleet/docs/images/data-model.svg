@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1240" viewBox="0 0 1600 1240" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Fleet Operational Data Model</title>
-  <desc>The operational graph that populate-aircraft-db loads from the generated CSVs. Aircraft has systems, systems have components and sensors, sensors have hourly readings. Components have maintenance events, which also point at their system and aircraft. Aircraft operate flights between airports, flights can have delays, and aircraft have component removals. One Dataset node records the generator stamp.</desc>
+  <desc>The operational graph that populate-aircraft-db loads from the generator's CSVs and stamp. It has twelve node labels and fourteen relationship types. Aircraft have systems. Systems have components and sensors. Sensors have hourly readings. Each sensor links by HAS_LIMIT to the operating limits of its aircraft's model. Components have maintenance events. Each event also points at its system and its aircraft. Aircraft operate flights between airports. Flights can have delays. Aircraft have removals. Each removal points at the component it removed. One Dataset node records the generator stamp.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
   </defs>
-  <rect width="1600" height="960" fill="#F7F8FA"/>
+  <rect width="1600" height="1240" fill="#F7F8FA"/>
   <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Fleet Operational Data Model</text>
-  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Eleven node labels and thirteen relationship types, loaded from the generator&#x27;s CSV files.</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Twelve node labels and fourteen relationship types, loaded from the generator&#x27;s CSV files and stamp.</text>
   <rect x="70" y="150" width="260" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
   <text x="200.0" y="182" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Airport</text>
   <text x="200.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">iata, icao, name</text>
@@ -15,9 +15,9 @@
   <text x="200.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">lat, lon</text>
   <rect x="470" y="150" width="260" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
   <text x="600.0" y="182" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Flight</text>
-  <text x="600.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">flight_number, operator</text>
-  <text x="600.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">origin, destination</text>
-  <text x="600.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">scheduled departure, arrival</text>
+  <text x="600.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">flight_number, operator, origin</text>
+  <text x="600.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">destination, scheduled_departure</text>
+  <text x="600.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">scheduled_arrival</text>
   <rect x="870" y="150" width="260" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
   <text x="1000.0" y="182" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Aircraft</text>
   <text x="1000.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">tail_number, icao24</text>
@@ -25,9 +25,9 @@
   <text x="1000.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">operator</text>
   <rect x="1270" y="150" width="260" height="130" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
   <text x="1400.0" y="182" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Removal</text>
-  <text x="1400.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">reason</text>
-  <text x="1400.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">removal_date, part_number</text>
-  <text x="1400.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">flight hours and cycles</text>
+  <text x="1400.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">reason, removal_date</text>
+  <text x="1400.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">part_number, serial_number</text>
+  <text x="1400.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">flight_hours_at_removal</text>
   <rect x="470" y="430" width="260" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
   <text x="600.0" y="462" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Delay</text>
   <text x="600.0" y="488" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">cause, minutes</text>
@@ -47,7 +47,7 @@
   <rect x="470" y="710" width="260" height="130" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="600.0" y="742" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Reading</text>
   <text x="600.0" y="768" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">reading_id, sensor_id</text>
-  <text x="600.0" y="790" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">timestamp (hourly), value</text>
+  <text x="600.0" y="790" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">timestamp, value</text>
   <rect x="870" y="710" width="260" height="130" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="1000.0" y="742" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Sensor</text>
   <text x="1000.0" y="768" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">type, name, unit</text>
@@ -95,7 +95,15 @@
   <path d="M1530,775 H1565 V122 H1000 V146" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
   <rect x="1225" y="113" width="129" height="21" rx="5" fill="#F7F8FA"/>
   <text x="1290" y="128" font-size="12" font-weight="600" fill="#851651" text-anchor="middle">AFFECTS_AIRCRAFT</text>
-  <rect x="70" y="430" width="260" height="150" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5"/>
+  <rect x="870" y="990" width="260" height="130" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1000.0" y="1022" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">OperatingLimit</text>
+  <text x="1000.0" y="1048" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">name, parameterName, regime</text>
+  <text x="1000.0" y="1070" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraftType, unit</text>
+  <text x="1000.0" y="1092" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">minValue, maxValue</text>
+  <path d="M1000,840 V986" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <rect x="964" y="895" width="72" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1000" y="910" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">HAS_LIMIT</text>
+  <rect x="70" y="430" width="260" height="174" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5"/>
   <text x="90" y="460" font-size="16" font-weight="700" fill="#344054" text-anchor="start">Key</text>
   <rect x="90" y="470" width="22" height="16" rx="4" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
   <text x="122" y="483" font-size="14" font-weight="400" fill="#344054" text-anchor="start">fleet structure</text>
@@ -105,5 +113,8 @@
   <text x="122" y="531" font-size="14" font-weight="400" fill="#344054" text-anchor="start">flight operations</text>
   <rect x="90" y="542" width="22" height="16" rx="4" fill="#FDF2FA" stroke="#C11574" stroke-width="1.5"/>
   <text x="122" y="555" font-size="14" font-weight="400" fill="#344054" text-anchor="start">maintenance and removals</text>
-  <text x="800" y="900" font-size="15" font-weight="400" fill="#5C6470" text-anchor="middle">Arrows point in the relationship direction. The knowledge graph links to Aircraft, System, Component, and Sensor (see dual-graph.svg).</text>
+  <rect x="90" y="566" width="22" height="16" rx="4" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="1.5"/>
+  <text x="122" y="579" font-size="14" font-weight="400" fill="#344054" text-anchor="start">operating limits</text>
+  <text x="800" y="1180" font-size="15" font-weight="400" fill="#5C6470" text-anchor="middle">Arrows point in the relationship direction. The knowledge graph connects to Aircraft, System, Component, and OperatingLimit.</text>
+  <text x="800" y="1204" font-size="15" font-weight="400" fill="#5C6470" text-anchor="middle">dual-graph.svg shows those links. Enrich links each OperatingLimit by FROM_CHUNK to the chunks that state it.</text>
 </svg>

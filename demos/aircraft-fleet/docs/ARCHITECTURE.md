@@ -59,7 +59,7 @@ All diagrams are SVG files in [`images/`](images/).
 |---------|-------|
 | [`architecture.svg`](images/architecture.svg) | The pipeline, the supervisor and its specialists, the browser UI, and the two databases |
 | [`pipeline-flow.svg`](images/pipeline-flow.svg) | The five pipeline stages and what each one writes |
-| [`generator-flow.svg`](images/generator-flow.svg) | How `generate-data` builds one dataset from one seed |
+| [`generator-flow.svg`](images/generator-flow.svg) | How `generate-data` builds one dataset from one seed, and the operating limits that need no seed |
 | [`data-model.svg`](images/data-model.svg) | The operational graph's labels and relationships |
 | [`dual-graph.svg`](images/dual-graph.svg) | The operational graph, the knowledge graph, and the links between them |
 | [`supervisor-request-flow.svg`](images/supervisor-request-flow.svg) | One request through the supervisor, a specialist, and its graph tools |

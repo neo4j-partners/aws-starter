@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="990" viewBox="0 0 1600 990" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Fleet Data Generator</title>
-  <desc>generate-data seeds one Python and one NumPy random generator, then writes six stages in order into a temp directory: fleet topology, hourly sensor readings, maintenance events from band crossings, flight operations grounded by CRITICAL events, component removals with reasons from earlier faults, and the stamp. A publish step moves the CSVs into the output directory and the stamp last. validate checks every reference column.</desc>
+  <desc>generate-data seeds one Python and one NumPy random generator. It then writes six stages in order into a temp directory: fleet topology, hourly sensor readings, maintenance events from band crossings, flight operations grounded by CRITICAL events, component removals with reasons from earlier faults, and the stamp. The fleet topology stage also writes operating_limits.csv. Those limits come from the same specs the maintenance manuals render. They use no seed, so every run writes the same 262 rows. A publish step moves the CSVs into the output directory and the stamp last. validate checks every reference column in the node and relationship CSVs. It skips operating_limits.csv.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
   </defs>
   <rect width="1600" height="990" fill="#F7F8FA"/>
   <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Fleet Data Generator</text>
-  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">One seed drives every stage. Each stage reads what the stages before it produced.</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">One seed drives every stage except the operating limits. Each stage reads what the stages before it produced.</text>
   <rect x="40" y="150" width="270" height="210" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
   <text x="175.0" y="182" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">GeneratorConfig</text>
   <text x="175.0" y="208" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraft, airports, days</text>
-  <text x="175.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">seed (default 42)</text>
+  <text x="175.0" y="230" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">seed, default 42</text>
   <text x="175.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">random.Random(seed)</text>
   <text x="175.0" y="274" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">default_rng(seed)</text>
   <text x="175.0" y="296" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">setup.sh: 30 aircraft, 90 days</text>
@@ -23,6 +23,13 @@
   <text x="418" y="194" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">Aircraft with Engine, Avionics, and Hydraulics systems, their components and sensors</text>
   <rect x="1043" y="169.0" width="163" height="26" rx="13" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
   <text x="1124.7" y="187.0" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">4 node + 3 rel CSVs</text>
+  <path d="M1220,182 H1252" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="1256" y="128" width="310" height="120" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="1411" y="154" font-size="16" font-weight="700" fill="#1E3A5F" text-anchor="middle">Operating limits</text>
+  <text x="1411" y="176" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="middle">Read from the specs the manuals render.</text>
+  <text x="1411" y="196" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="middle">No seed: the same 262 rows every run.</text>
+  <rect x="1325" y="209" width="172" height="26" rx="13" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="1.5"/>
+  <text x="1411" y="227" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">operating_limits.csv</text>
   <rect x="360" y="250" width="860" height="64" rx="12" fill="#FFFFFF" stroke="#008C72" stroke-width="1.5"/>
   <circle cx="390" cy="282.0" r="15" fill="#008C72"/>
   <text x="390" y="287.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
@@ -86,6 +93,7 @@
   <text x="560.0" y="822" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">generate-data validate</text>
   <text x="560.0" y="848" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">every rels_* column and readings&#x27; sensor_id,</text>
   <text x="560.0" y="870" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">duplicate IDs, missing files; exits 1</text>
+  <text x="560.0" y="892" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">skips operating_limits.csv</text>
   <rect x="820" y="790" width="400" height="120" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
   <text x="1020.0" y="822" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">generate --if-stale</text>
   <text x="1020.0" y="848" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">skips the run when .stamp.json matches;</text>

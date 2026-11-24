@@ -641,8 +641,9 @@ with `[OK] Verification passed.`
   Aircraft 30, SystemReference to System 1,355, and Sensor to OperatingLimit
   1,383.
 - **Note on the HAS_LIMIT figure:** The 1,383 figure counts every `HAS_LIMIT`
-  relationship in the graph, not only the links from a `Sensor`. Verify reads
-  it from the total for the relationship type.
+  relationship in the graph, not only the links from a `Sensor`. Verify read
+  it from the total for the relationship type at the time. Verify now counts
+  only the links from a `Sensor`.
 - **Data quality:** Every orphan check returned 0.
 
 ---

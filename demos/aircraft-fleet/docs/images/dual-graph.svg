@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>The Dual Graph</title>
-  <desc>The operational graph from the CSVs holds aircraft, systems, components, sensors, readings, flights, delays, and maintenance events. The knowledge graph extracted from the manuals holds aircraft models, system and component references, faults, procedures, and operating limits. Stage 4 links the two with DESCRIBES_MODEL, DESCRIBES_SYSTEM, DESCRIBES_COMPONENT, HAS_LIMIT, and APPLIES_TO relationships.</desc>
+  <desc>The operational graph from the CSVs holds aircraft, systems, components, sensors, readings, flights, delays, and maintenance events. The knowledge graph extracted from the manuals holds aircraft models, system and component references, faults, procedures, and operating limits. Stage 4 links the two with DESCRIBES_MODEL, DESCRIBES_SYSTEM, DESCRIBES_COMPONENT, HAS_LIMIT, and APPLIES_TO relationships. Each operating limit is named for its parameter, regime, and aircraft type, so a sensor links to one limit per regime.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -93,6 +93,7 @@
   <text x="1425" y="425" text-anchor="middle" class="dc">Chunk</text>
   <text x="1425" y="565" text-anchor="middle" class="kg">Fault</text>
   <text x="1425" y="695" text-anchor="middle" class="kg">MaintenanceProcedure</text>
+  <text x="1140" y="732" text-anchor="middle" class="rel">per regime: EGT Takeoff - A320-200</text>
 
   <!-- Knowledge edges -->
   <path d="M1140,306 V390" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
@@ -130,6 +131,6 @@
 
   <!-- Footer -->
   <rect x="40" y="770" width="1520" height="84" rx="16" fill="#FFFFFF" stroke="#E4E7EC"/>
-  <text x="70" y="806" font-size="15" fill="#344054">An agent can start at a sensor on one aircraft, follow HAS_LIMIT to the limit the manual sets for that model,</text>
+  <text x="70" y="806" font-size="15" fill="#344054">An agent can start at a sensor on one aircraft, follow HAS_LIMIT to the limits the manual sets for that model, one per regime,</text>
   <text x="70" y="830" font-size="15" fill="#344054">then use vector search over the linked chunks to pull the repair procedure. Every extracted entity also links to its Chunk.</text>
 </svg>

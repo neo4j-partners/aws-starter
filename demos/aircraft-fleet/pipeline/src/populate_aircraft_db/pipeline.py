@@ -946,15 +946,18 @@ def _source_params(sources: list[LimitSource]) -> list[dict[str, Any]]:
 
 
 def check_limit_nodes(driver: Driver, database: str, sources: list[LimitSource]) -> None:
-    """Raise ValueError when a limit in the CSV has no OperatingLimit node.
+    """Raise ValueError when a limit in the CSV has no loaded OperatingLimit node.
 
     The load writes the nodes, so a missing one means the graph was loaded
-    from other CSVs. Enrich runs this before the LLM work starts.
+    from other CSVs. A limit with the KG builder labels was extracted by an
+    older enrich, and the clear deletes it, so it does not count. Enrich runs
+    this before the clear and the LLM work.
     """
     records, _, _ = driver.execute_query(
         """
         UNWIND $names AS name
         OPTIONAL MATCH (ol:OperatingLimit {name: name})
+        WHERE NOT ol:__Entity__ AND NOT ol:__KGBuilder__
         WITH name, ol WHERE ol IS NULL
         RETURN collect(name) AS missing
         """,
@@ -963,7 +966,7 @@ def check_limit_nodes(driver: Driver, database: str, sources: list[LimitSource])
     )
     if missing := records[0]["missing"]:
         raise ValueError(
-            f"{len(missing)} limit(s) in {LIMITS_CSV} have no OperatingLimit node,"
+            f"{len(missing)} limit(s) in {LIMITS_CSV} have no loaded OperatingLimit node,"
             f" such as {missing[0]!r}. Load the operational graph first."
         )
 

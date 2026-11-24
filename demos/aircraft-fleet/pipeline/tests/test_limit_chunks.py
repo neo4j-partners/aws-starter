@@ -140,3 +140,18 @@ def test_a_limit_with_no_node_raises(driver: Driver, database: str) -> None:
     check_limit_nodes(driver, database, _SOURCES)
     with pytest.raises(ValueError, match="1 limit\\(s\\) in operating_limits.csv"):
         check_limit_nodes(driver, database, [*_SOURCES, LimitSource("Missing", DOC, 0, 1)])
+
+
+def test_an_extracted_limit_does_not_count_as_loaded(driver: Driver, database: str) -> None:
+    """An older enrich extracted limits with these labels, and the clear deletes them."""
+    _setup(driver, database)
+
+    for label in ("__Entity__", "__KGBuilder__"):
+        driver.execute_query(
+            f"MATCH (ol:OperatingLimit {{name: 'Split'}}) SET ol:{label}", database_=database
+        )
+        with pytest.raises(ValueError, match="1 limit\\(s\\) in operating_limits.csv"):
+            check_limit_nodes(driver, database, _SOURCES)
+        driver.execute_query(
+            f"MATCH (ol:OperatingLimit {{name: 'Split'}}) REMOVE ol:{label}", database_=database
+        )

@@ -12,7 +12,7 @@ reach it in two different ways.
 ## Components
 
 - **Pipeline:** The [`pipeline/`](../pipeline/) project builds the fleet graph in five stages. It generates a synthetic fleet, loads it, extracts knowledge from the manuals with Bedrock, links the two graphs, and verifies the result. It is the only component that writes the fleet graph.
-- **GraphRAG agent:** The [`graphrag-agent/`](../graphrag-agent/) project is one Strands agent with two retrieval tools. One tool writes Cypher from the live schema. The other runs hybrid search over the manual chunks.
+- **GraphRAG agent:** The `graphrag-agent/` project is one Strands agent with two retrieval tools. One tool writes Cypher from the live schema. The other runs hybrid search over the manual chunks.
 - **Supervisor agent:** The [`supervisor-agent/`](../supervisor-agent/) project is a Strands supervisor with two specialist agents as its tools. The specialists query the graph through the Neo4j MCP server.
 - **Neo4j MCP server:** The `fleet` deployment of [`neo4j-mcp-server/`](../../../neo4j-mcp-server/) runs `mcp-neo4j-cypher` read-only on AgentCore Runtime behind an AgentCore Gateway.
 - **Memory:** Both agents keep conversation memory with Neo4j Agent Memory in a second Neo4j database.

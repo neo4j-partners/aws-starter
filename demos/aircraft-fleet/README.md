@@ -28,7 +28,7 @@ The [`pipeline/`](./pipeline/) project builds the Aircraft Digital Twin graph.
 
 ### GraphRAG agent
 
-The [`graphrag-agent/`](./graphrag-agent/) project is a single Strands agent.
+The `graphrag-agent/` project is a single Strands agent.
 
 - **Direct driver:** It connects to Neo4j with the Python driver. It uses no MCP server and no Gateway.
 - **Text2Cypher:** The `graph_query` tool writes read-only Cypher from the live schema for exact and aggregate questions.
@@ -61,11 +61,6 @@ cp .env.sample .env          # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, ME
 cd pipeline
 uv sync
 ./setup.sh                   # build the graph
-
-cd ../graphrag-agent
-uv sync
-uv run fleet-server          # terminal 1: start the agent on port 7070
-uv run fleet-cli "How many aircraft are in the database?"   # terminal 2
 ```
 
 ## Prerequisites
@@ -87,7 +82,7 @@ cp .env.sample .env
 
 - **Fleet graph:** Set `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`. The pipeline and the GraphRAG agent use them.
 - **Memory:** Set `MEM_NEO4J_URI` and `MEM_NEO4J_PASSWORD`. Set `MEM_NEO4J_USERNAME` and `MEM_NEO4J_DATABASE` too if they are not `neo4j`. An agent server stops at startup if the URI or the password is missing.
-- **Supervisor graph access:** The supervisor reaches the fleet graph through MCP credentials, not the `NEO4J_*` settings. See Step 4.
+- **Supervisor graph access:** The supervisor reaches the fleet graph through MCP credentials, not the `NEO4J_*` settings. See Step 2.
 - **Another file:** Set `FLEET_ENV_FILE` to load a different file. A value already set in the environment wins.
 
 ## Step 1: Build the graph
@@ -109,38 +104,7 @@ See the [pipeline README](./pipeline/README.md) for each stage and the dual grap
 
 ![The dual graph](docs/images/dual-graph.svg)
 
-## Step 2: Run the GraphRAG agent locally
-
-Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
-
-```bash
-uv sync
-uv run fleet-server          # terminal 1: Ctrl+C stops it
-uv run fleet-cli "How many aircraft are in the database?"   # terminal 2
-uv run fleet-demo            # terminal 2: the full showcase
-```
-
-The agent reads the live graph schema, so it picks up a new graph with no
-changes. See the [GraphRAG agent README](./graphrag-agent/README.md) for the
-request flow, memory, and troubleshooting.
-
-## Step 3: Deploy the GraphRAG agent (optional)
-
-Run these commands from `demos/aircraft-fleet/graphrag-agent/`:
-
-```bash
-./agent.sh deploy
-./agent.sh invoke-cloud "How many aircraft are in the database?"
-```
-
-- **Settings:** The deploy reads its connection settings from `.env`.
-- **Passwords:** The deploy never sends a password. The runtime reads each one from the Secrets Manager secret named by `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN`.
-- **User names:** A secret with a `username` key also sets the Neo4j user. The shared `.env` can then keep the admin user for the pipeline while the agents read as a read-only user.
-
-See [Deploy](graphrag-agent/README.md#deploy) for the one-time setup, which
-creates the two secrets.
-
-## Step 4: Run the supervisor agent over the MCP Gateway (optional)
+## Step 2: Run the supervisor agent over the MCP Gateway (optional)
 
 The supervisor needs a Neo4j MCP server that points at the same `NEO4J_URI`.
 The MCP server deploy also needs Docker with buildx, the AWS CDK CLI, and a
@@ -199,6 +163,5 @@ The diagrams live in [`docs/images/`](./docs/images/) as SVG files.
 
 - **Architecture:** The [fleet architecture document](./docs/ARCHITECTURE.md) explains how the parts fit together. Each part has its own document: [pipeline](./docs/architecture/pipeline.md), [GraphRAG agent](./docs/architecture/graphrag-agent.md), [supervisor agent](./docs/architecture/supervisor-agent.md), [memory](./docs/architecture/memory.md), and [deployment](./docs/architecture/deployment.md).
 - **Pipeline:** The [pipeline README](./pipeline/README.md) covers the stages, Bedrock structured output, and dataset sizes.
-- **GraphRAG agent:** The [GraphRAG agent README](./graphrag-agent/README.md) covers the tools, memory, local and cloud runs, and troubleshooting.
 - **Supervisor agent:** The [supervisor agent README](./supervisor-agent/README.md) covers routing, Gateway recovery, and cloud deployment.
 - **Test plan:** The [end-to-end test plan](./docs/e2e-test-plan.md) holds the test steps and the last recorded run.

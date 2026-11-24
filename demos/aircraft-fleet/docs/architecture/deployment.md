@@ -94,8 +94,6 @@ truststore". TLS then falls back to each library's default CA store.
 Botocore and httpx use the certifi bundle, and the neo4j driver loads the
 system CAs. To catch an import-order
 failure before a deploy, run the local start check in the
-[GraphRAG agent README](../../graphrag-agent/README.md#check-the-runtime-start-locally)
-or the
 [supervisor README](../../supervisor-agent/README.md#check-the-runtime-start-locally).
 
 ## Teardown

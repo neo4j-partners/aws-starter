@@ -200,7 +200,6 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 
 ## Connect the agents
 
-- **GraphRAG agent:** The agent reads the live schema when it starts, so it sees the new graph with no changes. Its embedder must match this pipeline's. Try the queries in [`queries.txt`](../graphrag-agent/queries.txt).
 - **MCP server:** In `neo4j-mcp-server/.env.fleet`, set `NEO4J_URI` to the value used here. Set `NEO4J_USERNAME` and `NEO4J_PASSWORD` to a read-only user. The [MCP server README](../../../neo4j-mcp-server/README.md#use-a-read-only-database-user) shows how to create one. Then run the full deploy from the repo root:
 
 ```bash

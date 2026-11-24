@@ -41,7 +41,6 @@ uv sync
 | [`neo4j-mcp-server/`](./neo4j-mcp-server/) | Any graph | Not applicable | It is the MCP server | Not applicable | Any | Yes, the MCP server | AgentCore Runtime, Gateway, Cognito, Secrets Manager |
 | [`quickstart/`](./quickstart/) | Any graph the MCP server points at. The demo questions assume the aviation fleet graph | Not applicable | MCP Gateway | Yes | Default | No | AgentCore Gateway, Bedrock, SageMaker Unified Studio |
 | [`demos/aircraft-fleet/pipeline/`](./demos/aircraft-fleet/pipeline/) | Aviation fleet digital twin | `pipeline/setup.sh` | Neo4j Python driver | No | Not applicable | No | Bedrock Titan embeddings, Bedrock Claude |
-| [`demos/aircraft-fleet/graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/) | Aviation fleet digital twin | `pipeline/` | Neo4j Python driver | No | Not applicable | Yes | AgentCore Runtime, Bedrock |
 | [`demos/aircraft-fleet/supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/) | Aviation fleet digital twin | `pipeline/` | MCP Gateway | Yes | `fleet` | Yes | AgentCore Runtime, Gateway, Bedrock, CloudWatch |
 | [`demos/fraud-amazon-quick/fraud-iceberg/`](./demos/fraud-amazon-quick/fraud-iceberg/) | Synthetic fraud rings | `fraud-iceberg/` | Does not reach Neo4j | No | Not applicable | No | S3 Tables, Glue, Athena |
 | [`demos/fraud-amazon-quick/graph-loader/`](./demos/fraud-amazon-quick/graph-loader/) | Synthetic fraud rings | `graph-loader/` from `data/` | Neo4j Python driver | No | Not applicable | No | None |
@@ -96,11 +95,10 @@ digital twin fleet. Point every project at the same Neo4j instance with the
 same embedder. The projects then work together with no code changes.
 
 - **[`demos/aircraft-fleet/pipeline/`](./demos/aircraft-fleet/pipeline/):** The pipeline builds an operational graph in Neo4j from synthetic fleet data. It then reads maintenance manuals with `neo4j-graphrag`, using Bedrock Titan embeddings and Bedrock Claude entity extraction. The structured and extracted data end up in one Neo4j knowledge graph.
-- **[`demos/aircraft-fleet/graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/):** This Strands ReAct agent answers questions over that graph. It connects to Neo4j directly with the driver. It combines Text2Cypher with hybrid vector and fulltext search over the maintenance text chunks.
 - **[`demos/aircraft-fleet/supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/):** This Strands supervisor agent calls a Maintenance specialist agent and an Operations specialist agent as tools. The supervisor model picks one or both specialists for each question. It then writes the final answer from their results. The specialists reach Neo4j through the MCP server and the Gateway with OAuth2.
 - **Key features:** The command `pipeline/setup.sh` runs a five-stage Neo4j ingest. Entity extraction offers Bedrock one tool with `auto` tool choice and asks the model to call it. The GraphRAG agent caches the live schema and deploys to AgentCore Runtime with `graphrag-agent/agent.sh`. The supervisor reports to CloudWatch.
 - **Use case:** Use it as a reference for GraphRAG ingest on Bedrock and an agent over the result. One walkthrough runs it from start to finish.
-- **Docs:** Start with the [`demos/aircraft-fleet/README.md`](./demos/aircraft-fleet/README.md) quick start. Then read the [`pipeline/`](./demos/aircraft-fleet/pipeline/README.md), [`graphrag-agent/`](./demos/aircraft-fleet/graphrag-agent/README.md), and [`supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/README.md) READMEs.
+- **Docs:** Start with the [`demos/aircraft-fleet/README.md`](./demos/aircraft-fleet/README.md) quick start. Then read the [`pipeline/`](./demos/aircraft-fleet/pipeline/README.md) and [`supervisor-agent/`](./demos/aircraft-fleet/supervisor-agent/README.md) READMEs.
 
 ### Fraud investigation with Amazon Quick
 

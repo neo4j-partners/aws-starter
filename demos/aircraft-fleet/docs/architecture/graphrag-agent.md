@@ -4,7 +4,7 @@ Fleet questions come in two shapes. "How many CRITICAL events did the A320
 fleet log last month?" is a count over typed nodes, and only Cypher answers it
 exactly. "What does the manual say about high EGT on the CFM56?" is a search
 over prose, where the wording in the question rarely matches the wording in
-the manual. The GraphRAG agent in [`graphrag-agent/`](../../graphrag-agent/)
+the manual. The GraphRAG agent in `graphrag-agent/`
 is one Strands agent with one tool for each shape. It reaches Neo4j with the
 Neo4j Python driver over Bolt and uses neither the MCP server nor the Gateway.
 
@@ -128,6 +128,4 @@ lifecycle.
 | Secrets | The fleet and memory passwords, and optional user names, come from Secrets Manager on the Runtime |
 | Tracing | AWS Distro for OpenTelemetry |
 
-[Deployment](deployment.md) covers the Runtime deploy and the secret ARNs. The
-[GraphRAG agent README](../../graphrag-agent/README.md) has the full command
-list.
+[Deployment](deployment.md) covers the Runtime deploy and the secret ARNs.

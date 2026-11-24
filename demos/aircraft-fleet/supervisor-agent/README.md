@@ -162,7 +162,7 @@ OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
 
 - **Memory:** Set the `MEM_NEO4J_*` settings in `demos/aircraft-fleet/.env` before the first deploy. `MEM_NEO4J_URI` must use `neo4j+s://` or `bolt+s://`.
 - **Gateway:** The deploy reads `GATEWAY_URL` and `GATEWAY_SCOPES` from `gateway_url` and `scope` in the fleet credentials file. `GATEWAY_URL` must use `https://`.
-- **Password secret:** `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN. The runtime role can read only that secret. [Create the secrets](../graphrag-agent/README.md#create-the-secrets) shows how to create it.
+- **Password secret:** `MEM_NEO4J_PASSWORD_SECRET_ARN` must be a complete secret ARN. The runtime role can read only that secret.
 - **Parsing:** The files are parsed, not sourced. A value exported in the shell wins.
 - **Validation:** Synth stops with one error that lists every missing or malformed setting.
 
@@ -316,5 +316,4 @@ See `fleet_supervisor/client/queries.txt` for all 20 questions.
 ## See also
 
 - **Fleet demo:** The [fleet README](../README.md) shows how the pipeline and both agents fit together.
-- **Single agent:** The [GraphRAG agent](../graphrag-agent/) answers the same questions with a direct Neo4j driver.
 - **Architecture:** The [supervisor architecture document](../docs/architecture/supervisor-agent.md) explains routing, Gateway reconnects, and the token paths. The [deployment document](../docs/architecture/deployment.md) covers the `fleet-gateway` provider.

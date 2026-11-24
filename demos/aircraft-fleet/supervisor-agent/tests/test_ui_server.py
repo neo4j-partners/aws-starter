@@ -4,7 +4,7 @@ import asyncio
 import copy
 import importlib.util
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import nullcontext
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import neo4j
 import pytest
+import urllib3.exceptions
 
 from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager
 from tests.fake_bolt import FakeNeo4j
@@ -126,9 +127,10 @@ def ui_on_fake_neo4j(
     monkeypatch.setenv("NEO4J_URI", fake_neo4j.uri)
     monkeypatch.setenv("NEO4J_USERNAME", "reader")
     monkeypatch.setenv("NEO4J_PASSWORD", "first-pw")
-    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext([]))
     monkeypatch.setattr(
-        ui_server, "iter_events", lambda _chunks: iter(copy.deepcopy(EVIDENCE_TURN))
+        ui_server,
+        "supervisor_stream",
+        lambda _turn: nullcontext(iter(copy.deepcopy(EVIDENCE_TURN))),
     )
     return fake_neo4j
 
@@ -192,8 +194,7 @@ def test_a_failed_secret_read_marks_the_graph_unavailable(
     def fail(*_args: object) -> None:
         raise ui_server.ConfigError("Could not read the Neo4j secret.")
 
-    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext([]))
-    monkeypatch.setattr(ui_server, "iter_events", lambda _chunks: iter(events))
+    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext(iter(events)))
     monkeypatch.setattr(ui_server, "load_evidence", fail)
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
@@ -233,8 +234,7 @@ def test_a_node_with_no_id_marks_the_graph_unavailable_and_keeps_streaming(
         {"type": "chunk", "data": "Two aircraft."},
         {"type": "complete", "response": "Two aircraft."},
     ]
-    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext([]))
-    monkeypatch.setattr(ui_server, "iter_events", lambda _chunks: iter(events))
+    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext(iter(events)))
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
     frames = list(ui_server.relay(turn, driver=OneNodeDriver(), auth=static_login(monkeypatch)))
@@ -243,4 +243,26 @@ def test_a_node_with_no_id_marks_the_graph_unavailable_and_keeps_streaming(
         {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},
         {"type": "chunk", "data": "Two aircraft."},
         {"type": "complete", "response": "Two aircraft."},
+    ]
+
+
+def test_a_stream_that_fails_partway_ends_with_an_error(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The AgentCore reader raises urllib3's errors when the stream drops."""
+
+    def drop_after_one_chunk() -> Iterator[dict[str, Any]]:
+        yield {"type": "chunk", "data": "Two aircraft"}
+        raise urllib3.exceptions.ProtocolError("Connection broken")
+
+    monkeypatch.setattr(
+        ui_server, "supervisor_stream", lambda _turn: nullcontext(drop_after_one_chunk())
+    )
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=None, auth=None))
+
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == [
+        {"type": "chunk", "data": "Two aircraft"},
+        {"type": "error", "error": "Could not reach the fleet supervisor."},
     ]

@@ -24,6 +24,7 @@ dependencies = [
     { name = "starlette" },
     { name = "strands-agents" },
     { name = "truststore" },
+    { name = "urllib3" },
     { name = "uvicorn" },
 ]
 
@@ -48,6 +49,7 @@ requires-dist = [
     { name = "starlette", specifier = ">=1.10.0" },
     { name = "strands-agents", specifier = ">=1.65" },
     { name = "truststore", specifier = ">=0.10" },
+    { name = "urllib3", specifier = ">=2.8" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 

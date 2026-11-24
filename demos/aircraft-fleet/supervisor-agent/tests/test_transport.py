@@ -1,9 +1,13 @@
 """SSE parsing in the client transport."""
 
 import json
+import sys
 from itertools import pairwise
 
-from fleet_supervisor.client import transport
+import pytest
+import urllib3.exceptions
+
+from fleet_supervisor.client import cli, transport
 from fleet_supervisor.client.invoke import load_queries
 from fleet_supervisor.client.transport import (
     collect,
@@ -63,17 +67,21 @@ def test_queries_file_sets_expected_agent_from_headers():
 class _FakeRawStream:
     """The urllib3 response under botocore's body, returning one read at a time."""
 
-    def __init__(self, reads: list[bytes]) -> None:
+    def __init__(self, reads: list[bytes | Exception]) -> None:
         self._reads = list(reads)
 
     def read1(self, _size: int) -> bytes:
-        return self._reads.pop(0) if self._reads else b""
+        if not self._reads:
+            return b""
+        if isinstance(read := self._reads.pop(0), Exception):
+            raise read
+        return read
 
 
 class _FakeStream:
     """botocore's ``StreamingBody``, which the AgentCore reader reads through."""
 
-    def __init__(self, *reads: bytes) -> None:
+    def __init__(self, *reads: bytes | Exception) -> None:
         self._raw_stream = _FakeRawStream(list(reads))
         self.closed = False
 
@@ -82,12 +90,17 @@ class _FakeStream:
 
 
 class _FakeRuntimeClient:
-    def __init__(self) -> None:
+    def __init__(self, *reads: bytes | Exception) -> None:
         self.kwargs: dict = {}
+        self.stream = _FakeStream(*(reads or [sse({"type": "chunk", "data": "ok"})]))
+        self.closed = False
 
     def invoke_agent_runtime(self, **kwargs):
         self.kwargs = kwargs
-        return {"response": _FakeStream(sse({"type": "chunk", "data": "ok"}))}
+        return {"response": self.stream}
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def test_invoke_deployed_names_no_runtime_user(monkeypatch):
@@ -123,3 +136,22 @@ def test_deployed_events_split_across_reads_and_characters():
         {"type": "complete"},
     ]
     assert stream.closed
+
+
+def test_cli_reports_a_deployed_stream_that_fails_partway(monkeypatch, capsys):
+    """A read timeout mid-stream prints an error line and exits 1, with no traceback."""
+    timeout = urllib3.exceptions.ReadTimeoutError(None, None, "Read timed out.")
+    fake = _FakeRuntimeClient(sse({"type": "chunk", "data": "Two aircraft"}), timeout)
+    monkeypatch.setattr(transport.boto3, "client", lambda *args, **kwargs: fake)
+    monkeypatch.setenv("AGENT_ARN", "arn:aws:bedrock-agentcore:us-east-1:0:runtime/x")
+    monkeypatch.setattr(sys, "argv", ["fleet-supervisor-cli", "--remote", "hi"])
+
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main()
+
+    assert exit_info.value.code == 1
+    out = capsys.readouterr().out
+    assert "Two aircraft" in out
+    assert "ERROR: The deployed supervisor stream failed:" in out
+    assert fake.stream.closed
+    assert fake.closed

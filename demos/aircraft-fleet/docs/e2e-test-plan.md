@@ -638,6 +638,9 @@ with `[OK] Verification passed.`
 - **Cross-links:** The counts were Document to Aircraft 30, AircraftModel to
   Aircraft 30, SystemReference to System 1,355, and Sensor to OperatingLimit
   1,383.
+- **Note on the HAS_LIMIT figure:** The 1,383 figure counts every `HAS_LIMIT`
+  relationship in the graph, not only the links from a `Sensor`. Verify reads
+  it from the total for the relationship type.
 - **Data quality:** Every orphan check returned 0.
 
 ---

@@ -33,9 +33,10 @@ agentcore status   # reports the resources agentcore.json declares
 ## Extending the stack
 
 Add your own AWS resources in `lib/cdk-stack.ts` after the application and wire them to a runtime or harness through the
-application's accessors. Runtimes and harnesses implement `iam.IGrantable`, so any AWS L2 grant accepts them, and they
-expose `grantRead` / `grantWrite` / `grantReadWrite` for DynamoDB tables, S3 buckets and Secrets Manager secrets plus
-`addEnvironmentVariable`:
+application's accessors. Runtimes and harnesses implement `iam.IGrantable`, so any AWS L2 grant accepts them. They
+expose `grantRead` / `grantWrite` / `grantReadWrite` for DynamoDB tables and S3 buckets. A Secrets Manager secret takes
+only `grantRead`, because `grantWrite` and `grantReadWrite` throw on a secret. They also expose
+`grant(actions, resources)` and `addEnvironmentVariable`, which the example uses:
 
 ```ts
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -50,7 +51,7 @@ if (runtime !== undefined) {
 }
 ```
 
-Then run `agentcore deploy` again. `runtimes.get` returns `undefined` for a name that `agentcore.json` does not declare.
+Then run `./agent.sh deploy` again. `runtimes.get` returns `undefined` for a name that `agentcore.json` does not declare.
 The stack checks for that case. `agent.sh destroy` removes the Runtime from the spec and deploys, so synth must still
 pass with no Runtime.
 

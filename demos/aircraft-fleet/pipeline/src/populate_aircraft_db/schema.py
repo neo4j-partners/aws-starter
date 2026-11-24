@@ -85,7 +85,7 @@ SENSOR_PARAMETER_NAMES = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_T
 #   trend-averaged EGT thresholds.
 # - Advisory, Caution, Warning: band thresholds, such as vibration, DC bus
 #   voltage, and hydraulic pressure.
-# - All: a limit whose text names no regime.
+# - All: a stated limit whose text names no regime.
 OPERATING_LIMIT_REGIMES: list[str] = [
     "Takeoff",
     "Max Continuous",

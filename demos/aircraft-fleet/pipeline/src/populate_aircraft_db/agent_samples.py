@@ -408,7 +408,7 @@ SAMPLE_QUESTIONS: list[SampleQuestion] = [
 
 
 # Claude counts adaptive thinking toward max_tokens, so leave room for the
-# Cypher after it. "low" effort matches the extraction pipeline.
+# Cypher after it.
 _CHAT_MAX_TOKENS = 4000
 _CLAUDE_THINKING = {"type": "adaptive"}
 _CLAUDE_OUTPUT_CONFIG = {"effort": "low"}

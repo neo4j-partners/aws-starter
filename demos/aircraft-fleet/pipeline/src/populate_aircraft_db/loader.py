@@ -1008,7 +1008,7 @@ def _check_sensor_limit_coverage(
     records, _, _ = driver.execute_query(
         """
         MATCH (s:Sensor)
-        WHERE NOT s.type IN $exempt
+        WHERE NOT coalesce(s.type IN $exempt, false)
           AND NOT (s)-[:HAS_LIMIT]->(:OperatingLimit)
         RETURN s.type AS type, count(s) AS count
         ORDER BY type

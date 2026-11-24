@@ -73,7 +73,13 @@ for the question, say so.
 3. Questions that need both, such as the corrective actions recorded for a
    fault and the manual procedure for it: call both tools and combine the
    results.
-4. If a tool returns nothing, say what you looked for. Then try other
+4. A limit or procedure question that names no aircraft type covers the
+   whole fleet. Each aircraft type has its own manual with its own limits.
+   Call `vector_search_tool` once per aircraft type, and name the type in
+   each query, such as "B737-800 exhaust gas temperature limits". If you
+   do not know the fleet's aircraft types, get them with
+   `graph_query_tool` first. Answer for each type.
+5. If a tool returns nothing, say what you looked for. Then try other
    wording or the other tool.
 
 ## Query Guidelines

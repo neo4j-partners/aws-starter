@@ -216,7 +216,7 @@ OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
 - **Code zip:** The zip holds this folder except `.venv`, `agentcore/`, `__pycache__`, and `.pytest_cache`. The runtime runs `main.py`.
 - **Secret guard:** `./agent.sh deploy` refuses to run if any `.env*`, `.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem` file, or a `venv/` folder, is inside this folder.
 - **CDK dependencies:** `deploy` and `destroy` run `npm ci` in `agentcore/cdk` when the install is missing, incomplete, or older than `package-lock.json`. `configure` always runs it.
-- **Runtime user ID:** The Runtime issues a workload access token only when the call names a user. Every deployed call through `fleet_supervisor.client` sends `runtimeUserId` `default`, the same value `agentcore invoke` sends. That covers `fleet-supervisor-cli --remote`, `fleet-supervisor-invoke`, and `load-test`. The caller's IAM identity needs `bedrock-agentcore:InvokeAgentRuntimeForUser` as well as `InvokeAgentRuntime`.
+- **Invoke permission:** Deployed calls name no Runtime user, because the agent needs no workload access token. Its `agentcore.json` declares no credentials, memories, or gateways. That covers `fleet-supervisor-cli --remote`, `fleet-supervisor-invoke`, `load-test`, and the UI with `AGENT_ARN` set. The caller's IAM identity needs only `bedrock-agentcore:InvokeAgentRuntime`.
 
 ### Remove the deployment
 
@@ -287,6 +287,19 @@ to:
 ```json
 [{"name": "default", "account": "<12-digit account ID>", "region": "<region>"}]
 ```
+
+A checkout that deployed the earlier Gateway design had a Gateway credential
+provider. The current design does not use it. The next deploy deletes it when
+`agentcore/.cli/deployed-state.json` still records it. After that deploy,
+check for it, and delete it if it is still there:
+
+```bash
+aws bedrock-agentcore-control get-oauth2-credential-provider --region <region> --name fleetsupervisor_default_fleet-gateway
+aws bedrock-agentcore-control delete-oauth2-credential-provider --region <region> --name fleetsupervisor_default_fleet-gateway
+```
+
+Then delete the `AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET` line from
+`agentcore/.env.local` if it is there.
 
 ## Commands
 

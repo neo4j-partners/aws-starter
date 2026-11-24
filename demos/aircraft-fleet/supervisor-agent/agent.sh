@@ -7,13 +7,17 @@
 #
 # Usage:
 #   ./agent.sh start              Start supervisor locally (port 7071)
+#   ./agent.sh stop               Stop local supervisor
 #   ./agent.sh test               Test local supervisor
+#   ./agent.sh test-maintenance   Test with maintenance query
+#   ./agent.sh test-operations    Test with operations query
 #   ./agent.sh configure          Create the AgentCore project in agentcore/
 #   ./agent.sh deploy             Deploy to AgentCore Runtime
 #   ./agent.sh status             Check deployment status
 #   ./agent.sh logs               Show recent runtime logs
 #   ./agent.sh invoke-cloud           Send default question to deployed agent
 #   ./agent.sh invoke-cloud "prompt"  Send custom question to deployed agent
+#   ./agent.sh load-test [N]      Cloud load test, a random query every N s (5)
 #   ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)
 #
 # The cloud commands use the AgentCore CLI (npm install -g @aws/agentcore).

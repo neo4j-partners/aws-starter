@@ -69,13 +69,13 @@ class _FakeRuntimeClient:
         return {"response": _FakeStream(sse({"type": "chunk", "data": "ok"}))}
 
 
-def test_invoke_deployed_sends_runtime_user_id(monkeypatch):
-    """Without runtimeUserId the Runtime issues no workload access token."""
+def test_invoke_deployed_names_no_runtime_user(monkeypatch):
+    """The agent needs no workload access token, so the call names no user."""
     fake = _FakeRuntimeClient()
     monkeypatch.setattr(transport.boto3, "client", lambda *args, **kwargs: fake)
 
     result = invoke_deployed("hi", "arn:aws:bedrock-agentcore:us-east-1:0:runtime/x", "us-east-1")
 
-    assert fake.kwargs["runtimeUserId"] == transport.RUNTIME_USER_ID == "default"
+    assert "runtimeUserId" not in fake.kwargs
     assert len(fake.kwargs["runtimeSessionId"]) >= 33
     assert result.text == "ok"

@@ -26,11 +26,6 @@ LOCAL_URL = f"http://localhost:{os.getenv('AGENT_PORT', '7071')}/invocations"
 # calls and adaptive thinking. botocore's 60 s default would cut it off.
 READ_TIMEOUT_S = 300
 
-# Each call names one fixed Runtime user. "default" is what the AgentCore CLI
-# sends with `agentcore invoke`. The agent needs no workload access token. The
-# ID stays until a cloud test settles it.
-RUNTIME_USER_ID = "default"
-
 
 @dataclass
 class InvokeResult:
@@ -139,8 +134,8 @@ def invoke_deployed(
 ) -> InvokeResult:
     """Invoke the deployed runtime through the ``bedrock-agentcore`` data plane.
 
-    The caller needs ``bedrock-agentcore:InvokeAgentRuntimeForUser`` as well as
-    ``InvokeAgentRuntime``, because the call sets ``runtimeUserId``.
+    The call names no Runtime user, because the agent needs no workload access
+    token. So the caller needs only ``bedrock-agentcore:InvokeAgentRuntime``.
     """
     client = boto3.client(
         "bedrock-agentcore",
@@ -151,7 +146,6 @@ def invoke_deployed(
         agentRuntimeArn=agent_arn,
         # The service requires a session ID of at least 33 characters.
         runtimeSessionId=session_id or str(uuid.uuid4()),
-        runtimeUserId=RUNTIME_USER_ID,
         payload=json.dumps({"prompt": prompt}).encode(),
         qualifier="DEFAULT",
     )

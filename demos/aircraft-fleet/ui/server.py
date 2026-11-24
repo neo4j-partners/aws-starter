@@ -10,11 +10,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 # Import the supervisor package before TLS clients so it can set up truststore.
-from fleet_supervisor.client.transport import (
-    READ_TIMEOUT_S,
-    RUNTIME_USER_ID,
-    iter_events,
-)
+from fleet_supervisor.client.transport import READ_TIMEOUT_S, iter_events
 from fleet_supervisor.core.config import ConfigError
 from fleet_supervisor.core.secrets import neo4j_login
 
@@ -86,7 +82,6 @@ def supervisor_stream(turn: ChatRequest) -> Iterator[Iterator[bytes]]:
             response = client.invoke_agent_runtime(
                 agentRuntimeArn=arn,
                 runtimeSessionId=session_id,
-                runtimeUserId=RUNTIME_USER_ID,
                 payload=json.dumps(payload).encode(),
                 qualifier="DEFAULT",
             )

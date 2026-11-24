@@ -94,5 +94,5 @@
   <rect x="40" y="810" width="1520" height="120" rx="16" fill="#FFFFFF" stroke="#667085" stroke-width="1"/>
   <text x="64" y="844" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Stack parameters and Runtime environment</text>
   <text x="64" y="874" font-size="14" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">Parameters: ECRImageUri, Neo4jUri, Neo4jDatabase, Neo4jUsername, Neo4jPasswordSecretArn, NetworkMode</text>
-  <text x="64" y="902" font-size="14" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">Environment: NEO4J_TRANSPORT=http, port 8000, path /mcp, NEO4J_READ_ONLY=true, NEO4J_PASSWORD from {{resolve:secretsmanager}}</text>
+  <text x="64" y="902" font-size="14" font-weight="400" fill="#344054" text-anchor="start" font-family="Menlo, Consolas, monospace">Environment: NEO4J_TRANSPORT=http, port 8000, path /mcp, NEO4J_READ_ONLY=true, NEO4J_PASSWORD_SECRET_ARN read at startup</text>
 </svg>

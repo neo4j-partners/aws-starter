@@ -127,8 +127,8 @@ class EventMapper:
         if not (started := self._started.pop(call_id, None)):
             return
         name, start = started
-        is_graph_query = name in {"graph_query", "graph_query_tool"}
-        is_graph_tool = is_graph_query or name in {"vector_search", "vector_search_tool"}
+        is_graph_query = name == "graph_query_tool"
+        is_graph_tool = is_graph_query or name == "vector_search_tool"
         content = result.get("content", [])
         failed = result["status"] == "error" or (
             is_graph_tool

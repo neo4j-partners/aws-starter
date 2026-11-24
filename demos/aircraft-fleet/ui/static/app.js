@@ -49,9 +49,7 @@ function resetTrace() {
 
 function displayName(name) {
   return {
-    graph_query: 'Query fleet graph',
     graph_query_tool: 'Query fleet graph',
-    vector_search: 'Search maintenance manuals',
     vector_search_tool: 'Search maintenance manuals',
   }[name] ?? name;
 }

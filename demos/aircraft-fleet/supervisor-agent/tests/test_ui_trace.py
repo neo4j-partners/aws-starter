@@ -15,7 +15,7 @@ from tests.test_agents import FakeModel
 
 
 @tool
-def graph_query(question: str) -> str:
+def graph_query_tool(question: str) -> str:
     """Return a fleet record for the requested question."""
     return "{'event_id': 'ME0042', 'tail_number': 'N95040A', 'duplicate': 'ME0042'}"
 
@@ -47,8 +47,8 @@ def test_nested_tool_completion_carries_evidence_before_the_chat_answer():
         MAINTENANCE_TOOL,
         "Look up maintenance events",
         lambda: Agent(
-            model=ToolModel("graph_query", {"question": "Hydraulics"}),
-            tools=[graph_query],
+            model=ToolModel("graph_query_tool", {"question": "Hydraulics"}),
+            tools=[graph_query_tool],
             callback_handler=None,
         ),
     )
@@ -72,7 +72,7 @@ def test_nested_tool_completion_carries_evidence_before_the_chat_answer():
     }
     assert started == {
         "type": "tool",
-        "name": "graph_query",
+        "name": "graph_query_tool",
         "call_id": "call/call",
         "parent_id": "call",
     }

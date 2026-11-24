@@ -1124,9 +1124,13 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 │           │          Gearbox oil drain and refill with approved oil
 │           │          └─► END: Engineering disposition required
 │           │
-│           └─► NO (130-150°C) ─► Caution range; enhanced monitoring
-│                                  Schedule gearbox oil service within 25 FH
-│                                  └─► END: Scheduled maintenance
+│           └─► NO ─► Was temperature > 145°C?
+│               ├─► YES (145-150°C) ─► Investigate before further dispatch
+│               │                      └─► END: Engineering investigation
+│               │
+│               └─► NO (130-145°C) ─► Caution range; enhanced monitoring
+│                                      Schedule gearbox oil service within 25 FH
+│                                      └─► END: Scheduled maintenance
 ```
 
 ---

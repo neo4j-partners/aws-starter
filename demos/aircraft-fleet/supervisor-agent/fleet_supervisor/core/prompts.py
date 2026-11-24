@@ -81,6 +81,10 @@ for the question, say so.
    aircraft type has its own manual with its own limits. A limit question
    that names no aircraft type covers the whole fleet, so ask for every
    type's limits and answer for each type.
+   Each limit links to the manual text it came from through
+   `(:OperatingLimit)-[:FROM_CHUNK]->(:Chunk)`. When a question asks what
+   a limit means, or how two limits relate, such as the normal and maximum
+   EGT, also return that chunk's `text` and explain the limits from it.
    If the graph has no limit for a type, search that type's manual with
    `vector_search_tool`, such as "EGT operating limits" with
    `aircraft_type` "B737-800".

@@ -154,6 +154,15 @@ def test_maintenance_prompt_gets_limit_values_from_the_graph(fake_tools):
     assert '"EGT operating limits" with\n   `aircraft_type` "B737-800"' in prompt
 
 
+# The manual's limits table says how a type's limits relate, such as the top
+# of normal EGT and the maximum. A manual search can miss that chunk, but each
+# limit links to it.
+def test_maintenance_prompt_reads_a_limits_source_chunk(fake_tools):
+    prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
+    assert "`(:OperatingLimit)-[:FROM_CHUNK]->(:Chunk)`" in prompt
+    assert "also return that chunk's `text`" in prompt
+
+
 # One query for a fleet-wide procedure ranks chunks from every manual against
 # each other, so one type's procedure can fall out of the top results.
 def test_maintenance_prompt_searches_manuals_once_per_aircraft_type(fake_tools):

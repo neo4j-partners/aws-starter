@@ -76,11 +76,13 @@ def test_empty_and_missing_types_add_into_one_label() -> None:
     assert result.failures == ["Sensors without OperatingLimit: 3 ((no type) 3)"]
 
 
-def test_skip_enrichment_keeps_unlinked_sensors_a_warning() -> None:
+def test_skip_enrichment_still_fails_unlinked_sensors() -> None:
+    # The load makes the HAS_LIMIT links, so a graph with no enrichment
+    # must have them too.
     result = _check(FakeDriver({"EGT": 2}), skip_enrichment=True)
 
-    assert result.failures == []
-    assert result.warnings == ["Sensors without OperatingLimit: 2 (EGT 2)"]
+    assert result.failures == ["Sensors without OperatingLimit: 2 (EGT 2)"]
+    assert result.warnings == []
 
 
 @pytest.mark.parametrize("missing", sorted(LABELS))

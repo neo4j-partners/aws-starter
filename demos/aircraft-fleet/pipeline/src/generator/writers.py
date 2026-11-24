@@ -20,6 +20,17 @@ CSV_COLUMNS: dict[str, list[str]] = {
     "nodes_systems.csv": [":ID(System)", "aircraft_id", "type", "name"],
     "nodes_components.csv": [":ID(Component)", "system_id", "type", "name"],
     "nodes_sensors.csv": [":ID(Sensor)", "system_id", "type", "name", "unit"],
+    "operating_limits.csv": [
+        "name",
+        "parameterName",
+        "regime",
+        "aircraftType",
+        "unit",
+        "minValue",
+        "maxValue",
+        "sourceBlock",
+        "sourceText",
+    ],
     "nodes_maintenance.csv": [
         ":ID(MaintenanceEvent)",
         "component_id",

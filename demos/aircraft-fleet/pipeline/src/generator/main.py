@@ -25,6 +25,7 @@ from rich.table import Table
 from . import manuals
 from .config import GeneratorConfig
 from .fleet import AircraftNode, generate_fleet
+from .limits import LIMITS_FILE, operating_limit_rows
 from .maintenance import generate_maintenance_events
 from .operations import generate_operations
 from .removals import _check_start_date, generate_removals
@@ -329,11 +330,13 @@ def _write_dataset(
     write_csv(rels_ac_sys, work / "rels_aircraft_system.csv")
     write_csv(rels_sys_comp, work / "rels_system_component.csv")
     write_csv(rels_sys_sens, work / "rels_system_sensor.csv")
+    limit_count = write_csv(operating_limit_rows(), work / LIMITS_FILE)
     console.print(
         f"  [green]✓[/green] {len(aircraft_rows)} aircraft  "
         f"{len(system_rows)} systems  "
         f"{len(component_rows)} components  "
-        f"{len(sensor_rows)} sensors"
+        f"{len(sensor_rows)} sensors  "
+        f"{limit_count} operating limits"
     )
 
     # ── 2. Sensor readings + maintenance events ─────────────────────────────

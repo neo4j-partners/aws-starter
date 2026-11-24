@@ -1,4 +1,4 @@
-"""verify --strict checks the extracted EGT limits and System coverage."""
+"""verify --strict checks the loaded EGT limits and System coverage."""
 
 from __future__ import annotations
 
@@ -14,9 +14,12 @@ FakeResult = tuple[list[dict[str, Any]], None, None]
 
 
 def _limit_rows(overrides: dict[tuple[str, str], object] | None = None) -> list[dict[str, Any]]:
-    """One EGT limit row per expected maximum, as the verify query returns it."""
+    """One EGT limit row per expected maximum, as the verify query returns it.
+
+    The load stores each maxValue as a float.
+    """
     values: dict[tuple[str, str], object] = {
-        key: f"{maximum:g}" for key, maximum in loader.expected_egt_maximums().items()
+        key: float(maximum) for key, maximum in loader.expected_egt_maximums().items()
     }
     values.update(overrides or {})
     return [
@@ -78,39 +81,35 @@ def test_matching_limits_pass(capsys: pytest.CaptureFixture[str]) -> None:
     assert "[FAIL]" not in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("value", ["< 890", "890°C", "890.0"])
-def test_a_maximum_written_with_a_symbol_or_unit_still_matches(value: str) -> None:
+def test_a_maximum_stored_as_text_fails() -> None:
+    # The load stores numbers, so a string such as one an older extraction
+    # wrote does not match.
     assert ENGINE_SPECS["A220-300"].egt_limits.takeoff.maximum == 890
 
-    result = _check_egt(_limit_rows({("A220-300", "Takeoff"): value}))
+    result = _check_egt(_limit_rows({("A220-300", "Takeoff"): "890"}))
 
-    assert result.failures == []
-
-
-def test_a_maximum_with_a_thousands_comma_matches() -> None:
-    assert ENGINE_SPECS["A321neo"].egt_limits.takeoff.maximum == 1060
-
-    result = _check_egt(_limit_rows({("A321neo", "Takeoff"): "1,060"}))
-
-    assert result.failures == []
+    assert result.failures == [
+        "EGT Takeoff - A220-300 maxValue is '890', "
+        "but the generator's Takeoff maximum for A220-300 is 890"
+    ]
 
 
 def test_a_wrong_column_maximum_fails() -> None:
     # The A220-300 graph held the Max Continuous value in its Takeoff row.
-    result = _check_egt(_limit_rows({("A220-300", "Takeoff"): "855"}))
+    result = _check_egt(_limit_rows({("A220-300", "Takeoff"): 855.0}))
 
     assert result.failures == [
-        "EGT Takeoff - A220-300 maxValue is '855', "
+        "EGT Takeoff - A220-300 maxValue is 855.0, "
         "but the generator's Takeoff maximum for A220-300 is 890"
     ]
 
 
 def test_a_mismatch_is_a_warning_without_strict() -> None:
-    result = _check_egt(_limit_rows({("E190", "Start"): "700"}), strict=False)
+    result = _check_egt(_limit_rows({("E190", "Start"): 700.0}), strict=False)
 
     assert result.failures == []
     assert result.warnings == [
-        "EGT Start - E190 maxValue is '700', but the generator's Start maximum for E190 is 730"
+        "EGT Start - E190 maxValue is 700.0, but the generator's Start maximum for E190 is 730"
     ]
 
 
@@ -131,13 +130,12 @@ def test_a_limit_with_no_max_value_fails() -> None:
 
 
 def test_a_second_limit_for_the_same_regime_is_checked_too() -> None:
-    # A wrong-column read can add an "EGT - <type>" limit beside the right one.
-    extra = {"model": "E190", "regime": "takeoff", "name": "EGT - E190", "maxValue": "870"}
+    extra = {"model": "E190", "regime": "takeoff", "name": "EGT - E190", "maxValue": 870.0}
 
     result = _check_egt([*_limit_rows(), extra])
 
     assert result.failures == [
-        "EGT - E190 maxValue is '870', but the generator's Takeoff maximum for E190 is 900"
+        "EGT - E190 maxValue is 870.0, but the generator's Takeoff maximum for E190 is 900"
     ]
 
 
@@ -146,7 +144,7 @@ def test_an_a320_start_limit_fails_because_the_generator_has_none() -> None:
         "model": "A320-200",
         "regime": "start",
         "name": "EGT Start - A320-200",
-        "maxValue": "635",
+        "maxValue": 635.0,
     }
 
     result = _check_egt([*_limit_rows(), extra])

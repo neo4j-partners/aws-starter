@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from generator.limits import LIMITS_FILE
 from generator.manuals import MANUALS_DIR
 from populate_aircraft_db.config import _DATA_DIR
 from populate_aircraft_db.pipeline import (
     DOCUMENTS,
-    LIMITS_CSV,
     limit_sources,
     read_manual,
     read_manual_text,
@@ -102,7 +102,7 @@ _TAKEOFF_ROW = "| EGT (Takeoff, 5 min) | < 650°C | 650-695°C | 695°C |"
 
 
 def _write_csv(data_dir: Path, rows: list[dict[str, str]]) -> None:
-    with (data_dir / LIMITS_CSV).open("w", encoding="utf-8", newline="") as f:
+    with (data_dir / LIMITS_FILE).open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=_COLUMNS)
         writer.writeheader()
         for row in rows:
@@ -154,10 +154,10 @@ def test_a_source_not_once_in_its_block_raises(
 
 
 @pytest.mark.skipif(
-    not (_DATA_DIR / LIMITS_CSV).exists(), reason=f"no generated {LIMITS_CSV} to read"
+    not (_DATA_DIR / LIMITS_FILE).exists(), reason=f"no generated {LIMITS_FILE} to read"
 )
 def test_every_generated_limit_has_a_source() -> None:
-    with (_DATA_DIR / LIMITS_CSV).open(encoding="utf-8", newline="") as f:
+    with (_DATA_DIR / LIMITS_FILE).open(encoding="utf-8", newline="") as f:
         names = [row["name"] for row in csv.DictReader(f)]
 
     assert [s.name for s in limit_sources(_DATA_DIR, MANUALS_DIR)] == names

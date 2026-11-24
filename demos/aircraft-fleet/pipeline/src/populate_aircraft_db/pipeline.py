@@ -15,6 +15,8 @@ from neo4j_graphrag.components.text_splitters.base import TextSplitter
 from neo4j_graphrag.components.types import TextChunks
 from neo4j_graphrag.embeddings.openai import OpenAIEmbeddings
 
+from generator.limits import LIMITS_FILE
+
 from .loader import detach_delete_nodes
 from .schema import (
     COMPONENT_ALIASES_TEXT,
@@ -178,9 +180,6 @@ class LimitSource:
     end: int
 
 
-LIMITS_CSV = "operating_limits.csv"
-
-
 def limit_sources(data_dir: Path, document_dir: Path) -> list[LimitSource]:
     """Find each generated limit's sourceText inside its sourceBlock.
 
@@ -190,7 +189,7 @@ def limit_sources(data_dir: Path, document_dir: Path) -> list[LimitSource]:
     documents = {doc.aircraft_type: doc for doc in DOCUMENTS}
     manuals: dict[str, ManualText] = {}
     sources: list[LimitSource] = []
-    with (data_dir / LIMITS_CSV).open(encoding="utf-8", newline="") as f:
+    with (data_dir / LIMITS_FILE).open(encoding="utf-8", newline="") as f:
         for row in csv.DictReader(f):
             name, block_id, source = row["name"], row["sourceBlock"], row["sourceText"]
             doc = documents.get(row["aircraftType"])
@@ -966,7 +965,7 @@ def check_limit_nodes(driver: Driver, database: str, sources: list[LimitSource])
     )
     if missing := records[0]["missing"]:
         raise ValueError(
-            f"{len(missing)} limit(s) in {LIMITS_CSV} have no loaded OperatingLimit node,"
+            f"{len(missing)} limit(s) in {LIMITS_FILE} have no loaded OperatingLimit node,"
             f" such as {missing[0]!r}. Load the operational graph first."
         )
 

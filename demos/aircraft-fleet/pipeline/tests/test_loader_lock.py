@@ -82,10 +82,15 @@ def test_the_lock_is_held_for_the_whole_load(
         "load_relationships",
         lambda *args: held.append("relationships") if not _try_exclusive(tmp_path) else None,
     )
+    monkeypatch.setattr(
+        loader,
+        "load_operating_limits",
+        lambda *args: held.append("limits") if not _try_exclusive(tmp_path) else None,
+    )
 
     loader.load_operational_graph(_Driver(), "db", tmp_path)
 
-    assert held == ["nodes", "relationships"]
+    assert held == ["nodes", "relationships", "limits"]
     assert _try_exclusive(tmp_path)
 
 
@@ -101,6 +106,7 @@ def test_a_generate_fails_at_once_while_a_load_runs(
 
     monkeypatch.setattr(loader, "load_nodes", generate_during_load)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
+    monkeypatch.setattr(loader, "load_operating_limits", lambda *args: None)
 
     loader.load_operational_graph(_Driver(), "db", tmp_path)
 
@@ -132,6 +138,7 @@ def test_a_load_takes_the_lock_on_a_read_only_lock_file(
 
     monkeypatch.setattr(loader, "load_nodes", load_nodes)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
+    monkeypatch.setattr(loader, "load_operating_limits", lambda *args: None)
 
     loader.load_operational_graph(_Driver(), "db", read_only_dir)
 
@@ -147,6 +154,7 @@ def test_a_load_runs_without_the_lock_when_it_cannot_create_one(
     ran: list[str] = []
     monkeypatch.setattr(loader, "load_nodes", lambda *args: ran.append("nodes") or 0)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
+    monkeypatch.setattr(loader, "load_operating_limits", lambda *args: None)
 
     with caplog.at_level(logging.WARNING, logger=loader.__name__):
         loader.load_operational_graph(_Driver(), "db", read_only_dir)
@@ -176,6 +184,7 @@ def test_only_a_read_only_directory_lets_a_load_skip_the_lock(
     monkeypatch.setattr(Path, "open", open_)
     monkeypatch.setattr(loader, "load_nodes", lambda *args: 0)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
+    monkeypatch.setattr(loader, "load_operating_limits", lambda *args: None)
 
     if loads:
         loader.load_operational_graph(_Driver(), "db", tmp_path)

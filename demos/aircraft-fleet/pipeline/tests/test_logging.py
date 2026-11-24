@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from generator.limits import LIMITS_FILE
 from generator.stamp import write_stamp
 from populate_aircraft_db import loader, main, pipeline
 from populate_aircraft_db.schema import CONSTRAINTS, create_constraints
@@ -92,6 +93,7 @@ def test_skipped_readings_log_a_warning(
 ) -> None:
     monkeypatch.setattr(loader, "load_nodes", lambda *args: skipped)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
+    monkeypatch.setattr(loader, "load_operating_limits", lambda *args: None)
 
     loader.load_operational_graph(CountDriver(), "db", stamped_dir)
     assert _records(package_logs, "populate_aircraft_db.loader") == [
@@ -301,14 +303,19 @@ def test_cli_warning_reaches_stderr_when_stdout_cannot_flush(
 
 
 def _fake_loader(monkeypatch: pytest.MonkeyPatch, skipped: int) -> None:
-    """Load one node type and two relationship types, five rows each."""
+    """Load one node type, two relationship types and the limits, five rows each."""
     monkeypatch.setattr(loader, "_NODE_DEFINITIONS", [("Aircraft", "a.csv", "nodes")])
     monkeypatch.setattr(
         loader,
         "_REL_DEFINITIONS",
         [("HAS_SYSTEM", "r1.csv", "rels"), ("HAS_SENSOR", "r2.csv", "rels")],
     )
-    monkeypatch.setattr(loader, "iter_csv_batches", lambda data_dir, filename: iter([]))
+    limits = [{"name": f"Limit {n}"} for n in range(5)]
+    monkeypatch.setattr(
+        loader,
+        "iter_csv_batches",
+        lambda data_dir, filename: iter([limits] if filename == LIMITS_FILE else []),
+    )
     monkeypatch.setattr(
         loader,
         "_run_in_batches",
@@ -325,6 +332,9 @@ _LOADER_LINES = [
     "  [OK] Loaded 5 HAS_SYSTEM relationships.",
     "Loading HAS_SENSOR relationships...",
     "  [OK] Loaded 5 HAS_SENSOR relationships.",
+    "Loading OperatingLimit nodes...",
+    "  [OK] Loaded 5 OperatingLimit nodes and deleted 3 not in operating_limits.csv.",
+    "  [OK] Linked 3 Sensor -[:HAS_LIMIT]-> OperatingLimit.",
 ]
 
 
@@ -360,7 +370,18 @@ def test_cli_load_shows_blank_lines_between_load_phases(
     assert result.exit_code == 0, result.output
     loaded = result.output.split("Creating fulltext indexes...\n\n")[1].split("Linking")[0]
     assert loaded == "\n".join(
-        [*_LOADER_LINES[:2], "", *_LOADER_LINES[2:], "", summary, RECORDED, "", ""]
+        [
+            *_LOADER_LINES[:2],
+            "",
+            *_LOADER_LINES[2:6],
+            "",
+            *_LOADER_LINES[6:],
+            "",
+            summary,
+            RECORDED,
+            "",
+            "",
+        ]
     )
 
 
@@ -379,7 +400,7 @@ def test_load_phase_records_have_no_empty_messages(
     assert [r.getMessage() for r in records][:-2] == _LOADER_LINES
     assert records[-1].getMessage() == RECORDED
     assert all(r.getMessage().strip() for r in records)
-    assert [i for i, r in enumerate(records) if getattr(r, "blank_before", False)] == [2, 6]
+    assert [i for i, r in enumerate(records) if getattr(r, "blank_before", False)] == [2, 6, 9]
 
 
 def _process_two_documents(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

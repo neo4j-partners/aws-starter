@@ -7,7 +7,6 @@ import errno
 import fcntl
 import json
 import logging
-import re
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
@@ -18,6 +17,7 @@ from typing import Any, TextIO
 from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
 
+from generator.limits import LIMITS_FILE
 from generator.specs import ENGINE_SPECS
 from generator.stamp import (
     LOCK_NAME,
@@ -43,6 +43,7 @@ OPERATIONAL_LABELS = [
     "Delay",
     "MaintenanceEvent",
     "Removal",
+    "OperatingLimit",
 ]
 ENRICHMENT_LABELS = [
     "Document",
@@ -52,7 +53,6 @@ ENRICHMENT_LABELS = [
     "ComponentReference",
     "Fault",
     "MaintenanceProcedure",
-    "OperatingLimit",
 ]
 OPERATIONAL_RELATIONSHIP_TYPES = [
     "HAS_SYSTEM",
@@ -68,6 +68,7 @@ OPERATIONAL_RELATIONSHIP_TYPES = [
     "AFFECTS_AIRCRAFT",
     "HAS_REMOVAL",
     "REMOVED_COMPONENT",
+    "HAS_LIMIT",
 ]
 ENRICHMENT_RELATIONSHIP_TYPES = [
     "FROM_DOCUMENT",
@@ -75,7 +76,6 @@ ENRICHMENT_RELATIONSHIP_TYPES = [
     "DESCRIBES_MODEL",
     "DESCRIBES_SYSTEM",
     "DESCRIBES_COMPONENT",
-    "HAS_LIMIT",
 ]
 RELATIONSHIP_TYPES = [*OPERATIONAL_RELATIONSHIP_TYPES, *ENRICHMENT_RELATIONSHIP_TYPES]
 REQUIRED_INDEXES = [
@@ -431,6 +431,68 @@ def load_relationships(driver: Driver, database: str, data_dir: Path) -> None:
         logger.info("  [OK] Loaded %d %s relationships.", count, rel_type)
 
 
+# Each limit's whole property map comes from its CSV row, so a rerun over an
+# older graph keeps no leftover property or label. toFloat turns an empty
+# cell into null.
+_LIMIT_QUERY = """
+UNWIND $batch AS row
+MERGE (ol:OperatingLimit {name: row.name})
+SET ol = {
+    name: row.name,
+    parameterName: row.parameterName,
+    regime: row.regime,
+    aircraftType: row.aircraftType,
+    unit: row.unit,
+    minValue: toFloat(row.minValue),
+    maxValue: toFloat(row.maxValue)
+}
+REMOVE ol:__Entity__:__KGBuilder__
+"""
+
+
+def load_operating_limits(driver: Driver, database: str, data_dir: Path) -> None:
+    """Load the generated operating limits and link each Sensor to its own.
+
+    The graph's OperatingLimit nodes end up exactly the CSV's rows. A limit
+    the CSV no longer names is deleted. Every HAS_LIMIT link is rebuilt: a
+    Sensor links to each limit of its aircraft's model whose parameterName
+    is the Sensor type, ignoring case.
+    """
+    logger.info("Loading OperatingLimit nodes...", extra={"blank_before": True})
+    names = []
+    for batch in iter_csv_batches(data_dir, LIMITS_FILE):
+        names.extend(row["name"] for row in batch)
+        driver.execute_query(_LIMIT_QUERY, batch=batch, database_=database)
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (ol:OperatingLimit)
+        WHERE ol.name IS NULL OR NOT ol.name IN $names
+        DETACH DELETE ol
+        RETURN count(*) AS count
+        """,
+        names=names,
+        database_=database,
+    )
+    logger.info(
+        "  [OK] Loaded %d OperatingLimit nodes and deleted %d not in %s.",
+        len(names),
+        records[0]["count"],
+        LIMITS_FILE,
+    )
+    driver.execute_query("MATCH ()-[r:HAS_LIMIT]->() DELETE r", database_=database)
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (a:Aircraft)-[:HAS_SYSTEM]->(:System)-[:HAS_SENSOR]->(s:Sensor)
+        MATCH (ol:OperatingLimit {aircraftType: a.model})
+        WHERE toLower(ol.parameterName) = toLower(s.type)
+        MERGE (s)-[:HAS_LIMIT]->(ol)
+        RETURN count(*) AS count
+        """,
+        database_=database,
+    )
+    logger.info("  [OK] Linked %d Sensor -[:HAS_LIMIT]-> OperatingLimit.", records[0]["count"])
+
+
 def load_operational_graph(driver: Driver, database: str, data_dir: Path) -> None:
     """Load all operational nodes, then all relationships, then report skips.
 
@@ -494,6 +556,7 @@ def _load_operational_graph(driver: Driver, database: str, data_dir: Path) -> No
     driver.execute_query("MATCH (d:Dataset) DETACH DELETE d", database_=database)
     skipped = load_nodes(driver, database, data_dir)
     load_relationships(driver, database, data_dir)
+    load_operating_limits(driver, database, data_dir)
     if skipped:
         logger.warning(
             "[WARN] Skipped %s readings whose sensor_id matches no Sensor.",
@@ -781,7 +844,7 @@ def _check_counts(
         result.check(operational_counts[label] > 0, f"{label} has no nodes")
     for rel_type in OPERATIONAL_RELATIONSHIP_TYPES:
         result.check(rel_counts[rel_type] > 0, f"{rel_type} has no relationships")
-    for label in ("Document", "Chunk", "AircraftModel", "OperatingLimit"):
+    for label in ("Document", "Chunk", "AircraftModel"):
         result.check(
             enrichment_counts[label] > 0, f"{label} has no enrichment nodes", enrichment=True
         )
@@ -793,13 +856,20 @@ def _csv_row_count(path: Path) -> int:
         return sum(1 for _ in csv.DictReader(f))
 
 
+# Each label the load writes from one CSV, with that CSV.
+_COUNTED_CSVS: list[tuple[str, str]] = [
+    *((label, filename) for label, filename, _ in _NODE_DEFINITIONS),
+    ("OperatingLimit", LIMITS_FILE),
+]
+
+
 def _check_csv_counts(label_counts: dict[str, int], data_dir: Path, result: _VerifyResult) -> None:
-    """Compare each operational label's node count with its CSV's row count.
+    """Compare each label in _COUNTED_CSVS with its CSV's row count.
 
     The load MERGEs into whatever the graph holds, so a direct load over an
     earlier, larger dataset leaves extra nodes. They show up here.
     """
-    files = [(label, filename) for label, filename, _ in _NODE_DEFINITIONS]
+    files = _COUNTED_CSVS
     if not any((data_dir / filename).is_file() for _, filename in files):
         result.check(
             False, f"{data_dir} has no node CSVs, so node counts were not compared with them"
@@ -961,8 +1031,10 @@ def _check_vector_search(
 def _sensor_limit_count(driver: Driver, database: str, rel_counts: dict[str, int]) -> int:
     """Count (:Sensor)-[:HAS_LIMIT]->(:OperatingLimit) links.
 
-    Extracted SystemReference and ComponentReference nodes have HAS_LIMIT
-    edges too, so the HAS_LIMIT total can't show whether sensors were linked.
+    The load makes every Sensor link. Counting by pattern keeps the check
+    about sensors when the graph also holds HAS_LIMIT edges from other
+    labels, such as the SystemReference and ComponentReference edges an
+    older enrich extracted.
     """
     if rel_counts["HAS_LIMIT"] == 0:
         return 0
@@ -976,21 +1048,23 @@ def _sensor_limit_count(driver: Driver, database: str, rel_counts: dict[str, int
 def _check_cross_links(
     rel_counts: dict[str, int], sensor_limits: int, result: _VerifyResult
 ) -> None:
+    # (label, count, whether enrich makes the links). The load makes the
+    # Sensor links.
     cross_link_checks = [
-        ("Document -> Aircraft", rel_counts["APPLIES_TO"]),
-        ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"]),
-        ("SystemReference -> System", rel_counts["DESCRIBES_SYSTEM"]),
-        ("ComponentReference -> Component", rel_counts["DESCRIBES_COMPONENT"]),
-        ("Sensor -> OperatingLimit", sensor_limits),
+        ("Document -> Aircraft", rel_counts["APPLIES_TO"], True),
+        ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"], True),
+        ("SystemReference -> System", rel_counts["DESCRIBES_SYSTEM"], True),
+        ("ComponentReference -> Component", rel_counts["DESCRIBES_COMPONENT"], True),
+        ("Sensor -> OperatingLimit", sensor_limits, False),
     ]
     print("\nCross-Link Checks:")
-    for label, count in cross_link_checks:
+    for label, count, enrichment in cross_link_checks:
         print(f"  {label}: {count:,}")
-        result.check(count > 0, f"{label} has no links", enrichment=True)
+        result.check(count > 0, f"{label} has no links", enrichment=enrichment)
 
 
 # Sensor types the manuals list only in the sensor inventory, with no
-# operating limit, so enrichment links them to none.
+# operating limit, so the load links them to none.
 SENSOR_TYPES_WITHOUT_LIMITS = ("AirDataDisagree",)
 
 
@@ -1026,13 +1100,7 @@ def _check_sensor_limit_coverage(
     for sensor_type, count in unlinked.items():
         print(f"  {sensor_type}: {count:,}")
     by_type = ", ".join(f"{sensor_type} {count:,}" for sensor_type, count in unlinked.items())
-    result.check(
-        total == 0, f"Sensors without OperatingLimit: {total:,} ({by_type})", enrichment=True
-    )
-
-
-# The first number in a limit value such as "950", "< 950" or "1,060".
-_LIMIT_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+    result.check(total == 0, f"Sensors without OperatingLimit: {total:,} ({by_type})")
 
 
 def expected_egt_maximums() -> dict[tuple[str, str], float]:
@@ -1049,11 +1117,6 @@ def expected_egt_maximums() -> dict[tuple[str, str], float]:
         if limits.start_max is not None:
             expected[model, "Start"] = limits.start_max
     return expected
-
-
-def _limit_number(value: object) -> float | None:
-    match = _LIMIT_NUMBER.search(str(value)) if value is not None else None
-    return float(match.group().replace(",", "")) if match else None
 
 
 def _check_egt_limits(
@@ -1092,7 +1155,7 @@ def _check_egt_limits(
         rows = found.get((model, regime), [])
         if not rows:
             print(f"  [MISSING] {model} {regime}: expected {maximum:g}")
-            result.check(False, f"{model} has no EGT {regime} limit", enrichment=True)
+            result.check(False, f"{model} has no EGT {regime} limit")
             continue
         for row in rows:
             if maximum is None:
@@ -1101,10 +1164,9 @@ def _check_egt_limits(
                     False,
                     f"{row['name']} is an EGT {regime} limit, "
                     f"but the generator has none for {model}",
-                    enrichment=True,
                 )
                 continue
-            ok = _limit_number(row["maxValue"]) == maximum
+            ok = row["maxValue"] == maximum
             print(
                 f"  {'[OK]' if ok else '[FAIL]'} {row['name']}: "
                 f"maxValue {row['maxValue']!r}, expected {maximum:g}"
@@ -1113,7 +1175,6 @@ def _check_egt_limits(
                 ok,
                 f"{row['name']} maxValue is {row['maxValue']!r}, "
                 f"but the generator's {regime} maximum for {model} is {maximum:g}",
-                enrichment=True,
             )
 
 

@@ -130,7 +130,7 @@ case "$CMD" in
     do_generate --if-stale
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db load-operational
-    # This graph has no documents, chunks, or limits. --skip-enrichment turns
+    # This graph has no documents or chunks. --skip-enrichment turns
     # those checks into warnings. The operational checks still fail the run.
     uv run populate-aircraft-db verify --strict --skip-enrichment
     ;;

@@ -137,6 +137,37 @@ PHASES: tuple[str, str, str, str] = (
     "Takeoff (5 min)",
 )
 
+# The closed list of operating limit regimes. The name of each limit carries
+# its regime, and each regime names one kind of limit:
+# - Takeoff, Max Continuous, Start: hard limits, from the Operating Limits
+#   table's Maximum column.
+# - "<regime> Normal": normal ranges, one per column of the Normal Operating
+#   Parameters table.
+# - Trend Advisory, Trend Caution, Trend Warning: the Digital Twin
+#   trend-averaged EGT thresholds.
+# - Advisory, Caution, Warning: band thresholds, such as vibration, DC bus
+#   voltage, and hydraulic pressure.
+# - All: a stated limit whose text names no regime.
+OPERATING_LIMIT_REGIMES: tuple[str, ...] = (
+    "Takeoff",
+    "Max Continuous",
+    "Start",
+    "Ground Idle Normal",
+    "Flight Idle Normal",
+    "Cruise Normal",
+    "Max Continuous Normal",
+    "Takeoff Normal",
+    "Trend Advisory",
+    "Trend Caution",
+    "Trend Warning",
+    "Advisory",
+    "Caution",
+    "Warning",
+    "All",
+)
+# The hard limits. Each states a maximum.
+HARD_LIMIT_REGIMES: tuple[str, ...] = ("Takeoff", "Max Continuous", "Start")
+
 
 @dataclass(frozen=True)
 class EgtBand:
@@ -162,6 +193,17 @@ class EgtLimits:
 
 
 @dataclass(frozen=True)
+class GearboxOilTemperature:
+    """A geared fan's gearbox oil temperature table, in °C, at all power settings."""
+
+    normal: tuple[float, float]
+    caution: tuple[float, float]
+    # Operation above the limit is not permitted. Above the caution band's
+    # top, operation needs investigation before further dispatch.
+    limit: float
+
+
+@dataclass(frozen=True)
 class EngineSpec:
     engine_type: str
     sensors: tuple[SensorSpec, ...]
@@ -169,6 +211,8 @@ class EngineSpec:
     # Row label -> one cell per PHASES entry, for the rows the generator does
     # not produce. The renderer builds the EGT and vibration rows from specs.
     phase_limits: dict[str, tuple[str, str, str, str]]
+    # Only an engine with a reduction gearbox has one.
+    gearbox_oil_temperature: GearboxOilTemperature | None = None
 
 
 def _engine_sensors(
@@ -390,6 +434,9 @@ ENGINE_SPECS: dict[str, EngineSpec] = {
             "Gearbox Oil Pressure (psi)": ("50-65", "55-70", "65-80", "65-80"),
             "Gearbox Oil Temperature (°C)": ("60-90", "70-110", "90-130", "90-130"),
         },
+        gearbox_oil_temperature=GearboxOilTemperature(
+            normal=(60, 130), caution=(130, 145), limit=150
+        ),
     ),
 }
 
@@ -479,6 +526,35 @@ SYSTEM_SENSORS: dict[str, dict[str, tuple[SensorSpec, ...]]] = {
 def sensors_for(system_type: str, model: str) -> tuple[SensorSpec, ...]:
     """Return the sensors on one system type of one model, in sensor id order."""
     return SYSTEM_SENSORS.get(system_type, {}).get(model, ())
+
+
+@dataclass(frozen=True)
+class FluidTemperature:
+    """The hydraulic fluid's operating range, in °C, for every hydraulic system."""
+
+    low: float
+    high: float
+    # The temperature above which the fluid is at a warning, when the
+    # manual states one.
+    warning_above: float | None = None
+
+
+HYDRAULIC_FLUID_TEMPERATURES: dict[str, FluidTemperature] = {
+    "B737-800": FluidTemperature(-40, 107),
+    "A320-200": FluidTemperature(-40, 100, warning_above=110),
+    "A321neo": FluidTemperature(-40, 107),
+    "E190": FluidTemperature(-40, 107),
+    "A220-300": FluidTemperature(-40, 107),
+}
+
+# The most water the hydraulic fluid may hold, in % by volume. The A321neo
+# manual states none.
+HYDRAULIC_WATER_CONTENT_MAX: dict[str, float] = {
+    "B737-800": 0.1,
+    "A320-200": 0.1,
+    "E190": 0.1,
+    "A220-300": 0.1,
+}
 
 
 # Model allocation for aircraft beyond the manual registry. Proportions must

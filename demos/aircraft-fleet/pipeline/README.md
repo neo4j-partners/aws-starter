@@ -50,9 +50,11 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 | 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
 
 - **Sample fulltext indexes:** Stage 2 also creates four fulltext indexes for sample queries: `maintenance_search`, `delay_search`, `component_search`, and `document_search`.
-- **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`.
+- **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, `Removal`, and `OperatingLimit`.
+- **Limit file:** Stage 1 writes `operating_limits.csv` with one row for each limit the manuals state. `src/generator/limits.py` builds each row from the same specs that render the manuals' limit blocks, so each value is the one the manual prints. Each row also names its block and the exact line or sentence that states it.
+- **Limit load:** Stage 2 merges each row on `name` and stores the values as numbers. It deletes each `OperatingLimit` the file doesn't name. It then rebuilds every `Sensor -[:HAS_LIMIT]-> OperatingLimit` link.
 - **Extracted labels:** Stage 3 writes `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, and `MaintenanceProcedure`.
-- **Operating limits:** Enrich doesn't extract limits. The load writes each `OperatingLimit` from `generated/operating_limits.csv`, and enrich keeps those nodes. Each CSV row names the generated block and the exact line or sentence of the manual that states the limit. Enrich finds that text in the block and links the limit by `FROM_CHUNK` to each chunk that holds it whole. When no chunk holds it whole, the limit links to the chunks that overlap it. A table header that a chunk repeats doesn't count, and neither does a block that restates a limit, such as `egt-exceedance` or `quick-ref-engine`.
+- **Limit chunks:** Enrich doesn't extract limits, and it keeps the loaded `OperatingLimit` nodes. It finds each row's text in its block and links the limit by `FROM_CHUNK` to each chunk that holds it whole. When no chunk holds it whole, the limit links to the chunks that overlap it. A table header that a chunk repeats doesn't count, and neither does a block that restates a limit, such as `egt-exceedance` or `quick-ref-engine`.
 - **Model:** Extraction uses `global.anthropic.claude-sonnet-5-5` by default. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions.
 
 ## The dual graph
@@ -72,7 +74,8 @@ After stage 4, one database holds two subgraphs:
 | `AircraftModel -[:DESCRIBES_MODEL]-> Aircraft` | A model entity from the manual links to each aircraft of that model. |
 | `SystemReference -[:DESCRIBES_SYSTEM]-> System` | A system in the manual links to the real system. |
 | `ComponentReference -[:DESCRIBES_COMPONENT]-> Component` | A component in the manual links to the installed component. |
-| `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to each limit that the manual defines for its sensor type and model. Each limit covers one regime. |
+
+`Sensor -[:HAS_LIMIT]-> OperatingLimit` comes from the stage 2 load instead. A live sensor links to each limit in the limit file for its sensor type and model, and each limit covers one regime. After the links, stage 4 also adds each limit's `FROM_CHUNK` links to the chunks that state it.
 
 An agent can start from a sensor reading on one aircraft. It can move to the
 operating limits for that sensor and model. It can then pull the repair
@@ -125,7 +128,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **Your files:** Files you add to `generated/` are kept.
 - **Graph check:** `verify` compares the graph's `Dataset` node with the stamp, and the stamp with the current code. It also compares each operational label's node count with its CSV row count.
 - **Strict mode:** `verify --strict` fails on any mismatch, or when the stamp is missing.
-- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the cross links, the sensor limit check, the EGT limit check, the limit chunk check, and the check for systems without a `SystemReference`. The sensor limit check requires every `Sensor` to link to an `OperatingLimit`, except the `AirDataDisagree` sensors that the manuals give no limit. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
+- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the enrichment cross links, the limit chunk check, and the check for systems without a `SystemReference`. The operational and stamp checks still fail. So do the sensor limit check and the EGT limit check, because the load writes the limits. The sensor limit check requires every `Sensor` to link to an `OperatingLimit`, except the `AirDataDisagree` sensors that the manuals give no limit. `./setup.sh load-operational` uses it.
 
 ## Structured output on Bedrock
 
@@ -180,7 +183,7 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 
 1. **Replace stage 1:** Use your own structured data source. Update the constraints and indexes in `schema.py`.
 2. **Replace `manuals/`:** Add your own documents. Update the `DOCUMENTS` list and the `[DOCUMENT CONTEXT]` header in `pipeline.py`.
-3. **Redefine the extraction schema:** Edit `build_extraction_schema` and `OPERATING_LIMIT_REGIMES` in `schema.py`, and the rules in `EXTRACTION_PROMPT`. The `verify` EGT limit check in `loader.py` compares extracted limits with the generator's `ENGINE_SPECS`, so replace it too.
+3. **Redefine the extraction schema:** Edit `build_extraction_schema` in `schema.py` and the rules in `EXTRACTION_PROMPT`. Operating limits come from `src/generator/limits.py` and `specs.py`, not from extraction, so replace those too. Also replace the `verify` EGT limit check in `loader.py`, which compares the loaded limits with `ENGINE_SPECS`.
 4. **Rewrite the fusion Cypher:** Edit `link_to_existing_graph()` so it joins your two graphs on their shared keys.
 
 `StructuredBedrockLLM` and `ContextPrependingSplitter` work unchanged.

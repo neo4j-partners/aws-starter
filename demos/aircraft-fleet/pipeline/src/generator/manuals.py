@@ -27,6 +27,8 @@ from .specs import (
     ENGINE_SPECS,
     EVENT_SEVERITIES,
     FAULT_CODES,
+    HYDRAULIC_FLUID_TEMPERATURES,
+    HYDRAULIC_WATER_CONTENT_MAX,
     MANUAL_FLEET_TAILS,
     PHASES,
     SYSTEM_SENSORS,
@@ -35,6 +37,7 @@ from .specs import (
     EgtBand,
     EngineSpec,
     FaultCode,
+    GearboxOilTemperature,
     SensorSpec,
     sensors_for,
 )
@@ -115,16 +118,28 @@ def _sensor_table(model: str, engine: EngineSpec, stats: Stats) -> str:
     return "\n".join(lines)
 
 
-def _egt_trend_note(model: str, engine: EngineSpec, stats: Stats) -> str:
-    """§2.2: the hourly EGT trend scale, with its baseline and bands."""
+def egt_trend_thresholds(engine: EngineSpec) -> tuple[str, str, str, str]:
+    """The EGT trend baseline, Advisory, Caution, and Warning, as the note writes them."""
     egt = next(s for s in engine.sensors if s.type == "EGT")
     b = egt.bands
+    return (f"{egt.baseline:g}", f"{b.advisory:g}", f"{b.caution:g}", f"{b.warning:g}")
+
+
+def egt_trend_sentence(engine: EngineSpec) -> str:
+    """The trend note's sentence that states the baseline and the bands."""
+    baseline, advisory, caution, warning = egt_trend_thresholds(engine)
+    return (
+        f"For the {engine.engine_type}, the trend baseline is {baseline}°C, with Advisory "
+        f"at {advisory}°C, Caution at {caution}°C, and Warning at {warning}°C."
+    )
+
+
+def _egt_trend_note(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§2.2: the hourly EGT trend scale, with its baseline and bands."""
     return (
         "**Digital Twin Monitoring Note:** The Digital Twin Monitoring System records "
         "hourly trend-averaged EGT values on a normalized scale calibrated for long-term "
-        f"degradation detection. For the {engine.engine_type}, the trend baseline is "
-        f"{egt.baseline:g}°C, with Advisory at {b.advisory:g}°C, Caution at "
-        f"{b.caution:g}°C, and Warning at {b.warning:g}°C. These trend values differ from "
+        f"degradation detection. {egt_trend_sentence(engine)} These trend values differ from "
         "the instantaneous EGT limits in the Normal Operating Parameters table and "
         "Appendix 10.1, which reflect peak values during takeoff and high-power "
         "operations. The trend scale detects gradual EGT margin deterioration over weeks "
@@ -226,8 +241,8 @@ def _vibration_thresholds(engine: EngineSpec) -> tuple[float, float, float]:
     return b.advisory, b.caution, b.warning
 
 
-def _vibration_bands(model: str, engine: EngineSpec, stats: Stats) -> str:
-    """§4: the Vibration Limits table, with the event severity of each level."""
+def vibration_rows(model: str, engine: EngineSpec) -> list[tuple[str, ...]]:
+    """The Vibration Limits table's rows: level, N1 vibration, severity, and alert."""
     advisory, caution, warning = _vibration_thresholds(engine)
     ranges = (
         f"< {advisory:.1f} ips",
@@ -237,15 +252,15 @@ def _vibration_bands(model: str, engine: EngineSpec, stats: Stats) -> str:
     )
     severities = ("None", *(SEVERITY_BY_LEVEL[level] for level in (1, 2, 3)))
     alerts = ("None", *_VIBRATION_ALERTS[model])
+    return list(zip(VIBRATION_LEVELS, ranges, severities, alerts, strict=True))
+
+
+def _vibration_bands(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§4: the Vibration Limits table, with the event severity of each level."""
     lines = [
         "| Level | N1 Vibration | Event Severity | Flight Deck Alert |",
         "|-------|--------------|----------------|-------------------|",
-        *(
-            f"| {level} | {band} | {severity} | {alert} |"
-            for level, band, severity, alert in zip(
-                VIBRATION_LEVELS, ranges, severities, alerts, strict=True
-            )
-        ),
+        *(table_row(row) for row in vibration_rows(model, engine)),
     ]
     return "\n".join(lines)
 
@@ -262,11 +277,16 @@ def _vibration_shutdown(model: str, engine: EngineSpec, stats: Stats) -> str:
     )
 
 
+def table_row(cells: tuple[str, ...]) -> str:
+    """One row of a generated Markdown table."""
+    return "| " + " | ".join(cells) + " |"
+
+
 def _table(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> str:
     lines = [
-        "| " + " | ".join(header) + " |",
+        table_row(header),
         "|" + "|".join("-" * (len(cell) + 2) for cell in header) + "|",
-        *("| " + " | ".join(row) + " |" for row in rows),
+        *(table_row(row) for row in rows),
     ]
     return "\n".join(lines)
 
@@ -304,8 +324,12 @@ def _cruise_cell(spec: SensorSpec) -> str:
     return f"{spec.baseline:g} (< {spec.bands.advisory:.{places}f})"
 
 
-def _phase_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
-    """§3.3 and §10.1: engine limits at each power setting, with the cruise baseline."""
+# The Normal Operating Parameters table's header.
+PHASE_HEADER: tuple[str, ...] = ("Parameter", *PHASES[:2], "Cruise (digital twin)", *PHASES[2:])
+
+
+def phase_rows(engine: EngineSpec) -> list[tuple[str, ...]]:
+    """The Normal Operating Parameters table's rows, one cell per PHASE_HEADER column."""
     specs = {s.type: s for s in engine.sensors}
     limits = engine.egt_limits
     advisory = f"< {specs['Vibration'].bands.advisory:.1f}"
@@ -327,8 +351,12 @@ def _phase_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
         cruise = "—" if sensor is None else _cruise_cell(specs[sensor])
         idle, flight_idle, max_continuous, takeoff = cells[label]
         rows.append((label, idle, flight_idle, cruise, max_continuous, takeoff))
-    header = ("Parameter", *PHASES[:2], "Cruise (digital twin)", *PHASES[2:])
-    return _table(header, rows)
+    return rows
+
+
+def _phase_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.3 and §10.1: engine limits at each power setting, with the cruise baseline."""
+    return _table(PHASE_HEADER, phase_rows(engine))
 
 
 def _fuel_flow_range(model: str, engine: EngineSpec, stats: Stats) -> str:
@@ -351,8 +379,8 @@ def _egt_row(label: str, band: EgtBand) -> tuple[str, ...]:
     )
 
 
-def _egt_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
-    """§3.2.3: the instantaneous turbine temperature limits."""
+def egt_limit_rows(engine: EngineSpec) -> list[tuple[str, ...]]:
+    """The turbine limits table's rows: parameter, normal, caution, and maximum."""
     limits = engine.egt_limits
     rows = [
         _egt_row("EGT (Takeoff, 5 min)", limits.takeoff),
@@ -360,7 +388,12 @@ def _egt_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     ]
     if limits.start_max is not None:
         rows.append(("EGT (Start)", "—", "—", f"{limits.start_max:,.0f}°C"))
-    return _table(("Parameter", "Normal", "Caution", "Maximum"), rows)
+    return rows
+
+
+def _egt_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.2.3: the instantaneous turbine temperature limits."""
+    return _table(("Parameter", "Normal", "Caution", "Maximum"), egt_limit_rows(engine))
 
 
 def _egt_exceedance(model: str, engine: EngineSpec, stats: Stats) -> str:
@@ -389,10 +422,10 @@ def _egt_exceedance(model: str, engine: EngineSpec, stats: Stats) -> str:
     return _table(("Category", "Temperature", "Duration", "Required Action"), rows)
 
 
-_BAND_HEADER = ("Parameter", "Nominal", "Normal", "Advisory", "Caution", "Warning")
+BAND_HEADER = ("Parameter", "Nominal", "Normal", "Advisory", "Caution", "Warning")
 
 
-def _low_band_row(spec: SensorSpec) -> tuple[str, ...]:
+def low_band_row(spec: SensorSpec) -> tuple[str, ...]:
     """A quick reference row for a sensor that is bad when its value falls."""
     if spec.direction is not Direction.LOW:
         raise ValueError(f"sensor {spec.type!r} is {spec.direction}, not low")
@@ -407,17 +440,138 @@ def _low_band_row(spec: SensorSpec) -> tuple[str, ...]:
     )
 
 
+def band_sensors(system: str, model: str) -> tuple[SensorSpec, ...]:
+    """The sensors a quick reference band table lists.
+
+    The hydraulics table lists every hydraulic sensor. The avionics table
+    lists only the DC bus voltage.
+    """
+    specs = sensors_for(system, model)
+    if system == "Avionics":
+        return tuple(spec for spec in specs if spec.type == "BusVoltage")
+    return specs
+
+
 def _hydraulic_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     """§10.1: the hydraulic bands every circuit shares."""
-    return _table(_BAND_HEADER, [_low_band_row(spec) for spec in sensors_for("Hydraulics", model)])
+    return _table(BAND_HEADER, [low_band_row(spec) for spec in band_sensors("Hydraulics", model)])
 
 
 def _avionics_limits(model: str, engine: EngineSpec, stats: Stats) -> str:
     """§10.1: the DC bus voltage bands."""
-    rows = [
-        _low_band_row(spec) for spec in sensors_for("Avionics", model) if spec.type == "BusVoltage"
-    ]
-    return _table(_BAND_HEADER, rows)
+    return _table(BAND_HEADER, [low_band_row(spec) for spec in band_sensors("Avionics", model)])
+
+
+def gearbox_oil_temperature(engine: EngineSpec) -> GearboxOilTemperature:
+    """The engine's gearbox oil temperature table.
+
+    Raises:
+        ValueError: If the engine has no reduction gearbox.
+    """
+    if engine.gearbox_oil_temperature is None:
+        raise ValueError(f"the {engine.engine_type} has no gearbox oil temperature table")
+    return engine.gearbox_oil_temperature
+
+
+def gearbox_oil_temperature_row(gearbox: GearboxOilTemperature) -> tuple[str, ...]:
+    """The gearbox Oil Temperature table's row: setting, normal, caution, and limit."""
+    normal_low, normal_high = gearbox.normal
+    caution_low, caution_high = gearbox.caution
+    return (
+        "All power",
+        f"{normal_low:g}-{normal_high:g}",
+        f"{caution_low:g}-{caution_high:g}",
+        f"{gearbox.limit:g}",
+    )
+
+
+def _gearbox_oil_temperature(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.5.1: the gearbox oil temperature bands at all power settings."""
+    return _table(
+        ("Power Setting", "Normal (°C)", "Caution (°C)", "Limit (°C)"),
+        [gearbox_oil_temperature_row(gearbox_oil_temperature(engine))],
+    )
+
+
+def gearbox_dispatch_sentence(gearbox: GearboxOilTemperature) -> str:
+    """The sentence that states the gearbox oil outlet temperature limit."""
+    return (
+        f"Sustained operation above {gearbox.caution[1]:g}°C requires investigation before "
+        f"further dispatch; operation above {gearbox.limit:g}°C is not permitted."
+    )
+
+
+def _gearbox_temperature_monitoring(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§3.5.1: the gearbox oil outlet thermocouple and its limit."""
+    return (
+        "**Temperature Monitoring:** A dedicated thermocouple monitors gearbox oil outlet "
+        "temperature. This reading is displayed on the maintenance page and is used by the "
+        "FADEC for oil system health trending. "
+        + gearbox_dispatch_sentence(gearbox_oil_temperature(engine))
+    )
+
+
+# How each manual names its hydraulic systems.
+_HYDRAULIC_SYSTEM_NAMES: dict[str, str] = {
+    "A220-300": "The Left, Right, and Standby systems",
+    "A320-200": "The Green, Blue, and Yellow systems",
+    "A321neo": "The Green, Blue, and Yellow systems",
+    "B737-800": "System A, System B, and Standby",
+    "E190": "The Left, Right, and Standby systems",
+}
+
+
+def fluid_temperature_sentences(model: str) -> tuple[str, str | None]:
+    """The sentence with the fluid's operating range, and the one with its warning.
+
+    The second is None when the manual states no warning temperature.
+    """
+    temperature = HYDRAULIC_FLUID_TEMPERATURES[model]
+    operating = (
+        f"**Fluid temperature:** {_HYDRAULIC_SYSTEM_NAMES[model]} each operate from "
+        f"{temperature.low:g} to {temperature.high:+g}°C."
+    )
+    if temperature.warning_above is None:
+        return operating, None
+    return operating, f"Above {temperature.warning_above:g}°C is a warning."
+
+
+def _hydraulic_fluid_temperature(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§10.1: the hydraulic fluid's operating temperature range."""
+    operating, warning = fluid_temperature_sentences(model)
+    return operating if warning is None else f"{operating} {warning}"
+
+
+# The A320 manual states the water limit as a step of its fluid testing
+# procedure. The others state it under the contamination classes.
+_WATER_CONTENT_LINES: dict[str, str] = {
+    "A320-200": "3. Check water content (< {maximum:g}% by volume)",
+}
+_WATER_CONTENT_LINE = "**Water Content:** Maximum {maximum:g}% by volume"
+
+
+def water_content_line(model: str) -> str:
+    """The line that states the hydraulic fluid's water content limit."""
+    template = _WATER_CONTENT_LINES.get(model, _WATER_CONTENT_LINE)
+    return template.format(maximum=HYDRAULIC_WATER_CONTENT_MAX[model])
+
+
+# The A320 block holds its whole testing procedure. Block markers inside the
+# numbered list would split it into separate lists when the manual renders.
+_A320_TESTING_PROCEDURE = (
+    "1. Obtain fluid sample from reservoir drain\n"
+    "2. Perform particle count analysis (NAS 1638 Class 6 max)\n"
+    "{water_content}\n"
+    "4. Verify fluid acidity (TAN < 1.5)"
+)
+
+
+def _hydraulic_water_content(model: str, engine: EngineSpec, stats: Stats) -> str:
+    """§6: the hydraulic fluid's water content limit."""
+    line = water_content_line(model)
+    if model == "A320-200":
+        return _A320_TESTING_PROCEDURE.format(water_content=line)
+    return line
 
 
 # The section 7 text of each code, from the B737 manual: description, ATA
@@ -640,6 +794,10 @@ RENDERERS: dict[str, Renderer] = {
     "fuel-flow-range": _fuel_flow_range,
     "quick-ref-avionics": _avionics_limits,
     "quick-ref-hydraulics": _hydraulic_limits,
+    "gearbox-oil-temperature": _gearbox_oil_temperature,
+    "gearbox-temperature-monitoring": _gearbox_temperature_monitoring,
+    "hydraulic-fluid-temperature": _hydraulic_fluid_temperature,
+    "hydraulic-water-content": _hydraulic_water_content,
     "fault-codes-engine": functools.partial(_fault_codes, "Engine"),
     "fault-codes-avionics": functools.partial(_fault_codes, "Avionics"),
     "fault-codes-hydraulics": functools.partial(_fault_codes, "Hydraulics"),
@@ -651,8 +809,20 @@ RENDERERS: dict[str, Renderer] = {
     "fleet-statistics": _fleet_statistics,
 }
 
-# Blocks only one model's manual has, which that manual must have once.
-MODEL_BLOCKS: dict[str, tuple[str, ...]] = {"A321neo": ("egt-exceedance",)}
+# Blocks only some models' manuals have, which each of those manuals must
+# have once. The gearbox blocks need an engine with a gearbox table, and the
+# water content block needs a stated water limit.
+MODEL_BLOCKS: dict[str, tuple[str, ...]] = {
+    "A220-300": (
+        "gearbox-oil-temperature",
+        "gearbox-temperature-monitoring",
+        "hydraulic-water-content",
+    ),
+    "A320-200": ("hydraulic-water-content",),
+    "A321neo": ("egt-exceedance",),
+    "B737-800": ("hydraulic-water-content",),
+    "E190": ("hydraulic-water-content",),
+}
 
 # Blocks every manual must have, once each. A manual has a fault's statistics
 # block only in the section of that fault.

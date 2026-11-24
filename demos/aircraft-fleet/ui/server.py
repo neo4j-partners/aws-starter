@@ -15,6 +15,8 @@ from fleet_supervisor.client.transport import (
     RUNTIME_USER_ID,
     iter_events,
 )
+from fleet_supervisor.core.config import ConfigError
+from fleet_supervisor.core.secrets import neo4j_login
 
 # isort: split
 
@@ -46,13 +48,18 @@ class ChatRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: Starlette) -> AsyncIterator[None]:
     load_dotenv(os.environ.get("FLEET_ENV_FILE") or ROOT.parent / ".env")
-    uri = os.getenv("NEO4J_URI")
-    password = os.getenv("NEO4J_PASSWORD")
     driver = None
-    if uri and password:
+    login = None
+    if uri := os.getenv("NEO4J_URI"):
+        try:
+            login = neo4j_login()
+        except ConfigError as error:
+            # The page still works without the evidence graph.
+            logger.warning("Fleet graph evidence is off: %s", error)
+    if login:
         driver = GraphDatabase.driver(
             uri,
-            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), password),
+            auth=login,
             connection_timeout=5,
             connection_acquisition_timeout=8,
             max_transaction_retry_time=0,

@@ -27,9 +27,11 @@ aircraft with hydraulic system issues**. The starter question asks the agent
 to include maintenance event IDs so the canvas can show the paths from
 aircraft through systems and components to those events.
 
-The UI server uses `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and
-`NEO4J_DATABASE` from the shared fleet `.env` for bounded, read-only evidence
-lookups. Use a read-only fleet login for the UI. The [Neo4j Visualization
+The UI server logs in to the fleet graph the same way the supervisor's graph
+tools do, using the shared fleet `.env`. It reads `NEO4J_PASSWORD_SECRET_ARN`
+when that is set, and `NEO4J_USERNAME` and `NEO4J_PASSWORD` otherwise. It
+also reads `NEO4J_URI` and `NEO4J_DATABASE`. It uses the login for bounded,
+read-only evidence lookups. Use a read-only fleet login for the UI. The [Neo4j Visualization
 Library license](https://www.npmjs.com/package/@neo4j-nvl/base) covers use with
 Neo4j Aura or a commercial Neo4j product.
 

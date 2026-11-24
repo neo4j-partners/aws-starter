@@ -26,9 +26,10 @@ EXCLUDED_PATHS=(
 # data-agent is followed by a lookahead so the real S3 bucket names, such as
 # data-agent-neo4j-euw1, still pass. The Databricks integration has its own
 # neo4j_mcp_agent.py, so only the quickstart module paths are retired.
+# The lookbehind on finance-demo passes the real S3 bucket
+# neo4j-finance-demo.
 RETIRED_NAMES=(
     "neo4j-agentcore-agents"
-    "neo4j-agentcore-mcp-server"
     "infra[-_]samples"
     "databrick[-_]samples"
     "fleet-agent-demo"
@@ -41,14 +42,11 @@ RETIRED_NAMES=(
     "orchestrator-(server|invoke)"
     "sec-filings-graphrag-demo"
     "finance-agent"
-    "finance-(server|cli|demo|invoke|traffic)(?![-\\w])"
+    "(?<!neo4j-)finance-(server|cli|demo|invoke|traffic)(?![-\\w])"
     "finance_graph"
     "(?<![-\\w])aura-agents\\b"
     "simple-oauth-(gateway|mcp-server)"
-    "neo4j-agentcore-"
-    "finance[-_ ]agent"
     "finance-graph-(load|enrich|analyze)"
-    "simple-neo4j-mcp-server"
     "databrick(?!s)"
     "fintech-demo"
     "(?-i)E2E-TEST-PLAN"
@@ -81,6 +79,20 @@ RETIRED_OUTSIDE_E2E_HISTORY=(
     "(?<![-\\w])fleet-(server|cli|demo|invoke)(?![-\\w])"
 )
 E2E_HISTORY_PATHS=(
+    "demos/aircraft-fleet/docs/e2e-test-plan.md"
+)
+
+# Retired everywhere except two cleanup records. These are real AWS resource
+# names, such as log groups and a workload identity, that the fraud fixes and
+# the end-to-end test plan's history record deleting or keeping.
+RETIRED_OUTSIDE_CLEANUP_RECORDS=(
+    "neo4j-agentcore-mcp-server"
+    "neo4j-agentcore-"
+    "finance[-_ ]agent"
+    "simple-neo4j-mcp-server"
+)
+CLEANUP_RECORD_PATHS=(
+    "demos/fraud-amazon-quick/fraud-fixes.md"
     "demos/aircraft-fleet/docs/e2e-test-plan.md"
 )
 
@@ -179,7 +191,8 @@ check_names() {
     local name
     if [ ${#RETIRED_NAMES[@]} -eq 0 ] \
         && [ ${#RETIRED_OUTSIDE_GATEWAY_PATTERN[@]} -eq 0 ] \
-        && [ ${#RETIRED_OUTSIDE_E2E_HISTORY[@]} -eq 0 ]; then
+        && [ ${#RETIRED_OUTSIDE_E2E_HISTORY[@]} -eq 0 ] \
+        && [ ${#RETIRED_OUTSIDE_CLEANUP_RECORDS[@]} -eq 0 ]; then
         echo "No retired names are listed yet."
         return 0
     fi
@@ -192,6 +205,9 @@ check_names() {
     done
     for name in "${RETIRED_OUTSIDE_E2E_HISTORY[@]}"; do
         check_pattern "$name" "${E2E_HISTORY_PATHS[@]}" || found=1
+    done
+    for name in "${RETIRED_OUTSIDE_CLEANUP_RECORDS[@]}"; do
+        check_pattern "$name" "${CLEANUP_RECORD_PATHS[@]}" || found=1
     done
 
     if [ "$found" -ne 0 ]; then

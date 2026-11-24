@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import threading
 import time
 from collections.abc import Iterator
@@ -137,6 +138,17 @@ def test_a_type_search_names_the_type_in_its_text(
 
     [call] = hybrid.calls
     assert call["query_text"] == searched
+
+
+def test_vector_search_logs_its_query_and_top_k(
+    hybrid: FakeHybridRetriever, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.INFO, logger=retrieval.logger.name):
+        retrieval.vector_search("EGT limits", 7, "A320-200")
+
+    assert "vector_search query='A320-200 EGT limits' top_k=7 aircraft_type=A320-200" in (
+        caplog.text
+    )
 
 
 def test_a_blank_aircraft_type_searches_every_manual(hybrid: FakeHybridRetriever) -> None:

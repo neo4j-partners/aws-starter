@@ -350,6 +350,7 @@ def vector_search(query: str, top_k: int = 5, aircraft_type: str | None = None) 
     if not text:
         return "No relevant document chunks found."
     pool = top_k * TYPE_FILTER_POOL_FACTOR if aircraft_type else top_k
+    logger.info("vector_search query=%r top_k=%d aircraft_type=%s", query, top_k, aircraft_type)
     # Embed outside the retried call, so a rotated login does not embed twice.
     query_vector = _embedder().embed_query(query)
     result = _with_rotated_login(

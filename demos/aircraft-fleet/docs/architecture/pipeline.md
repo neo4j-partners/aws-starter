@@ -57,7 +57,7 @@ The stamp is how later steps tell a current dataset from a stale one.
 - **Skip when current:** `generate --if-stale` skips the run when the stamp matches the config, the code hash, and the runtime versions. `./setup.sh load` uses it.
 - **Recorded in the graph:** The loader copies the stamp onto `Dataset {id: 'current'}`.
 - **Checked by verify:** `verify` reports a stamp that no longer matches the code, and a `Dataset` node that no longer matches the CSVs. `verify --strict` exits 1 on either.
-- **Reference checks:** `generate-data validate` checks every `rels_*` reference column and each reading's `sensor_id` against the node files. It also reports duplicate IDs, missing files, and missing columns. It checks that `operating_limits.csv` has the expected header, one row for each limit that `limits.py` builds, and a numeric `minValue` or `maxValue` on every row. Any failure prints `Found N validation error(s)` and exits 1.
+- **Reference checks:** `generate-data validate` checks every `rels_*` reference column and each reading's `sensor_id` against the node files. It also reports duplicate IDs, missing files, and missing columns. It checks that `operating_limits.csv` has the expected header, one row for each limit that `limits.py` builds, and at least one of `minValue`, `maxValue`, or `nominalValue` on every row. Each value a row sets must be a number. Any failure prints `Found N validation error(s)` and exits 1.
 
 ## Operational data model
 

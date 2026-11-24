@@ -114,7 +114,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 `uv run generate-data` drives the generator:
 
 - **`generate`:** This command writes the CSVs and the stamp into `generated/`.
-- **`validate`:** This command checks referential integrity across the generated CSVs. It also checks that `operating_limits.csv` has the expected header, one row for each limit that `src/generator/limits.py` builds, and a numeric `minValue` or `maxValue` on every row. On any failure it prints `Found N validation error(s)` with the first 20 errors and exits 1. Otherwise it prints `All validation checks passed`.
+- **`validate`:** This command checks referential integrity across the generated CSVs. It also checks that `operating_limits.csv` has the expected header, one row for each limit that `src/generator/limits.py` builds, and at least one of `minValue`, `maxValue`, or `nominalValue` on every row. Each value a row sets must be a number. On any failure it prints `Found N validation error(s)` with the first 20 errors and exits 1. Otherwise it prints `All validation checks passed`.
 - **`stats`:** This command recounts the default dataset's maintenance events into `manuals/fleet-stats.json`. Run it after a generator change.
 - **`render-manuals`:** This command re-renders the generated blocks in the manuals from their specs. Add `--check` to test without writing.
 

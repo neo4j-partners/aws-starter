@@ -133,7 +133,7 @@ Stage 5 reads the graph and prints a report of warnings and failures.
 - **Schema:** The constraints and the two chunk indexes must exist.
 - **Embeddings:** Every chunk must have an embedding of the configured dimension.
 - **Search:** A vector search smoke test must succeed.
-- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, `DESCRIBES_COMPONENT`, and `HAS_LIMIT` links must each exist.
+- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, `DESCRIBES_COMPONENT`, and `HAS_LIMIT` links must each exist. The `HAS_LIMIT` count includes only the links from a `Sensor` to an `OperatingLimit`.
 - **Sensor limits:** Every `Sensor` must have a `HAS_LIMIT` link to an `OperatingLimit`. `AirDataDisagree` sensors are exempt, because the manuals list them only in the sensor inventory. A failure gives the unlinked count for each sensor type.
 - **EGT limits:** Each aircraft type needs an EGT limit for each regime that the generator's `ENGINE_SPECS` gives a maximum. Those regimes are Takeoff, Max Continuous, and Start when the spec has a start maximum. Each `maxValue` must equal the generator's maximum. An EGT limit for a regime with no generator maximum fails, such as an A320-200 Start limit.
 - **Orphans:** Readings without a sensor, flights without an aircraft, components without a system, sensors without readings, documents without chunks, and systems without a `SystemReference` must all be zero.

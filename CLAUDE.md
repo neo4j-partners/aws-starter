@@ -10,6 +10,8 @@ This repository demonstrates deploying a **Neo4j MCP server to Amazon Bedrock Ag
 2. **Connect AI agents** via AgentCore Gateway with OAuth2 authentication
 3. **Explore patterns** for multi-agent orchestration, SageMaker notebooks, and Databricks integration
 
+The aircraft fleet demo does not use this path. Its agents query Neo4j with a direct Neo4j driver, with no MCP and no Gateway.
+
 See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams and component descriptions.
 
 ## Common Commands
@@ -246,14 +248,14 @@ app.run(port=8080)
 
 ### LangGraph ReAct Agent
 ```python
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
-from langchain_aws import ChatBedrockConverse
 
-llm = ChatBedrockConverse(model="global.anthropic.claude-sonnet-4-5-20250929-v1:0")
+llm = init_chat_model("global.anthropic.claude-haiku-4-5-20251001-v1:0", model_provider="bedrock_converse", region_name=region, temperature=0)
 client = MultiServerMCPClient({"server": {"transport": "streamable_http", "url": url, "headers": {"Authorization": f"Bearer {token}"}}})
 tools = await client.get_tools()
-agent = create_react_agent(llm, tools)
+agent = create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 ```
 
 ## Configuration

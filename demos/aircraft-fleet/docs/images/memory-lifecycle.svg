@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="860" viewBox="0 0 1600 860" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Conversation Memory Lifecycle</title>
-  <desc>The supervisor process holds one SharedMemory client. Each request builds a session manager on it, restores history, answers, saves the turn, and closes the manager. Entity extraction runs in the background while /ping reports HealthyBusy. Shutdown waits for running work, then closes the client.</desc>
+  <desc>The supervisor process holds one SharedMemory client. Each request builds a session manager on it, restores history, answers, saves the turn, and closes the manager. Entity extraction runs in the background while /ping reports HealthyBusy. A rejected password retires the client, and the same request reads the secret again and opens a new one. Shutdown waits for running work, then closes the current client and any retired ones.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
@@ -8,10 +8,11 @@
   <rect width="1600" height="860" fill="#F7F8FA"/>
   <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Conversation Memory Lifecycle</text>
   <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">The supervisor keeps conversation memory with Neo4j Agent Memory, in its own Neo4j database.</text>
-  <rect x="40" y="116" width="1520" height="110" rx="18" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="40" y="116" width="1520" height="126" rx="18" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
   <text x="70" y="152" font-size="19" font-weight="700" fill="#851651" text-anchor="start">Once per process</text>
   <text x="70" y="178" font-size="15" font-weight="400" fill="#344054" text-anchor="start">One SharedMemory client, opened on the first request</text>
   <text x="70" y="202" font-size="15" font-weight="400" fill="#344054" text-anchor="start">and shared by every later request. A failed open is retried on the next request.</text>
+  <text x="70" y="226" font-size="15" font-weight="400" fill="#344054" text-anchor="start">A rejected password retires it. The request reads the secret again and opens a new one.</text>
   <text x="1530" y="166" font-size="14" font-weight="400" fill="#5C6470" text-anchor="end">Memory is required. A request fails</text>
   <text x="1530" y="190" font-size="14" font-weight="400" fill="#5C6470" text-anchor="end">while the client cannot open.</text>
   <text x="40" y="280" font-size="19" font-weight="700" fill="#1E3A5F" text-anchor="start">Every request</text>
@@ -39,9 +40,9 @@
   <path d="M620,370 H656" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
   <path d="M930,370 H966" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
   <path d="M1240,370 H1276" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
-  <path d="M250,226 V296" fill="none" stroke="#C11574" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-pink)"/>
-  <rect x="196" y="249" width="108" height="21" rx="5" fill="#F7F8FA"/>
-  <text x="250" y="264" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">shared client</text>
+  <path d="M250,242 V296" fill="none" stroke="#C11574" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-pink)"/>
+  <rect x="196" y="258" width="108" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="250" y="273" font-size="13" font-weight="600" fill="#851651" text-anchor="middle">shared client</text>
   <rect x="40" y="520" width="890" height="110" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
   <text x="485.0" y="552" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Memory database</text>
   <text x="485.0" y="578" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sessions, messages, entities, preferences · separate from the fleet graph</text>
@@ -66,7 +67,7 @@
   <text x="610.5999999999999" y="768" font-size="15" font-weight="600" fill="#344054" text-anchor="middle">Let any still running unwind</text>
   <path d="M751,762 H785" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
   <rect x="791.3999999999999" y="740" width="286.0" height="44" rx="22" fill="#F2F4F7" stroke="#667085" stroke-width="1.5"/>
-  <text x="934.3999999999999" y="768" font-size="15" font-weight="600" fill="#344054" text-anchor="middle">Close the shared memory client</text>
+  <text x="934.3999999999999" y="768" font-size="15" font-weight="600" fill="#344054" text-anchor="middle">Close every memory client</text>
   <text x="1530" y="768" font-size="14.5" font-weight="400" fill="#5C6470" text-anchor="end">Worst case: about 100 s</text>
   <text x="70" y="812" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">An extraction still running at the deadline is lost. The stored message keeps its text without entities.</text>
 </svg>

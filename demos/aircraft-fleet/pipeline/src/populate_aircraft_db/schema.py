@@ -74,6 +74,37 @@ COMPONENT_ALIASES_TEXT = "; ".join(
 # OperatingLimit parameterName.
 SENSOR_PARAMETER_NAMES = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)
 
+# The closed list of OperatingLimit regimes, from the manuals' limit tables.
+# Entity resolution merges limits by name and keeps one node's properties,
+# so the name carries the regime and each regime names one kind of limit:
+# - Takeoff, Max Continuous, Start: hard limits, from the Operating Limits
+#   table's Maximum column.
+# - "<regime> Normal": normal ranges, one per column of the Normal Operating
+#   Parameters table and its Quick Reference copy.
+# - Trend Advisory, Trend Caution, Trend Warning: the Digital Twin
+#   trend-averaged EGT thresholds.
+# - Advisory, Caution, Warning: band thresholds, such as vibration, DC bus
+#   voltage, and hydraulic pressure.
+# - All: a limit whose text names no regime.
+OPERATING_LIMIT_REGIMES: list[str] = [
+    "Takeoff",
+    "Max Continuous",
+    "Start",
+    "Ground Idle Normal",
+    "Flight Idle Normal",
+    "Cruise Normal",
+    "Max Continuous Normal",
+    "Takeoff Normal",
+    "Trend Advisory",
+    "Trend Caution",
+    "Trend Warning",
+    "Advisory",
+    "Caution",
+    "Warning",
+    "All",
+]
+OPERATING_LIMIT_REGIMES_TEXT = ", ".join(OPERATING_LIMIT_REGIMES)
+
 # (label, property) pairs, one uniqueness constraint each.
 CONSTRAINTS: list[tuple[str, str]] = [
     ("Aircraft", "aircraft_id"),
@@ -392,8 +423,9 @@ def build_extraction_schema():
                     type="STRING",
                     description=(
                         "Unique identifier combining parameter, regime, and aircraft "
-                        "type, e.g. 'EGT Takeoff - A320-200', "
-                        "'EGT Max Continuous - A320-200', 'N1Speed Cruise - B737-800'. "
+                        "type, e.g. 'EGT Takeoff - A320-200' for the hard limit and "
+                        "'EGT Takeoff Normal - A320-200' for the normal range. "
+                        "Use the regime value word for word. "
                         "Always append ' - <aircraft type>'."
                     ),
                 ),
@@ -411,13 +443,29 @@ def build_extraction_schema():
                     name="regime",
                     type="STRING",
                     description=(
-                        "Operating regime the limit applies to, e.g. Takeoff, "
-                        "Max Continuous, Cruise, Flight Idle, Ground Idle. "
+                        f"Operating regime or level, exactly one of: "
+                        f"{OPERATING_LIMIT_REGIMES_TEXT}. "
                         "Use All when the text names no regime."
                     ),
                 ),
-                PropertyType(name="minValue", type="STRING", description="Minimum value"),
-                PropertyType(name="maxValue", type="STRING", description="Maximum value"),
+                PropertyType(
+                    name="minValue",
+                    type="STRING",
+                    description=(
+                        "Lowest allowed value, a number from the text. "
+                        "Set minValue or maxValue on every limit."
+                    ),
+                ),
+                PropertyType(
+                    name="maxValue",
+                    type="STRING",
+                    description=(
+                        "Highest allowed value, a number from the text. For Takeoff, "
+                        "Max Continuous, and Start it is the hard limit from the "
+                        "Operating Limits table's Maximum column. A Normal Operating "
+                        "Parameters bound uses a '<regime> Normal' regime instead."
+                    ),
+                ),
                 PropertyType(
                     name="aircraftType",
                     type="STRING",

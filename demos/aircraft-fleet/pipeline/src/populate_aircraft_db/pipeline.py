@@ -19,6 +19,7 @@ from .schema import (
     COMPONENT_ALIASES_TEXT,
     COMPONENT_TYPE_BY_ALIAS,
     COMPONENT_TYPES_TEXT,
+    OPERATING_LIMIT_REGIMES_TEXT,
     SENSOR_PARAMETER_NAMES,
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
     SYSTEM_TYPES,
@@ -240,9 +241,8 @@ MaintenanceProcedure, and OperatingLimit, the `name` property must follow \
 AircraftModel uses the aircraft type only (e.g. "A320-200"). This prevents \
 cross-model entity resolution mistakes. An OperatingLimit's specific name is \
 its parameter and then its `regime` (e.g. "EGT Takeoff - A320-200" and \
-"EGT Max Continuous - A320-200"), so each regime's limit stays a separate \
-entity. Set `regime` on every OperatingLimit, and use All when the text names \
-no regime.
+"EGT Takeoff Normal - A320-200"), so each regime's limit stays a separate \
+entity. Set `regime` on every OperatingLimit, as rule 8 says.
 
 6. RELATIONSHIPS: Create relationships only when the text supports them. \
 Prefer the schema patterns: AircraftModel HAS_SYSTEM SystemReference, \
@@ -260,6 +260,32 @@ OperatingLimit.
 HP Turbine for a high-pressure turbine stage and Main Fuel Pump for an engine \
 fuel pump. Omit `componentType` when no listed type fits, such as a fuel \
 filter or a fuel nozzle. Never invent other values.
+
+"""
+    + f"""\
+8. OPERATING LIMITS: Emit an OperatingLimit only when the text gives a \
+numeric minValue or maxValue. Set `regime` to exactly one of \
+{OPERATING_LIMIT_REGIMES_TEXT}, and use the same words in the name. Use All \
+when the text names no regime.
+- Hard limits: Takeoff, Max Continuous, and Start come only from the \
+Operating Limits table, the one with Normal, Caution, and Maximum columns. \
+Set maxValue from its Maximum column, e.g. "EGT Takeoff - A320-200" with \
+maxValue 695. Ignore that table's Normal and Caution columns.
+- Normal ranges: The Normal Operating Parameters table and its Quick \
+Reference - Normal Operating Limits copy hold normal ranges, not hard limits. \
+Use the column's regime followed by Normal, e.g. "EGT Takeoff Normal - \
+A320-200" with regime Takeoff Normal and maxValue 650. Never give these a \
+hard-limit regime.
+- Bands: For an Advisory, Caution, or Warning row, set the band's bounds, \
+e.g. "Vibration N1 Warning - A220-300" with minValue 3.5. Skip Normal band \
+rows and Nominal values.
+- Trend: The Digital Twin trend-averaged EGT thresholds use Trend Advisory, \
+Trend Caution, and Trend Warning, with minValue where the level starts. Skip \
+the trend baseline.
+- Values: "a-b" sets minValue a and maxValue b. "< x" or "≤ x" sets maxValue \
+x. "> x" or "≥ x" sets minValue x. For "v (a-b)" or "v (< x)", use the range \
+in parentheses. A lone number in the Normal Operating Parameters table sets \
+maxValue.
 
 """
     + """\

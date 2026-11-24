@@ -20,7 +20,7 @@ manuals, and links the two into one graph.
 - **Stamped datasets:** Each run records its settings and code hash. The load copies the stamp into the graph, and `verify` checks it.
 - **Safe regeneration:** A failed or stopped generate run keeps the previous CSVs. A lock stops two runs from writing the same folder.
 - **Structured output on Bedrock:** `StructuredBedrockLLM` gets schema-valid JSON from Claude through Converse tool use.
-- **Document context in every chunk:** `ContextPrependingSplitter` puts the aircraft model in front of every chunk, so extraction labels each entity correctly. It also repeats a markdown table's header row in every chunk cut from that table.
+- **Document context in every chunk:** `ContextPrependingSplitter` puts the aircraft model in front of every chunk, so extraction labels each entity correctly. It also names the manual section each chunk starts in. It repeats a markdown table's header row in every chunk cut from that table.
 - **Graph fusion:** Typed relationships link the extracted knowledge to the real aircraft, systems, components, and sensors.
 - **Hybrid search indexes:** The pipeline creates a vector index and a fulltext index over the manual chunks.
 - **Strict verification:** `verify --strict` turns warnings into failures and exits with a nonzero code. That makes it usable in CI. With `--skip-enrichment`, the enrichment checks stay warnings.

@@ -218,14 +218,14 @@ match.
 Run these commands from `neo4j-mcp-server/`:
 
 ```bash
-cp .env.sample .env.fleet
+cp .env.sample .env.finance
 ```
 
 Only the `NEO4J_*` values need to change. Both deployments can use the same
 `NEO4J_MCP_REPO` and `ECR_REPO_NAME` when they run the same image:
 
 ```bash
-# .env.fleet
+# .env.finance
 NEO4J_URI=neo4j+s://yyyyyyyy.databases.neo4j.io
 NEO4J_DATABASE=neo4j
 NEO4J_USERNAME=neo4j
@@ -236,20 +236,20 @@ NEO4J_MCP_REPO=/path/to/mcp-neo4j/servers/mcp-neo4j-cypher
 AWS_REGION=us-east-1
 ```
 
-Leave out `STACK_NAME`. The `--env fleet` flag sets the stack name to
-`neo4j-mcp-server-fleet`.
+Leave out `STACK_NAME`. The `--env finance` flag sets the stack name to
+`neo4j-mcp-server-finance`.
 
 Deploy, generate credentials, and test:
 
 ```bash
-./deploy.py --env fleet
-./deploy.py --env fleet credentials   # writes .mcp-credentials.fleet.json
-./cloud.sh --env fleet                # tests the fleet deployment
-./cloud.sh                            # still tests the .env deployment
+./deploy.py --env finance
+./deploy.py --env finance credentials   # writes .mcp-credentials.finance.json
+./cloud.sh --env finance                # tests the finance deployment
+./cloud.sh                              # still tests the .env deployment
 ```
 
 Each deployment has its own stack, Gateway, Cognito pool, and credentials
-file. `./deploy.py --env fleet cleanup` removes only the fleet deployment.
+file. `./deploy.py --env finance cleanup` removes only the finance deployment.
 
 If you set `STACK_NAME` yourself, it replaces the derived name. It must then
 be unique for each deployment. Two deployments with the same stack name
@@ -392,7 +392,6 @@ credentials with another.
 | Selector | Config file | Credentials file | Stack name |
 |----------|-------------|------------------|------------|
 | (none) | `.env` | `.mcp-credentials.json` | `neo4j-mcp-server` |
-| `--env fleet` | `.env.fleet` | `.mcp-credentials.fleet.json` | `neo4j-mcp-server-fleet` |
 | `--env finance` | `.env.finance` | `.mcp-credentials.finance.json` | `neo4j-mcp-server-finance` |
 
 - **Scripts:** `--env` works with `./deploy.py`, `./cloud.sh`, `./cloud-http.sh`, and `./local.sh`.

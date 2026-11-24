@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>System Overview</title>
-  <desc>Agents in quickstart and the demos reach Neo4j in one of two ways. Agents over MCP get a JWT from Amazon Cognito and call the AgentCore Gateway. The Gateway calls the Neo4j MCP server on AgentCore Runtime, which runs read-only Cypher on Neo4j. The fleet pipeline, the GraphRAG agent, the fraud graph loader, and the SEC filings notebook use the Neo4j Python driver directly. Every agent calls Claude on Amazon Bedrock.</desc>
+  <desc>Agents in quickstart and the demos reach Neo4j in one of two ways. Agents over MCP get a JWT from Amazon Cognito and call the AgentCore Gateway. The Gateway calls the Neo4j MCP server on AgentCore Runtime, which runs read-only Cypher on Neo4j. The fleet pipeline, the fleet supervisor, the fraud graph loader, and the SEC filings notebook use the Neo4j Python driver directly. Every agent calls Claude on Amazon Bedrock.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
@@ -10,18 +10,14 @@
   <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">Agents reach Neo4j through the MCP Gateway or with a direct driver.</text>
   <rect x="40" y="120" width="380" height="490" rx="18" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
   <text x="64" y="152" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Agents over the MCP Gateway</text>
-  <rect x="70" y="175" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="230.0" y="207" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Quickstart agent</text>
-  <text x="230.0" y="233" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">LangGraph ReAct agent</text>
-  <text x="230.0" y="255" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">default deployment</text>
-  <rect x="70" y="315" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="230.0" y="347" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fleet supervisor</text>
-  <text x="230.0" y="373" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, two specialists</text>
-  <text x="230.0" y="395" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">--env fleet</text>
-  <rect x="70" y="455" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="230.0" y="487" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fraud memory agent</text>
-  <text x="230.0" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands agent</text>
-  <text x="230.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">--env finance</text>
+  <rect x="70" y="215" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="247" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Quickstart agent</text>
+  <text x="230.0" y="273" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">LangGraph ReAct agent</text>
+  <text x="230.0" y="295" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">default deployment</text>
+  <rect x="70" y="405" width="320" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="230.0" y="437" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fraud memory agent</text>
+  <text x="230.0" y="463" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands agent</text>
+  <text x="230.0" y="485" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">--env finance</text>
   <rect x="560" y="130" width="300" height="120" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
   <text x="710.0" y="162" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Cognito</text>
   <text x="710.0" y="188" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">client_credentials grant</text>
@@ -69,9 +65,9 @@
   <text x="215.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">builds the fleet graph</text>
   <text x="215.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraft-fleet/pipeline</text>
   <rect x="385" y="725" width="290" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="530.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">GraphRAG agent</text>
-  <text x="530.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Text2Cypher, hybrid search</text>
-  <text x="530.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, port 7070</text>
+  <text x="530.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fleet supervisor</text>
+  <text x="530.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, two specialists</text>
+  <text x="530.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Text2Cypher, hybrid search</text>
   <rect x="700" y="725" width="290" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="845.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fraud graph loader</text>
   <text x="845.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loads the fraud graph</text>

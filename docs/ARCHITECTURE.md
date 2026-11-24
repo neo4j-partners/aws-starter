@@ -32,8 +32,8 @@ The two access paths serve different needs.
 
 | Path | Projects | How they reach Neo4j |
 |------|----------|----------------------|
-| MCP through the Gateway | Quickstart agent, fleet supervisor agent, fraud memory agent | Cognito token, AgentCore Gateway, AgentCore Runtime, Neo4j MCP server |
-| Direct driver | Fleet pipeline, fleet GraphRAG agent, fraud graph loader, SEC filings notebook | Neo4j Python driver over Bolt |
+| MCP through the Gateway | Quickstart agent, fraud memory agent | Cognito token, AgentCore Gateway, AgentCore Runtime, Neo4j MCP server |
+| Direct driver | Fleet pipeline, fleet supervisor agent, fraud graph loader, SEC filings notebook | Neo4j Python driver over Bolt |
 
 - **Read-only MCP server:** The deployed MCP server runs with `NEO4J_READ_ONLY=true`. Agents on the MCP path get two tools, `get_neo4j_schema` and `read_neo4j_cypher`.
 - **Writes:** Every write to Neo4j happens on the direct-driver path. The fleet pipeline and the fraud graph loader populate their graphs this way.
@@ -154,7 +154,7 @@ CloudWatch receives the Runtime logs under `/aws/bedrock-agentcore/`. The agent 
 | `./deploy.py stack-name` | Prints the stack name for the chosen deployment |
 | `./deploy.py cleanup` | Deletes the stack, the Neo4j password secret, and, after a separate prompt, the ECR repository |
 
-- **Named deployments:** `./deploy.py --env fleet` deploys the stack `neo4j-mcp-server-fleet` for the supervisor agent. `./deploy.py --env finance` deploys `neo4j-mcp-server-finance` for the fraud memory agent.
+- **Named deployments:** `./deploy.py --env finance` deploys the stack `neo4j-mcp-server-finance` for the fraud memory agent.
 - **Credential sync:** `scripts/sync-credentials.sh` copies each deployment's credentials file to the samples that use it.
 
 ### CDK Stack Components
@@ -215,12 +215,12 @@ Machine-to-machine auth through the Gateway has these benefits.
 
 ## Aircraft Fleet Demo
 
-The aircraft fleet demo in `demos/aircraft-fleet/` uses both access paths over one graph. Its [architecture documents](../demos/aircraft-fleet/docs/ARCHITECTURE.md) cover it in full.
+The aircraft fleet demo in `demos/aircraft-fleet/` uses only the direct-driver path. It does not use this MCP server or the Gateway. Its [architecture documents](../demos/aircraft-fleet/docs/ARCHITECTURE.md) cover it in full.
 
 - **Pipeline:** The pipeline loads a generated fleet and its maintenance manuals into Neo4j with a direct driver.
-- **GraphRAG agent:** The GraphRAG agent answers with Text2Cypher and hybrid search over a direct driver.
-- **Supervisor agent:** The supervisor agent routes questions to two specialists that query the graph through the `fleet` deployment of this MCP server.
-- **Memory:** Both agents keep conversation memory in a second Neo4j database.
+- **Supervisor agent:** The supervisor agent routes questions to a Maintenance specialist and an Operations specialist. They answer with Text2Cypher and hybrid search over a direct driver.
+- **Read-only login:** The deployed supervisor reads the fleet graph as a read-only Neo4j user. It gets both logins from Secrets Manager.
+- **Memory:** The supervisor keeps conversation memory in a second Neo4j database.
 
 ---
 
@@ -244,7 +244,7 @@ The projects use different Claude models.
 
 | Model | Used by |
 |-------|---------|
-| Claude Sonnet 5.5 | Both fleet agents, fleet pipeline extraction, and fleet memory extraction |
+| Claude Sonnet 5.5 | The fleet supervisor and its specialists, fleet pipeline extraction, and fleet memory extraction |
 | Claude Haiku 4.5 | The quickstart agent and the fraud memory agent by default |
 | Claude Sonnet 4.6 | The SEC filings notebook |
 

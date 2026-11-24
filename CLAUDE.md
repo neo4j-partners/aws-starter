@@ -34,7 +34,6 @@ cd neo4j-mcp-server
 ./local.sh test              # Test local server
 
 # Named deployments: --env NAME reads .env.NAME, writes .mcp-credentials.NAME.json
-./deploy.py --env fleet     # Aircraft fleet graph (supervisor-agent)
 ./deploy.py --env finance   # Fraud graph (fraud-memory-agent)
 
 # Copy each deployment's credentials to the samples that use it
@@ -62,14 +61,15 @@ uv run python -m neo4j_mcp_quickstart.simple_agent "query"  # Simple agent (stat
 
 ### Aircraft Fleet Demo
 
-End-to-end GraphRAG demo. The pipeline populates Neo4j. The GraphRAG agent
-answers questions over it with a direct Neo4j driver, with no MCP and no
-Gateway. The supervisor agent queries the same graph through the MCP Gateway.
-Point everything at the same Neo4j instance with a matching embedder.
+End-to-end GraphRAG demo. The pipeline populates Neo4j. One supervisor agent
+routes each question to a Maintenance or Operations specialist. The
+specialists query the graph with a direct Neo4j driver, with no MCP and no
+Gateway. The supervisor keeps conversation memory in a separate Neo4j
+database. Point everything at the same fleet graph with a matching embedder.
 
 ```bash
 cd demos/aircraft-fleet
-cp .env.sample .env              # shared by pipeline/, graphrag-agent/, supervisor-agent/
+cp .env.sample .env              # shared by pipeline/, supervisor-agent/, and ui/
 
 # Step 1: populate the graph
 cd pipeline
@@ -78,25 +78,26 @@ uv sync
 uv run generate-data stats       # recount manuals/fleet-stats.json after a generator change
 uv run generate-data render-manuals   # re-render the manuals' generated blocks (--check to test)
 
-# Step 2: run the GraphRAG agent locally
-cd ../graphrag-agent
-uv sync
-uv run fleet-server              # Terminal 1 (port 7070)
-uv run fleet-cli "How many aircraft are in the database?"   # Terminal 2
-uv run fleet-demo
-
-# Step 3: deploy to AgentCore Runtime (optional, needs the AgentCore CLI
-# and the *_SECRET_ARN settings in .env; see graphrag-agent/README.md)
-./agent.sh deploy
-./agent.sh invoke-cloud "query"
-
-# Step 4: supervisor agent over the MCP Gateway (needs ./deploy.py --env fleet)
+# Step 2: supervisor agent
 cd ../supervisor-agent
-./agent.sh start
+uv sync
+./agent.sh start             # Terminal 1 (port 7071)
 ./agent.sh test-maintenance  # Test routing to Maintenance Agent
 ./agent.sh test-operations   # Test routing to Operations Agent
+uv run fleet-supervisor-cli "query"
+uv run pytest                # all tests (cd agentcore/cdk && npm test for the stack)
+
+# Step 3: deploy to AgentCore Runtime (needs the AgentCore CLI and a
+# read-only Neo4j user; see supervisor-agent/README.md)
+uv run fleet-supervisor-secrets   # creates both secrets, prints the *_SECRET_ARN lines for .env
 ./agent.sh deploy
+./agent.sh invoke-cloud "query"
 ./agent.sh load-test         # Continuous cloud testing
+
+# Browser UI (keep the supervisor running)
+cd ../ui
+npm ci && npm run build
+uv run --project ../supervisor-agent python server.py   # port 8081
 ```
 
 ### Fraud Investigation Demo
@@ -183,7 +184,7 @@ Don't add `exclude-newer` to a pyproject or `min-release-age` to an `.npmrc`. Ei
 |-----------|----------|---------|
 | **Neo4j MCP Server** | `neo4j-mcp-server/` | MCP server on AgentCore Runtime with Gateway auth |
 | **Quickstart** | `quickstart/` | Standalone LangGraph ReAct agent, notebooks for SageMaker |
-| **Aircraft Fleet Demo** | `demos/aircraft-fleet/` | GraphRAG pipeline, direct-to-Neo4j GraphRAG agent, and MCP supervisor agent |
+| **Aircraft Fleet Demo** | `demos/aircraft-fleet/` | GraphRAG pipeline, a supervisor agent with direct Neo4j tools, and a browser UI |
 | **Fraud Investigation Demo** | `demos/fraud-amazon-quick/` | Graph loader, fraud memory agent, and Iceberg loaders for Amazon Quick |
 | **SEC Filings GraphRAG** | `demos/sec-filings-graphrag/` | Four levels of GraphRAG retrieval in one notebook |
 | **Databricks Integration** | `integrations/databricks/` | Unity Catalog HTTP connection integration |

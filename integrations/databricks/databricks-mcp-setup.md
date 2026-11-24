@@ -5,8 +5,9 @@ AI Playground, Genie Code, and Databricks agents can call the Neo4j MCP tools wi
 the Gateway's credentials. Databricks stores the Cognito client credentials in Unity Catalog,
 performs the OAuth exchange itself, and refreshes the access token on its own schedule.
 
-Written against the supplier deployment (`./deploy.py --env supplier`), but nothing here is
-supplier-specific apart from the names.
+These steps use the default deployment from plain `./deploy.py`. A named deployment from
+`./deploy.py --env NAME` works the same way. Its credentials step writes
+`.mcp-credentials.NAME.json` instead.
 
 ## Two objects are required, not one
 
@@ -42,7 +43,8 @@ Run this step and the next one from the MCP server folder:
 
 ```bash
 cd ../../neo4j-mcp-server
-./deploy.py --env supplier credentials   # writes .mcp-credentials.supplier.json
+./deploy.py                # skip if the neo4j-mcp-server stack is already deployed
+./deploy.py credentials    # writes .mcp-credentials.json
 ```
 
 Every value Databricks needs is in that file. It is gitignored and holds a live client secret, so
@@ -68,18 +70,17 @@ Databricks OAuth Machine-to-Machine auth type.
 Build the request body from the credentials file and create the connection through the REST API:
 
 ```bash
-ENV=supplier                     # matches .mcp-credentials.$ENV.json
-CONN=neo4j_agentcore_supplier    # connection name in Unity Catalog
+CONN=neo4j_agentcore             # connection name in Unity Catalog
 CATALOG=your_catalog
 SCHEMA=your_schema
 PROFILE=your-databricks-profile
 
-python3 - "$ENV" "$CONN" > /tmp/conn.json <<'PY'
+python3 - "$CONN" > /tmp/conn.json <<'PY'
 import json, pathlib, sys
 from urllib.parse import urlparse
 
-env, name = sys.argv[1], sys.argv[2]
-c = json.loads(pathlib.Path(f".mcp-credentials.{env}.json").read_text())
+name = sys.argv[1]
+c = json.loads(pathlib.Path(".mcp-credentials.json").read_text())
 u = urlparse(c["gateway_url"])
 print(json.dumps({
     "name": name,
@@ -128,7 +129,7 @@ There is no SQL DDL for MCP Services. Use the UI or the REST API.
 ```bash
 CATALOG=your_catalog
 SCHEMA=your_schema
-SERVICE=neo4j_agentcore_supplier
+SERVICE=neo4j_agentcore
 
 databricks api post \
   "/api/2.1/unity-catalog/mcp-services?parent=schemas/$CATALOG.$SCHEMA&mcp_service_id=$SERVICE" \
@@ -262,7 +263,7 @@ administer the deployment.
 
 The connection holds a copy of the Cognito client secret, so it goes stale if the stack is
 redeployed with new credentials, and the `host` goes stale if the Gateway URL changes. After any
-full `./deploy.py --env <name>` run that recreates the Gateway or the Cognito client, regenerate
+full `./deploy.py` run that recreates the Gateway or the Cognito client, regenerate
 credentials and update the connection options rather than recreating it, so the MCP Service keeps
 pointing at the same object.
 
@@ -276,12 +277,12 @@ databricks connections delete "$CONN" -p "$PROFILE"
 Delete the MCP Service before the connection. The service references the connection, and a deleted
 connection surfaces as `is_deleted` on the service rather than cleaning itself up.
 
-## What was done differently for the supplier deployment
+## What was done differently in the original setup
 
 Four deliberate departures from the shortest path in the docs.
 
 **OAuth M2M rather than the bearer token.** The docs lead with a bearer token and
-`.mcp-credentials.*.json` hands you a ready-made `access_token`, which is tempting. That token is a
+`.mcp-credentials.json` hands you a ready-made `access_token`, which is tempting. That token is a
 Cognito access token with a lifetime measured in hours, so the connection would have broken by the
 next morning and needed a manual re-paste on every demo day. Feeding Databricks the `client_id`,
 `client_secret`, `oauth_scope`, and `token_endpoint` instead makes Databricks the token holder, and
@@ -314,7 +315,7 @@ Registering the Gateway in Unity Catalog is independent of pointing a local clie
 Code, Claude Desktop, and Cursor can either:
 
 - talk to the AgentCore Gateway directly, with the Cognito `access_token` from
-  `.mcp-credentials.*.json` in an `Authorization: Bearer` header, which is what `cloud-http.sh` and
+  `.mcp-credentials.json` in an `Authorization: Bearer` header, which is what `cloud-http.sh` and
   `docs/CLAUDE_DESKTOP.md` describe, and which needs a re-paste whenever that token expires, or
 - go through Databricks, pointing at
   `https://<workspace-host>/api/2.0/unity-catalog/connections/<conn>/proxy` or the

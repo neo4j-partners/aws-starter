@@ -148,6 +148,8 @@ def test_maintenance_prompt_asks_for_manual_document_ids(fake_tools):
 def test_maintenance_prompt_gets_limit_values_from_the_graph(fake_tools):
     prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
     assert "Limit values, such as a maximum EGT, are `OperatingLimit` nodes" in prompt
+    assert "hold the values each type's manual states" in prompt
+    assert "extracted from the manuals" not in prompt
     assert "Get them with `graph_query_tool`" in prompt
     assert '"EGT operating limits" with\n   `aircraft_type` "B737-800"' in prompt
 

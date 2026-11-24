@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Pipeline Flow</title>
-  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Enrich repeats each table's header in every chunk cut from it, and each operating limit names one regime from a fixed list. Index and fuse drops limits with no min and no max before it links sensors to limits. Verify also checks the EGT limits against the generator's specs and checks that every System has a SystemReference. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
+  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Generate also writes the operating limits to a CSV, and load writes them with their Sensor HAS_LIMIT links. Enrich repeats each table's header in every chunk cut from it, extracts faults and procedures, and links each limit to the chunks that state it. Verify also checks the EGT limits against the generator's specs and checks that every System has a SystemReference. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -54,10 +54,11 @@
   <text x="104" y="263" class="t">Generate</text>
   <text x="60" y="296" class="m">src/generator/</text>
   <text x="60" y="334" class="s">Writes the fleet CSVs</text>
-  <text x="60" y="360" class="s">Same seed, same data</text>
-  <text x="60" y="386" class="s">Stamps settings and</text>
-  <text x="60" y="406" class="s">versions in .stamp.json</text>
-  <text x="60" y="446" class="m">generated/*.csv</text>
+  <text x="60" y="354" class="s">and the operating limits</text>
+  <text x="60" y="380" class="s">Same seed, same data</text>
+  <text x="60" y="406" class="s">Stamps settings and</text>
+  <text x="60" y="426" class="s">versions in .stamp.json</text>
+  <text x="60" y="466" class="m">generated/*.csv</text>
 
   <circle cx="386" cy="256" r="18" fill="#2E6DB4"/><text x="386" y="262" text-anchor="middle" class="num">2</text>
   <text x="414" y="263" class="t">Load</text>
@@ -67,6 +68,8 @@
   <text x="370" y="380" class="s">Creates constraints</text>
   <text x="370" y="400" class="s">and indexes</text>
   <text x="370" y="426" class="s">Writes one Dataset node</text>
+  <text x="370" y="452" class="s">Loads operating limits</text>
+  <text x="370" y="472" class="s">and Sensor HAS_LIMIT links</text>
 
   <circle cx="696" cy="256" r="18" fill="#D97706"/><text x="696" y="262" text-anchor="middle" class="num">3</text>
   <text x="724" y="263" class="t" fill="#8A4B08">Enrich</text>
@@ -76,10 +79,10 @@
   <text x="680" y="380" class="s">Repeats each table's header</text>
   <text x="680" y="400" class="s">in every chunk cut from it</text>
   <text x="680" y="426" class="s">Embeds each chunk</text>
-  <text x="680" y="452" class="s">Extracts faults, limits,</text>
-  <text x="680" y="472" class="s">and procedures</text>
-  <text x="680" y="498" class="s">Limits name one regime</text>
-  <text x="680" y="518" class="s">from a fixed list</text>
+  <text x="680" y="452" class="s">Extracts faults and</text>
+  <text x="680" y="472" class="s">procedures</text>
+  <text x="680" y="498" class="s">Links each limit to the</text>
+  <text x="680" y="518" class="s">chunks that state it</text>
   <text x="680" y="544" class="s">Merges same-name entities</text>
 
   <circle cx="1006" cy="256" r="18" fill="#2E6DB4"/><text x="1006" y="262" text-anchor="middle" class="num">4</text>
@@ -89,9 +92,7 @@
   <text x="990" y="360" class="s">Fulltext index on chunks</text>
   <text x="990" y="386" class="s">Links manual entities to</text>
   <text x="990" y="406" class="s">real aircraft, systems,</text>
-  <text x="990" y="426" class="s">components, and sensors</text>
-  <text x="990" y="452" class="s">Drops limits with no min</text>
-  <text x="990" y="472" class="s">and no max before HAS_LIMIT</text>
+  <text x="990" y="426" class="s">and components</text>
 
   <circle cx="1316" cy="256" r="18" fill="#2E6DB4"/><text x="1316" y="262" text-anchor="middle" class="num">5</text>
   <text x="1344" y="263" class="t">Verify</text>

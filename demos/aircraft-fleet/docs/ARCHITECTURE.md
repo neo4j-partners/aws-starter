@@ -3,7 +3,7 @@
 A maintenance question about one aircraft needs three things at once. It needs
 the sensor history of that aircraft, the faults logged against its parts, and
 the limit that the maintenance manual sets for each sensor. The fleet records
-live in rows and the limits live in prose. This demo puts both into one Neo4j
+live in rows and the manuals live in prose. This demo puts both into one Neo4j
 graph, links them, and answers questions over that graph with one supervisor
 agent and two specialists.
 
@@ -11,7 +11,7 @@ agent and two specialists.
 
 ## Components
 
-- **Pipeline:** The [`pipeline/`](../pipeline/) project builds the fleet graph in five stages. It generates a synthetic fleet, loads it, extracts knowledge from the manuals with Bedrock, links the two graphs, and verifies the result. It is the only component that writes the fleet graph.
+- **Pipeline:** The [`pipeline/`](../pipeline/) project builds the fleet graph in five stages. It generates a synthetic fleet and its operating limits, loads them, extracts knowledge from the manuals with Bedrock, links the two graphs, and verifies the result. It is the only component that writes the fleet graph.
 - **Supervisor agent:** The [`supervisor-agent/`](../supervisor-agent/) project is a Strands supervisor with two specialist agents as its tools. The Maintenance specialist writes Cypher from the live schema and runs hybrid search over the manual chunks. The Operations specialist writes Cypher only.
 - **Graph access:** The specialists reach Neo4j with the Neo4j Python driver over Bolt. On the Runtime, they log in as a read-only user whose password comes from Secrets Manager.
 - **Browser UI:** The [`ui/`](../ui/) project shows the supervisor's answer, the specialist and tool calls, and the graph evidence for each call.
@@ -29,7 +29,7 @@ covers the check.
 
 ## Two databases
 
-- **Fleet graph:** The fleet graph holds the operational graph from the generated CSVs and the knowledge graph extracted from the manuals. The pipeline writes it. The supervisor and the UI only read it.
+- **Fleet graph:** The fleet graph holds the operational graph and the operating limits from the generated CSVs, and the knowledge graph from the manuals. The pipeline writes it. The supervisor and the UI only read it.
 - **Memory database:** The memory database holds sessions, messages, extracted entities, and user preferences for the supervisor. It stays apart from the fleet graph, because memory labels in the fleet graph would reach the Text2Cypher schema prompt.
 
 ## Models

@@ -141,6 +141,9 @@ the stages.
 This runs all five stages: generate CSVs, clean, load operational graph,
 enrich (chunk + Titan embeddings + Claude extraction over `manuals/`), index
 + fuse, strict verify. Stage 3 is the only stage that calls Bedrock.
+The load writes the `OperatingLimit` nodes and each `Sensor` `HAS_LIMIT`
+link from `generated/operating_limits.csv`. Enrich links each limit to the
+chunks that state it.
 
 If credentials or model access fail mid-run, record the failing stage. To
 isolate stages: `./setup.sh generate`, `./setup.sh load-operational` (no LLM,
@@ -149,7 +152,8 @@ no key), `./setup.sh load`, `./setup.sh verify`.
 **Result:** PASS (2026-11-23). `./setup.sh` exited 0. The graph has
 799,954 nodes, with 227 `MaintenanceEvent`, 5,145 `Delay`, 337 `Chunk`, and
 5 `Document` nodes. The `maintenanceChunkEmbeddings` and
-`maintenanceChunkText` indexes exist.
+`maintenanceChunkText` indexes exist. This run came before the generator
+wrote the operating limits, so Claude extracted its limits from the manuals.
 
 ---
 
@@ -162,13 +166,15 @@ a clean read-only pass:
 ./setup.sh verify
 ```
 
-Expect a pass report and exit code 0.
+Expect a pass report and exit code 0. Verify also checks that every
+operating limit links to at least one chunk.
 
 **Result:** PASS (2026-11-23). `verify --strict` exited 0 with
 `[OK] Verification passed`. Every required constraint was OK, the vector
 smoke test returned 1 result, and the data-quality orphan counts were all 0.
 This run came before verify gained the EGT limit check and the check for
-systems without a `SystemReference`, so it did not cover either one.
+systems without a `SystemReference`, so it did not cover either one. It
+also came before the generated operating limits and their chunk check.
 
 ---
 

@@ -128,7 +128,9 @@ shows how to create that user.
 Strands sends a tool's exception text to the model, and a driver message can
 name the server address. The tools in `core/graph/tools.py` replace that text
 with fixed results and log the details. `core/graph/neo4j_errors.py`
-classifies the driver errors.
+classifies the driver errors. The graph tools return these fixed results with
+a Strands error status, so the trace and the UI mark the call as failed, and
+the model also sees the status.
 
 | Failure | Result the model gets |
 |---------|-----------------------|

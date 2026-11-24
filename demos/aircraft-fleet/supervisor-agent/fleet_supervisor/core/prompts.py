@@ -75,7 +75,8 @@ for the question, say so.
    fault and the manual procedure for it: call both tools and combine the
    results.
 4. Limit values, such as a maximum EGT, are `OperatingLimit` nodes
-   that hold the values each type's manual states.
+   that hold the values each type's manual states. A limit with only a
+   `nominalValue` is a typical reading, not a bound.
    Get them with `graph_query_tool`, by aircraft type and parameter. Each
    aircraft type has its own manual with its own limits. A limit question
    that names no aircraft type covers the whole fleet, so ask for every

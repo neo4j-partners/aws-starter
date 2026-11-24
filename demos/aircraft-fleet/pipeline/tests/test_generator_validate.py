@@ -151,7 +151,7 @@ def test_a_missing_limits_row_fails(copy: Path) -> None:
     assert f"{LIMITS_FILE}: {len(rows) - 1} rows, expected {len(rows)}" in result.output
 
 
-@pytest.mark.parametrize("column", ["minValue", "maxValue"])
+@pytest.mark.parametrize("column", ["minValue", "maxValue", "nominalValue"])
 @pytest.mark.parametrize("value", ["high", "nan", "inf"])
 def test_a_non_numeric_limit_value_fails(copy: Path, column: str, value: str) -> None:
     _set_first_row(copy / LIMITS_FILE, column, value)
@@ -166,9 +166,21 @@ def test_a_limit_row_with_no_value_fails(copy: Path) -> None:
     path = copy / LIMITS_FILE
     _set_first_row(path, "minValue", "")
     _set_first_row(path, "maxValue", "")
+    _set_first_row(path, "nominalValue", "")
 
     result = runner.invoke(app, ["validate", str(copy)])
 
     assert result.exit_code == 1, result.output
     assert "Found 1 validation error(s)" in result.output
-    assert f"{LIMITS_FILE}:2: no minValue or maxValue" in result.output
+    assert f"{LIMITS_FILE}:2: no minValue, maxValue, or nominalValue" in result.output
+
+
+def test_a_limit_row_with_only_a_nominal_value_passes(copy: Path) -> None:
+    path = copy / LIMITS_FILE
+    _set_first_row(path, "minValue", "")
+    _set_first_row(path, "maxValue", "")
+    _set_first_row(path, "nominalValue", "22")
+
+    result = runner.invoke(app, ["validate", str(copy)])
+
+    assert result.exit_code == 0, result.output

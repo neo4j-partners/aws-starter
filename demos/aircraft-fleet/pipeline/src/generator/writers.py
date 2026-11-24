@@ -28,6 +28,7 @@ CSV_COLUMNS: dict[str, list[str]] = {
         "unit",
         "minValue",
         "maxValue",
+        "nominalValue",
         "sourceBlock",
         "sourceText",
     ],

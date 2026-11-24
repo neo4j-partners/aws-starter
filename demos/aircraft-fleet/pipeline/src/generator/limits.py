@@ -37,6 +37,9 @@ class OperatingLimit:
     source_text: str
     # The name's leading words, when they differ from the parameter name.
     name_prefix: str | None = None
+    # A typical reading the manual prints, such as a cruise baseline. It is
+    # not a bound.
+    nominal_value: float | None = None
 
     @property
     def name(self) -> str:
@@ -54,6 +57,7 @@ class OperatingLimit:
             "unit": self.unit,
             "minValue": format_value(self.min_value),
             "maxValue": format_value(self.max_value),
+            "nominalValue": format_value(self.nominal_value),
             "sourceBlock": self.source_block,
             "sourceText": self.source_text,
         }
@@ -71,7 +75,7 @@ _SUFFIX = r"(?:°C| ips)?"
 _RANGE = re.compile(rf"({_NUMBER})-({_NUMBER}){_SUFFIX}")
 _BOUND = re.compile(rf"([<≤≥]) ?({_NUMBER}){_SUFFIX}")
 _LONE = re.compile(rf"({_NUMBER}){_SUFFIX}")
-_CRUISE = re.compile(rf"{_NUMBER} \((.+)\)")
+_CRUISE = re.compile(rf"({_NUMBER}) \((.+)\)")
 
 
 def _number(text: str) -> float:
@@ -83,13 +87,14 @@ def parse_cell(cell: str) -> tuple[float | None, float | None]:
 
     "a-b" gives both. "< x", "≤ x", and a lone "x" give a maximum, and
     "≥ x" gives a minimum. A cruise cell such as "85 (83-87)" gives the
-    range in its parentheses.
+    range in its parentheses and drops the leading number. phase_cell
+    keeps that number as the cell's nominal value.
 
     Raises:
         ValueError: If the cell states no limit, such as "—".
     """
     if cruise := _CRUISE.fullmatch(cell):
-        return parse_cell(cruise.group(1))
+        return parse_cell(cruise.group(2))
     if match := _RANGE.fullmatch(cell):
         return _number(match.group(1)), _number(match.group(2))
     if match := _BOUND.fullmatch(cell):
@@ -98,6 +103,24 @@ def parse_cell(cell: str) -> tuple[float | None, float | None]:
     if match := _LONE.fullmatch(cell):
         return None, _number(match.group(1))
     raise ValueError(f"cell {cell!r} states no limit")
+
+
+def phase_cell(cell: str, *, idle: bool) -> tuple[float | None, float | None, float | None]:
+    """A normal-parameters cell's minimum, maximum, and nominal value.
+
+    A cruise cell such as "85 (83-87)" gives the range in its parentheses,
+    and its leading number is the nominal. In an idle column a lone "x" is a
+    typical reading, not a bound, so it gives only a nominal. Every other
+    cell reads as parse_cell reads it, with no nominal.
+
+    Raises:
+        ValueError: If the cell states no limit, such as "—".
+    """
+    if cruise := _CRUISE.fullmatch(cell):
+        return *parse_cell(cruise.group(2)), _number(cruise.group(1))
+    if idle and (match := _LONE.fullmatch(cell)):
+        return None, None, _number(match.group(1))
+    return *parse_cell(cell), None
 
 
 def _split_label(label: str) -> tuple[str, str]:
@@ -113,6 +136,8 @@ _PHASE_REGIMES = (
     "Max Continuous Normal",
     "Takeoff Normal",
 )
+# The idle columns, where a lone number is a typical reading, not a bound.
+_IDLE_REGIMES = frozenset({"Ground Idle Normal", "Flight Idle Normal"})
 # Normal Operating Parameters rows whose label is not the parameter name.
 _PHASE_PARAMETERS = {"Vibration N1": "Vibration"}
 
@@ -126,7 +151,7 @@ def _phase_limits(model: str, engine: EngineSpec) -> list[OperatingLimit]:
         for regime, cell in zip(_PHASE_REGIMES, cells, strict=True):
             if cell == "—":
                 continue
-            low, high = parse_cell(cell)
+            low, high, nominal = phase_cell(cell, idle=regime in _IDLE_REGIMES)
             limits.append(
                 OperatingLimit(
                     parameter,
@@ -138,6 +163,7 @@ def _phase_limits(model: str, engine: EngineSpec) -> list[OperatingLimit]:
                     "normal-parameters",
                     manuals.table_row(row),
                     name_prefix=prefix if prefix != parameter else None,
+                    nominal_value=nominal,
                 )
             )
     return limits

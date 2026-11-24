@@ -76,16 +76,19 @@ airports and carry delays. Removals connect an aircraft to the component that
 came off.
 
 The pipeline also creates the uniqueness constraints and lookup indexes for
-these labels. One `Dataset` node holds the stamp for verify.
+these labels. It also creates four fulltext indexes for sample queries:
+`maintenance_search`, `delay_search`, `component_search`, and
+`document_search`. One `Dataset` node holds the stamp for verify.
 
 ## Manual enrichment
 
 Stage 3 turns each maintenance manual into a lexical graph and a set of
 extracted entities with `neo4j-graphrag`'s `SimpleKGPipeline`.
 
-- **Chunks:** `ContextPrependingSplitter` wraps `FixedSizeSplitter` with 800-character chunks and a 100-character overlap. It puts a `[DOCUMENT CONTEXT]` header with the aircraft type and title in front of every chunk. `SimpleKGPipeline` passes document metadata only to the lexical graph builder, so the header is the only place the extractor sees the airframe model. Chunks deep in an engine section often name only the engine.
+- **Chunks:** `ContextPrependingSplitter` wraps `FixedSizeSplitter` with 800-character chunks and a 100-character overlap. It puts a `[DOCUMENT CONTEXT]` header with the aircraft type and title in front of every chunk. `SimpleKGPipeline` passes document metadata only to the lexical graph builder, so the header is the only place the extractor sees the airframe model. Chunks deep in an engine section often name only the engine. A chunk that starts inside a markdown table also gets the table's header row and separator, so its values keep their column names.
 - **Embeddings:** Titan Text Embeddings v2 embeds each chunk at 1024 dimensions.
 - **Extraction:** Claude Sonnet 5.5 extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. Entity names include the aircraft type, so entity resolution stays inside one model and each model keeps its own limits.
+- **Operating limits:** Each `OperatingLimit` has a `regime` from a closed list of 15 in `schema.OPERATING_LIMIT_REGIMES`. Rule 8 of `EXTRACTION_PROMPT` takes the hard limits for Takeoff, Max Continuous, and Start only from the Maximum column of a manual's Operating Limits table. It gives a value from the Normal Operating Parameters table a `<regime> Normal` regime, such as `Takeoff Normal`.
 
 ### Structured output on Bedrock
 
@@ -93,7 +96,8 @@ The `neo4j-graphrag` extractor asks its LLM for JSON that matches a schema
 through `response_format`. `StructuredBedrockLLM` in `bedrock_structured.py`
 answers that request through Bedrock Converse tool use. It declares the target
 schema as a tool and offers it with `toolChoice` set to `auto`. Sonnet 5.5
-rejects a forced tool choice. If the reply has no tool call, the call is
+rejects a forced tool choice. If the reply has no tool call, or its tool
+arguments fail validation against the `response_format` model, the call is
 retried once. The tool input is the structured result. The class is a small `BedrockLLM` subclass that
 works in any Bedrock and `neo4j-graphrag` pipeline.
 
@@ -110,14 +114,15 @@ operational graph with `link_to_existing_graph()`.
 | `AircraftModel -[:DESCRIBES_MODEL]-> Aircraft` | A model entity links to each aircraft of that model. |
 | `SystemReference -[:DESCRIBES_SYSTEM]-> System` | A system in the manual links to the real system. |
 | `ComponentReference -[:DESCRIBES_COMPONENT]-> Component` | A component in the manual links to the installed component. |
-| `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to the limit the manual defines. |
+| `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to each limit the manual defines for its sensor type and model. Each limit covers one regime. |
 
 - **Vector index:** `maintenanceChunkEmbeddings` covers `Chunk` embeddings with cosine similarity at the configured dimension.
 - **Fulltext index:** `maintenanceChunkText` covers `Chunk` text. The Maintenance specialist's hybrid search uses both indexes.
+- **Empty limits:** `link_to_existing_graph()` deletes each `OperatingLimit` that has no `minValue` and no `maxValue`. It does this before it writes `HAS_LIMIT`.
 
 With the links in place, one query can start at a reading on one aircraft,
-step to its sensor, follow `HAS_LIMIT` to the manual's operating limit, and
-reach the chunks that describe the repair.
+step to its sensor, follow `HAS_LIMIT` to the manual's operating limits for
+each regime, and reach the chunks that describe the repair.
 
 ## Verify
 
@@ -129,13 +134,16 @@ Stage 5 reads the graph and prints a report of warnings and failures.
 - **Embeddings:** Every chunk must have an embedding of the configured dimension.
 - **Search:** A vector search smoke test must succeed.
 - **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, and `HAS_LIMIT` links must each exist.
-- **Orphans:** Readings without a sensor, flights without an aircraft, components without a system, sensors without readings, and documents without chunks must all be zero.
+- **EGT limits:** Each aircraft type needs an EGT limit for each regime that the generator's `ENGINE_SPECS` gives a maximum. Those regimes are Takeoff, Max Continuous, and Start when the spec has a start maximum. Each `maxValue` must equal the generator's maximum. An EGT limit for a regime with no generator maximum fails, such as an A320-200 Start limit.
+- **Orphans:** Readings without a sensor, flights without an aircraft, components without a system, sensors without readings, documents without chunks, and systems without a `SystemReference` must all be zero.
 
-`./setup.sh` runs `verify --strict`, which exits nonzero on any warning, so the
-same check works in CI.
+`./setup.sh` runs `verify --strict`. Strict mode fails on warnings and exits
+nonzero, so the same check works in CI. The one exception is
+`--skip-enrichment`, which keeps the enrichment checks as warnings.
 
 `verify --strict --skip-enrichment` keeps the counts, stamp, CSV comparison,
 operational constraints, and operational orphans as failures. It reports the
 embeddings, chunk indexes, search test, extracted-entity constraints, cross
-links, and documents without chunks as warnings. `./setup.sh load-operational`
+links, EGT limits, documents without chunks, and systems without a
+`SystemReference` as warnings. `./setup.sh load-operational`
 uses it, because that graph has no enrichment.

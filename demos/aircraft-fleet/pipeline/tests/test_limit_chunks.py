@@ -122,9 +122,9 @@ def _links(driver: Driver, database: str) -> dict[str, list[str]]:
 def test_limits_link_to_the_chunks_that_hold_their_source(driver: Driver, database: str) -> None:
     _setup(driver, database)
 
-    link_limits_to_chunks(driver, database, _SOURCES)
+    assert link_limits_to_chunks(driver, database, _SOURCES) == ["Unchunked"]
     # A second run adds no links.
-    link_limits_to_chunks(driver, database, _SOURCES)
+    assert link_limits_to_chunks(driver, database, _SOURCES) == ["Unchunked"]
 
     assert _links(driver, database) == {
         "Held Once": [f"{DOC}-c1"],

@@ -107,6 +107,63 @@ def read_manual_text(path: Path) -> str:
 # Context-aware text splitter
 # ---------------------------------------------------------------------------
 
+# A markdown table's separator line, such as "|-------|:---:|".
+_TABLE_SEPARATOR = re.compile(r"\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*")
+
+
+@dataclass(frozen=True)
+class TableSpan:
+    """Offsets of one markdown table in a text."""
+
+    start: int  # start of the header row
+    body_start: int  # start of the first row after the separator line
+    end: int  # end of the last row, after its newline
+
+
+def markdown_tables(text: str) -> list[TableSpan]:
+    """Each markdown table in ``text``: a header row, a separator, then rows."""
+    lines = text.split("\n")
+    offsets = [0]
+    for line in lines:
+        offsets.append(offsets[-1] + len(line) + 1)
+    tables = []
+    i = 0
+    while i < len(lines) - 1:
+        if lines[i].lstrip().startswith("|") and _TABLE_SEPARATOR.fullmatch(lines[i + 1]):
+            j = i + 2
+            while j < len(lines) and lines[j].lstrip().startswith("|"):
+                j += 1
+            tables.append(
+                TableSpan(
+                    start=offsets[i],
+                    body_start=min(offsets[i + 2], len(text)),
+                    end=min(offsets[j], len(text)),
+                )
+            )
+            i = j
+        else:
+            i += 1
+    return tables
+
+
+def with_table_header(text: str, start: int, end: int, tables: list[TableSpan]) -> str:
+    """``text[start:end]``, led by its table's header when it starts inside a table.
+
+    A chunk that starts in a table's header or separator line is extended
+    back to the header row. A chunk that starts in a body row gets the
+    header row and separator, then that whole row, so its first row is
+    complete and its cells line up with the header.
+    """
+    chunk = text[start:end]
+    first = start + len(chunk) - len(chunk.lstrip())
+    line_start = text.rfind("\n", 0, first) + 1
+    for table in tables:
+        if table.start <= line_start < table.end and first > table.start:
+            if line_start < table.body_start:
+                return text[table.start : end]
+            return text[table.start : table.body_start] + text[line_start:end]
+    return chunk
+
 
 class ContextPrependingSplitter(TextSplitter):
     """Wraps a ``TextSplitter`` and prepends a context line to every chunk.
@@ -126,6 +183,13 @@ class ContextPrependingSplitter(TextSplitter):
     splitter, then prepending a short context header to *every* resulting
     chunk so the LLM always has access to the document-level aircraft type.
 
+    A chunk that starts inside a markdown table also gets the table's header
+    row and separator after the context line. Without them, a chunk cut below
+    a table's header holds values with no column names, such as an EGT row
+    with no operating regimes. The inner splitter must return substrings of
+    the text, as ``FixedSizeSplitter`` does, so each chunk's offset can be
+    found.
+
     It also sets ``chunkId`` to ``"{document_id}:{index}"`` in each chunk's
     metadata. The lexical graph builder copies chunk metadata onto the
     ``Chunk`` node, so every chunk gets a stable id for its uniqueness
@@ -144,7 +208,17 @@ class ContextPrependingSplitter(TextSplitter):
         if not self.document_id:
             raise ValueError("Set document_id before splitting so every Chunk gets a chunkId.")
         result = await self.inner.run(text)
+        tables = markdown_tables(text)
+        search_from = 0
         for chunk in result.chunks:
+            start = text.find(chunk.text, search_from)
+            if start < 0:
+                raise ValueError(
+                    f"chunk {chunk.index} is not a substring of the text, "
+                    "so its table header can't be found"
+                )
+            search_from = start + 1
+            chunk.text = with_table_header(text, start, start + len(chunk.text), tables)
             if self.context:
                 chunk.text = self.context + chunk.text
             chunk.metadata = {

@@ -8,7 +8,7 @@
   "dependencies": {
     "@neo4j-nvl/base": "2.1.0",
     "@neo4j-nvl/interaction-handlers": "2.1.0",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.18",
     "marked": "18.0.11"
   },
   "devDependencies": {

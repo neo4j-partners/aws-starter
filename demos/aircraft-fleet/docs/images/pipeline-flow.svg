@@ -132,7 +132,7 @@
   <text x="70" y="841" class="m" fill="#16233A">./setup.sh</text>
   <text x="170" y="841" font-size="15" fill="#475467">all five stages</text>
   <text x="440" y="841" class="m" fill="#16233A">./setup.sh load-operational</text>
-  <text x="680" y="841" font-size="15" fill="#475467">stages 1, 2, and 5, no model calls</text>
-  <text x="1040" y="841" class="m" fill="#16233A">./setup.sh verify</text>
-  <text x="1190" y="841" font-size="15" fill="#475467">stage 5 only, read-only</text>
+  <text x="680" y="841" font-size="15" fill="#475467">stage 1 if stale, stage 2, relinking, stage 5, no model calls</text>
+  <text x="1150" y="841" class="m" fill="#16233A">./setup.sh verify</text>
+  <text x="1300" y="841" font-size="15" fill="#475467">stage 5 only, read-only</text>
 </svg>

@@ -7,6 +7,7 @@ import errno
 import fcntl
 import json
 import logging
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
@@ -17,6 +18,7 @@ from typing import Any, TextIO
 from neo4j import READ_ACCESS, Driver, NotificationDisabledClassification
 from neo4j.exceptions import Neo4jError
 
+from generator.specs import ENGINE_SPECS
 from generator.stamp import (
     LOCK_NAME,
     STAMP_NAME,
@@ -755,6 +757,14 @@ _ORPHAN_CHECKS = [
         {"FROM_DOCUMENT"},
         True,
     ),
+    (
+        "Systems without SystemReference",
+        "MATCH (s:System) WHERE NOT (:SystemReference)-[:DESCRIBES_SYSTEM]->(s) "
+        "RETURN count(s) AS count",
+        {"System", "SystemReference"},
+        {"DESCRIBES_SYSTEM"},
+        True,
+    ),
 ]
 
 
@@ -961,6 +971,92 @@ def _check_cross_links(rel_counts: dict[str, int], result: _VerifyResult) -> Non
         result.check(count > 0, f"{label} has no links", enrichment=True)
 
 
+# The first number in a limit value such as "950", "< 950" or "1,060".
+_LIMIT_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def expected_egt_maximums() -> dict[tuple[str, str], float]:
+    """The generator's EGT maximum for each (aircraft type, regime).
+
+    A type whose spec has no start limit, such as the A320-200, has no
+    Start entry.
+    """
+    expected = {}
+    for model, spec in ENGINE_SPECS.items():
+        limits = spec.egt_limits
+        expected[model, "Takeoff"] = limits.takeoff.maximum
+        expected[model, "Max Continuous"] = limits.max_continuous.maximum
+        if limits.start_max is not None:
+            expected[model, "Start"] = limits.start_max
+    return expected
+
+
+def _limit_number(value: object) -> float | None:
+    match = _LIMIT_NUMBER.search(str(value)) if value is not None else None
+    return float(match.group().replace(",", "")) if match else None
+
+
+def _check_egt_limits(
+    driver: Driver, database: str, existing_labels: set[str], result: _VerifyResult
+) -> None:
+    """Compare EGT Takeoff, Max Continuous and Start maxValues with the generator.
+
+    A missing limit fails, and so does one for a type the generator gives no
+    limit, such as an A320-200 Start limit. With no OperatingLimit nodes the
+    check is skipped, since the count check already reports them.
+    """
+    if "OperatingLimit" not in existing_labels:
+        return
+    expected = expected_egt_maximums()
+    regimes = {regime.lower(): regime for _, regime in expected}
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (l:OperatingLimit)
+        WHERE toUpper(trim(l.parameterName)) = 'EGT'
+          AND toLower(trim(l.regime)) IN $regimes
+          AND l.aircraftType IS NOT NULL
+        RETURN l.aircraftType AS model, toLower(trim(l.regime)) AS regime,
+               l.name AS name, l.maxValue AS maxValue
+        ORDER BY model, regime, name
+        """,
+        regimes=sorted(regimes),
+        database_=database,
+    )
+    found: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in records:
+        found.setdefault((row["model"], regimes[row["regime"]]), []).append(row)
+
+    print("\nEGT Limit Checks:")
+    for model, regime in sorted(expected.keys() | found.keys()):
+        maximum = expected.get((model, regime))
+        rows = found.get((model, regime), [])
+        if not rows:
+            print(f"  [MISSING] {model} {regime}: expected {maximum:g}")
+            result.check(False, f"{model} has no EGT {regime} limit", enrichment=True)
+            continue
+        for row in rows:
+            if maximum is None:
+                print(f"  [FAIL] {row['name']}: maxValue {row['maxValue']!r}, expected none")
+                result.check(
+                    False,
+                    f"{row['name']} is an EGT {regime} limit, "
+                    f"but the generator has none for {model}",
+                    enrichment=True,
+                )
+                continue
+            ok = _limit_number(row["maxValue"]) == maximum
+            print(
+                f"  {'[OK]' if ok else '[FAIL]'} {row['name']}: "
+                f"maxValue {row['maxValue']!r}, expected {maximum:g}"
+            )
+            result.check(
+                ok,
+                f"{row['name']} maxValue is {row['maxValue']!r}, "
+                f"but the generator's {regime} maximum for {model} is {maximum:g}",
+                enrichment=True,
+            )
+
+
 def _check_data_quality(
     driver: Driver,
     database: str,
@@ -1042,5 +1138,6 @@ def verify(
         result=result,
     )
     _check_cross_links(rel_counts, result)
+    _check_egt_limits(driver, database, set(label_counts), result)
     _check_data_quality(driver, database, set(label_counts), set(relationship_counts), result)
     return _print_summary(result)

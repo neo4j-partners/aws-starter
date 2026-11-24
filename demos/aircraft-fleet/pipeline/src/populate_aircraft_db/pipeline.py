@@ -636,6 +636,7 @@ def debug_extract_chunks(
             approximate=True,
         ),
         context=(f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}"),
+        document_id=meta.document_id,
     )
     schema = build_extraction_schema()
 

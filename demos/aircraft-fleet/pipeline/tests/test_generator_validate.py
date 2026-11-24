@@ -160,3 +160,15 @@ def test_a_non_numeric_limit_value_fails(copy: Path, column: str, value: str) ->
 
     assert result.exit_code == 1, result.output
     assert f"{LIMITS_FILE}:2: {column}={value!r} is not a number" in result.output
+
+
+def test_a_limit_row_with_no_value_fails(copy: Path) -> None:
+    path = copy / LIMITS_FILE
+    _set_first_row(path, "minValue", "")
+    _set_first_row(path, "maxValue", "")
+
+    result = runner.invoke(app, ["validate", str(copy)])
+
+    assert result.exit_code == 1, result.output
+    assert "Found 1 validation error(s)" in result.output
+    assert f"{LIMITS_FILE}:2: no minValue or maxValue" in result.output

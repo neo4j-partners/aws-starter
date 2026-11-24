@@ -579,8 +579,8 @@ def validate(
 ) -> None:
     """Check referential integrity of generated CSV files.
 
-    Also check that operating_limits.csv has the expected header, row count,
-    and numeric values.
+    Also check that operating_limits.csv has the expected header and row
+    count, and that each row has a numeric minValue or maxValue.
     """
     import csv as _csv
 
@@ -635,6 +635,8 @@ def validate(
         if len(rows) != expected_rows:
             errors.append(f"{LIMITS_FILE}: {len(rows)} rows, expected {expected_rows}")
         for i, row in enumerate(rows, start=2):
+            if not (row["minValue"] or row["maxValue"]):
+                errors.append(f"{LIMITS_FILE}:{i}: no minValue or maxValue")
             for col in ("minValue", "maxValue"):
                 if not (val := row[col]):
                     continue
@@ -687,7 +689,7 @@ def validate(
     check_limits()
 
     if errors:
-        console.print(f"[red]Found {len(errors)} referential integrity error(s):[/red]")
+        console.print(f"[red]Found {len(errors)} validation error(s):[/red]")
         for e in errors[:20]:
             console.print(f"  [red]✗[/red] {e}")
         if len(errors) > 20:

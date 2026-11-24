@@ -1233,9 +1233,9 @@ def _check_limit_chunks(
 
     Stage 4 links each limit to the chunks that hold its source text, after
     the chunk indexes are built. enrich runs that step, and load-operational
-    runs it again. A failure names the unlinked count for each aircraft type. With no
-    OperatingLimit or Chunk nodes the check is skipped, since the count
-    checks already report them.
+    runs it again. A failure names the unlinked count for each aircraft type.
+    With no OperatingLimit or Chunk nodes the check is skipped, since the
+    count checks already report them.
     """
     if not {"OperatingLimit", "Chunk"} <= existing_labels:
         return

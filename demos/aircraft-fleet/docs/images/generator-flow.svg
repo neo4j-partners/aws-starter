@@ -15,7 +15,7 @@
   <text x="175.0" y="252" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">random.Random(seed)</text>
   <text x="175.0" y="274" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">default_rng(seed)</text>
   <text x="175.0" y="296" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">setup.sh: 30 aircraft, 90 days</text>
-  <path d="M310,255 H356" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <path d="M310,182 H356" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
   <rect x="360" y="150" width="860" height="64" rx="12" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="1.5"/>
   <circle cx="390" cy="182.0" r="15" fill="#2E6DB4"/>
   <text x="390" y="187.0" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>

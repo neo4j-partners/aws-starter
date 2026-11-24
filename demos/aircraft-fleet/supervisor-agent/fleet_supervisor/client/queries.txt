@@ -2,8 +2,8 @@
 # These queries test routing to Maintenance and Operations specialist agents.
 #
 # Query Categories:
-# - Maintenance Domain (1-10): Faults, components, sensors, reliability
-# - Operations Domain (11-20): Flights, delays, routes, airports
+# - Maintenance Domain (1-18): Faults, components, sensors, reliability, manuals
+# - Operations Domain (19-33): Flights, delays, routes, airports, fleet discovery
 #
 # Each query should route to the appropriate specialist agent.
 
@@ -29,24 +29,52 @@
 
 10. Which aircraft have had repeated failures of the same component type?
 
+11. Show me all the systems installed on Boeing 737-800 aircraft.
+
+12. What sensors are monitoring engine systems across the fleet and what do they measure?
+
+13. For ExampleAir's Boeing 737-800 fleet, trace the path from aircraft to systems to components to sensors and show the full hierarchy.
+
+# This one spans both domains. The supervisor should call Maintenance and Operations.
+14. Which aircraft have both maintenance events AND flight delays? Show the correlation between maintenance issues and operational delays.
+
+# Manual questions. Only the Maintenance Agent can search the manuals.
+15. What is the procedure for detecting a hydraulic system leak?
+
+16. How do I troubleshoot an engine exhaust gas temperature exceedance?
+
+17. What does the maintenance manual recommend for hydraulic reservoir low-level warnings?
+
+18. For maintenance events whose fault is 'Vibration exceedance', what corrective actions were taken, and what does the manual say the correct engine-vibration troubleshooting procedure is?
+
 # === Operations Domain (Routes to Operations Agent) ===
 
-11. What are the most common causes of flight delays and how many minutes do they add?
+19. What are the most common causes of flight delays and how many minutes do they add?
 
-12. Which routes have the most delays? Show origin, destination, and total delay minutes.
+20. Which routes have the most delays? Show origin, destination, and total delay minutes.
 
-13. Compare delay statistics by operator - which airline has the worst on-time performance?
+21. Compare delay statistics by operator - which airline has the worst on-time performance?
 
-14. Find all weather-related delays longer than 60 minutes and show affected flights.
+22. Find all weather-related delays longer than 60 minutes and show affected flights.
 
-15. What flights depart from JFK airport and where do they go?
+23. What flights depart from JFK airport and where do they go?
 
-16. Which airports have the highest traffic volume in our database?
+24. Which airports have the highest traffic volume in our database?
 
-17. Show me the busiest routes by number of flights operated.
+25. Show me the busiest routes by number of flights operated.
 
-18. What is the on-time performance for flights to LAX?
+26. What is the on-time performance for flights to LAX?
 
-19. Which carriers operate the most flights in the system?
+27. Which carriers operate the most flights in the system?
 
-20. Find flights with the longest scheduled duration and their routes.
+28. Find flights with the longest scheduled duration and their routes.
+
+29. What is the database schema? Show me all node types and their relationships.
+
+30. How many aircraft are in the fleet and what models do we have?
+
+31. List all airports in the database with their IATA codes and cities.
+
+32. Which manufacturers build the aircraft in our fleet and how many of each?
+
+33. What aircraft does SkyWays operate and what are their tail numbers?

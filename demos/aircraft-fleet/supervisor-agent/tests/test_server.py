@@ -1,4 +1,4 @@
-"""The AgentCore entrypoint, with the runtime and supervisor stubbed."""
+"""The AgentCore entrypoint, with the model, schema, and supervisor stubbed."""
 
 import asyncio
 import threading
@@ -9,9 +9,9 @@ import anyio
 import pytest
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
-from strands.types.exceptions import ToolProviderException
 
 from fleet_supervisor import server
+from fleet_supervisor.core.config import ConfigError
 from tests.conftest import collect
 
 
@@ -31,7 +31,7 @@ class FakeSupervisor:
 
 @pytest.fixture
 def supervisor(monkeypatch):
-    """Install a fake supervisor and a fake runtime; return the supervisor."""
+    """Install a fake supervisor, model, and schema; return the supervisor."""
     fake = FakeSupervisor(
         events=[
             {"current_tool_use": {"toolUseId": "t1", "name": "operations_specialist"}},
@@ -40,19 +40,21 @@ def supervisor(monkeypatch):
     )
 
     calls: list[str] = []
+    model = object()
 
-    class FakeGateway:
-        async def prepare_request(self):
-            calls.append("prepare_request")
+    def fake_get_model():
+        calls.append("get_model")
+        return model
 
-    async def fake_runtime():
-        calls.append("get_runtime")
-        return SimpleNamespace(model=object(), tools=[])
+    def fake_get_graph_schema():
+        calls.append("get_graph_schema")
+        return "SCHEMA"
 
-    monkeypatch.setattr(server, "gateway_auth", FakeGateway)
-    monkeypatch.setattr(server, "get_runtime", fake_runtime)
+    monkeypatch.setattr(server, "get_model", fake_get_model)
+    monkeypatch.setattr(server, "get_graph_schema", fake_get_graph_schema)
     fake.calls = calls
-    monkeypatch.setattr(server, "build_supervisor", lambda model, tools, manager=None: fake)
+    fake.model = model
+    monkeypatch.setattr(server, "build_supervisor", lambda model, schema, manager=None: fake)
     monkeypatch.setattr(server, "memory_settings", lambda: None)
     monkeypatch.setattr(
         server, "build_session_manager", lambda session_id, user_id, settings, background_hook: None
@@ -88,7 +90,7 @@ def manager(monkeypatch, supervisor):
         built["hook"] = background_hook
         return fake
 
-    def fake_build_supervisor(model, tools, manager=None):
+    def fake_build_supervisor(model, schema, manager=None):
         built["manager"] = manager
         return supervisor
 
@@ -225,7 +227,7 @@ def blocked_build(monkeypatch, supervisor, manager):
     started, release = threading.Event(), threading.Event()
     order: list[str] = []
 
-    def blocking_build(model, tools, session_manager=None):
+    def blocking_build(model, schema, session_manager=None):
         started.set()
         release.wait(5)
         order.append("built")
@@ -292,7 +294,7 @@ def test_task_cancel_during_the_build_closes_the_manager_after_the_build(manager
 
 
 def test_a_failed_build_closes_the_manager_once(supervisor, manager, monkeypatch):
-    def failing_build(model, tools, session_manager=None):
+    def failing_build(model, schema, session_manager=None):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(server, "build_supervisor", failing_build)
@@ -329,7 +331,7 @@ def test_a_rejected_password_is_read_again_once(supervisor, password_retry, monk
     managers, forgotten = password_retry
     errors = [password_rejected_error()]
 
-    def build(model, tools, session_manager=None):
+    def build(model, schema, session_manager=None):
         if errors:
             raise errors.pop()
         return supervisor
@@ -363,7 +365,7 @@ def test_concurrent_rejections_of_one_password_read_it_again_once(supervisor, mo
         2, action=lambda: monkeypatch.setenv("MEM_NEO4J_PASSWORD", "new-pw")
     )
 
-    def build(model, tools, session_manager=None):
+    def build(model, schema, session_manager=None):
         if session_manager.password == "old-pw":
             both_built.wait(timeout=10)
             raise password_rejected_error()
@@ -441,7 +443,7 @@ def test_a_rejected_restore_forgets_the_password_its_client_used(supervisor, mon
     monkeypatch.setenv("MEM_NEO4J_PASSWORD", "p2")
     p2 = memory.memory_settings()
 
-    def build(model, tools, session_manager=None):
+    def build(model, schema, session_manager=None):
         if session_manager.password == "p1":
             raise password_rejected_error()
         return supervisor
@@ -464,7 +466,7 @@ def test_a_password_rejected_twice_fails_without_a_third_try(
 ):
     managers, forgotten = password_retry
 
-    def build(model, tools, session_manager=None):
+    def build(model, schema, session_manager=None):
         raise password_rejected_error()
 
     monkeypatch.setattr(server, "build_supervisor", build)
@@ -514,7 +516,7 @@ def test_a_rejected_open_forgets_the_password_the_open_used(supervisor, monkeypa
 def test_other_build_errors_keep_the_cached_password(supervisor, password_retry, monkeypatch):
     managers, forgotten = password_retry
 
-    def build(model, tools, session_manager=None):
+    def build(model, schema, session_manager=None):
         raise MemoryConnectionError("Neo4j service unavailable")
 
     monkeypatch.setattr(server, "build_supervisor", build)
@@ -535,7 +537,7 @@ def test_close_error_is_logged_not_sent(supervisor, manager, caplog):
 def test_no_memory_manager_when_memory_is_off(supervisor, monkeypatch):
     seen: dict = {}
 
-    def fake_build_supervisor(model, tools, manager=None):
+    def fake_build_supervisor(model, schema, manager=None):
         seen["manager"] = manager
         return supervisor
 
@@ -554,16 +556,35 @@ def test_the_background_hook_marks_the_server_busy_until_done():
     assert server.app.get_async_task_info()["active_count"] == before
 
 
-def test_shutdown_closes_the_shared_memory(monkeypatch):
+def test_shutdown_closes_the_shared_memory_and_the_graph_driver(monkeypatch):
     calls: list[str] = []
-    monkeypatch.setattr(server, "close_shared_memory", lambda: calls.append("closed"))
+    monkeypatch.setattr(server, "close_shared_memory", lambda: calls.append("memory"))
+    monkeypatch.setattr(server, "close", lambda: calls.append("graph"))
 
     async def serve_then_stop():
         async with server.app.router.lifespan_context(server.app):
             assert calls == []
-        assert calls == ["closed"]
+        assert calls == ["memory", "graph"]
 
     asyncio.run(serve_then_stop())
+
+
+def test_shutdown_closes_the_graph_driver_when_the_memory_close_fails(monkeypatch):
+    calls: list[str] = []
+
+    def failing_close():
+        raise RuntimeError("memory close failed")
+
+    monkeypatch.setattr(server, "close_shared_memory", failing_close)
+    monkeypatch.setattr(server, "close", lambda: calls.append("graph"))
+
+    async def serve_then_stop():
+        async with server.app.router.lifespan_context(server.app):
+            pass
+
+    with pytest.raises(RuntimeError, match="memory close failed"):
+        asyncio.run(serve_then_stop())
+    assert calls == ["graph"]
 
 
 def test_streams_agent_chunk_and_complete(supervisor):
@@ -578,20 +599,34 @@ def test_streams_agent_chunk_and_complete(supervisor):
     assert supervisor.prompts == ["How many flights?"]
 
 
-def test_gateway_token_is_prepared_on_the_request_path(supervisor):
+def test_model_and_schema_are_read_on_every_request(supervisor):
     collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
-    assert supervisor.calls == ["prepare_request", "get_runtime"]
+    collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s2")))
+    assert supervisor.calls == ["get_model", "get_graph_schema"] * 2
 
 
-def test_gateway_token_failure_sends_generic_error(supervisor, monkeypatch, caplog):
-    class BrokenGateway:
-        async def prepare_request(self):
-            raise RuntimeError("AccessDenied for provider fleet-gateway")
+def test_the_model_and_schema_go_to_the_supervisor(supervisor, monkeypatch):
+    built: list[tuple] = []
 
-    monkeypatch.setattr(server, "gateway_auth", BrokenGateway)
-    events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
-    assert events == [{"type": "error", "error": server.GENERIC_ERROR}]
-    assert "AccessDenied" in caplog.text
+    def fake_build_supervisor(model, schema, manager=None):
+        built.append((model, schema))
+        return supervisor
+
+    monkeypatch.setattr(server, "build_supervisor", fake_build_supervisor)
+    collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert built == [(supervisor.model, "SCHEMA")]
+
+
+def test_the_schema_is_read_off_the_event_loop(supervisor, monkeypatch):
+    threads: list[int] = []
+
+    def fake_get_graph_schema():
+        threads.append(threading.get_ident())
+        return "SCHEMA"
+
+    monkeypatch.setattr(server, "get_graph_schema", fake_get_graph_schema)
+    collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
+    assert threads and threads[0] != threading.get_ident()
 
 
 @pytest.mark.parametrize("key", ["prompt", "message", "query", "inputText", "input"])
@@ -656,166 +691,59 @@ def test_non_string_user_id_does_not_raise(supervisor):
     assert events[-1] == {"type": "complete"}
 
 
-def test_startup_error_text_stays_in_the_log(supervisor, monkeypatch, caplog):
-    async def failing_runtime():
+def test_schema_error_text_stays_in_the_log(supervisor, monkeypatch, caplog):
+    def failing_schema():
         raise RuntimeError("bolt://user:pw@host")
 
-    monkeypatch.setattr(server, "get_runtime", failing_runtime)
+    monkeypatch.setattr(server, "get_graph_schema", failing_schema)
     events = collect(server.invoke({"prompt": "q"}, SimpleNamespace(session_id="s1")))
     assert events == [{"type": "error", "error": server.GENERIC_ERROR}]
     assert "bolt://user:pw@host" in caplog.text
+    assert supervisor.prompts == []
 
 
-class FakeClient:
-    """Stands in for MCPClient. ``pages`` is the tool list the server returns."""
+def test_model_is_built_once_and_failures_are_retried(monkeypatch):
+    results: list = [ValueError("no region"), "model"]
 
-    def __init__(self, tools=("t",), list_error=None, stop_error=None):
-        self.tools = list(tools)
-        self.list_error = list_error
-        self.stop_error = stop_error
-        self.active = False
-        self.stopped = False
-
-    def start(self):
-        self.active = True
-        return self
-
-    def list_tools_sync(self, pagination_token=None):
-        if self.list_error:
-            raise self.list_error
-        page = [SimpleNamespace(tool_name=t, tool_spec={"name": t}) for t in self.tools]
-        return Page(page)
-
-    async def load_tools(self):
-        """Mirror MCPClient.load_tools: start, wrap a start failure, list every page."""
-        try:
-            self.start()
-        except Exception as error:
-            raise ToolProviderException(f"Failed to start MCP client: {error}") from error
-        tools, token = [], None
-        while True:
-            page = self.list_tools_sync(pagination_token=token)
-            tools.extend(page)
-            token = page.pagination_token
-            if token is None:
-                return tools
-
-    def _is_session_active(self):
-        return self.active
-
-    def stop(self, *exc_info):
-        self.stopped = True
-        self.active = False
-        if self.stop_error:
-            raise self.stop_error
-
-
-class Page(list):
-    pagination_token = None
-
-
-@pytest.fixture
-def clients(monkeypatch):
-    """Hand out the queued FakeClients in order and stub the model."""
-    queue: list[FakeClient] = []
-    monkeypatch.setattr(server, "_runtime", None)
-    monkeypatch.setattr(server, "_attempts", 0)
-    monkeypatch.setattr(server, "_last_attempt_failed", False)
-    monkeypatch.setattr(server, "build_model", lambda: "model")
-    monkeypatch.setattr(server, "gateway_auth", lambda: "gateway")
-    monkeypatch.setattr(server, "build_mcp_client", lambda gateway: queue.pop(0))
-    return queue
-
-
-def test_runtime_is_reused_while_the_session_is_up(clients):
-    clients.append(FakeClient())
-    first = server._start_runtime()
-    assert server._start_runtime() is first
-
-
-def test_dead_session_is_rebuilt(clients):
-    old, new = FakeClient(), FakeClient()
-    clients.extend([old, new])
-    first = server._start_runtime()
-    old.active = False  # the Gateway dropped the session
-    second = server._start_runtime()
-    assert second.connection.client is new
-    assert second.model == first.model
-    assert second.tools == first.tools  # the tool wrappers and their specs are kept
-    assert old.stopped
-
-
-def test_get_runtime_rebuilds_a_dead_session(clients):
-    import asyncio
-
-    old, new = FakeClient(), FakeClient()
-    clients.extend([old, new])
-    asyncio.run(server.get_runtime())
-    old.active = False
-    assert asyncio.run(server.get_runtime()).connection.client is new
-
-
-def test_startup_failure_stops_client_and_retries(clients):
-    bad, good = FakeClient(list_error=ConnectionError("gateway down")), FakeClient()
-    clients.extend([bad, good])
-    with pytest.raises(ConnectionError):
-        server._start_runtime()
-    assert bad.stopped
-    assert server._runtime is None
-    assert server._start_runtime().connection.client is good
-
-
-def test_empty_tool_list_is_an_error(clients):
-    client = FakeClient(tools=())
-    clients.append(client)
-    with pytest.raises(RuntimeError, match="none of the specialist tools"):
-        server._start_runtime()
-    assert client.stopped
-    assert server._runtime is None
-
-
-def test_stop_error_does_not_mask_the_startup_error(clients, caplog):
-    clients.append(FakeClient(list_error=ConnectionError("gateway down"), stop_error=OSError("x")))
-    with pytest.raises(ConnectionError, match="gateway down"):
-        server._start_runtime()
-    assert "Error while stopping the MCP client" in caplog.text
-
-
-def test_model_error_starts_no_client(monkeypatch, clients):
-    def broken_model():
-        raise ValueError("bad model id")
-
-    monkeypatch.setattr(server, "build_model", broken_model)
-    with pytest.raises(ValueError):
-        server._start_runtime()
-    assert clients == []  # build_mcp_client was never called
-
-
-def test_session_check_uses_the_strands_private_method():
-    # gateway_tools.session_is_running relies on MCPClient._is_session_active. If Strands
-    # renames it, this test fails before the runtime does.
-    from strands.tools.mcp import MCPClient
-
-    assert callable(getattr(MCPClient, "_is_session_active", None))
-
-
-def test_gateway_auth_is_built_once_and_failures_are_retried(monkeypatch):
-    built: list[str] = []
-    results = [ValueError("no credentials file"), "creds"]
-
-    def fake_load_credentials():
+    def fake_build_model():
         result = results.pop(0)
         if isinstance(result, Exception):
             raise result
         return result
 
-    monkeypatch.setattr(server, "load_credentials", fake_load_credentials)
-    monkeypatch.setattr(server, "build_gateway_auth", lambda c: built.append(c) or object())
-    server.gateway_auth.cache_clear()
+    monkeypatch.setattr(server, "build_model", fake_build_model)
+    server.get_model.cache_clear()
     try:
-        with pytest.raises(ValueError):
-            server.gateway_auth()
-        assert server.gateway_auth() is server.gateway_auth()
-        assert built == ["creds"]
+        with pytest.raises(ValueError, match="no region"):
+            server.get_model()
+        # A third build would find the list empty and raise IndexError.
+        assert server.get_model() == "model"
+        assert server.get_model() == "model"
     finally:
-        server.gateway_auth.cache_clear()
+        server.get_model.cache_clear()
+
+
+@pytest.fixture
+def startup(monkeypatch):
+    """Stub what main() calls; return the order of the calls."""
+    calls: list[str] = []
+    monkeypatch.delenv("AGENT_PORT", raising=False)
+    monkeypatch.setattr(server, "neo4j_login", lambda: calls.append("neo4j_login"))
+    monkeypatch.setattr(server, "memory_settings", lambda: calls.append("memory_settings"))
+    monkeypatch.setattr(server.app, "run", lambda port: calls.append(f"run:{port}"))
+    return calls
+
+
+def test_main_reads_the_graph_login_before_serving(startup):
+    server.main(default_port=8080)
+    assert startup == ["neo4j_login", "memory_settings", "run:8080"]
+
+
+def test_a_missing_graph_login_stops_startup(startup, monkeypatch):
+    def missing_login():
+        raise ConfigError("Set NEO4J_PASSWORD_SECRET_ARN")
+
+    monkeypatch.setattr(server, "neo4j_login", missing_login)
+    with pytest.raises(ConfigError):
+        server.main()
+    assert startup == []

@@ -47,10 +47,10 @@ def test_both_specialists_are_reported_in_order():
     assert mapper.specialists == ["Operations Agent", "Maintenance Agent"]
 
 
-def test_mcp_tool_inside_specialist_becomes_tool_event():
-    inner = {"current_tool_use": tool_use("m1", "gw___read_neo4j_cypher")}
+def test_graph_tool_inside_specialist_becomes_tool_event():
+    inner = {"current_tool_use": tool_use("m1", "graph_query_tool")}
     out, _ = map_all([specialist_event("t1", inner), specialist_event("t1", inner)])
-    assert out == [{"type": "tool", "name": "gw___read_neo4j_cypher"}]
+    assert out == [{"type": "tool", "name": "graph_query_tool"}]
 
 
 def test_specialist_text_is_not_forwarded():

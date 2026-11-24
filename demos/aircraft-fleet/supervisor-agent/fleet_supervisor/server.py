@@ -6,10 +6,10 @@ agents, each wrapped as a tool:
 - Maintenance Agent: reliability, faults, components, sensors
 - Operations Agent: flights, delays, routes, airports
 
-The model, the Gateway MCP client, and the Gateway tools are created once,
-on the first request. The client is rebuilt if its MCP session ends. A tool
-call that finds the session ended rebuilds it and retries once. See
-``fleet_supervisor.core.gateway_tools``. The agents are built per request.
+The specialists query Neo4j directly through the graph tools in
+``fleet_supervisor.core.graph``. The model is created once, on the first
+request. Each request reads the graph schema, which the graph package caches,
+and formats it into the specialist prompts. The agents are built per request.
 See ``fleet_supervisor.core.agents`` for why. Each request also gets its own
 memory session manager on the supervisor, closed when the request ends. The
 managers share one memory client, opened on the first request and closed at
@@ -28,11 +28,9 @@ Cloud deployment:
 import asyncio
 import logging
 import os
-import threading
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from functools import cache, partial
 from pathlib import Path
 from typing import Any
@@ -55,19 +53,8 @@ from strands.models import BedrockModel  # noqa: E402
 
 from fleet_supervisor.core.agents import build_supervisor  # noqa: E402
 from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
-from fleet_supervisor.core.credentials import load_credentials  # noqa: E402
 from fleet_supervisor.core.events import EventMapper  # noqa: E402
-from fleet_supervisor.core.gateway_tools import (  # noqa: E402
-    REQUEST_SESSION_ID,
-    GatewayConnection,
-    GatewayTool,
-    stop_quietly,
-)
-from fleet_supervisor.core.mcp import (  # noqa: E402
-    GatewayAuth,
-    build_gateway_auth,
-    build_mcp_client,
-)
+from fleet_supervisor.core.graph import close, get_graph_schema  # noqa: E402
 from fleet_supervisor.core.memory import (  # noqa: E402
     MemoryClientError,
     MemorySession,
@@ -79,6 +66,7 @@ from fleet_supervisor.core.memory import (  # noqa: E402
     password_rejected,
 )
 from fleet_supervisor.core.model import build_model  # noqa: E402
+from fleet_supervisor.core.secrets import neo4j_login  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,16 +83,20 @@ NO_PROMPT_ERROR = "No prompt provided. Include 'prompt' in the request."
 
 @asynccontextmanager
 async def _lifespan(app: BedrockAgentCoreApp) -> AsyncIterator[None]:
-    """Close the shared memory client when the server stops.
+    """Close the shared memory client and the graph driver when the server stops.
 
-    The close waits up to 30 seconds for open memory sessions. A request
-    cancelled at shutdown still writes its memory only if its session closes
-    in that time. Then the close waits for background extraction. Closing
-    the memory clients takes at most about 100 seconds. An extraction still
-    running at that deadline is lost.
+    The memory close waits up to 30 seconds for open memory sessions. A
+    request cancelled at shutdown still writes its memory only if its session
+    closes in that time. Then the close waits for background extraction.
+    Closing the memory clients takes at most about 100 seconds. An extraction
+    still running at that deadline is lost. The graph driver closes after
+    that, even if the memory close fails.
     """
     yield
-    await asyncio.to_thread(close_shared_memory)
+    try:
+        await asyncio.to_thread(close_shared_memory)
+    finally:
+        await asyncio.to_thread(close)
 
 
 app = BedrockAgentCoreApp(lifespan=_lifespan)
@@ -121,155 +113,13 @@ def track_background_task(name: str) -> Callable[[], None]:
     return partial(app.complete_async_task, app.add_async_task(name))
 
 
-@dataclass
-class Runtime:
-    """Process-wide resources, created on the first request.
-
-    ``model`` and ``tools`` last for the process. ``connection`` is replaced
-    when its MCP session ends, and is None after a failed rebuild.
-    """
-
-    model: BedrockModel
-    tools: list[GatewayTool]
-    connection: GatewayConnection | None
-
-
-_runtime: Runtime | None = None
-_runtime_lock = threading.Lock()
-# Counts finished build and rebuild attempts, and records whether the last
-# one failed. Both change only under _runtime_lock, when an attempt ends. A
-# caller that waited for the lock while another caller's attempt failed
-# skips its own attempt, so a Gateway outage costs one connect attempt, not
-# one per waiting caller. That includes a caller that arrived while the
-# attempt was running, because the count changes only when it ends.
-_attempts = 0
-_last_attempt_failed = False
-
-
-class RecentRebuildFailedError(RuntimeError):
-    """Another caller's build or rebuild failed while this one waited."""
-
-
 @cache
-def gateway_auth() -> GatewayAuth:
-    """Return the process-wide Gateway auth.
+def get_model() -> BedrockModel:
+    """Return the process-wide model, built on the first request.
 
-    It outlives MCP client rebuilds, so a reconnect keeps the cached token.
     A failure is not cached, so the next request tries again.
     """
-    return build_gateway_auth(load_credentials())
-
-
-def _connect_mcp() -> GatewayConnection:
-    """Start the Gateway client and fetch the filtered tool list."""
-    # One filtered client serves both specialists: they need the same
-    # two tools, so per-specialist filters would be identical.
-    mcp_client = build_mcp_client(gateway_auth())
-    try:
-        # load_tools starts the client, then lists every page with the
-        # client's tool filters applied. This runs in a worker thread with
-        # no event loop, so asyncio.run is safe here.
-        tools = list(asyncio.run(mcp_client.load_tools()))
-        if not tools:
-            raise RuntimeError(
-                "The Gateway returned none of the specialist tools. "
-                "Check the Gateway target and SPECIALIST_TOOL_FILTERS."
-            )
-    except Exception:
-        # Stop the client's background thread; the next request retries.
-        stop_quietly(mcp_client)
-        raise
-    logger.info("Gateway tools: %s", [t.tool_name for t in tools])
-    return GatewayConnection(mcp_client, tools)
-
-
-def _is_usable(runtime: Runtime | None, stale: GatewayConnection | None) -> bool:
-    connection = None if runtime is None else runtime.connection
-    return connection is not None and connection is not stale and connection.is_running()
-
-
-def current_connection() -> GatewayConnection | None:
-    """Return the current Gateway connection for a tool call."""
-    runtime = _runtime
-    return None if runtime is None else runtime.connection
-
-
-async def reconnect(stale: GatewayConnection | None) -> GatewayConnection:
-    """Return a running connection for a tool call whose ``stale`` one failed."""
-    connection = (await get_runtime(stale)).connection
-    if connection is None:
-        # get_runtime sets the connection or raises, so this means a bug.
-        raise RuntimeError("get_runtime returned no Gateway connection")
-    return connection
-
-
-def _start_runtime(
-    stale: GatewayConnection | None = None, seen_attempts: int | None = None
-) -> Runtime:
-    """Return a runtime with a live MCP session, building or rebuilding it.
-
-    ``stale`` is a connection a caller saw fail. It is rebuilt only if it is
-    still the current one, so callers that arrive after a rebuild reuse the
-    new connection instead of rebuilding again. ``seen_attempts`` is the
-    attempt count the caller read before waiting for the lock. If an attempt
-    since then failed, the caller fails fast instead of trying again. None
-    means the caller did not wait, so it always tries.
-    """
-    global _runtime, _attempts, _last_attempt_failed
-    with _runtime_lock:
-        runtime = _runtime
-        if _is_usable(runtime, stale):
-            return runtime
-        if seen_attempts is not None and _attempts != seen_attempts and _last_attempt_failed:
-            raise RecentRebuildFailedError(
-                "Another request's Gateway connect attempt just failed; not retrying yet"
-            )
-        failed = True
-        try:
-            runtime = _build_or_rebuild(runtime)
-            failed = False
-            return runtime
-        finally:
-            _attempts += 1
-            _last_attempt_failed = failed
-
-
-def _build_or_rebuild(runtime: Runtime | None) -> Runtime:
-    """Build the runtime, or rebuild its connection. Hold ``_runtime_lock``."""
-    global _runtime
-    if runtime is None:
-        # Build the model before the client, so a model error leaves
-        # no client thread running.
-        model = build_model()
-        connection = _connect_mcp()
-        tools = [
-            GatewayTool(tool, current_connection, reconnect) for tool in connection.tools.values()
-        ]
-        _runtime = Runtime(model=model, tools=tools, connection=connection)
-        return _runtime
-
-    old = runtime.connection
-    runtime.connection = None
-    if old is not None:
-        logger.warning("Rebuilding the Gateway MCP client (session=%s)", REQUEST_SESSION_ID.get())
-        old.retire()
-    connection = _connect_mcp()
-    missing = sorted({tool.tool_name for tool in runtime.tools} - connection.tools.keys())
-    if missing:
-        logger.warning("The rebuilt Gateway client lacks tools %s", missing)
-    runtime.connection = connection
-    return runtime
-
-
-async def get_runtime(stale: GatewayConnection | None = None) -> Runtime:
-    """Return the shared runtime, starting or reconnecting it when needed.
-
-    Pass ``stale`` when a call on that connection found the session ended.
-    """
-    runtime = _runtime
-    if _is_usable(runtime, stale):
-        return runtime
-    return await asyncio.to_thread(_start_runtime, stale, _attempts)
+    return build_model()
 
 
 def extract_prompt(payload: Any) -> str | None:
@@ -296,7 +146,7 @@ def _close_logged(session: MemorySession) -> None:
 
 
 def _build_agent(
-    runtime: Runtime, session_id: str, user_id: str
+    model: BedrockModel, schema: str, session_id: str, user_id: str
 ) -> tuple[Agent, MemorySession | None]:
     """Build the memory session and the supervisor. Blocks on Neo4j.
 
@@ -310,7 +160,7 @@ def _build_agent(
     """
     settings = memory_settings()
     try:
-        return _build_agent_once(runtime, settings, session_id, user_id)
+        return _build_agent_once(model, schema, settings, session_id, user_id)
     except Exception as error:
         if not password_rejected(error):
             raise
@@ -319,11 +169,15 @@ def _build_agent(
     # Outside the except block, so a second failure does not chain the first.
     logger.warning("Neo4j rejected the memory password; reading it again")
     forget_memory_settings(settings)
-    return _build_agent_once(runtime, memory_settings(), session_id, user_id)
+    return _build_agent_once(model, schema, memory_settings(), session_id, user_id)
 
 
 def _build_agent_once(
-    runtime: Runtime, settings: MemorySettings, session_id: str, user_id: str
+    model: BedrockModel,
+    schema: str,
+    settings: MemorySettings,
+    session_id: str,
+    user_id: str,
 ) -> tuple[Agent, MemorySession | None]:
     """Build the memory session and the supervisor once.
 
@@ -335,7 +189,7 @@ def _build_agent_once(
     session = build_session_manager(session_id, user_id, settings, track_background_task)
     try:
         supervisor = build_supervisor(
-            runtime.model, runtime.tools, session.manager if session is not None else None
+            model, schema, session.manager if session is not None else None
         )
     except BaseException as error:
         if session is not None:
@@ -393,19 +247,19 @@ async def invoke(payload: Any, context):
         user_id = payload.get("user_id")
         if not isinstance(user_id, str) or not user_id:
             user_id = "anonymous"
-        REQUEST_SESSION_ID.set(session_id)
         # The prompt is user text, so only its length goes to INFO.
         logger.info("Request session=%s user=%s prompt_chars=%d", session_id, user_id, len(prompt))
         logger.debug("Request session=%s prompt=%s", session_id, prompt)
 
-        # The workload access token is valid here, on the request path, so
-        # the Gateway token is fetched here too. See GatewayAuth.
-        gateway = await asyncio.to_thread(gateway_auth)
-        await gateway.prepare_request()
-        runtime = await get_runtime()
+        model = await asyncio.to_thread(get_model)
+        # The graph package caches the schema, so this queries Neo4j only
+        # when the cached copy has expired.
+        schema = await asyncio.to_thread(get_graph_schema)
         # The shield keeps a cancel from abandoning the build, so the finally
         # block can wait for it before closing the manager.
-        build = asyncio.create_task(asyncio.to_thread(_build_agent, runtime, session_id, user_id))
+        build = asyncio.create_task(
+            asyncio.to_thread(_build_agent, model, schema, session_id, user_id)
+        )
         supervisor, _ = await asyncio.shield(build)
         mapper = EventMapper()
         # Strands flushes memory through a hook in the stream's finally. The
@@ -441,14 +295,16 @@ async def invoke(payload: Any, context):
 def main(default_port: int = LOCAL_PORT) -> None:
     """Start the server in the foreground. Stop it with Ctrl+C.
 
-    ``uv run fleet-supervisor-server`` calls this with the local port, 7071,
-    so the supervisor can run beside graphrag-agent on 7070. The root
-    ``main.py`` calls it with 8080, the port AgentCore Runtime expects.
+    ``uv run fleet-supervisor-server`` calls this with the local port, 7071.
+    The root ``main.py`` calls it with 8080, the port AgentCore Runtime
+    expects.
     ``AGENT_PORT`` overrides both.
     """
     port = int(os.environ.get("AGENT_PORT", str(default_port)))
-    # Build the memory settings and read the password before serving, so a
-    # missing setting, a bad secret ARN, or a missing IAM grant stops startup.
+    # Read the graph login, build the memory settings, and read the memory
+    # password before serving. A missing setting, a bad secret ARN, or a
+    # missing IAM grant then stops startup.
+    neo4j_login()
     memory_settings()
     logger.info("Starting Aircraft Fleet Supervisor Agent (model %s) on port %s", MODEL_ID, port)
     app.run(port=port)

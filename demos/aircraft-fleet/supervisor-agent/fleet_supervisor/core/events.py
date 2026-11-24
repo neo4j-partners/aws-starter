@@ -1,10 +1,10 @@
 """Map Strands stream events to the client SSE event format.
 
-The format matches graphrag-agent, plus one event for routing:
+The client events:
 
 - ``{"type": "chunk", "data": ...}``: supervisor answer text
 - ``{"type": "agent", "name": ...}``: a specialist was called
-- ``{"type": "tool", "name": ...}``: an MCP tool was called
+- ``{"type": "tool", "name": ...}``: a graph tool was called
 - ``{"type": "complete"}`` and ``{"type": "error", "error": ...}``: sent by the server
 """
 
@@ -28,8 +28,8 @@ class EventMapper:
     def map(self, event: dict[str, Any]) -> Iterator[dict[str, Any]]:
         """Yield the client events for one Strands event."""
         if stream := event.get("tool_stream_event"):
-            # Events from inside a specialist. Only its MCP tool calls are
-            # forwarded; its text reaches the user through the supervisor.
+            # Events from inside a specialist. Only its graph tool calls are
+            # forwarded. Its text reaches the user through the supervisor.
             inner = stream.get("data")
             if isinstance(inner, dict) and (tool_use := inner.get("current_tool_use")):
                 yield from self._tool_event(tool_use)

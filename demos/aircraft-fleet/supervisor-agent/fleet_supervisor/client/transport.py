@@ -29,11 +29,9 @@ LOCAL_URL = f"http://localhost:{os.getenv('AGENT_PORT', '7071')}/invocations"
 # calls and adaptive thinking. botocore's 60 s default would cut it off.
 READ_TIMEOUT_S = 300
 
-# The Runtime issues a workload access token only when the call names a
-# user. The agent needs that token to fetch its Gateway token from AgentCore
-# Identity. "default" is what the AgentCore CLI sends with `agentcore invoke`.
-# One fixed ID works because the Gateway token is M2M. A per-user OAuth flow
-# would need each caller's own ID, or every caller would share one credential.
+# Each call names one fixed Runtime user. "default" is what the AgentCore CLI
+# sends with `agentcore invoke`. The agent itself no longer needs the workload
+# access token that a named user brings.
 RUNTIME_USER_ID = "default"
 
 

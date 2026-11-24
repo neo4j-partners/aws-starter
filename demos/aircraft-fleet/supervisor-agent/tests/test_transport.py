@@ -46,10 +46,10 @@ def test_collect_records_errors_and_skips_junk():
 
 def test_queries_file_sets_expected_agent_from_headers():
     queries = load_queries()
-    assert len(queries) == 20
+    assert [q.number for q in queries] == list(range(1, 34))
     by_number = {q.number: q.expected_agent for q in queries}
-    assert by_number[1] == "Maintenance Agent"
-    assert by_number[11] == "Operations Agent"
+    assert by_number[1] == by_number[18] == "Maintenance Agent"
+    assert by_number[19] == by_number[33] == "Operations Agent"
 
 
 class _FakeStream:

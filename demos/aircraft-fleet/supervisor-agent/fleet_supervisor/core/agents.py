@@ -1,7 +1,9 @@
 """Build the supervisor Agent and its specialist tools.
 
 Each specialist is a :class:`SpecialistTool`. The tool descriptions drive
-routing, so they name each specialist's domain.
+routing, so they name each specialist's domain. Maintenance gets the graph
+query and manual search tools, and Operations gets the graph query tool. Both
+specialist prompts hold the live graph schema.
 
 A specialist ``Agent`` serves one call at a time: ``Agent.as_tool`` holds a
 lock while the agent runs and fails a second call with "already processing a
@@ -20,9 +22,10 @@ from strands.session import SessionManager
 from strands.types.events import ToolResultEvent
 from strands.types.tools import AgentTool, ToolGenerator, ToolSpec, ToolUse
 
+from fleet_supervisor.core.graph import MAINTENANCE_TOOLS, OPERATIONS_TOOLS
 from fleet_supervisor.core.prompts import (
-    MAINTENANCE_SYSTEM_PROMPT,
-    OPERATIONS_SYSTEM_PROMPT,
+    MAINTENANCE_SYSTEM_PROMPT_TEMPLATE,
+    OPERATIONS_SYSTEM_PROMPT_TEMPLATE,
     SUPERVISOR_SYSTEM_PROMPT,
 )
 
@@ -40,8 +43,10 @@ SPECIALIST_NAMES = {
 MAINTENANCE_DESCRIPTION = (
     "Answers questions about aircraft maintenance and reliability: maintenance "
     "events, faults, failures, components, systems, sensors, readings, and "
-    "severity. Pass a self-contained question that resolves references from the "
-    "conversation."
+    "severity. Also answers questions about the maintenance manuals, such as "
+    "procedures, troubleshooting steps, and limits, and cites the manual "
+    "document IDs. Pass a self-contained question that resolves references "
+    "from the conversation."
 )
 OPERATIONS_DESCRIPTION = (
     "Answers questions about flight operations: flights, delays, delay causes, "
@@ -123,21 +128,22 @@ class SpecialistTool(AgentTool):
 
 def build_supervisor(
     model: Model,
-    specialist_tools: Sequence[Any],
+    schema: str,
     session_manager: SessionManager | None = None,
 ) -> Agent:
     """Build one supervisor with its Maintenance and Operations specialist tools.
 
-    ``specialist_tools`` is the filtered Gateway tool list, shared by both
-    specialists. ``session_manager`` attaches to the supervisor only.
+    ``schema`` is the live graph schema text, formatted into both specialist
+    prompts. ``session_manager`` attaches to the supervisor only.
     """
 
-    def specialist(name: str, system_prompt: str) -> Callable[[], Agent]:
+    def specialist(name: str, template: str, tools: Sequence[Any]) -> Callable[[], Agent]:
+        system_prompt = template.format(schema=schema)
         return lambda: Agent(
             name=name,
             model=model,
             system_prompt=system_prompt,
-            tools=list(specialist_tools),
+            tools=list(tools),
             callback_handler=None,
         )
 
@@ -149,12 +155,14 @@ def build_supervisor(
             SpecialistTool(
                 MAINTENANCE_TOOL,
                 MAINTENANCE_DESCRIPTION,
-                specialist("maintenance_agent", MAINTENANCE_SYSTEM_PROMPT),
+                specialist(
+                    "maintenance_agent", MAINTENANCE_SYSTEM_PROMPT_TEMPLATE, MAINTENANCE_TOOLS
+                ),
             ),
             SpecialistTool(
                 OPERATIONS_TOOL,
                 OPERATIONS_DESCRIPTION,
-                specialist("operations_agent", OPERATIONS_SYSTEM_PROMPT),
+                specialist("operations_agent", OPERATIONS_SYSTEM_PROMPT_TEMPLATE, OPERATIONS_TOOLS),
             ),
         ],
         callback_handler=None,

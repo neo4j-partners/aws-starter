@@ -9,8 +9,9 @@ from strands import Agent, tool
 from strands.models import Model
 from strands.types.events import ToolResultEvent
 
-from fleet_supervisor.core import agents
+from fleet_supervisor.core import agents, graph
 from fleet_supervisor.core.agents import (
+    MAINTENANCE_DESCRIPTION,
     MAINTENANCE_TOOL,
     OPERATIONS_TOOL,
     SPECIALIST_ERROR,
@@ -20,10 +21,18 @@ from fleet_supervisor.core.agents import (
 )
 from fleet_supervisor.core.model import build_model
 
+SCHEMA = "Node labels: Aircraft, MaintenanceEvent, Flight, Delay"
+
 
 @tool
-def read_neo4j_cypher(query: str) -> str:
-    """Stand-in for the Gateway read tool."""
+def graph_query_tool(question: str) -> str:
+    """Stand-in for the graph query tool."""
+    return question
+
+
+@tool
+def vector_search_tool(query: str, top_k: int = 5) -> str:
+    """Stand-in for the manual search tool."""
     return query
 
 
@@ -60,6 +69,18 @@ def empty_spec_cache(monkeypatch):
     monkeypatch.setattr(agents, "_SPEC_CACHE", {})
 
 
+@pytest.fixture
+def fake_tools(monkeypatch):
+    """Replace the graph tools that agents hands to each specialist."""
+    monkeypatch.setattr(agents, "MAINTENANCE_TOOLS", (graph_query_tool, vector_search_tool))
+    monkeypatch.setattr(agents, "OPERATIONS_TOOLS", (graph_query_tool,))
+
+
+def specialist_agent(supervisor: Agent, name: str) -> Agent:
+    """Build the agent behind one of the supervisor's specialist tools."""
+    return supervisor.tool_registry.registry[name]._build_agent()
+
+
 def specialist_tool(model: Model) -> SpecialistTool:
     return SpecialistTool(
         MAINTENANCE_TOOL,
@@ -79,15 +100,63 @@ async def final_result(specialist: SpecialistTool, tool_use_id: str) -> dict[str
     return result
 
 
-def test_supervisor_has_both_specialist_tools():
-    supervisor = build_supervisor(build_model(), [read_neo4j_cypher])
+def test_supervisor_has_both_specialist_tools(fake_tools):
+    supervisor = build_supervisor(build_model(), SCHEMA)
     assert sorted(supervisor.tool_names) == sorted([MAINTENANCE_TOOL, OPERATIONS_TOOL])
+
+
+def test_maintenance_gets_graph_query_and_manual_search(fake_tools):
+    agent = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL)
+    assert sorted(agent.tool_names) == ["graph_query_tool", "vector_search_tool"]
+
+
+def test_operations_gets_graph_query_only(fake_tools):
+    agent = specialist_agent(build_supervisor(FakeModel(), SCHEMA), OPERATIONS_TOOL)
+    assert agent.tool_names == ["graph_query_tool"]
+
+
+def test_specialists_use_the_graph_package_tools_by_default():
+    assert agents.MAINTENANCE_TOOLS is graph.MAINTENANCE_TOOLS
+    assert agents.OPERATIONS_TOOLS is graph.OPERATIONS_TOOLS
+
+
+@pytest.mark.parametrize("name", [MAINTENANCE_TOOL, OPERATIONS_TOOL])
+def test_specialist_prompt_holds_the_schema(fake_tools, name):
+    prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), name).system_prompt
+    assert SCHEMA in prompt
+    assert "{schema}" not in prompt
+    # The schema is in the prompt, so no schema or raw Cypher tool is named.
+    assert "get_neo4j_schema" not in prompt
+    assert "read_neo4j_cypher" not in prompt
+
+
+def test_schema_braces_reach_the_prompt_unchanged(fake_tools):
+    schema = "Aircraft {tail_number: STRING}"
+    prompt = specialist_agent(build_supervisor(FakeModel(), schema), OPERATIONS_TOOL).system_prompt
+    assert schema in prompt
+
+
+def test_maintenance_prompt_asks_for_manual_document_ids(fake_tools):
+    prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
+    assert "[Source: ...]" in prompt
+    assert "vector_search_tool" in prompt
+
+
+def test_operations_prompt_names_no_manual_search_tool(fake_tools):
+    prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), OPERATIONS_TOOL).system_prompt
+    assert "vector_search_tool" not in prompt
+
+
+def test_manual_questions_route_to_maintenance(fake_tools):
+    assert "manuals" in MAINTENANCE_DESCRIPTION
+    prompt = build_supervisor(FakeModel(), SCHEMA).system_prompt
+    assert "If the question asks what a manual says" in prompt
 
 
 # Memory stores no tool calls, so restored turns hold only text. The
 # supervisor must not read a missing specialist call as no call.
-def test_supervisor_prompt_says_restored_turns_hold_no_tool_calls():
-    prompt = build_supervisor(build_model(), [read_neo4j_cypher]).system_prompt
+def test_supervisor_prompt_says_restored_turns_hold_no_tool_calls(fake_tools):
+    prompt = build_supervisor(build_model(), SCHEMA).system_prompt
     assert "Earlier turns restored from memory contain only user and assistant text" in prompt
     assert "does not mean no specialist ran" in prompt
     assert "call the specialist again rather than comment on it" in prompt
@@ -151,7 +220,7 @@ def test_spec_agent_is_built_once_across_requests():
     assert other.tool_spec["description"] == "other"
 
 
-def test_supervisors_built_per_request_reuse_the_specs(monkeypatch):
+def test_supervisors_built_per_request_reuse_the_specs(monkeypatch, fake_tools):
     built: list[str] = []
     real_agent = agents.Agent
 
@@ -161,8 +230,8 @@ def test_supervisors_built_per_request_reuse_the_specs(monkeypatch):
 
     monkeypatch.setattr(agents, "Agent", counting_agent)
     model = FakeModel()
-    build_supervisor(model, [read_neo4j_cypher])
-    build_supervisor(model, [read_neo4j_cypher])
+    build_supervisor(model, SCHEMA)
+    build_supervisor(model, SCHEMA)
     # Two spec agents on the first request, then only the supervisors.
     assert sorted(built) == sorted(
         ["maintenance_agent", "operations_agent", "fleet_supervisor", "fleet_supervisor"]

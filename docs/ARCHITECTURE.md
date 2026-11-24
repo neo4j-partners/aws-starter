@@ -244,9 +244,9 @@ The projects use different Claude models.
 
 | Model | Used by |
 |-------|---------|
-| Claude Sonnet 5.5 | The fleet supervisor and its specialists, fleet pipeline extraction, and fleet memory extraction |
-| Claude Haiku 4.5 | The quickstart agent and the fraud memory agent by default |
-| Claude Sonnet 4.6 | The SEC filings notebook |
+| Claude Sonnet 5.5 | The fleet supervisor and its specialists, fleet pipeline extraction, fleet memory extraction, and the fraud memory agent by default |
+| Claude Haiku 4.5 | The quickstart agent |
+| Claude Sonnet 4.6 | The SEC filings notebook's planned final answer cell. That cell does not exist yet |
 
 ---
 

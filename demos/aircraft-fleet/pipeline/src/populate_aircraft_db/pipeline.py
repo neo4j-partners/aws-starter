@@ -464,10 +464,11 @@ Input text:
 
 
 # Sonnet 5.5 thinks adaptively by default at "high" effort. Extraction is a
-# well-specified, per-chunk task, so "low" effort keeps pipeline cost down.
+# well-specified, per-chunk task, so "medium" keeps pipeline cost below that.
+# At "low", the model dropped whole table rows in some runs of a chunk.
 _BEDROCK_EXTRACTION_THINKING = {
     "thinking": {"type": "adaptive"},
-    "output_config": {"effort": "low"},
+    "output_config": {"effort": "medium"},
 }
 
 

@@ -40,6 +40,8 @@ QUERY_FAILED_RESULT = (
 SEARCH_FAILED_RESULT = (
     "The search could not be run. Tell the user the question could not be answered right now."
 )
+# A Cypher error from the database starts with this, followed by its message.
+QUERY_ERROR_PREFIX = "The generated Cypher query failed:"
 # The vector search returns between these many chunks. The tool description
 # states the same bounds.
 MIN_TOP_K = 1
@@ -62,7 +64,7 @@ def _neo4j_error_result(tool_name: str, error: Exception) -> str:
 
 def _query_error_result(message: str) -> str:
     return (
-        f"The generated Cypher query failed: {message[:_MAX_QUERY_ERROR_CHARS]}\n"
+        f"{QUERY_ERROR_PREFIX} {message[:_MAX_QUERY_ERROR_CHARS]}\n"
         "Rephrase the question to fit the schema and try again."
     )
 

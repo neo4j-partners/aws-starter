@@ -5,7 +5,13 @@ The client events:
 - ``{"type": "chunk", "data": ...}``: supervisor answer text
 - ``{"type": "agent", "name": ...}``: a specialist was called
 - ``{"type": "tool", "name": ...}``: a graph tool was called
+- ``{"type": "tool_complete", "call_id": ..., "status": ..., "duration_ms": ...}``:
+  a specialist or graph tool call finished. A successful graph query also
+  carries ``evidence_ids``, the fleet IDs in its result. Sent only with trace on.
 - ``{"type": "complete"}`` and ``{"type": "error", "error": ...}``: sent by the server
+
+With trace on, the ``agent`` and ``tool`` events also carry ``call_id`` and
+``parent_id``. A graph tool's ``parent_id`` is the specialist call that ran it.
 """
 
 import re
@@ -16,6 +22,14 @@ from typing import Any
 from strands import Agent
 
 from fleet_supervisor.core.agents import SPECIALIST_NAMES
+from fleet_supervisor.core.graph.tools import (
+    DATABASE_ERROR_RESULT,
+    QUERY_ERROR_PREFIX,
+    QUERY_FAILED_RESULT,
+    SEARCH_FAILED_RESULT,
+    TIMEOUT_RESULT,
+    UNAVAILABLE_RESULT,
+)
 from fleet_supervisor.core.tool_stream import (
     RESULT_EVENT_KEY,
     TRACE_STATE_KEY,
@@ -25,13 +39,15 @@ from fleet_supervisor.core.tool_stream import (
 FLEET_ID = re.compile(
     r"\b(?:AC\d{4,}(?:-S\d{2}(?:-C\d{2})?)?|ME\d{4,}|FL\d{5,}|N\d{5}[A-Z]?)(?![\w-])"
 )
+# The graph tools report failures as text, so a result that starts with one
+# of these is a failure even when its status is success.
 GRAPH_ERROR_PREFIXES = (
-    "The generated Cypher query failed:",
-    "The query took too long and was stopped.",
-    "The graph database is unavailable right now.",
-    "The graph database returned an error.",
-    "The query could not be generated.",
-    "The search could not be run.",
+    QUERY_ERROR_PREFIX,
+    TIMEOUT_RESULT,
+    UNAVAILABLE_RESULT,
+    DATABASE_ERROR_RESULT,
+    QUERY_FAILED_RESULT,
+    SEARCH_FAILED_RESULT,
 )
 
 
@@ -111,10 +127,7 @@ class EventMapper:
         if not (started := self._started.pop(call_id, None)):
             return
         name, start = started
-        is_graph_query = name.endswith("read_neo4j_cypher") or name in {
-            "graph_query",
-            "graph_query_tool",
-        }
+        is_graph_query = name in {"graph_query", "graph_query_tool"}
         is_graph_tool = is_graph_query or name in {"vector_search", "vector_search_tool"}
         content = result.get("content", [])
         failed = result["status"] == "error" or (
@@ -130,7 +143,7 @@ class EventMapper:
             else round((monotonic() - start) * 1000),
         }
         if is_graph_query and not failed:
-            # GraphRAG supplies row text and MCP can supply JSON blocks. Send only fleet IDs.
+            # The graph query returns row text. Send only the fleet IDs in it.
             refs = dict.fromkeys(FLEET_ID.findall(str(content)[:100_000]))
             event["evidence_ids"] = list(refs)[:30]
         yield event

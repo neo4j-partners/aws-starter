@@ -61,8 +61,8 @@ both specialists, and the supervisor combines their answers.
 The tools live in `fleet_supervisor/core/graph/`. They share one Neo4j driver
 per process.
 
-- **Graph query:** `graph_query_tool(question)` asks Claude for Cypher against the live schema, checks it, and runs it. It answers lookups, counts, aggregations, and traversals.
-- **Vector search:** `vector_search_tool(query, top_k=5)` runs hybrid vector and fulltext search over the manual chunks. `top_k` runs from 1 to 20.
+- **Graph query:** `graph_query_tool(question)` asks Claude for Cypher against the live schema, checks it, and runs it. It answers lookups, counts, aggregations, and traversals. The Maintenance prompt sends operating limit values here, to the graph's `OperatingLimit` nodes.
+- **Vector search:** `vector_search_tool(query, top_k=5, aircraft_type=None)` runs hybrid vector and fulltext search over the manual chunks. `top_k` runs from 1 to 20. With `aircraft_type` set, it searches only that type's manual. For limits it is the fallback when the graph has none.
 - **Schema:** Both specialist prompts hold the live schema. It is cached for 600 seconds, so a running server picks up a pipeline reload.
 - **Login:** The driver reads `NEO4J_PASSWORD_SECRET_ARN` when it is set. Otherwise it uses `NEO4J_USERNAME` and `NEO4J_PASSWORD`.
 

@@ -49,8 +49,8 @@ The Maintenance model picks a tool from the two tool descriptions. Each
 description names the other tool for the questions it does not handle, so
 the choice follows the question's shape.
 
-- **Graph query:** `graph_query_tool(question)` answers exact lookups, counts, aggregations, and traversals. It hands the question to a Text2Cypher retriever from `neo4j-graphrag`, which asks Claude Sonnet 5.5 for Cypher against the live schema and runs it.
-- **Vector search:** `vector_search_tool(query, top_k=5)` answers descriptive questions over the manual chunks. `top_k` runs from 1 to 20.
+- **Graph query:** `graph_query_tool(question)` answers exact lookups, counts, aggregations, and traversals. It hands the question to a Text2Cypher retriever from `neo4j-graphrag`, which asks Claude Sonnet 5.5 for Cypher against the live schema and runs it. The Maintenance prompt sends operating limit values here, to the graph's `OperatingLimit` nodes.
+- **Vector search:** `vector_search_tool(query, top_k=5, aircraft_type=None)` answers descriptive questions over the manual chunks. `top_k` runs from 1 to 20. With `aircraft_type` set, it searches only that type's manual. For limits it is the fallback when the graph has none.
 
 The tools share one driver per process. It is a connection pool, created on
 first use. The login comes from `core/secrets.py`, which reads

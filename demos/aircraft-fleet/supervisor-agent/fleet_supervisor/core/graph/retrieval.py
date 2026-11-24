@@ -31,6 +31,7 @@ from functools import lru_cache
 
 import neo4j
 from neo4j import Driver, GraphDatabase
+from neo4j.auth_management import AuthManagers
 from neo4j_graphrag.embeddings import BedrockEmbeddings
 from neo4j_graphrag.llm import BedrockLLM
 from neo4j_graphrag.retrievers import HybridCypherRetriever
@@ -39,7 +40,7 @@ from neo4j_graphrag.types import RetrieverResultItem
 
 from fleet_supervisor.core.config import AWS_REGION, MODEL_ID, ConfigError, graph_settings
 from fleet_supervisor.core.graph.text2cypher import BoundedText2CypherRetriever
-from fleet_supervisor.core.secrets import neo4j_login
+from fleet_supervisor.core.secrets import forget_secrets, neo4j_login
 
 logger = logging.getLogger(__name__)
 
@@ -56,17 +57,32 @@ def _require_env(name: str) -> str:
 
 
 _driver: Driver | None = None
+_driver_lock = threading.Lock()
+
+
+def _fresh_login() -> neo4j.Auth:
+    """Read the fleet graph login again, for the driver's auth manager.
+
+    The driver calls this for its first connection, and again each time Neo4j
+    rejects the login as ``Unauthorized``. The cached secrets are dropped
+    first, so a password rotated in Secrets Manager is read again. The driver
+    then retries the query in the same request. The memory path recovers the
+    same way in ``server._build_agent``.
+    """
+    forget_secrets()
+    login = neo4j_login()
+    return neo4j.basic_auth(login.username, login.password)
 
 
 def get_driver() -> Driver:
     """Return the process-wide Neo4j driver. It is a connection pool, created once."""
     global _driver
-    if _driver is None:
-        uri = _require_env("NEO4J_URI")
-        login = neo4j_login()
-        logger.info("Connecting to Neo4j at %s", uri)
-        _driver = GraphDatabase.driver(uri, auth=(login.username, login.password))
-    return _driver
+    with _driver_lock:
+        if _driver is None:
+            uri = _require_env("NEO4J_URI")
+            logger.info("Connecting to Neo4j at %s", uri)
+            _driver = GraphDatabase.driver(uri, auth=AuthManagers.basic(_fresh_login))
+        return _driver
 
 
 def _neo4j_database() -> str:
@@ -255,8 +271,15 @@ def graph_query(question: str) -> str:
 
 
 def close() -> None:
-    """Close the shared driver. Safe to call when no driver was opened."""
+    """Close the shared driver. Safe to call when no driver was opened.
+
+    The cached retrievers hold the driver, so they are dropped too. The next
+    call builds a new driver and new retrievers.
+    """
     global _driver
-    if _driver is not None:
-        _driver.close()
-        _driver = None
+    with _driver_lock:
+        _hybrid_retriever.cache_clear()
+        _text2cypher_retriever.cache_clear()
+        if _driver is not None:
+            _driver.close()
+            _driver = None

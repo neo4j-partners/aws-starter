@@ -7,4 +7,5 @@
 - :mod:`core.prompts`: supervisor and specialist system prompts
 - :mod:`core.agents`: builds the supervisor with its specialists as tools
 - :mod:`core.events`: maps Strands stream events to client SSE events
+- :mod:`core.tool_stream`: emits each tool result as a stream event when the trace is on
 """

@@ -204,6 +204,6 @@ def test_the_count_check_still_reports_no_describes_system_links() -> None:
     rel_counts = dict.fromkeys(loader.RELATIONSHIP_TYPES, 1)
     rel_counts["DESCRIBES_SYSTEM"] = 0
 
-    loader._check_cross_links(rel_counts, result)
+    loader._check_cross_links(rel_counts, 1, result)
 
     assert result.failures == ["SystemReference -> System has no links"]

@@ -958,12 +958,30 @@ def _check_vector_search(
     result.check(vector_ok, f"vector search smoke test failed: {vector_detail}", enrichment=True)
 
 
-def _check_cross_links(rel_counts: dict[str, int], result: _VerifyResult) -> None:
+def _sensor_limit_count(driver: Driver, database: str, rel_counts: dict[str, int]) -> int:
+    """Count (:Sensor)-[:HAS_LIMIT]->(:OperatingLimit) links.
+
+    Extracted SystemReference and ComponentReference nodes have HAS_LIMIT
+    edges too, so the HAS_LIMIT total can't show whether sensors were linked.
+    """
+    if rel_counts["HAS_LIMIT"] == 0:
+        return 0
+    records, _, _ = driver.execute_query(
+        "MATCH (:Sensor)-[r:HAS_LIMIT]->(:OperatingLimit) RETURN count(r) AS count",
+        database_=database,
+    )
+    return records[0]["count"]
+
+
+def _check_cross_links(
+    rel_counts: dict[str, int], sensor_limits: int, result: _VerifyResult
+) -> None:
     cross_link_checks = [
         ("Document -> Aircraft", rel_counts["APPLIES_TO"]),
         ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"]),
         ("SystemReference -> System", rel_counts["DESCRIBES_SYSTEM"]),
-        ("Sensor -> OperatingLimit", rel_counts["HAS_LIMIT"]),
+        ("ComponentReference -> Component", rel_counts["DESCRIBES_COMPONENT"]),
+        ("Sensor -> OperatingLimit", sensor_limits),
     ]
     print("\nCross-Link Checks:")
     for label, count in cross_link_checks:
@@ -1137,7 +1155,7 @@ def verify(
         has_vector_index="maintenanceChunkEmbeddings" in index_names,
         result=result,
     )
-    _check_cross_links(rel_counts, result)
+    _check_cross_links(rel_counts, _sensor_limit_count(driver, database, rel_counts), result)
     _check_egt_limits(driver, database, set(label_counts), result)
     _check_data_quality(driver, database, set(label_counts), set(relationship_counts), result)
     return _print_summary(result)

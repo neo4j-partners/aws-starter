@@ -15,7 +15,7 @@ LABELS = {"Sensor", "OperatingLimit"}
 class FakeDriver:
     """Answer the coverage query with fixed unlinked counts by type."""
 
-    def __init__(self, unlinked: dict[str, int]) -> None:
+    def __init__(self, unlinked: dict[str | None, int]) -> None:
         self.unlinked = unlinked
         self.calls: list[tuple[str, dict[str, object]]] = []
 
@@ -47,6 +47,7 @@ def test_the_query_exempts_air_data_disagree_sensors() -> None:
 
     [(query, kwargs)] = driver.calls
     assert "NOT (s)-[:HAS_LIMIT]->(:OperatingLimit)" in query
+    assert "NOT coalesce(s.type IN $exempt, false)" in query
     assert kwargs["exempt"] == ["AirDataDisagree"]
 
 
@@ -58,6 +59,15 @@ def test_unlinked_sensors_fail_with_their_count_by_type(
     assert result.failures == ["Sensors without OperatingLimit: 32 (EGT 2, Vibration 30)"]
     out = capsys.readouterr().out
     assert "EGT: 2" in out and "Vibration: 30" in out
+
+
+def test_sensors_with_no_type_are_labeled_no_type(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = _check(FakeDriver({"EGT": 1, None: 2}))
+
+    assert result.failures == ["Sensors without OperatingLimit: 3 (EGT 1, (no type) 2)"]
+    assert "(no type): 2" in capsys.readouterr().out
 
 
 def test_skip_enrichment_keeps_unlinked_sensors_a_warning() -> None:

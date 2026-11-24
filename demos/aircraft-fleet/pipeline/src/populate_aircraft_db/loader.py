@@ -1016,7 +1016,7 @@ def _check_sensor_limit_coverage(
         exempt=list(SENSOR_TYPES_WITHOUT_LIMITS),
         database_=database,
     )
-    unlinked = {row["type"]: row["count"] for row in records}
+    unlinked = {row["type"] or "(no type)": row["count"] for row in records}
     total = sum(unlinked.values())
     print(f"\nSensors without OperatingLimit: {total:,}")
     for sensor_type, count in unlinked.items():

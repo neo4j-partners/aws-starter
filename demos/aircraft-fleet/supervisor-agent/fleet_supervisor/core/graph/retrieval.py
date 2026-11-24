@@ -191,14 +191,18 @@ def _embedder() -> BedrockEmbeddings:
 
 # Appended to the hybrid search, where ``node`` is the matched Chunk and
 # ``score`` its hybrid score. It follows the lexical graph to the source
-# Document and to every entity extracted from the chunk. Entity labels are not
+# Document and to the entities linked to the chunk. Entity labels are not
 # hard-coded, so this keeps working when the extraction schema changes.
 #
 # With ``$aircraft_type`` set, it keeps only that type's chunks and then the
 # ``$result_k`` best. A null ``$aircraft_type`` keeps every chunk.
 #
-# The entity ``collect`` does not keep row order, so the final ORDER BY puts
-# the hits back in score order.
+# A chunk keeps at most ``$max_entities`` entities. They are taken in label
+# order from ``$entity_label_rank``, with a label it does not name at rank 0,
+# and then by name. So a table chunk's many OperatingLimit nodes come after
+# its faults, procedures, and components instead of crowding them out.
+#
+# The final ORDER BY keeps the hits in score order.
 CHUNK_RETRIEVAL_QUERY = """
 OPTIONAL MATCH (node)-[:FROM_DOCUMENT]->(doc:Document)
 WITH node, score, doc
@@ -206,23 +210,49 @@ WHERE $aircraft_type IS NULL OR toLower(doc.aircraftType) = toLower($aircraft_ty
 WITH node, score, doc
 ORDER BY score DESC
 LIMIT $result_k
-OPTIONAL MATCH (entity)-[:FROM_CHUNK]->(node)
-WITH node, score, doc, collect(DISTINCT entity)[..$max_entities] AS entities
+WITH node, score, doc, COLLECT {
+    MATCH (entity)-[:FROM_CHUNK]->(node)
+    WITH DISTINCT entity
+    WITH entity,
+         coalesce(head([l IN labels(entity) WHERE NOT l STARTS WITH '__']), 'Entity') AS label
+    ORDER BY coalesce($entity_label_rank[label], 0), entity.name, label, elementId(entity)
+    LIMIT $max_entities
+    RETURN label + ': ' + coalesce(entity.name, '?')
+} AS entities
 RETURN node.text AS text,
        score,
        doc.documentId AS document_id,
        doc.aircraftType AS aircraft_type,
        doc.title AS title,
        node.index AS chunk_index,
-       [e IN entities |
-           coalesce(head([l IN labels(e) WHERE NOT l STARTS WITH '__']), 'Entity')
-           + ': ' + coalesce(e.name, '?')] AS entities
+       entities
 ORDER BY score DESC
 """
 
 # Entities listed per chunk. Enough to show what the chunk is about without
 # flooding the model context.
 MAX_ENTITIES_PER_CHUNK = 10
+
+# Entity labels listed first on a hit, in this order. The pipeline extracts
+# them from the manual text.
+LEADING_ENTITY_LABELS = (
+    "Fault",
+    "MaintenanceProcedure",
+    "ComponentReference",
+    "SystemReference",
+    "AircraftModel",
+)
+
+# Entity labels listed last, after any label not named here. A table chunk
+# can link 25 to 35 generated limits, and ``graph_query`` reads their values.
+TRAILING_ENTITY_LABELS = ("OperatingLimit",)
+
+# Rank by label for ``$entity_label_rank``. Leading labels rank below 0 and
+# trailing labels above it, so a label in neither list, at rank 0, falls
+# between them.
+ENTITY_LABEL_RANK: dict[str, int] = {
+    label: rank - len(LEADING_ENTITY_LABELS) for rank, label in enumerate(LEADING_ENTITY_LABELS)
+} | {label: rank for rank, label in enumerate(TRAILING_ENTITY_LABELS, start=1)}
 
 # A search for one aircraft type takes this many times ``top_k`` hits from
 # each index before the type filter. neo4j-graphrag rejects filters on
@@ -364,6 +394,7 @@ def vector_search(query: str, top_k: int = 5, aircraft_type: str | None = None) 
             top_k=pool,
             query_params={
                 "max_entities": MAX_ENTITIES_PER_CHUNK,
+                "entity_label_rank": ENTITY_LABEL_RANK,
                 "aircraft_type": aircraft_type,
                 "result_k": top_k,
             },

@@ -105,6 +105,7 @@ def test_vector_search_without_a_type_takes_top_k_from_each_index(
     assert call["top_k"] == 5
     assert call["query_params"] == {
         "max_entities": retrieval.MAX_ENTITIES_PER_CHUNK,
+        "entity_label_rank": retrieval.ENTITY_LABEL_RANK,
         "aircraft_type": None,
         "result_k": 5,
     }
@@ -173,11 +174,50 @@ def test_the_chunk_query_filters_by_type_before_its_limit() -> None:
     assert where < query.index("ORDER BY score DESC") < query.index("LIMIT $result_k")
 
 
-# The entity collect runs after the LIMIT and does not keep row order.
+# Cypher keeps no row order after the LIMIT unless the query asks for it.
 def test_the_chunk_query_returns_hits_in_score_order() -> None:
     query = retrieval.CHUNK_RETRIEVAL_QUERY
     assert query.rstrip().endswith("ORDER BY score DESC")
     assert query.rindex("ORDER BY score DESC") > query.index("RETURN ")
+
+
+# A table chunk links 25 to 35 OperatingLimit nodes. A cap taken in no set
+# order dropped the chunk's faults and procedures from its Entities line.
+def test_the_chunk_query_caps_entities_after_ordering_them() -> None:
+    query = retrieval.CHUNK_RETRIEVAL_QUERY
+    subquery = query[query.index("COLLECT {") : query.index("} AS entities")]
+    order_by = subquery.index(
+        "ORDER BY coalesce($entity_label_rank[label], 0), entity.name, label, elementId(entity)"
+    )
+    assert order_by < subquery.index("LIMIT $max_entities")
+    assert "[..$max_entities]" not in query
+
+
+def test_the_chunk_query_names_no_entity_label() -> None:
+    query = retrieval.CHUNK_RETRIEVAL_QUERY
+    labels = (*retrieval.LEADING_ENTITY_LABELS, *retrieval.TRAILING_ENTITY_LABELS)
+    assert not [label for label in labels if label in query]
+
+
+def test_entity_labels_rank_extracted_types_before_limits() -> None:
+    unknown = "SomeNewLabel"
+    labels = [*retrieval.ENTITY_LABEL_RANK, unknown]
+    ranked = sorted(labels, key=lambda label: retrieval.ENTITY_LABEL_RANK.get(label, 0))
+    assert ranked == [
+        "Fault",
+        "MaintenanceProcedure",
+        "ComponentReference",
+        "SystemReference",
+        "AircraftModel",
+        unknown,
+        "OperatingLimit",
+    ]
+
+
+def test_entity_label_ranks_are_distinct_and_leave_zero_for_unknown_labels() -> None:
+    ranks = list(retrieval.ENTITY_LABEL_RANK.values())
+    assert len(set(ranks)) == len(ranks)
+    assert 0 not in ranks
 
 
 def test_schema_cache_honors_ttl(monkeypatch) -> None:

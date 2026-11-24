@@ -24,11 +24,13 @@ dependencies = [
 # Console entry points. The server runs in the foreground of its own
 # terminal (Ctrl+C to stop). `fleet-supervisor-cli` asks the local server one
 # question. `fleet-supervisor-invoke` is the cloud invocation and load-test
-# client.
+# client. `fleet-supervisor-secrets` creates or updates the two deploy
+# secrets from ../.env.
 [project.scripts]
 fleet-supervisor-server = "fleet_supervisor.server:main"
 fleet-supervisor-cli = "fleet_supervisor.client.cli:main"
 fleet-supervisor-invoke = "fleet_supervisor.client.invoke:main"
+fleet-supervisor-secrets = "fleet_supervisor.setup_secrets:main"
 
 [dependency-groups]
 dev = [

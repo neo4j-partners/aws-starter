@@ -213,7 +213,7 @@ OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
 
 ### How the deploy works
 
-- **Code zip:** The zip holds this folder except `.venv`, `agentcore/`, `__pycache__`, and `.pytest_cache`. The runtime runs `main.py`.
+- **Code zip:** The zip holds this folder except `.git`, `.venv`, `agentcore/`, `__pycache__`, `.pytest_cache`, `.DS_Store`, and `node_modules`. The runtime runs `main.py`.
 - **Secret guard:** `./agent.sh deploy` refuses to run if any `.env*`, `.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem` file, or a `venv/` folder, is inside this folder.
 - **CDK dependencies:** `deploy` and `destroy` run `npm ci` in `agentcore/cdk` when the install is missing, incomplete, or older than `package-lock.json`. `configure` always runs it.
 - **Invoke permission:** Deployed calls name no Runtime user, because the agent needs no workload access token. Its `agentcore.json` declares no credentials, memories, or gateways. That covers `fleet-supervisor-cli --remote`, `fleet-supervisor-invoke`, `load-test`, and the UI with `AGENT_ARN` set. The caller's IAM identity needs only `bedrock-agentcore:InvokeAgentRuntime`.

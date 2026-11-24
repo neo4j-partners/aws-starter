@@ -86,8 +86,8 @@ the query. The vector side embeds the original question with Titan Text
 Embeddings v2. That embedder must match the one the pipeline used.
 
 Each hit then runs `CHUNK_RETRIEVAL_QUERY`. The query follows `FROM_DOCUMENT`
-to the source manual and `FROM_CHUNK` back to the entities extracted from the
-chunk, at most 10 per chunk. The tool result starts each chunk with its
+to the source manual and `FROM_CHUNK` back to the entities and limits linked to
+the chunk, at most 10 per chunk. The tool result starts each chunk with its
 document ID, aircraft type, and chunk number, followed by those entities. The
 model can cite the source and see which faults or limits the chunk mentions.
 

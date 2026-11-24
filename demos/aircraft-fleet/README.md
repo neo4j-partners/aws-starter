@@ -8,7 +8,7 @@ One supervisor agent and its two specialists read it.
 
 ## Overview
 
-- **One graph, two kinds of data:** The graph joins live fleet records with knowledge extracted from maintenance manuals. An agent can move from a sensor on one aircraft to the limit the manual sets for it.
+- **One graph, two kinds of data:** The graph joins live fleet records with knowledge from maintenance manuals. An agent can move from a sensor on one aircraft to the limit the manual sets for it.
 - **One pipeline:** The pipeline generates the fleet data, loads it, enriches it from the manuals with Bedrock, links the two graphs, and verifies the result.
 - **One agent:** The supervisor agent routes each question to a Maintenance or Operations specialist. The specialists read Neo4j directly with the Neo4j Python driver.
 - **Memory:** The supervisor remembers each session and what it learns about a user. Memory lives in its own Neo4j database, apart from the fleet graph.
@@ -22,8 +22,9 @@ One supervisor agent and its two specialists read it.
 The [`pipeline/`](./pipeline/) project builds the Aircraft Digital Twin graph.
 
 - **Synthetic fleet:** It generates aircraft, systems, components, sensors, hourly readings, flights, delays, and maintenance events from a fixed seed.
-- **Manual enrichment:** It chunks the maintenance manuals, embeds each chunk with Bedrock Titan, and extracts faults, procedures, and limits with Bedrock Claude.
-- **Graph fusion:** It links the extracted knowledge to the real aircraft, systems, components, and sensors.
+- **Operating limits:** The generator writes the limits that the manuals state to a CSV. The loader writes them to the graph and links each sensor to its limits.
+- **Manual enrichment:** It chunks the maintenance manuals, embeds each chunk with Bedrock Titan, and extracts faults and procedures with Bedrock Claude. It links each operating limit to the chunks that state it.
+- **Graph fusion:** It links the extracted knowledge to the real aircraft, systems, and components.
 - **Indexes:** It creates the vector and fulltext chunk indexes that the Maintenance specialist searches.
 - **Checks:** It stamps each dataset and verifies node counts and stamps after every load.
 

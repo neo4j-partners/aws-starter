@@ -10,7 +10,13 @@ from neo4j.exceptions import Neo4jError
 from .display import WIDTH, header, show_cypher, table, val
 from .query_errors import report_query_error
 
-_EXTRACTED_LABELS = ["OperatingLimit"]
+_EXTRACTED_LABELS = [
+    "AircraftModel",
+    "SystemReference",
+    "ComponentReference",
+    "Fault",
+    "MaintenanceProcedure",
+]
 _VECTOR_INDEX = "maintenanceChunkEmbeddings"
 _FULLTEXT_INDEX = "maintenanceChunkText"
 
@@ -310,7 +316,7 @@ LIMIT $limit""",
 def _cross_links(driver: Driver, database: str, limit: int) -> None:
     header(
         "8. Cross-Links: Knowledge Graph \u2194 Operational Graph",
-        "Relationships connecting extracted entities to the operational aircraft graph.",
+        "Relationships connecting the manuals' knowledge to the operational aircraft graph.",
     )
     any_results = False
     for title, query, headers in _CROSSLINKS:

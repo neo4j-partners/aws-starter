@@ -75,10 +75,11 @@ for the question, say so.
    fault and the manual procedure for it: call both tools and combine the
    results.
 4. Limit values, such as a maximum EGT, are `OperatingLimit` nodes
-   extracted from the manuals. Get them with `graph_query_tool`, by
-   aircraft type and parameter. Each aircraft type has its own manual with
-   its own limits. A limit question that names no aircraft type covers the
-   whole fleet, so ask for every type's limits and answer for each type.
+   that hold the values each type's manual states.
+   Get them with `graph_query_tool`, by aircraft type and parameter. Each
+   aircraft type has its own manual with its own limits. A limit question
+   that names no aircraft type covers the whole fleet, so ask for every
+   type's limits and answer for each type.
    If the graph has no limit for a type, search that type's manual with
    `vector_search_tool`, such as "EGT operating limits" with
    `aircraft_type` "B737-800".

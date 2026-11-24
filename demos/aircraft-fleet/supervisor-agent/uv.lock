@@ -19,15 +19,18 @@ dependencies = [
     { name = "neo4j" },
     { name = "neo4j-agent-memory", extra = ["strands"] },
     { name = "neo4j-graphrag", extra = ["bedrock"] },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "starlette" },
     { name = "strands-agents" },
     { name = "truststore" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "anyio" },
     { name = "pytest" },
-    { name = "python-dotenv" },
     { name = "ruff" },
 ]
 
@@ -40,15 +43,18 @@ requires-dist = [
     { name = "neo4j", specifier = ">=6.3.1" },
     { name = "neo4j-agent-memory", extras = ["strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" },
     { name = "neo4j-graphrag", extras = ["bedrock"], specifier = ">=1.24" },
+    { name = "pydantic", specifier = ">=2.14.4" },
+    { name = "python-dotenv", specifier = ">=1.2.4" },
+    { name = "starlette", specifier = ">=1.10.0" },
     { name = "strands-agents", specifier = ">=1.65" },
     { name = "truststore", specifier = ">=0.10" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "anyio", specifier = ">=4.16.0" },
     { name = "pytest", specifier = ">=8.0" },
-    { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "ruff", specifier = ">=0.8.0" },
 ]
 

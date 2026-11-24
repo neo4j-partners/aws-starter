@@ -122,8 +122,6 @@ def test_cross_links_log_each_count(package_logs: pytest.LogCaptureFixture) -> N
             "AircraftModel -[:DESCRIBES_MODEL]-> Aircraft",
             "SystemReference -[:DESCRIBES_SYSTEM]-> System",
             "ComponentReference -[:DESCRIBES_COMPONENT]-> Component",
-            "OperatingLimit with no value dropped",
-            "Sensor -[:HAS_LIMIT]-> OperatingLimit",
         ]
     ]
 
@@ -131,9 +129,18 @@ def test_cross_links_log_each_count(package_logs: pytest.LogCaptureFixture) -> N
 def test_clear_enrichment_logs_the_total(
     package_logs: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(pipeline, "detach_delete_nodes", lambda driver, database, label: 1)
+    cleared: list[str] = []
+
+    def detach_delete_nodes(driver: object, database: str, label: str) -> int:
+        cleared.append(label)
+        return 1
+
+    monkeypatch.setattr(pipeline, "detach_delete_nodes", detach_delete_nodes)
 
     pipeline.clear_enrichment_data(CountDriver(), "db")
+    # The load writes the OperatingLimit nodes, so enrich keeps them.
+    assert "Chunk" in cleared
+    assert "OperatingLimit" not in cleared
     records = _records(package_logs, "populate_aircraft_db.pipeline")
     assert records[0] == (
         logging.INFO,
@@ -333,13 +340,18 @@ def test_cli_load_shows_blank_lines_between_load_phases(
     monkeypatch: pytest.MonkeyPatch, stamped_dir: Path, skipped: int, summary: str
 ) -> None:
     settings = SimpleNamespace(
-        neo4j_uri="bolt://example", neo4j_database="db", data_dir=stamped_dir
+        neo4j_uri="bolt://example",
+        neo4j_database="db",
+        data_dir=stamped_dir,
+        document_dir=stamped_dir,
     )
     monkeypatch.setattr(main, "Settings", lambda: settings)
     monkeypatch.setattr(main, "_connect", lambda s: nullcontext(CountDriver()))
     for name in ("create_constraints", "create_indexes", "create_fulltext_indexes"):
         monkeypatch.setattr(main, name, lambda driver, database: None)
     monkeypatch.setattr(pipeline, "link_to_existing_graph", lambda driver, database: None)
+    monkeypatch.setattr(pipeline, "limit_sources", lambda data_dir, document_dir: [])
+    monkeypatch.setattr(pipeline, "link_limits_to_chunks", lambda driver, database, sources: None)
     monkeypatch.setattr(pipeline, "validate_enrichment", lambda driver, database: None)
     _fake_loader(monkeypatch, skipped)
 

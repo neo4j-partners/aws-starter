@@ -243,11 +243,21 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
 def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> None:
     """Run the enrichment pipeline: chunk, embed, extract entities, and link."""
     from .pipeline import (
+        check_limit_nodes,
         clear_enrichment_data,
+        limit_sources,
+        link_limits_to_chunks,
         link_to_existing_graph,
         process_all_documents,
         validate_enrichment,
     )
+
+    # Find each limit's source text before any graph change or LLM call.
+    print("Finding operating limit sources in the manuals...")
+    sources = limit_sources(settings.data_dir, settings.document_dir)
+    check_limit_nodes(driver, settings.neo4j_database, sources)
+    print(f"  [OK] {len(sources)} limits")
+    print()
 
     print("Clearing existing enrichment data (safe re-run)...")
     clear_enrichment_data(driver, settings.neo4j_database)
@@ -300,6 +310,7 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
 
     print("\nLinking to existing graph...")
     link_to_existing_graph(driver, settings.neo4j_database)
+    link_limits_to_chunks(driver, settings.neo4j_database, sources)
 
     validate_enrichment(driver, settings.neo4j_database)
 
@@ -442,7 +453,12 @@ def clean_enrichment_cmd() -> None:
 @app.command("load-operational")
 def load_operational_cmd() -> None:
     """Load only CSV operational data and relink existing enrichment."""
-    from .pipeline import link_to_existing_graph, validate_enrichment
+    from .pipeline import (
+        limit_sources,
+        link_limits_to_chunks,
+        link_to_existing_graph,
+        validate_enrichment,
+    )
 
     settings = Settings()  # type: ignore[call-arg]
 
@@ -463,6 +479,8 @@ def load_operational_cmd() -> None:
 
         print("Linking existing enrichment to operational graph...")
         link_to_existing_graph(driver, settings.neo4j_database)
+        sources = limit_sources(settings.data_dir, settings.document_dir)
+        link_limits_to_chunks(driver, settings.neo4j_database, sources)
 
         validate_enrichment(driver, settings.neo4j_database)
 

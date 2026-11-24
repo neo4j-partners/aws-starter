@@ -87,8 +87,9 @@ extracted entities with `neo4j-graphrag`'s `SimpleKGPipeline`.
 
 - **Chunks:** `ContextPrependingSplitter` wraps `FixedSizeSplitter` with 800-character chunks and a 100-character overlap. It puts a `[DOCUMENT CONTEXT]` header with the aircraft type and title in front of every chunk. The header also names the manual section the chunk starts in, except in a manual's first chunk, which starts before any section heading. `SimpleKGPipeline` passes document metadata only to the lexical graph builder, so the header is the only place the extractor sees the airframe model. Chunks deep in an engine section often name only the engine. A chunk that starts inside a markdown table also gets the table's header row and separator, so its values keep their column names.
 - **Embeddings:** Titan Text Embeddings v2 embeds each chunk at 1024 dimensions.
-- **Extraction:** Claude Sonnet 5.5 extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit` entities. Entity names include the aircraft type, so entity resolution stays inside one model and each model keeps its own limits.
-- **Operating limits:** Each `OperatingLimit` has a `regime` from a closed list of 15 in `schema.OPERATING_LIMIT_REGIMES`. Rule 8 of `EXTRACTION_PROMPT` takes the hard limits for Takeoff, Max Continuous, and Start only from the Maximum column of a manual's Operating Limits table. It gives a value from the Normal Operating Parameters table a `<regime> Normal` regime, such as `Takeoff Normal`.
+- **Extraction:** Claude Sonnet 5.5 extracts `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, and `MaintenanceProcedure` entities. Entity names include the aircraft type, so entity resolution stays inside one model.
+- **Chunk offsets:** Each chunk records `startOffset` and `endOffset` in the manual's text, with comments stripped. The range starts at the chunk's own text, after any table header the splitter repeats.
+- **Operating limits:** Enrich doesn't extract limits. The load writes each `OperatingLimit` from `generated/operating_limits.csv`, and enrich keeps those nodes. Each CSV row names the generated block and the exact line or sentence of the manual that states the limit. Enrich finds that text in the block and links the limit by `FROM_CHUNK` to each chunk that holds it whole. When no chunk holds it whole, the limit links to the chunks that overlap it. A table header that a chunk repeats doesn't count, and neither does a block that restates a limit, such as `egt-exceedance` or `quick-ref-engine`.
 
 ### Structured output on Bedrock
 
@@ -118,11 +119,10 @@ operational graph with `link_to_existing_graph()`.
 
 - **Vector index:** `maintenanceChunkEmbeddings` covers `Chunk` embeddings with cosine similarity at the configured dimension.
 - **Fulltext index:** `maintenanceChunkText` covers `Chunk` text. The Maintenance specialist's hybrid search uses both indexes.
-- **Empty limits:** `link_to_existing_graph()` deletes each `OperatingLimit` that has no `minValue` and no `maxValue`. It does this before it writes `HAS_LIMIT`.
 
 With the links in place, one query can start at a reading on one aircraft,
 step to its sensor, follow `HAS_LIMIT` to the manual's operating limits for
-each regime, and reach the chunks that describe the repair.
+each regime, and follow `FROM_CHUNK` to the chunks that state each limit.
 
 ## Verify
 
@@ -135,6 +135,7 @@ Stage 5 reads the graph and prints a report of warnings and failures.
 - **Search:** A vector search smoke test must succeed.
 - **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, `DESCRIBES_COMPONENT`, and `HAS_LIMIT` links must each exist. The `HAS_LIMIT` count includes only the links from a `Sensor` to an `OperatingLimit`.
 - **Sensor limits:** Every `Sensor` must have a `HAS_LIMIT` link to an `OperatingLimit`. `AirDataDisagree` sensors are exempt, because the manuals list them only in the sensor inventory. A failure gives the unlinked count for each sensor type.
+- **Limit chunks:** Every `OperatingLimit` must have a `FROM_CHUNK` link to a `Chunk`. A failure gives the unlinked count for each aircraft type.
 - **EGT limits:** Each aircraft type needs an EGT limit for each regime that the generator's `ENGINE_SPECS` gives a maximum. Those regimes are Takeoff, Max Continuous, and Start when the spec has a start maximum. Each `maxValue` must equal the generator's maximum. An EGT limit for a regime with no generator maximum fails, such as an A320-200 Start limit.
 - **Orphans:** Readings without a sensor, flights without an aircraft, components without a system, sensors without readings, documents without chunks, and systems without a `SystemReference` must all be zero.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import logging
 import re
 from dataclasses import dataclass
@@ -19,8 +20,6 @@ from .schema import (
     COMPONENT_ALIASES_TEXT,
     COMPONENT_TYPE_BY_ALIAS,
     COMPONENT_TYPES_TEXT,
-    OPERATING_LIMIT_REGIMES_TEXT,
-    SENSOR_PARAMETER_NAMES,
     SYSTEM_TYPE_BY_COMPONENT_TYPE,
     SYSTEM_TYPES,
     SYSTEM_TYPES_TEXT,
@@ -35,7 +34,6 @@ EXTRACTED_LABELS = [
     "ComponentReference",
     "Fault",
     "MaintenanceProcedure",
-    "OperatingLimit",
 ]
 
 # ---------------------------------------------------------------------------
@@ -108,6 +106,113 @@ def read_manual_text(path: Path) -> str:
     return strip_comments(path.read_text(encoding="utf-8")).strip()
 
 
+# A generated block's marker line, as generator.manuals writes it. The
+# generator checks the markers, so here they only mark where blocks are.
+_BLOCK_MARKER = re.compile(r"^<!-- (BEGIN|END) GENERATED: ([a-z0-9-]+) -->$")
+
+
+@dataclass(frozen=True)
+class ManualText:
+    """A manual's chunked text and where each generated block sits in it.
+
+    blocks maps a block id to the (start, end) range of its body in text.
+    """
+
+    text: str
+    blocks: dict[str, tuple[int, int]]
+
+
+def read_manual(path: Path) -> ManualText:
+    """A manual's text as read_manual_text gives it, with its block ranges.
+
+    Each run of lines between marker lines is stripped on its own, so the
+    offset at each marker is the length of the stripped text before it.
+    """
+    raw = path.read_text(encoding="utf-8")
+    parts: list[str] = []
+    offset = 0
+    starts: dict[str, int] = {}
+    blocks: dict[str, tuple[int, int]] = {}
+    segment: list[str] = []
+    for line in [*raw.splitlines(keepends=True), None]:
+        match = None if line is None else _BLOCK_MARKER.match(line.rstrip("\n"))
+        if line is not None and match is None:
+            segment.append(line)
+            continue
+        stripped = strip_comments("".join(segment))
+        parts.append(stripped)
+        offset += len(stripped)
+        segment = []
+        if match is not None:
+            kind, block_id = match.groups()
+            if kind == "BEGIN":
+                starts[block_id] = offset
+            else:
+                blocks[block_id] = (starts.pop(block_id), offset)
+    joined = "".join(parts)
+    if joined != strip_comments(raw):
+        raise ValueError(f"{path.name}: a comment spans a block marker")
+    text = joined.strip()
+    lead = len(joined) - len(joined.lstrip())
+
+    def clamp(pos: int) -> int:
+        return min(max(pos - lead, 0), len(text))
+
+    return ManualText(
+        text=text,
+        blocks={block_id: (clamp(s), clamp(e)) for block_id, (s, e) in blocks.items()},
+    )
+
+
+@dataclass(frozen=True)
+class LimitSource:
+    """Where an operating limit's source text sits in its manual.
+
+    start and end are offsets in the manual's chunked text, the same text the
+    chunks' startOffset and endOffset index.
+    """
+
+    name: str
+    document_id: str
+    start: int
+    end: int
+
+
+LIMITS_CSV = "operating_limits.csv"
+
+
+def limit_sources(data_dir: Path, document_dir: Path) -> list[LimitSource]:
+    """Find each generated limit's sourceText inside its sourceBlock.
+
+    Raises ValueError when a row's aircraftType has no manual, its block is
+    missing, or its sourceText does not occur exactly once in the block.
+    """
+    documents = {doc.aircraft_type: doc for doc in DOCUMENTS}
+    manuals: dict[str, ManualText] = {}
+    sources: list[LimitSource] = []
+    with (data_dir / LIMITS_CSV).open(encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            name, block_id, source = row["name"], row["sourceBlock"], row["sourceText"]
+            doc = documents.get(row["aircraftType"])
+            if doc is None:
+                raise ValueError(f"{name}: no manual for {row['aircraftType']!r}")
+            if doc.filename not in manuals:
+                manuals[doc.filename] = read_manual(document_dir / doc.filename)
+            manual = manuals[doc.filename]
+            if block_id not in manual.blocks:
+                raise ValueError(f"{name}: {doc.filename} has no block {block_id!r}")
+            block_start, block_end = manual.blocks[block_id]
+            body = manual.text[block_start:block_end]
+            if (count := body.count(source)) != 1:
+                raise ValueError(
+                    f"{name}: sourceText occurs {count} times in block {block_id!r}"
+                    f" of {doc.filename}"
+                )
+            start = block_start + body.index(source)
+            sources.append(LimitSource(name, doc.document_id, start, start + len(source)))
+    return sources
+
+
 # ---------------------------------------------------------------------------
 # Context-aware text splitter
 # ---------------------------------------------------------------------------
@@ -151,13 +256,16 @@ def markdown_tables(text: str) -> list[TableSpan]:
     return tables
 
 
-def with_table_header(text: str, start: int, end: int, tables: list[TableSpan]) -> str:
-    """``text[start:end]``, led by its table's header when it starts inside a table.
+def held_start(
+    text: str, start: int, end: int, tables: list[TableSpan]
+) -> tuple[int, TableSpan | None]:
+    """Where a chunk ``text[start:end]`` starts once it is extended to a whole table row.
 
     A chunk that starts in a table's header or separator line is extended
-    back to the header row. A chunk that starts in a body row gets the
-    header row and separator, then that whole row, so its first row is
-    complete and its cells line up with the header.
+    back to the header row. A chunk that starts in a body row is extended
+    back to the start of that row, and the table is returned too, since the
+    chunk also needs its header row and separator. Otherwise the chunk
+    starts at ``start`` and no table is returned.
     """
     chunk = text[start:end]
     first = start + len(chunk) - len(chunk.lstrip())
@@ -165,9 +273,21 @@ def with_table_header(text: str, start: int, end: int, tables: list[TableSpan]) 
     for table in tables:
         if table.start <= line_start < table.end and first > table.start:
             if line_start < table.body_start:
-                return text[table.start : end]
-            return text[table.start : table.body_start] + text[line_start:end]
-    return chunk
+                return table.start, None
+            return line_start, table
+    return start, None
+
+
+def with_table_header(text: str, start: int, end: int, tables: list[TableSpan]) -> str:
+    """``text[start:end]``, led by its table's header when it starts inside a table.
+
+    A chunk that starts in a body row gets the header row and separator,
+    then that whole row, so its first row is complete and its cells line up
+    with the header. :func:`held_start` says how the start moves.
+    """
+    held, table = held_start(text, start, end, tables)
+    header = text[table.start : table.body_start] if table else ""
+    return header + text[held:end]
 
 
 _HEADING = re.compile(r"(#{1,6})[ \t]+(.+?)[ \t]*")
@@ -230,7 +350,7 @@ class ContextPrependingSplitter(TextSplitter):
     engine designation (e.g. "LEAP-1A") dominates and the aircraft model
     (e.g. "A321neo") is never mentioned.  Without explicit context, the LLM
     confuses engine types for aircraft types, breaking downstream cross-links
-    that match on ``OperatingLimit.aircraftType == Aircraft.model``.
+    that match an entity's ``aircraftType`` to ``Aircraft.model``.
 
     This wrapper solves the problem by delegating splitting to the inner
     splitter, then prepending a short context header to *every* resulting
@@ -253,6 +373,12 @@ class ContextPrependingSplitter(TextSplitter):
     metadata. The lexical graph builder copies chunk metadata onto the
     ``Chunk`` node, so every chunk gets a stable id for its uniqueness
     constraint.
+
+    The metadata also holds ``startOffset`` and ``endOffset``, the range of
+    the split text the chunk holds. A chunk that starts inside a table row
+    holds that whole row, so its range starts at the row. A table header
+    added above a body row isn't in the range. Enrich links each operating
+    limit to the chunks whose range holds its source line.
 
     Set :attr:`context` and :attr:`document_id` before each call to
     ``pipeline.run_async()``. :attr:`context` is the context line without
@@ -287,13 +413,17 @@ class ContextPrependingSplitter(TextSplitter):
             # Skip leading blank lines, so a chunk that opens on blank
             # lines and then a heading counts as starting at that heading.
             body_start = start + len(chunk.text) - len(chunk.text.lstrip())
-            chunk.text = with_table_header(text, start, start + len(chunk.text), tables)
+            end = start + len(chunk.text)
+            held, _ = held_start(text, start, end, tables)
+            chunk.text = with_table_header(text, start, end, tables)
             if self.context:
                 section = section_path(headings, body_start)
                 chunk.text = self._context_line(section) + chunk.text
             chunk.metadata = {
                 **(chunk.metadata or {}),
                 "chunkId": f"{self.document_id}:{chunk.index}",
+                "startOffset": held,
+                "endOffset": end,
             }
         return result
 
@@ -340,11 +470,11 @@ according to the schema below.
 Return result as JSON using this format:
 {{"nodes": [
   {{"id": "0", "label": "AircraftModel", "properties": {{"name": "A320-200"}}}},
-  {{"id": "1", "label": "ComponentReference", "properties": {{"name": "High-Pressure Turbine - A320-200", "componentType": "HP Turbine", "aircraftType": "A320-200"}}}},
-  {{"id": "2", "label": "OperatingLimit", "properties": {{"name": "EGT Takeoff - A320-200", "parameterName": "EGT", "regime": "Takeoff", "aircraftType": "A320-200", "unit": "°C", "maxValue": "695"}}}}
+  {{"id": "1", "label": "SystemReference", "properties": {{"name": "Engine - A320-200", "systemType": "Engine", "aircraftType": "A320-200"}}}},
+  {{"id": "2", "label": "ComponentReference", "properties": {{"name": "High-Pressure Turbine - A320-200", "componentType": "HP Turbine", "aircraftType": "A320-200"}}}}
 ],
 "relationships": [
-  {{"start_node_id": "1", "end_node_id": "2", "type": "HAS_LIMIT", "properties": {{}}}}
+  {{"start_node_id": "1", "end_node_id": "2", "type": "HAS_COMPONENT", "properties": {{}}}}
 ]}}
 
 Use only the following node and relationship types:
@@ -366,41 +496,26 @@ throughout the text but they are components OF the aircraft, not the \
 aircraft type itself.
 
 3. EXTRACT USEFUL MANUAL KNOWLEDGE: Extract aircraft models, systems, \
-components, faults, procedures, and operating limits when they are explicitly \
-mentioned in the text. Do not invent part numbers, fault codes, intervals, or \
-limits that are not present.
-
-"""
-    + f"""\
-4. PARAMETER NAMES: For OperatingLimit, `parameterName` must be one of the \
-fleet sensor types {SENSOR_PARAMETER_NAMES} when the limit is for that \
-measurement. Use Vibration for every engine vibration limit, including N1 and \
-N2 vibration, and name the shaft in `name` instead. For any other parameter, \
-use its words from the text, e.g. Oil Pressure or N2. When the row or its \
-section belongs to a subsystem such as the gearbox, put the subsystem first \
-in `parameterName` and `name`, e.g. Gearbox Oil Pressure. Never qualify a \
-sensor type.
+components, faults, and procedures when they are explicitly mentioned in the \
+text. Do not invent part numbers, fault codes, or intervals that are not \
+present.
 
 """
     + """\
-5. ENTITY NAME FORMAT: For SystemReference, ComponentReference, Fault, \
-MaintenanceProcedure, and OperatingLimit, the `name` property must follow \
+4. ENTITY NAME FORMAT: For SystemReference, ComponentReference, Fault, and \
+MaintenanceProcedure, the `name` property must follow \
 "<specific name> - <aircraftType>" (e.g. "High-Pressure Turbine - A320-200"). \
 AircraftModel uses the aircraft type only (e.g. "A320-200"). This prevents \
-cross-model entity resolution mistakes. An OperatingLimit's specific name is \
-its parameter and then its `regime` (e.g. "EGT Takeoff - A320-200" and \
-"EGT Takeoff Normal - A320-200"), so each regime's limit stays a separate \
-entity. Set `regime` on every OperatingLimit, as rule 8 says.
+cross-model entity resolution mistakes.
 
-6. RELATIONSHIPS: Create relationships only when the text supports them. \
+5. RELATIONSHIPS: Create relationships only when the text supports them. \
 Prefer the schema patterns: AircraftModel HAS_SYSTEM SystemReference, \
 SystemReference HAS_COMPONENT ComponentReference, ComponentReference HAS_FAULT \
-Fault, Fault CORRECTED_BY MaintenanceProcedure, and component/system HAS_LIMIT \
-OperatingLimit.
+Fault, and Fault CORRECTED_BY MaintenanceProcedure.
 
 """
     + f"""\
-7. FLEET TYPES: Set SystemReference `systemType` to exactly one of \
+6. FLEET TYPES: Set SystemReference `systemType` to exactly one of \
 {SYSTEM_TYPES_TEXT}, and omit it for any other system. Set ComponentReference \
 `componentType` to exactly one of the types listed for the part's system: \
 {COMPONENT_TYPES_TEXT}. Use these types for the manuals' own part names: \
@@ -408,35 +523,6 @@ OperatingLimit.
 HP Turbine for a high-pressure turbine stage and Main Fuel Pump for an engine \
 fuel pump. Omit `componentType` when no listed type fits, such as a fuel \
 filter or a fuel nozzle. Never invent other values.
-
-"""
-    + f"""\
-8. OPERATING LIMITS: Emit an OperatingLimit only when the text gives a \
-numeric minValue or maxValue. Set `regime` to exactly one of \
-{OPERATING_LIMIT_REGIMES_TEXT}, and use the same words in the name. Use All \
-for a stated limit whose text names no regime. Skip nominal, design, and \
-capacity values, such as a pump's flow rate or a system's operating pressure.
-- Hard limits: Takeoff, Max Continuous, and Start come only from the \
-Operating Limits table, the one with Normal, Caution, and Maximum columns. \
-Set maxValue from its Maximum column, e.g. "EGT Takeoff - A320-200" with \
-maxValue 695. Ignore that table's Normal and Caution columns.
-- Normal ranges: The Normal Operating Parameters table and its Quick \
-Reference - Normal Operating Limits copy hold normal ranges, not hard limits. \
-Use the column's regime followed by Normal, e.g. "EGT Takeoff Normal - \
-A320-200" with regime Takeoff Normal and maxValue 650. Never give these a \
-hard-limit regime. Emit one limit for every row and regime column of these \
-tables that has a value, including oil, N2, and gearbox rows that match no \
-sensor type.
-- Bands: For an Advisory, Caution, or Warning row, set the band's bounds, \
-e.g. "Vibration N1 Warning - A220-300" with minValue 3.5. Skip Normal band \
-rows and Nominal values.
-- Trend: The Digital Twin trend-averaged EGT thresholds use Trend Advisory, \
-Trend Caution, and Trend Warning, with minValue where the level starts. Skip \
-the trend baseline.
-- Values: "a-b" sets minValue a and maxValue b. "< x" or "≤ x" sets maxValue \
-x. "> x" or "≥ x" sets minValue x. For "v (a-b)" or "v (< x)", use the range \
-in parentheses. A lone number in the Normal Operating Parameters table sets \
-maxValue.
 
 """
     + """\
@@ -851,32 +937,77 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         "  [OK] %d ComponentReference -[:DESCRIBES_COMPONENT]-> Component", records[0]["count"]
     )
 
-    # Drop each OperatingLimit with no minValue and no maxValue, so no
-    # Sensor links to a limit without a value.
-    records, _, _ = driver.execute_query(
-        """
-        MATCH (ol:OperatingLimit)
-        WHERE ol.minValue IS NULL AND ol.maxValue IS NULL
-        DETACH DELETE ol
-        RETURN count(*) AS count
-    """,
-        database_=database,
-    )
-    logger.info("  [OK] %d OperatingLimit with no value dropped", records[0]["count"])
 
-    # Sensor -[:HAS_LIMIT]-> OperatingLimit
-    # (same aircraft model, parameterName equals the Sensor type, ignoring case)
+def _source_params(sources: list[LimitSource]) -> list[dict[str, Any]]:
+    return [
+        {"name": s.name, "documentId": s.document_id, "start": s.start, "end": s.end}
+        for s in sources
+    ]
+
+
+def check_limit_nodes(driver: Driver, database: str, sources: list[LimitSource]) -> None:
+    """Raise ValueError when a limit in the CSV has no loaded OperatingLimit node.
+
+    The load writes the nodes, so a missing one means the graph was loaded
+    from other CSVs. A limit with the KG builder labels was extracted by an
+    older enrich, and the clear deletes it, so it does not count. Enrich runs
+    this before the clear and the LLM work.
+    """
     records, _, _ = driver.execute_query(
         """
-        MATCH (a:Aircraft)-[:HAS_SYSTEM]->(:System)-[:HAS_SENSOR]->(s:Sensor)
-        MATCH (ol:OperatingLimit {aircraftType: a.model})
-        WHERE toLower(ol.parameterName) = toLower(s.type)
-        MERGE (s)-[:HAS_LIMIT]->(ol)
-        RETURN count(*) AS count
-    """,
+        UNWIND $names AS name
+        OPTIONAL MATCH (ol:OperatingLimit {name: name})
+        WHERE NOT ol:__Entity__ AND NOT ol:__KGBuilder__
+        WITH name, ol WHERE ol IS NULL
+        RETURN collect(name) AS missing
+        """,
+        names=[s.name for s in sources],
         database_=database,
     )
-    logger.info("  [OK] %d Sensor -[:HAS_LIMIT]-> OperatingLimit", records[0]["count"])
+    if missing := records[0]["missing"]:
+        raise ValueError(
+            f"{len(missing)} limit(s) in {LIMITS_CSV} have no loaded OperatingLimit node,"
+            f" such as {missing[0]!r}. Load the operational graph first."
+        )
+
+
+def link_limits_to_chunks(driver: Driver, database: str, sources: list[LimitSource]) -> None:
+    """Link each OperatingLimit by FROM_CHUNK to the chunks of its source text.
+
+    A limit links to every chunk of its manual whose range holds the whole
+    source text. When none does, it links to the chunks that overlap it. A
+    chunk's range starts at its own text, so a table header the splitter
+    repeats at the top of a chunk never counts.
+    """
+    records, _, _ = driver.execute_query(
+        """
+        UNWIND $sources AS src
+        MATCH (ol:OperatingLimit {name: src.name})
+        OPTIONAL MATCH (c:Chunk)-[:FROM_DOCUMENT]->(:Document {documentId: src.documentId})
+        WHERE c.startOffset < src.end AND src.start < c.endOffset
+        WITH src, ol, collect(c) AS overlapping
+        WITH ol, overlapping,
+             [c IN overlapping WHERE c.startOffset <= src.start AND src.end <= c.endOffset]
+             AS holding
+        WITH ol, CASE WHEN holding = [] THEN overlapping ELSE holding END AS chunks
+        CALL (ol, chunks) {
+            UNWIND chunks AS c
+            MERGE (ol)-[:FROM_CHUNK]->(c)
+        }
+        RETURN count(ol) AS limits,
+               sum(size(chunks)) AS links,
+               sum(CASE WHEN chunks = [] THEN 1 ELSE 0 END) AS unlinked
+        """,
+        sources=_source_params(sources),
+        database_=database,
+    )
+    row = records[0]
+    logger.info(
+        "  [OK] %d OperatingLimit -[:FROM_CHUNK]-> Chunk (%d limits, %d with no chunk)",
+        row["links"],
+        row["limits"],
+        row["unlinked"],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -885,7 +1016,11 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
 
 
 def clear_enrichment_data(driver: Driver, database: str) -> None:
-    """Delete all Document, Chunk, and extracted entity nodes (preserves operational graph)."""
+    """Delete all Document, Chunk, and extracted entity nodes (preserves operational graph).
+
+    OperatingLimit nodes are part of the operational graph, since the load
+    writes them, so they stay. Their FROM_CHUNK edges go with the chunks.
+    """
     # __Entity__ and __KGBuilder__ are labels the KG pipeline adds to its nodes.
     labels_to_clear = ["Document", "Chunk", *EXTRACTED_LABELS, "__Entity__", "__KGBuilder__"]
 

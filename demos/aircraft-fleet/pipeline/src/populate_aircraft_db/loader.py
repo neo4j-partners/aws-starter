@@ -1157,6 +1157,41 @@ def _print_summary(result: _VerifyResult) -> bool:
     return True
 
 
+def _check_limit_chunks(
+    driver: Driver, database: str, existing_labels: set[str], result: _VerifyResult
+) -> None:
+    """Check that every OperatingLimit has a FROM_CHUNK link to a Chunk.
+
+    Enrich links each limit to the chunks that hold its source text. A
+    failure names the unlinked count for each aircraft type. With no
+    OperatingLimit or Chunk nodes the check is skipped, since the count
+    checks already report them.
+    """
+    if not {"OperatingLimit", "Chunk"} <= existing_labels:
+        return
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (ol:OperatingLimit)
+        WHERE NOT (ol)-[:FROM_CHUNK]->(:Chunk)
+        RETURN ol.aircraftType AS aircraftType, count(ol) AS count
+        ORDER BY aircraftType
+        """,
+        database_=database,
+    )
+    unlinked: dict[str, int] = {}
+    for row in records:
+        label = row["aircraftType"] or "(no aircraftType)"
+        unlinked[label] = unlinked.get(label, 0) + row["count"]
+    total = sum(unlinked.values())
+    print(f"\nOperatingLimits without Chunk: {total:,}")
+    for aircraft_type, count in unlinked.items():
+        print(f"  {aircraft_type}: {count:,}")
+    by_type = ", ".join(f"{aircraft_type} {count:,}" for aircraft_type, count in unlinked.items())
+    result.check(
+        total == 0, f"OperatingLimits without Chunk: {total:,} ({by_type})", enrichment=True
+    )
+
+
 def verify(
     driver: Driver,
     database: str,
@@ -1201,4 +1236,5 @@ def verify(
     _check_sensor_limit_coverage(driver, database, set(label_counts), result)
     _check_egt_limits(driver, database, set(label_counts), result)
     _check_data_quality(driver, database, set(label_counts), set(relationship_counts), result)
+    _check_limit_chunks(driver, database, set(label_counts), result)
     return _print_summary(result)

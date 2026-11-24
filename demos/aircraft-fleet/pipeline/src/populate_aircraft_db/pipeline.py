@@ -419,7 +419,9 @@ maxValue 695. Ignore that table's Normal and Caution columns.
 Reference - Normal Operating Limits copy hold normal ranges, not hard limits. \
 Use the column's regime followed by Normal, e.g. "EGT Takeoff Normal - \
 A320-200" with regime Takeoff Normal and maxValue 650. Never give these a \
-hard-limit regime.
+hard-limit regime. Emit one limit for every row and regime column of these \
+tables that has a value, including oil, N2, and gearbox rows that match no \
+sensor type.
 - Bands: For an Advisory, Caution, or Warning row, set the band's bounds, \
 e.g. "Vibration N1 Warning - A220-300" with minValue 3.5. Skip Normal band \
 rows and Nominal values.

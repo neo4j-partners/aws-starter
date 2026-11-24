@@ -297,7 +297,7 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
         if not settings.enrich_sample_size:
             raise UnlinkedLimitsError(message)
         print(
-            f"  [WARN] {message}. Sampling skipped their source documents, "
+            f"  [WARN] {message}. Sampling truncated the manuals before their source text, "
             f"with ENRICH_SAMPLE_SIZE={settings.enrich_sample_size}."
         )
 

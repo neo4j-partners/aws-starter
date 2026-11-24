@@ -248,7 +248,7 @@ def test_a_sampled_enrich_warns_about_the_limits_left_with_no_chunk(
     assert (
         "  [WARN] 2 operating limits have no chunk: "
         "EGT Cruise Max - B737-800, N1 Takeoff - A320-200. "
-        "Sampling skipped their source documents, with ENRICH_SAMPLE_SIZE=3.\n"
+        "Sampling truncated the manuals before their source text, with ENRICH_SAMPLE_SIZE=3.\n"
     ) in result.output
     assert calls[-1] == "validate_enrichment"
 

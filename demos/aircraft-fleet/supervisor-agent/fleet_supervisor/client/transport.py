@@ -1,8 +1,9 @@
-"""SSE transport for the supervisor: one parser, a local and a deployed source.
+"""SSE transport for the supervisor: a local and a deployed source.
 
 The server streams ``data: {...}`` events: ``chunk``, ``agent``, ``tool``,
-``error``, and ``complete``. Both transports yield the same bytes, so one
-parser handles them.
+``error``, and ``complete``. The deployed source reads them with
+``bedrock_agentcore.runtime.iter_events``. That reader takes only a boto3
+response, so the local httpx source keeps a small parser of its own.
 """
 
 import codecs
@@ -16,6 +17,7 @@ from typing import Any
 
 import boto3
 import httpx
+from bedrock_agentcore import runtime
 from botocore.config import Config
 
 logger = logging.getLogger(__name__)
@@ -45,7 +47,7 @@ EventHandler = Callable[[dict[str, Any]], None]
 
 
 def iter_events(chunks: Iterable[bytes]) -> Iterator[dict[str, Any]]:
-    """Yield each SSE event as a dict, as the bytes arrive."""
+    """Yield each SSE event from the local server as a dict, as the bytes arrive."""
     # Chunks can end in the middle of a multi-byte character.
     decoder = codecs.getincrementaldecoder("utf-8")()
     buffer = ""
@@ -74,11 +76,21 @@ def _parse(message: str) -> dict[str, Any] | None:
     return event if isinstance(event, dict) else None
 
 
-def collect(chunks: Iterable[bytes], on_event: EventHandler | None = None) -> InvokeResult:
+def iter_deployed_events(response: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """Yield each SSE event of an ``invoke_agent_runtime`` response as a dict."""
+    for data in runtime.iter_events(response):
+        if isinstance(data, dict):
+            yield data
+        elif isinstance(data, str):
+            # The reader yields data that is not JSON as a string.
+            logger.warning("Skipping a non-JSON SSE message: %s", data[:200])
+
+
+def collect(events: Iterable[dict[str, Any]], on_event: EventHandler | None = None) -> InvokeResult:
     """Read every event into an ``InvokeResult``, calling ``on_event`` for each."""
     result = InvokeResult()
     parts: list[str] = []
-    for event in iter_events(chunks):
+    for event in events:
         if on_event:
             on_event(event)
         match event.get("type"):
@@ -122,7 +134,7 @@ def invoke_local(
         client.stream("POST", url, json={"prompt": prompt}, headers=headers) as response,
     ):
         response.raise_for_status()
-        return collect(response.iter_bytes(), on_event)
+        return collect(iter_events(response.iter_bytes()), on_event)
 
 
 def invoke_deployed(
@@ -149,4 +161,4 @@ def invoke_deployed(
         payload=json.dumps({"prompt": prompt}).encode(),
         qualifier="DEFAULT",
     )
-    return collect(response["response"].iter_chunks(), on_event)
+    return collect(iter_deployed_events(response), on_event)

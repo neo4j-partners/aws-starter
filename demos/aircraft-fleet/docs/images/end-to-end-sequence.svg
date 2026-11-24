@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1152" viewBox="0 0 1600 1152" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>End-to-End Request</title>
-  <desc>A user asks the supervisor about the most common faults. Claude on Bedrock picks the maintenance_specialist tool. The supervisor builds a new Maintenance Agent, which loops with Claude and calls graph_query_tool until Claude has an answer. The tool asks Claude to write Cypher from the live schema, checks it with EXPLAIN, and runs it read-only against Neo4j with the driver. The specialist answer returns to the supervisor, Claude writes the final answer, and the supervisor streams it to the user as SSE events.</desc>
+  <desc>A user asks the supervisor about the most common faults. Claude on Bedrock picks the maintenance_specialist tool. The supervisor builds a new Maintenance Agent. That agent loops with Claude and calls graph_query_tool until Claude has an answer. The tool asks Claude to write Cypher from the live schema. It checks the Cypher with EXPLAIN. It then runs the query read-only against Neo4j with the driver. The specialist answer returns to the supervisor. Claude writes the final answer. The supervisor streams it to the user as SSE events.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
@@ -29,7 +29,7 @@
   <rect x="1371" y="110" width="210" height="58" rx="12" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
   <text x="1476" y="135" font-size="15" font-weight="700" fill="#00594A" text-anchor="middle">Neo4j</text>
   <text x="1476" y="155" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle">fleet graph</text>
-  <rect x="40" y="190" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <rect x="40" y="190" width="1520" height="28" rx="6" fill="#ECEEF2"/>
   <text x="54" y="209" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">1. Route</text>
   <path d="M120,250 H385" fill="none" stroke="#667085" stroke-width="2" marker-end="url(#a-slate)"/>
   <rect x="132" y="226" width="246" height="21" rx="5" fill="#F7F8FA"/>
@@ -40,7 +40,7 @@
   <path d="M662,334 H397" fill="none" stroke="#2E6DB4" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
   <rect x="422" y="310" width="210" height="21" rx="5" fill="#F7F8FA"/>
   <text x="526.5" y="325" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">call maintenance_specialist</text>
-  <rect x="40" y="358" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <rect x="40" y="358" width="1520" height="28" rx="6" fill="#ECEEF2"/>
   <text x="54" y="377" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">2. Build the specialist</text>
   <path d="M391,418 H928" fill="none" stroke="#2E6DB4" stroke-width="2" marker-end="url(#a-blue)"/>
   <rect x="522" y="394" width="282" height="21" rx="5" fill="#F7F8FA"/>
@@ -48,7 +48,7 @@
   <path d="M934,460 H668" fill="none" stroke="#2E6DB4" stroke-width="2" marker-end="url(#a-blue)"/>
   <rect x="657" y="436" width="282" height="21" rx="5" fill="#F7F8FA"/>
   <text x="798.0" y="451" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">prompt with the live schema, question</text>
-  <rect x="40" y="484" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <rect x="40" y="484" width="1520" height="28" rx="6" fill="#ECEEF2"/>
   <text x="54" y="503" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">3. Tool loop, until Claude answers</text>
   <rect x="552" y="520" width="1008" height="380" rx="10" fill="none" stroke="#98A2B3" stroke-width="1.5" stroke-dasharray="4 4"/>
   <text x="566" y="540" font-size="13" font-weight="700" fill="#5C6470" text-anchor="start">loop</text>
@@ -76,7 +76,7 @@
   <path d="M934,866 H668" fill="none" stroke="#2E6DB4" stroke-width="2" marker-end="url(#a-blue)"/>
   <rect x="750" y="842" width="95" height="21" rx="5" fill="#F7F8FA"/>
   <text x="798.0" y="857" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">tool result</text>
-  <rect x="40" y="914" width="1520" height="28" rx="6" fill="#E4E7EC" fill-opacity="0.6"/>
+  <rect x="40" y="914" width="1520" height="28" rx="6" fill="#ECEEF2"/>
   <text x="54" y="933" font-size="14" font-weight="700" fill="#16233A" text-anchor="start">4. Answer</text>
   <path d="M662,966 H928" fill="none" stroke="#2E6DB4" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
   <rect x="729" y="942" width="138" height="21" rx="5" fill="#F7F8FA"/>

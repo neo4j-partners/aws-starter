@@ -155,8 +155,9 @@ The server is a `BedrockAgentCoreApp` that streams server-sent events.
 
 A payload with `"trace": true` adds a `call_id` and a `parent_id` to the
 `agent` and `tool` events. It also adds a `tool_complete` event when a
-specialist or graph tool call finishes. The [browser UI](../../ui/) uses the
-trace to draw each tool call's evidence.
+specialist or graph tool call finishes. The event for a successful graph
+query also carries `evidence_ids`, the fleet IDs in its result. The
+[browser UI](../../ui/) uses the trace to draw each tool call's evidence.
 
 ## Memory and serving
 

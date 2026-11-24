@@ -7,15 +7,15 @@ is useful only when an agent can move from a sensor on one aircraft to the
 limits the manual sets for that sensor, so the pipeline's last real job is to
 link the two.
 
-![Pipeline flow: generate, load, enrich, index and fuse, verify, with what each stage writes](../images/pipeline-flow.svg)
+![Pipeline flow: generate, load, enrich, index and fuse, and verify, with what each stage writes and checks, including the operating limits](../images/pipeline-flow.svg)
 
 | Stage | Code | Writes |
 |-------|------|--------|
 | 1. Generate | `src/generator/` | CSVs and `.stamp.json` in `generated/` |
-| 2. Load | `loader.py`, `schema.py` | The operational graph, one `Dataset` node, constraints, and indexes |
+| 2. Load | `loader.py`, `schema.py` | The operational graph with the operating limits and their `HAS_LIMIT` links, one `Dataset` node, constraints, and indexes |
 | 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings, and the extracted entities |
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The chunk vector and fulltext indexes, and the links between the two graphs |
-| 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
+| 5. Verify | `loader.py` | A pass or fail report |
 
 `./setup.sh` runs all five. Only stage 3 calls a model.
 `./setup.sh load-operational` builds the operational graph with no Bedrock
@@ -26,7 +26,7 @@ clear and relinks the enrichment an earlier full run left in the database.
 
 ## Generator
 
-![Fleet data generator: one config and seed drive six stages from fleet topology to the stamp, with atomic publish and the checks on the output](../images/generator-flow.svg)
+![Fleet data generator: one config and seed drive six stages from fleet topology to the stamp, with atomic publish and the checks on the output. The topology stage also writes operating_limits.csv from the manual specs, with no seed.](../images/generator-flow.svg)
 
 `generate-data generate` builds the whole fleet from one `GeneratorConfig`.
 The config holds the aircraft count, the airport count, the day count, and the
@@ -61,7 +61,7 @@ The stamp is how later steps tell a current dataset from a stale one.
 
 ## Operational data model
 
-![Fleet operational data model: eleven node labels and thirteen relationship types](../images/data-model.svg)
+![Fleet operational data model: twelve node labels and fourteen relationship types, with each Sensor linked by HAS_LIMIT to the OperatingLimit nodes for its aircraft's model](../images/data-model.svg)
 
 The loader reads the CSVs in batches and writes the operational graph with
 batched `UNWIND` queries. Each `Aircraft` has systems through `HAS_SYSTEM`.
@@ -120,7 +120,7 @@ works in any Bedrock and `neo4j-graphrag` pipeline.
 
 ## Fusion and indexes
 
-![The dual graph: the operational graph, the knowledge graph, and the links between them](../images/dual-graph.svg)
+![The dual graph: the operational graph with each Sensor linked to its operating limits, the knowledge graph built from the manuals, and the stage 4 links between them, including FROM_CHUNK from each limit to its chunks](../images/dual-graph.svg)
 
 Stage 4 creates the chunk indexes and then links the knowledge graph to the
 operational graph with `link_to_existing_graph()`.
@@ -162,8 +162,9 @@ nonzero, so the same check works in CI. The one exception is
 
 `verify --strict --skip-enrichment` keeps the counts, stamp, CSV comparison,
 operational constraints, sensor limits, EGT limits, the `Sensor -[:HAS_LIMIT]->`
-cross link, and operational orphans as failures. It reports the embeddings,
-chunk indexes, search test, extracted-entity constraints, the other cross
-links, documents without chunks, and systems without a `SystemReference` as
+cross link, and operational orphans as failures. It reports the document,
+chunk, and `AircraftModel` counts, the embeddings, chunk indexes, search test,
+extracted-entity constraints, the other cross links, the limit chunk check,
+documents without chunks, and systems without a `SystemReference` as
 warnings. `./setup.sh load-operational`
 uses it, because that graph has no enrichment.

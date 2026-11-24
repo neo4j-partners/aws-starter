@@ -44,10 +44,10 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 | Stage | Code | Output |
 |-------|------|--------|
 | 1. Generate | `src/generator/` | CSVs and a `.stamp.json` in `generated/`. The folder is git-ignored. |
-| 2. Load | `loader.py`, `schema.py` | The operational graph, one `Dataset` node with the stamp, and the constraints and indexes |
+| 2. Load | `loader.py`, `schema.py` | The operational graph with the operating limits and their `HAS_LIMIT` links, one `Dataset` node with the stamp, and the constraints and indexes |
 | 3. Enrich | `pipeline.py` | `Document` and `Chunk` nodes with embeddings, and the extracted entities |
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The `maintenanceChunkEmbeddings` vector index, the `maintenanceChunkText` fulltext index, and the links between the two graphs |
-| 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
+| 5. Verify | `loader.py` | A pass or fail report |
 
 - **Sample fulltext indexes:** Stage 2 also creates four fulltext indexes for sample queries: `maintenance_search`, `delay_search`, `component_search`, and `document_search`.
 - **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, `Removal`, and `OperatingLimit`.

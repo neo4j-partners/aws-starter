@@ -8,7 +8,7 @@ of its own. The memory graph stays apart from the fleet graph, because memory
 labels in the fleet graph would reach the schema in the specialist prompts and
 the Text2Cypher prompt.
 
-![The supervisor holds one shared memory client. Each request builds a session manager, restores history, answers, saves the turn, and closes the manager. Entity extraction runs in the background. Shutdown waits for running work, then closes the client.](../images/memory-lifecycle.svg)
+![The supervisor reads its memory password at startup and opens one shared memory client on the first request. Each request builds a session manager, restores history, entities, and preferences, answers, saves the turn, and closes the manager. Entity extraction runs in the background. Shutdown waits for running work, then closes every memory client.](../images/memory-lifecycle.svg)
 
 ## What memory holds
 

@@ -6,7 +6,7 @@ loaded before it can answer. The Runtime reads both Neo4j passwords from
 Secrets Manager, so no password appears in a template, an environment
 variable, or a deployment package.
 
-![One AgentCore CLI stack holds the supervisor Runtime. The Runtime reads the fleet graph and the memory database directly. It calls Claude and Titan on Bedrock and reads both Neo4j passwords from Secrets Manager.](../images/deployment-topology.svg)
+![One AgentCore CLI stack holds the supervisor Runtime. Before the deploy, the developer creates the two Neo4j secrets. The Runtime reads the fleet graph and the memory database directly. It calls Claude and Titan on Bedrock. It reads both Neo4j passwords from Secrets Manager and writes its logs to CloudWatch Logs.](../images/deployment-topology.svg)
 
 | Stack | Deployed by | Holds |
 |-------|-------------|-------|

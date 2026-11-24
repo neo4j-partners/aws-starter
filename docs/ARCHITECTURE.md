@@ -33,7 +33,7 @@ The two access paths serve different needs.
 | Path | Projects | How they reach Neo4j |
 |------|----------|----------------------|
 | MCP through the Gateway | Quickstart agent, fraud memory agent, Databricks, Amazon Quick | Cognito token, AgentCore Gateway, AgentCore Runtime, Neo4j MCP server. Amazon Quick uses a Cognito token pasted in by hand. That token lasts 24 hours. |
-| Direct driver | Fleet pipeline, fleet supervisor agent, fraud graph loader, SEC filings notebook | Neo4j Python driver over Bolt |
+| Direct driver | Fleet pipeline, fleet supervisor agent, fleet browser UI, fraud graph loader, SEC filings notebook | Neo4j Python driver over Bolt. The fleet browser UI uses it only for read-only evidence lookups. |
 
 - **Databricks:** Databricks reaches the default deployment's Gateway through a Unity Catalog HTTP connection. Databricks gets and refreshes the tokens itself with the Cognito client credentials.
 - **Amazon Quick:** Amazon Quick connects to the finance Gateway as a remote MCP connector. You paste its bearer token in by hand. The token lasts 24 hours.

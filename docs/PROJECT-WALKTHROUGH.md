@@ -137,9 +137,9 @@ component that writes the fleet graph.
 **Main components**
 
 - `setup.sh` drives the five stages: generate, load, enrich, index and fuse, and verify.
-- `src/generator/` generates aircraft, sensors, readings, flights, delays, and maintenance events from a fixed seed.
-- `src/populate_aircraft_db/loader.py` bulk loads the CSVs and verifies the graph.
-- `src/populate_aircraft_db/pipeline.py` chunks, embeds, and extracts entities from the manuals with `neo4j-graphrag`, then links them to the fleet records.
+- `src/generator/` generates aircraft, sensors, readings, flights, delays, and maintenance events from a fixed seed. It also writes the operating limits that the manuals state.
+- `src/populate_aircraft_db/loader.py` bulk loads the CSVs, links each sensor to its operating limits, and verifies the graph.
+- `src/populate_aircraft_db/pipeline.py` chunks, embeds, and extracts entities from the manuals with `neo4j-graphrag`, then links them to the fleet records. It links each operating limit to the chunks that state it.
 - `src/populate_aircraft_db/schema.py` defines the constraints, the vector and fulltext chunk indexes, and the extraction schema.
 - `src/populate_aircraft_db/bedrock_structured.py` gets schema-valid JSON from Claude through Converse tool use.
 - `manuals/` holds the five maintenance manuals that enrichment reads.

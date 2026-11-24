@@ -435,7 +435,9 @@ def build_extraction_schema():
                     description=(
                         f"Fleet sensor type when the limit is for one: {SENSOR_PARAMETER_NAMES}. "
                         "Use Vibration for N1 and N2 vibration. "
-                        "Otherwise a short sensor-style parameter name."
+                        "Otherwise the parameter's words from the text, e.g. Oil Pressure, "
+                        "led by its subsystem when it has one, e.g. Gearbox Oil Pressure. "
+                        "Never qualify a sensor type."
                     ),
                 ),
                 PropertyType(name="unit", type="STRING", description="Unit of measurement"),
@@ -445,7 +447,7 @@ def build_extraction_schema():
                     description=(
                         f"Operating regime or level, exactly one of: "
                         f"{OPERATING_LIMIT_REGIMES_TEXT}. "
-                        "Use All when the text names no regime."
+                        "Use All for a stated limit whose text names no regime."
                     ),
                 ),
                 PropertyType(

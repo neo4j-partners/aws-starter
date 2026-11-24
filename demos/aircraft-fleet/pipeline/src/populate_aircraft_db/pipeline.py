@@ -353,7 +353,8 @@ Use only the following node and relationship types:
 IMPORTANT RULES:
 
 1. DOCUMENT CONTEXT: The input text starts with a [DOCUMENT CONTEXT] line \
-that identifies the aircraft type and title. Use the aircraft type from this \
+that identifies the aircraft type and title. Its Section part names the \
+manual section the chunk starts in. Use the aircraft type from this \
 context line as the `aircraftType` property on every extracted entity except \
 AircraftModel, where it is the `name`.
 

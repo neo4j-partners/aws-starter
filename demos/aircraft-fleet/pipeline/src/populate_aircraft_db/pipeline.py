@@ -375,7 +375,10 @@ limits that are not present.
 fleet sensor types {SENSOR_PARAMETER_NAMES} when the limit is for that \
 measurement. Use Vibration for every engine vibration limit, including N1 and \
 N2 vibration, and name the shaft in `name` instead. For any other parameter, \
-use a concise sensor-style name.
+use its words from the text, e.g. Oil Pressure or N2. When the row or its \
+section belongs to a subsystem such as the gearbox, put the subsystem first \
+in `parameterName` and `name`, e.g. Gearbox Oil Pressure. Never qualify a \
+sensor type.
 
 """
     + """\

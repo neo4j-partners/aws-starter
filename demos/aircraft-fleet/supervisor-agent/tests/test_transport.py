@@ -1,10 +1,20 @@
 """SSE parsing in the client transport."""
 
 import json
+import sys
+from itertools import pairwise
 
-from fleet_supervisor.client import transport
+import pytest
+import urllib3.exceptions
+
+from fleet_supervisor.client import cli, transport
 from fleet_supervisor.client.invoke import load_queries
-from fleet_supervisor.client.transport import collect, invoke_deployed, iter_events
+from fleet_supervisor.client.transport import (
+    collect,
+    invoke_deployed,
+    iter_deployed_events,
+    iter_events,
+)
 
 
 def sse(*events: dict) -> bytes:
@@ -31,7 +41,7 @@ def test_collect_keeps_newlines_and_routing():
         {"type": "chunk", "data": "line 1\nline 2"},
         {"type": "complete"},
     )
-    result = collect([body])
+    result = collect(iter_events([body]))
     assert result.text == "line 1\nline 2"
     assert result.specialists == ["Maintenance Agent"]
     assert result.tools == ["gw___read_neo4j_cypher"]
@@ -39,7 +49,9 @@ def test_collect_keeps_newlines_and_routing():
 
 
 def test_collect_records_errors_and_skips_junk():
-    result = collect([b"data: not json\n\n" + sse({"type": "error", "error": "failed"})])
+    result = collect(
+        iter_events([b"data: not json\n\n" + sse({"type": "error", "error": "failed"})])
+    )
     assert result.errors == ["failed"]
     assert not result.ok
 
@@ -52,21 +64,43 @@ def test_queries_file_sets_expected_agent_from_headers():
     assert by_number[19] == by_number[33] == "Operations Agent"
 
 
-class _FakeStream:
-    def __init__(self, body: bytes) -> None:
-        self._body = body
+class _FakeRawStream:
+    """The urllib3 response under botocore's body, returning one read at a time."""
 
-    def iter_chunks(self):
-        yield self._body
+    def __init__(self, reads: list[bytes | Exception]) -> None:
+        self._reads = list(reads)
+
+    def read1(self, _size: int) -> bytes:
+        if not self._reads:
+            return b""
+        if isinstance(read := self._reads.pop(0), Exception):
+            raise read
+        return read
+
+
+class _FakeStream:
+    """botocore's ``StreamingBody``, which the AgentCore reader reads through."""
+
+    def __init__(self, *reads: bytes | Exception) -> None:
+        self._raw_stream = _FakeRawStream(list(reads))
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class _FakeRuntimeClient:
-    def __init__(self) -> None:
+    def __init__(self, *reads: bytes | Exception) -> None:
         self.kwargs: dict = {}
+        self.stream = _FakeStream(*(reads or [sse({"type": "chunk", "data": "ok"})]))
+        self.closed = False
 
     def invoke_agent_runtime(self, **kwargs):
         self.kwargs = kwargs
-        return {"response": _FakeStream(sse({"type": "chunk", "data": "ok"}))}
+        return {"response": self.stream}
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def test_invoke_deployed_names_no_runtime_user(monkeypatch):
@@ -79,3 +113,45 @@ def test_invoke_deployed_names_no_runtime_user(monkeypatch):
     assert "runtimeUserId" not in fake.kwargs
     assert len(fake.kwargs["runtimeSessionId"]) >= 33
     assert result.text == "ok"
+
+
+def test_deployed_events_split_across_reads_and_characters():
+    """Reads can end inside an event and inside a multi-byte character."""
+    body = (
+        sse({"type": "agent", "name": "Maintenance Agent"})
+        + b"data: not json\n\n"
+        + b"data: [1, 2]\n\n"
+        + sse({"type": "chunk", "data": "naïve – ✈"}, {"type": "complete"})
+    )
+    plane = body.index("✈".encode())
+    cuts = [5, body.index(b"\n\n") + 1, plane + 1, plane + 2, len(body) - 3]
+    reads = [body[start:end] for start, end in pairwise([0, *cuts, len(body)])]
+    stream = _FakeStream(*reads)
+
+    events = list(iter_deployed_events({"response": stream}))
+
+    assert events == [
+        {"type": "agent", "name": "Maintenance Agent"},
+        {"type": "chunk", "data": "naïve – ✈"},
+        {"type": "complete"},
+    ]
+    assert stream.closed
+
+
+def test_cli_reports_a_deployed_stream_that_fails_partway(monkeypatch, capsys):
+    """A read timeout mid-stream prints an error line and exits 1, with no traceback."""
+    timeout = urllib3.exceptions.ReadTimeoutError(None, None, "Read timed out.")
+    fake = _FakeRuntimeClient(sse({"type": "chunk", "data": "Two aircraft"}), timeout)
+    monkeypatch.setattr(transport.boto3, "client", lambda *args, **kwargs: fake)
+    monkeypatch.setenv("AGENT_ARN", "arn:aws:bedrock-agentcore:us-east-1:0:runtime/x")
+    monkeypatch.setattr(sys, "argv", ["fleet-supervisor-cli", "--remote", "hi"])
+
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main()
+
+    assert exit_info.value.code == 1
+    out = capsys.readouterr().out
+    assert "Two aircraft" in out
+    assert "ERROR: The deployed supervisor stream failed:" in out
+    assert fake.stream.closed
+    assert fake.closed

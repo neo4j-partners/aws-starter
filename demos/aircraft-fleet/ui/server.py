@@ -4,23 +4,22 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator, Iterator
-from contextlib import asynccontextmanager, closing, contextmanager
+from contextlib import AbstractContextManager, asynccontextmanager
 from functools import partial
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import UUID
 
 # Import the supervisor package before TLS clients so it can set up truststore.
-from fleet_supervisor.client.transport import READ_TIMEOUT_S, iter_events
+from fleet_supervisor.client.transport import stream_deployed, stream_local
 from fleet_supervisor.core.config import ConfigError
 from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager, retry_on_rotated_login
 
 # isort: split
 
-import boto3
 import httpx
+import urllib3.exceptions
 import uvicorn
-from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 from evidence import load_evidence
@@ -75,40 +74,14 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
             driver.close()
 
 
-@contextmanager
-def supervisor_stream(turn: ChatRequest) -> Iterator[Iterator[bytes]]:
+def supervisor_stream(turn: ChatRequest) -> AbstractContextManager[Iterator[dict[str, Any]]]:
     payload = {"prompt": turn.prompt, "trace": True}
     session_id = str(turn.session_id)
     if arn := os.getenv("AGENT_ARN"):
-        client = boto3.client(
-            "bedrock-agentcore",
-            region_name=os.getenv("AWS_REGION"),
-            config=Config(read_timeout=READ_TIMEOUT_S, connect_timeout=10),
-        )
-        with closing(client):
-            response = client.invoke_agent_runtime(
-                agentRuntimeArn=arn,
-                runtimeSessionId=session_id,
-                payload=json.dumps(payload).encode(),
-                qualifier="DEFAULT",
-            )
-            with closing(response["response"]) as body:
-                yield body.iter_chunks()
-        return
-
+        return stream_deployed(payload, arn, os.getenv("AWS_REGION"), session_id)
     port = os.getenv("AGENT_PORT", "7071")
     url = os.getenv("FLEET_SUPERVISOR_URL", f"http://127.0.0.1:{port}/invocations")
-    with (
-        httpx.Client(timeout=httpx.Timeout(READ_TIMEOUT_S, connect=10)) as client,
-        client.stream(
-            "POST",
-            url,
-            json=payload,
-            headers={"X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id},
-        ) as response,
-    ):
-        response.raise_for_status()
-        yield response.iter_bytes()
+    return stream_local(payload, session_id, url)
 
 
 def _frame(event: dict[str, Any]) -> str:
@@ -121,8 +94,8 @@ def relay(
     database = os.getenv("NEO4J_DATABASE", "neo4j")
     terminal = False
     try:
-        with supervisor_stream(turn) as chunks:
-            for event in iter_events(chunks):
+        with supervisor_stream(turn) as events:
+            for event in events:
                 if event.get("type") == "tool_complete":
                     ids = event.pop("evidence_ids", [])
                     if ids and driver is not None and auth is not None:
@@ -144,7 +117,7 @@ def relay(
                 if event.get("type") in {"complete", "error"}:
                     terminal = True
                     break
-    except (httpx.HTTPError, BotoCoreError, ClientError):
+    except (httpx.HTTPError, urllib3.exceptions.HTTPError, BotoCoreError, ClientError):
         logger.exception("Fleet supervisor stream failed")
         yield _frame({"type": "error", "error": "Could not reach the fleet supervisor."})
         return

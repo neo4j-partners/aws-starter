@@ -80,7 +80,7 @@ covers the read-only guard, hybrid search, and the errors the model sees.
 - **Background extraction:** Entity extraction runs after the reply. The health check reports busy until it ends, so AgentCore Runtime keeps the session alive.
 - **Shutdown:** Shutdown waits up to 30 seconds for open requests to write their memory, then closes the client. The whole close takes at most about 100 seconds.
 - **Lost work:** An extraction still running at the deadline is lost. The stored message keeps its text without entities.
-- **Password rotation:** If Neo4j rejects the memory password, the server reads the secret again and reopens the client with it.
+- **Password rotation:** If Neo4j rejects the memory password or the fleet graph password, the server reads that secret again. Memory reopens its client with the new password, and the graph tools retry the query with it.
 
 ## Run locally
 

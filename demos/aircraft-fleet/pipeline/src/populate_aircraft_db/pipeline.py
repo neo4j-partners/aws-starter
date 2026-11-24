@@ -196,7 +196,7 @@ Return result as JSON using this format:
 {{"nodes": [
   {{"id": "0", "label": "AircraftModel", "properties": {{"name": "A320-200"}}}},
   {{"id": "1", "label": "ComponentReference", "properties": {{"name": "High-Pressure Turbine - A320-200", "componentType": "HP Turbine", "aircraftType": "A320-200"}}}},
-  {{"id": "2", "label": "OperatingLimit", "properties": {{"name": "EGT - A320-200", "parameterName": "EGT", "aircraftType": "A320-200", "unit": "°C", "maxValue": "695"}}}}
+  {{"id": "2", "label": "OperatingLimit", "properties": {{"name": "EGT Takeoff - A320-200", "parameterName": "EGT", "regime": "Takeoff", "aircraftType": "A320-200", "unit": "°C", "maxValue": "695"}}}}
 ],
 "relationships": [
   {{"start_node_id": "1", "end_node_id": "2", "type": "HAS_LIMIT", "properties": {{}}}}
@@ -236,9 +236,13 @@ use a concise sensor-style name.
     + """\
 5. ENTITY NAME FORMAT: For SystemReference, ComponentReference, Fault, \
 MaintenanceProcedure, and OperatingLimit, the `name` property must follow \
-"<specific name> - <aircraftType>" (e.g. "EGT - A320-200"). AircraftModel \
-uses the aircraft type only (e.g. "A320-200"). This prevents cross-model \
-entity resolution mistakes.
+"<specific name> - <aircraftType>" (e.g. "High-Pressure Turbine - A320-200"). \
+AircraftModel uses the aircraft type only (e.g. "A320-200"). This prevents \
+cross-model entity resolution mistakes. An OperatingLimit's specific name is \
+its parameter and then its `regime` (e.g. "EGT Takeoff - A320-200" and \
+"EGT Max Continuous - A320-200"), so each regime's limit stays a separate \
+entity. Set `regime` on every OperatingLimit, and use All when the text names \
+no regime.
 
 6. RELATIONSHIPS: Create relationships only when the text supports them. \
 Prefer the schema patterns: AircraftModel HAS_SYSTEM SystemReference, \

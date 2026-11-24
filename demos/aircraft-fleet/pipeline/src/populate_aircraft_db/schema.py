@@ -391,8 +391,9 @@ def build_extraction_schema():
                     name="name",
                     type="STRING",
                     description=(
-                        "Unique identifier combining parameter and aircraft type, "
-                        "e.g. 'EGT - A320-200', 'N1Speed - B737-800'. "
+                        "Unique identifier combining parameter, regime, and aircraft "
+                        "type, e.g. 'EGT Takeoff - A320-200', "
+                        "'EGT Max Continuous - A320-200', 'N1Speed Cruise - B737-800'. "
                         "Always append ' - <aircraft type>'."
                     ),
                 ),
@@ -409,7 +410,11 @@ def build_extraction_schema():
                 PropertyType(
                     name="regime",
                     type="STRING",
-                    description="Operating regime, e.g. takeoff, cruise",
+                    description=(
+                        "Operating regime the limit applies to, e.g. Takeoff, "
+                        "Max Continuous, Cruise, Flight Idle, Ground Idle. "
+                        "Use All when the text names no regime."
+                    ),
                 ),
                 PropertyType(name="minValue", type="STRING", description="Minimum value"),
                 PropertyType(name="maxValue", type="STRING", description="Maximum value"),
@@ -477,6 +482,16 @@ def build_extraction_schema():
             "OperatingLimit",
         )
     ]
+    # Entity resolution merges same-name limits and discards the later
+    # properties, so a limit needs its regime to keep a name of its own.
+    constraints.append(
+        ConstraintType(
+            type=GraphConstraintType.EXISTENCE,
+            node_type="OperatingLimit",
+            property_names=("regime",),
+            relationship_type=None,
+        )
+    )
 
     return GraphSchema(
         node_types=tuple(node_types),

@@ -348,6 +348,9 @@ def graph_query(question: str) -> str:
     The model-facing description lives on ``core.graph.tools.graph_query_tool``.
     The current cached schema is passed on every call, so a schema refresh
     reaches the Cypher prompt without rebuilding the retriever.
+    A rejected login that has rotated reruns the whole search, Cypher
+    generation included. Claude writes the Cypher again, so the second query
+    can differ from the first.
     """
     result = _with_rotated_login(
         lambda: _text2cypher_retriever().search(

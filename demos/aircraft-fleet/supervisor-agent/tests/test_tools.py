@@ -256,6 +256,26 @@ def test_a_rotated_password_recovers_in_the_same_tool_call(
     assert tools_on_fake_neo4j.logins == ["first-pw", "rotated-pw"]
 
 
+# The embedding runs before the retried call, so a rotated login reruns only
+# the Neo4j search and makes no second Bedrock embedding call.
+def test_a_rotated_password_embeds_a_manual_search_once(
+    tools_on_fake_neo4j: FakeNeo4j, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    embedded: list[str] = []
+
+    def embed_query(query: str) -> list[float]:
+        embedded.append(query)
+        return []
+
+    monkeypatch.setattr(retrieval, "_embedder", lambda: SimpleNamespace(embed_query=embed_query))
+    assert retrieval._shared_driver()[1].get_auth().credentials == "first-pw"
+    monkeypatch.setenv("NEO4J_PASSWORD", "rotated-pw")
+
+    assert "row" in tools.vector_search_tool("hydraulic leak")
+    assert tools_on_fake_neo4j.logins == ["first-pw", "rotated-pw"]
+    assert embedded == ["hydraulic leak"]
+
+
 @pytest.mark.parametrize(
     "call",
     [

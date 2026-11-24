@@ -99,7 +99,6 @@ def test_enrich_checks_the_limits_before_the_clear_and_links_them_after_fusion(
     creds = main._LLMCredentials(
         provider="bedrock",
         openai_key=None,
-        anthropic_key=None,
         llm_model="model",
         llm_max_tokens=1,
         embedding_model="embedder",

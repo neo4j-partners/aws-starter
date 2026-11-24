@@ -152,9 +152,8 @@ def _connect(settings: Settings) -> Generator[Driver, None, None]:
 
 @dataclass
 class _LLMCredentials:
-    provider: Literal["bedrock", "openai", "anthropic"]
+    provider: Literal["bedrock", "openai"]
     openai_key: str | None
-    anthropic_key: str | None
     llm_model: str
     llm_max_tokens: int
     embedding_model: str
@@ -173,7 +172,6 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
     """Validate and resolve LLM credentials from settings. Raises typer.BadParameter on failure."""
     provider = settings.llm_provider
     openai_key = None
-    anthropic_key = None
     region = None
 
     if provider == "bedrock":
@@ -186,7 +184,6 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
         return _LLMCredentials(
             provider=provider,
             openai_key=None,
-            anthropic_key=None,
             llm_model=llm_model,
             llm_max_tokens=llm_max_tokens,
             embedding_model=embedding_model,
@@ -202,24 +199,8 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
         openai_key = settings.openai_api_key.get_secret_value()
         llm_model = settings.openai_extraction_model
         llm_max_tokens = settings.openai_extraction_max_completion_tokens
-    elif provider == "anthropic":
-        # Anthropic still needs OpenAI for embeddings.
-        if settings.openai_api_key is None:
-            raise typer.BadParameter(
-                "OPENAI_API_KEY is required for embeddings when using Anthropic. "
-                "Set it in .env or as an env var."
-            )
-        openai_key = settings.openai_api_key.get_secret_value()
-        if settings.anthropic_api_key is None:
-            raise typer.BadParameter(
-                "ANTHROPIC_API_KEY is required when using Anthropic. "
-                "Set it in .env or as an env var."
-            )
-        anthropic_key = settings.anthropic_api_key.get_secret_value()
-        llm_model = settings.anthropic_extraction_model
-        llm_max_tokens = settings.anthropic_extraction_max_tokens
     else:
-        raise typer.BadParameter(f"Unknown provider: {provider!r}. Use 'openai' or 'anthropic'.")
+        raise typer.BadParameter(f"Unknown provider: {provider!r}. Use 'bedrock' or 'openai'.")
 
     embedding_model = settings.openai_embedding_model
     embedding_dims = settings.openai_embedding_dimensions
@@ -227,7 +208,6 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
     return _LLMCredentials(
         provider=provider,
         openai_key=openai_key,
-        anthropic_key=anthropic_key,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
         embedding_model=embedding_model,
@@ -291,7 +271,6 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
         settings.document_dir,
         provider=creds.provider,
         openai_api_key=creds.openai_key,
-        anthropic_api_key=creds.anthropic_key,
         region=creds.region,
         llm_model=creds.llm_model,
         llm_max_tokens=creds.llm_max_tokens,
@@ -526,25 +505,18 @@ def debug_extract_cmd(
     except ValueError as exc:
         raise typer.BadParameter("--chunks must be a comma-separated list of integers") from exc
 
-    try:
-        passed = debug_extract_chunks(
-            settings.document_dir,
-            filename=document,
-            chunk_indexes=chunk_indexes,
-            provider=creds.provider,
-            openai_api_key=creds.openai_key,
-            anthropic_api_key=creds.anthropic_key,
-            region=creds.region,
-            llm_model=creds.llm_model,
-            llm_max_tokens=creds.llm_max_tokens,
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap,
-        )
-    except ImportError as exc:
-        print(f"[FAIL] {exc}")
-        if creds.provider == "anthropic":
-            print("Install Anthropic support with: uv sync --extra anthropic")
-        raise typer.Exit(code=1) from exc
+    passed = debug_extract_chunks(
+        settings.document_dir,
+        filename=document,
+        chunk_indexes=chunk_indexes,
+        provider=creds.provider,
+        openai_api_key=creds.openai_key,
+        region=creds.region,
+        llm_model=creds.llm_model,
+        llm_max_tokens=creds.llm_max_tokens,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
     if not passed:
         raise typer.Exit(code=1)
 
@@ -577,7 +549,6 @@ def agent_samples_cmd() -> None:
             settings.neo4j_database,
             provider=creds.provider,
             openai_key=creds.openai_key,
-            anthropic_key=creds.anthropic_key,
             region=creds.region,
             llm_model=creds.llm_model,
             embedding_model=creds.embedding_model,

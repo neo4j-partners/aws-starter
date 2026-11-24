@@ -562,7 +562,6 @@ def _create_extraction_llm(
     *,
     provider: str,
     openai_api_key: str | None,
-    anthropic_api_key: str | None,
     region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
@@ -591,19 +590,6 @@ def _create_extraction_llm(
             },
             api_key=openai_api_key,
         )
-    if provider == "anthropic":
-        # Untested against the live Anthropic API; see anthropic_effort.py.
-        from .anthropic_effort import EffortAnthropicLLM
-
-        return EffortAnthropicLLM(
-            model_name=llm_model,
-            model_params={
-                "max_tokens": llm_max_tokens,
-                "thinking": _BEDROCK_EXTRACTION_THINKING["thinking"],
-            },
-            effort=_BEDROCK_EXTRACTION_THINKING["output_config"]["effort"],
-            api_key=anthropic_api_key,
-        )
     raise ValueError(f"Unknown LLM provider: {provider!r}")
 
 
@@ -613,7 +599,6 @@ def _create_pipeline(
     *,
     provider: str,
     openai_api_key: str | None,
-    anthropic_api_key: str | None,
     region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
@@ -634,7 +619,6 @@ def _create_pipeline(
     llm = _create_extraction_llm(
         provider=provider,
         openai_api_key=openai_api_key,
-        anthropic_api_key=anthropic_api_key,
         region=region,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
@@ -689,7 +673,6 @@ def debug_extract_chunks(
     chunk_indexes: list[int],
     provider: str,
     openai_api_key: str | None,
-    anthropic_api_key: str | None,
     region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
@@ -715,7 +698,6 @@ def debug_extract_chunks(
     llm = _create_extraction_llm(
         provider=provider,
         openai_api_key=openai_api_key,
-        anthropic_api_key=anthropic_api_key,
         region=region,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,
@@ -781,7 +763,6 @@ def process_all_documents(
     *,
     provider: str,
     openai_api_key: str | None,
-    anthropic_api_key: str | None,
     region: str | None = None,
     llm_model: str,
     llm_max_tokens: int,
@@ -802,7 +783,6 @@ def process_all_documents(
         database,
         provider=provider,
         openai_api_key=openai_api_key,
-        anthropic_api_key=anthropic_api_key,
         region=region,
         llm_model=llm_model,
         llm_max_tokens=llm_max_tokens,

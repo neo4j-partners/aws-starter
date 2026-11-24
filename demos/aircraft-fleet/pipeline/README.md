@@ -159,7 +159,6 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 
 - **`bedrock`:** This default uses Bedrock Titan and Bedrock Claude with the standard AWS credential chain.
 - **`openai`:** This option uses OpenAI for embeddings and extraction.
-- **`anthropic`:** This option uses OpenAI embeddings and Anthropic extraction. `./setup.sh` installs the `anthropic` extra. If you run `uv` yourself, run `uv sync --extra anthropic` first.
 
 ### Bedrock settings
 

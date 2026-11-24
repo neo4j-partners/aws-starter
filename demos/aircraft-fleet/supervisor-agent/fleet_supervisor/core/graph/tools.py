@@ -5,6 +5,7 @@ The callables in :mod:`core.graph.retrieval` carry no Strands dependency. The
 """
 
 import logging
+from typing import Any
 
 import neo4j
 from neo4j_graphrag.exceptions import Text2CypherRetrievalError
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Strands sends a tool's exception text to the model, and a driver message can
 # name the server address. These fixed results replace it. The details go to
-# the log.
+# the log. A tool returns each one with an error status.
 TIMEOUT_RESULT = (
     "The query took too long and was stopped. Try a narrower question, "
     "for example with a filter or fewer aircraft."
@@ -50,27 +51,36 @@ MAX_TOP_K = 20
 _MAX_QUERY_ERROR_CHARS = 500
 
 
-def _neo4j_error_result(tool_name: str, error: Exception) -> str:
+def _error_result(text: str) -> dict[str, Any]:
+    """Return ``text`` as a tool result with an error status.
+
+    The ``@tool`` decorator passes a dict with ``status`` and ``content``
+    through as the result and adds the ``toolUseId``.
+    """
+    return {"status": "error", "content": [{"text": text}]}
+
+
+def _neo4j_error_result(tool_name: str, error: Exception) -> dict[str, Any]:
     """Log a driver error and return the fixed result the model sees."""
     if isinstance(error, UNREACHABLE):
         logger.error("%s: Neo4j unreachable", tool_name, exc_info=error)
-        return UNAVAILABLE_RESULT
+        return _error_result(UNAVAILABLE_RESULT)
     if isinstance(error, neo4j.exceptions.Neo4jError) and is_transaction_timeout(error):
         logger.warning("%s: Neo4j transaction timed out: %s", tool_name, error)
-        return TIMEOUT_RESULT
+        return _error_result(TIMEOUT_RESULT)
     logger.error("%s: Neo4j error", tool_name, exc_info=error)
-    return DATABASE_ERROR_RESULT
+    return _error_result(DATABASE_ERROR_RESULT)
 
 
-def _query_error_result(message: str) -> str:
-    return (
+def _query_error_result(message: str) -> dict[str, Any]:
+    return _error_result(
         f"{QUERY_ERROR_PREFIX} {message[:_MAX_QUERY_ERROR_CHARS]}\n"
         "Rephrase the question to fit the schema and try again."
     )
 
 
 @tool
-def graph_query_tool(question: str) -> str:
+def graph_query_tool(question: str) -> str | dict[str, Any]:
     """Answer a structured question by generating and running read-only Cypher.
 
     Use for exact lookups, counts, aggregations, and relationship traversal
@@ -96,11 +106,13 @@ def graph_query_tool(question: str) -> str:
         return _neo4j_error_result("graph_query_tool", e)
     except Exception as e:
         logger.error("graph_query_tool failed", exc_info=e)
-        return QUERY_FAILED_RESULT
+        return _error_result(QUERY_FAILED_RESULT)
 
 
 @tool
-def vector_search_tool(query: str, top_k: int = 5, aircraft_type: str | None = None) -> str:
+def vector_search_tool(
+    query: str, top_k: int = 5, aircraft_type: str | None = None
+) -> str | dict[str, Any]:
     """Search aircraft maintenance-document chunks by meaning and keywords.
 
     Use for conceptual or descriptive questions where wording varies and the
@@ -124,4 +136,4 @@ def vector_search_tool(query: str, top_k: int = 5, aircraft_type: str | None = N
     except Exception as e:
         # The embedding call to Bedrock can fail too. Its text stays in the log.
         logger.error("vector_search_tool failed", exc_info=e)
-        return SEARCH_FAILED_RESULT
+        return _error_result(SEARCH_FAILED_RESULT)

@@ -62,7 +62,9 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
                 auth=auth,
                 connection_timeout=5,
                 connection_acquisition_timeout=8,
-                max_transaction_retry_time=0,
+                # A lookup that meets a rotated password retries with the new
+                # login after about a second, so the graph still shows.
+                max_transaction_retry_time=10,
             )
     app.state.driver = driver
     try:

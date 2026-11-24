@@ -33,8 +33,8 @@ when that is set, and `NEO4J_USERNAME` and `NEO4J_PASSWORD` otherwise. It
 also reads `NEO4J_URI` and `NEO4J_DATABASE`. It uses the login for bounded,
 read-only evidence lookups. When Neo4j rejects the login, the server reads the
 secret again, so a rotated password takes effect without a restart. The lookup
-that met the rejected login shows the graph as unavailable, and later lookups
-use the new password. Use a read-only fleet login for the UI. The
+that met the rejected login retries once with the new password after about a
+second, and the graph still shows. Use a read-only fleet login for the UI. The
 [Neo4j Visualization Library
 license](https://www.npmjs.com/package/@neo4j-nvl/base) covers use with Neo4j
 Aura or a commercial Neo4j product.

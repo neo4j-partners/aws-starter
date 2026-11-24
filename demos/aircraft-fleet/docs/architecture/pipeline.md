@@ -133,7 +133,8 @@ Stage 5 reads the graph and prints a report of warnings and failures.
 - **Schema:** The constraints and the two chunk indexes must exist.
 - **Embeddings:** Every chunk must have an embedding of the configured dimension.
 - **Search:** A vector search smoke test must succeed.
-- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, and `HAS_LIMIT` links must each exist.
+- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, `DESCRIBES_COMPONENT`, and `HAS_LIMIT` links must each exist.
+- **Sensor limits:** Every `Sensor` must have a `HAS_LIMIT` link to an `OperatingLimit`. `AirDataDisagree` sensors are exempt, because the manuals list them only in the sensor inventory. A failure gives the unlinked count for each sensor type.
 - **EGT limits:** Each aircraft type needs an EGT limit for each regime that the generator's `ENGINE_SPECS` gives a maximum. Those regimes are Takeoff, Max Continuous, and Start when the spec has a start maximum. Each `maxValue` must equal the generator's maximum. An EGT limit for a regime with no generator maximum fails, such as an A320-200 Start limit.
 - **Orphans:** Readings without a sensor, flights without an aircraft, components without a system, sensors without readings, documents without chunks, and systems without a `SystemReference` must all be zero.
 
@@ -144,6 +145,6 @@ nonzero, so the same check works in CI. The one exception is
 `verify --strict --skip-enrichment` keeps the counts, stamp, CSV comparison,
 operational constraints, and operational orphans as failures. It reports the
 embeddings, chunk indexes, search test, extracted-entity constraints, cross
-links, EGT limits, documents without chunks, and systems without a
+links, sensor limits, EGT limits, documents without chunks, and systems without a
 `SystemReference` as warnings. `./setup.sh load-operational`
 uses it, because that graph has no enrichment.

@@ -70,6 +70,97 @@ def test_vector_search_with_no_tokens_skips_the_database(monkeypatch) -> None:
     assert retrieval.vector_search("?!") == "No relevant document chunks found."
 
 
+class FakeHybridRetriever:
+    """Record each search call and return fixed hits."""
+
+    def __init__(self, items: list[RetrieverResultItem]) -> None:
+        self.items = items
+        self.calls: list[dict[str, object]] = []
+
+    def search(self, **kwargs: object) -> SimpleNamespace:
+        self.calls.append(kwargs)
+        return SimpleNamespace(items=self.items)
+
+
+@pytest.fixture
+def hybrid(monkeypatch: pytest.MonkeyPatch) -> FakeHybridRetriever:
+    hit = RetrieverResultItem(content="Check EGT.", metadata={"chunk_index": 3})
+    retriever = FakeHybridRetriever([hit])
+    monkeypatch.setattr(retrieval, "_hybrid_retriever", lambda: retriever)
+    monkeypatch.setattr(
+        retrieval, "_embedder", lambda: SimpleNamespace(embed_query=lambda q: [0.0])
+    )
+    # Run the search once and directly, with no shared driver.
+    monkeypatch.setattr(retrieval, "_with_rotated_login", lambda call: call())
+    return retriever
+
+
+def test_vector_search_without_a_type_takes_top_k_from_each_index(
+    hybrid: FakeHybridRetriever,
+) -> None:
+    retrieval.vector_search("EGT limits", 5)
+
+    [call] = hybrid.calls
+    assert call["top_k"] == 5
+    assert call["query_params"] == {
+        "max_entities": retrieval.MAX_ENTITIES_PER_CHUNK,
+        "aircraft_type": None,
+        "result_k": 5,
+    }
+
+
+def test_vector_search_for_a_type_over_fetches_and_keeps_top_k(
+    hybrid: FakeHybridRetriever,
+) -> None:
+    retrieval.vector_search("EGT limits", 5, " A320-200 ")
+
+    [call] = hybrid.calls
+    assert call["top_k"] == 5 * retrieval.TYPE_FILTER_POOL_FACTOR
+    assert call["query_params"]["aircraft_type"] == "A320-200"
+    assert call["query_params"]["result_k"] == 5
+
+
+# Without the type in the text, each index's pool holds every manual's
+# chunks, and a 709ad5c7 probe kept as few as 1 of 5 after the filter.
+@pytest.mark.parametrize(
+    ("query", "searched"),
+    [
+        ("EGT limits", "a320 200 egt limits"),
+        ("a320-200 EGT limits", "a320 200 egt limits"),
+    ],
+    ids=["added", "already-named"],
+)
+def test_a_type_search_names_the_type_in_its_text(
+    hybrid: FakeHybridRetriever, query: str, searched: str
+) -> None:
+    retrieval.vector_search(query, 5, "A320-200")
+
+    [call] = hybrid.calls
+    assert call["query_text"] == searched
+
+
+def test_a_blank_aircraft_type_searches_every_manual(hybrid: FakeHybridRetriever) -> None:
+    retrieval.vector_search("EGT limits", 5, "  ")
+
+    [call] = hybrid.calls
+    assert call["top_k"] == 5
+    assert call["query_params"]["aircraft_type"] is None
+
+
+def test_no_hits_for_a_type_names_the_type(hybrid: FakeHybridRetriever) -> None:
+    hybrid.items = []
+
+    assert retrieval.vector_search("EGT limits", 5, "A320") == (
+        "No relevant document chunks found for aircraft type A320."
+    )
+
+
+def test_the_chunk_query_filters_by_type_before_its_limit() -> None:
+    query = retrieval.CHUNK_RETRIEVAL_QUERY
+    where = query.index("WHERE $aircraft_type IS NULL OR")
+    assert where < query.index("ORDER BY score DESC") < query.index("LIMIT $result_k")
+
+
 def test_schema_cache_honors_ttl(monkeypatch) -> None:
     clock = [1000.0]
     fetches: list[int] = []

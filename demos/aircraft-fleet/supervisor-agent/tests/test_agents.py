@@ -31,7 +31,7 @@ def graph_query_tool(question: str) -> str:
 
 
 @tool
-def vector_search_tool(query: str, top_k: int = 5) -> str:
+def vector_search_tool(query: str, top_k: int = 5, aircraft_type: str | None = None) -> str:
     """Stand-in for the manual search tool."""
     return query
 
@@ -149,7 +149,7 @@ def test_maintenance_prompt_gets_limit_values_from_the_graph(fake_tools):
     prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
     assert "Limit values, such as a maximum EGT, are `OperatingLimit` nodes" in prompt
     assert "Get them with `graph_query_tool`" in prompt
-    assert '"B737-800 EGT operating limits"' in prompt
+    assert '"EGT operating limits" with\n   `aircraft_type` "B737-800"' in prompt
 
 
 # One query for a fleet-wide procedure ranks chunks from every manual against
@@ -158,7 +158,7 @@ def test_maintenance_prompt_searches_manuals_once_per_aircraft_type(fake_tools):
     prompt = specialist_agent(build_supervisor(FakeModel(), SCHEMA), MAINTENANCE_TOOL).system_prompt
     assert "A procedure question that names no aircraft type" in prompt
     assert "Call `vector_search_tool` once per aircraft type" in prompt
-    assert "name the\n   type in each query" in prompt
+    assert "pass the\n   type as `aircraft_type`" in prompt
 
 
 def test_operations_prompt_names_no_manual_search_tool(fake_tools):

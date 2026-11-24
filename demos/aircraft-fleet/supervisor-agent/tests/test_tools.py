@@ -170,13 +170,34 @@ def test_vector_search_top_k_is_clamped(
 ) -> None:
     calls: list[int] = []
 
-    def fake_search(query: str, top_k: int) -> str:
+    def fake_search(query: str, top_k: int, aircraft_type: str | None) -> str:
         calls.append(top_k)
         return "chunks"
 
     monkeypatch.setattr(tools, "vector_search", fake_search)
     tools.vector_search_tool("q", asked)
     assert calls == [used]
+
+
+@pytest.mark.parametrize("aircraft_type", [None, "A320-200"])
+def test_vector_search_passes_the_aircraft_type(
+    monkeypatch: pytest.MonkeyPatch, aircraft_type: str | None
+) -> None:
+    calls: list[str | None] = []
+
+    def fake_search(query: str, top_k: int, aircraft_type: str | None) -> str:
+        calls.append(aircraft_type)
+        return "chunks"
+
+    monkeypatch.setattr(tools, "vector_search", fake_search)
+    tools.vector_search_tool("q", aircraft_type=aircraft_type)
+    assert calls == [aircraft_type]
+
+
+def test_the_aircraft_type_is_optional_for_the_model() -> None:
+    schema = tools.vector_search_tool.tool_spec["inputSchema"]["json"]
+    assert "aircraft_type" in schema["properties"]
+    assert "aircraft_type" not in schema.get("required", [])
 
 
 def test_tool_description_states_the_top_k_bounds() -> None:

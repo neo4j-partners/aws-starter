@@ -100,7 +100,7 @@ def graph_query_tool(question: str) -> str:
 
 
 @tool
-def vector_search_tool(query: str, top_k: int = 5) -> str:
+def vector_search_tool(query: str, top_k: int = 5, aircraft_type: str | None = None) -> str:
     """Search aircraft maintenance-document chunks by meaning and keywords.
 
     Use for conceptual or descriptive questions where wording varies and the
@@ -112,11 +112,13 @@ def vector_search_tool(query: str, top_k: int = 5) -> str:
     Args:
         query: Natural-language search text.
         top_k: Number of chunks to return, from 1 to 20 (default 5).
+        aircraft_type: Search only this aircraft type's manual, such as
+            "B737-800". Leave it out to search every manual.
     """
     top_k = min(max(top_k, MIN_TOP_K), MAX_TOP_K)
     # The search Cypher is fixed, so no error here is the model's to fix.
     try:
-        return vector_search(query, top_k)
+        return vector_search(query, top_k, aircraft_type)
     except (neo4j.exceptions.Neo4jError, neo4j.exceptions.DriverError) as e:
         return _neo4j_error_result("vector_search_tool", e)
     except Exception as e:

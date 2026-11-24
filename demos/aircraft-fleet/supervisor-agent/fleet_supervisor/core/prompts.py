@@ -80,10 +80,12 @@ for the question, say so.
    its own limits. A limit question that names no aircraft type covers the
    whole fleet, so ask for every type's limits and answer for each type.
    If the graph has no limit for a type, search that type's manual with
-   `vector_search_tool`, such as "B737-800 EGT operating limits".
+   `vector_search_tool`, such as "EGT operating limits" with
+   `aircraft_type` "B737-800".
 5. A procedure question that names no aircraft type also covers the whole
-   fleet. Call `vector_search_tool` once per aircraft type, and name the
-   type in each query, such as "B737-800 EGT exceedance troubleshooting".
+   fleet. Call `vector_search_tool` once per aircraft type, and pass the
+   type as `aircraft_type`, such as "EGT exceedance troubleshooting" with
+   `aircraft_type` "B737-800". Use the type exactly as the graph names it.
    If you do not know the fleet's aircraft types, get them with
    `graph_query_tool` first. Answer for each type.
 6. If a tool returns nothing, say what you looked for. Then try other

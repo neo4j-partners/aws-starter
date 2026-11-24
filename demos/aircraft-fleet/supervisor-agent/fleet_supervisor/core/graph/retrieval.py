@@ -193,8 +193,16 @@ def _embedder() -> BedrockEmbeddings:
 # ``score`` its hybrid score. It follows the lexical graph to the source
 # Document and to every entity extracted from the chunk. Entity labels are not
 # hard-coded, so this keeps working when the extraction schema changes.
+#
+# With ``$aircraft_type`` set, it keeps only that type's chunks and then the
+# ``$result_k`` best. A null ``$aircraft_type`` keeps every chunk.
 CHUNK_RETRIEVAL_QUERY = """
 OPTIONAL MATCH (node)-[:FROM_DOCUMENT]->(doc:Document)
+WITH node, score, doc
+WHERE $aircraft_type IS NULL OR toLower(doc.aircraftType) = toLower($aircraft_type)
+WITH node, score, doc
+ORDER BY score DESC
+LIMIT $result_k
 OPTIONAL MATCH (entity)-[:FROM_CHUNK]->(node)
 WITH node, score, doc, collect(DISTINCT entity)[..$max_entities] AS entities
 RETURN node.text AS text,
@@ -211,6 +219,14 @@ RETURN node.text AS text,
 # Entities listed per chunk. Enough to show what the chunk is about without
 # flooding the model context.
 MAX_ENTITIES_PER_CHUNK = 10
+
+# A search for one aircraft type takes this many times ``top_k`` hits from
+# each index before the type filter. neo4j-graphrag rejects filters on
+# hybrid search, so the filter runs after the hits are ranked. Each index
+# returns only ``top_k`` hits, and other types' chunks would otherwise take
+# most of them. A probe of 12 EGT queries gave the same results from a pool
+# of 4x top_k up.
+TYPE_FILTER_POOL_FACTOR = 4
 
 _PROVENANCE_KEYS = (
     "score",
@@ -318,26 +334,40 @@ def _text2cypher_retriever() -> BoundedText2CypherRetriever:
     )
 
 
-def vector_search(query: str, top_k: int = 5) -> str:
+def vector_search(query: str, top_k: int = 5, aircraft_type: str | None = None) -> str:
     """Return the ``top_k`` best hybrid-search chunks with their sources.
 
+    With ``aircraft_type`` set, only chunks from that type's manual count.
+    The type is also added to the search text when the query doesn't name
+    it, so both indexes rank that type's chunks first and the filter keeps
+    ``top_k`` of them.
     The model-facing description lives on ``core.graph.tools.vector_search_tool``.
     """
+    aircraft_type = (aircraft_type or "").strip() or None
+    if aircraft_type and aircraft_type.lower() not in query.lower():
+        query = f"{aircraft_type} {query}"
     text = fulltext_query(query)
     if not text:
         return "No relevant document chunks found."
+    pool = top_k * TYPE_FILTER_POOL_FACTOR if aircraft_type else top_k
     # Embed outside the retried call, so a rotated login does not embed twice.
     query_vector = _embedder().embed_query(query)
     result = _with_rotated_login(
         lambda: _hybrid_retriever().search(
             query_text=text,
             query_vector=query_vector,
-            top_k=top_k,
-            query_params={"max_entities": MAX_ENTITIES_PER_CHUNK},
+            top_k=pool,
+            query_params={
+                "max_entities": MAX_ENTITIES_PER_CHUNK,
+                "aircraft_type": aircraft_type,
+                "result_k": top_k,
+            },
         )
     )
     hits = [item for item in result.items if item.content]
     if not hits:
+        if aircraft_type:
+            return f"No relevant document chunks found for aircraft type {aircraft_type}."
         return "No relevant document chunks found."
     return "\n\n---\n\n".join(_format_hit(item) for item in hits)
 

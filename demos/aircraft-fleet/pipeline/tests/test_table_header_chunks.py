@@ -20,7 +20,7 @@ from populate_aircraft_db.pipeline import (
 
 MANUALS_DIR = Path(__file__).resolve().parent.parent / "manuals"
 MANUALS = sorted(MANUALS_DIR.glob("MAINTENANCE_*.md"))
-CONTEXT = "[DOCUMENT CONTEXT] Aircraft Type: X | Title: Y\n\n"
+CONTEXT = "[DOCUMENT CONTEXT] Aircraft Type: X | Title: Y"
 
 HEADER = "| Parameter | Idle | Takeoff |\n|-----------|------|---------|\n"
 ROWS = "| EGT (°C) | 400 | < 950 |\n| N1 (%) | 20 | 97 |\n"
@@ -46,6 +46,12 @@ def _split(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     )
     result = asyncio.run(splitter.run(text))
     return [chunk.text for chunk in result.chunks]
+
+
+def _body(chunk: str) -> str:
+    """``chunk`` after its context line, which ends with a blank line."""
+    assert chunk.startswith(CONTEXT)
+    return chunk.split("\n\n", 1)[1]
 
 
 def _rows_without_header(chunk: str) -> list[str]:
@@ -118,9 +124,9 @@ def test_the_splitter_puts_the_header_after_the_context_line() -> None:
     in_table = [c for c in chunks if "| EGT" in c or "| N1" in c]
     assert in_table
     for chunk in in_table:
-        assert chunk.startswith(CONTEXT)
+        assert chunk.startswith(CONTEXT + "\n\n")
         assert HEADER in chunk
-        assert _rows_without_header(chunk.removeprefix(CONTEXT)) == []
+        assert _rows_without_header(_body(chunk)) == []
 
 
 def test_the_splitter_rejects_chunks_that_are_not_substrings() -> None:
@@ -139,7 +145,7 @@ def test_every_table_row_in_a_real_manual_chunk_sits_under_its_header(manual: Pa
     orphans = {
         index: rows
         for index, chunk in enumerate(chunks)
-        if (rows := _rows_without_header(chunk.removeprefix(CONTEXT)))
+        if (rows := _rows_without_header(_body(chunk)))
     }
     assert orphans == {}
 

@@ -165,6 +165,54 @@ def with_table_header(text: str, start: int, end: int, tables: list[TableSpan]) 
     return chunk
 
 
+_HEADING = re.compile(r"(#{1,6})[ \t]+(.+?)[ \t]*")
+_FENCE = "```"
+
+
+@dataclass(frozen=True)
+class Heading:
+    """One markdown heading in a text."""
+
+    start: int  # start of the heading line
+    level: int  # 1 for "#", 2 for "##", and so on
+    text: str
+
+
+def markdown_headings(text: str) -> list[Heading]:
+    """Each markdown heading in ``text``, skipping lines in fenced code blocks."""
+    headings = []
+    offset = 0
+    in_fence = False
+    for line in text.split("\n"):
+        if line.lstrip().startswith(_FENCE):
+            in_fence = not in_fence
+        elif not in_fence and (match := _HEADING.fullmatch(line)):
+            headings.append(Heading(offset, len(match.group(1)), match.group(2)))
+        offset += len(line) + 1
+    return headings
+
+
+def section_path(headings: list[Heading], offset: int) -> list[str]:
+    """Heading texts in effect at ``offset``, from the "##" level down.
+
+    The "#" heading is the manual's title, which the context line already
+    names. A heading whose line starts after ``offset`` is not in effect
+    yet. A heading that starts exactly at ``offset`` closes its earlier
+    siblings but is left out, so a chunk that starts with a heading shows
+    only that heading's parents.
+    """
+    path: list[Heading] = []
+    for heading in headings:
+        if heading.start > offset:
+            break
+        while path and path[-1].level >= heading.level:
+            path.pop()
+        if heading.start == offset:
+            break
+        path.append(heading)
+    return [heading.text for heading in path if heading.level >= 2]
+
+
 class ContextPrependingSplitter(TextSplitter):
     """Wraps a ``TextSplitter`` and prepends a context line to every chunk.
 
@@ -190,13 +238,20 @@ class ContextPrependingSplitter(TextSplitter):
     the text, as ``FixedSizeSplitter`` does, so each chunk's offset can be
     found.
 
+    The context line also names the manual section each chunk starts in, as
+    ``" | Section: 3. Engine > 3.2 Components > 3.2.3 High-Pressure Turbine"``.
+    A chunk cut below its section heading otherwise loses which component or
+    fault its text, tables and limits belong to. The context is added after
+    the inner splitter runs, so it doesn't change chunk sizes or boundaries.
+
     It also sets ``chunkId`` to ``"{document_id}:{index}"`` in each chunk's
     metadata. The lexical graph builder copies chunk metadata onto the
     ``Chunk`` node, so every chunk gets a stable id for its uniqueness
     constraint.
 
     Set :attr:`context` and :attr:`document_id` before each call to
-    ``pipeline.run_async()``.
+    ``pipeline.run_async()``. :attr:`context` is the context line without
+    its section or line break. An empty context adds no line.
     """
 
     def __init__(self, inner: TextSplitter, context: str = "", document_id: str = "") -> None:
@@ -204,11 +259,17 @@ class ContextPrependingSplitter(TextSplitter):
         self.context = context
         self.document_id = document_id
 
+    def _context_line(self, section: list[str]) -> str:
+        if not section:
+            return f"{self.context}\n\n"
+        return f"{self.context} | Section: {' > '.join(section)}\n\n"
+
     async def run(self, text: str) -> TextChunks:
         if not self.document_id:
             raise ValueError("Set document_id before splitting so every Chunk gets a chunkId.")
         result = await self.inner.run(text)
         tables = markdown_tables(text)
+        headings = markdown_headings(text)
         search_from = 0
         for chunk in result.chunks:
             start = text.find(chunk.text, search_from)
@@ -218,9 +279,13 @@ class ContextPrependingSplitter(TextSplitter):
                     "so its table header can't be found"
                 )
             search_from = start + 1
+            # Skip leading blank lines, so a chunk that opens on blank
+            # lines and then a heading counts as starting at that heading.
+            body_start = start + len(chunk.text) - len(chunk.text.lstrip())
             chunk.text = with_table_header(text, start, start + len(chunk.text), tables)
             if self.context:
-                chunk.text = self.context + chunk.text
+                section = section_path(headings, body_start)
+                chunk.text = self._context_line(section) + chunk.text
             chunk.metadata = {
                 **(chunk.metadata or {}),
                 "chunkId": f"{self.document_id}:{chunk.index}",
@@ -570,9 +635,7 @@ def debug_extract_chunks(
             chunk_overlap=chunk_overlap,
             approximate=True,
         ),
-        context=(
-            f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}\n\n"
-        ),
+        context=(f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}"),
     )
     schema = build_extraction_schema()
 
@@ -674,7 +737,7 @@ def process_all_documents(
             # with the aircraft type.  The custom EXTRACTION_PROMPT instructs
             # the LLM to read this header.
             splitter.context = (
-                f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}\n\n"
+                f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}"
             )
             splitter.document_id = meta.document_id
 

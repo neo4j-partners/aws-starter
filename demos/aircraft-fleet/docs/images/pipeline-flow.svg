@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Pipeline Flow</title>
-  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Enrich repeats each table's header in every chunk cut from it, and operating limits use a closed list of regimes. Index and fuse drops limits with no min and no max before it links sensors to limits. Verify also checks the EGT limits against the generator's specs and checks that every System has a SystemReference. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
+  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Enrich repeats each table's header in every chunk cut from it, and each operating limit names one regime from a fixed list. Index and fuse drops limits with no min and no max before it links sensors to limits. Verify also checks the EGT limits against the generator's specs and checks that every System has a SystemReference. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -78,8 +78,8 @@
   <text x="680" y="426" class="s">Embeds each chunk</text>
   <text x="680" y="452" class="s">Extracts faults, limits,</text>
   <text x="680" y="472" class="s">and procedures</text>
-  <text x="680" y="498" class="s">Limits use a closed</text>
-  <text x="680" y="518" class="s">list of regimes</text>
+  <text x="680" y="498" class="s">Limits name one regime</text>
+  <text x="680" y="518" class="s">from a fixed list</text>
   <text x="680" y="544" class="s">Merges same-name entities</text>
 
   <circle cx="1006" cy="256" r="18" fill="#2E6DB4"/><text x="1006" y="262" text-anchor="middle" class="num">4</text>
@@ -132,7 +132,7 @@
   <text x="70" y="841" class="m" fill="#16233A">./setup.sh</text>
   <text x="170" y="841" font-size="15" fill="#475467">all five stages</text>
   <text x="440" y="841" class="m" fill="#16233A">./setup.sh load-operational</text>
-  <text x="680" y="841" font-size="15" fill="#475467">stage 1 if stale, stage 2, relinking, stage 5, no model calls</text>
+  <text x="680" y="841" font-size="15" fill="#475467">stage 1 if stale, clean, stage 2, stage 5, no model calls</text>
   <text x="1150" y="841" class="m" fill="#16233A">./setup.sh verify</text>
   <text x="1300" y="841" font-size="15" fill="#475467">stage 5 only, read-only</text>
 </svg>

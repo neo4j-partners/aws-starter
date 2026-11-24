@@ -1031,8 +1031,10 @@ def _check_vector_search(
 def _sensor_limit_count(driver: Driver, database: str, rel_counts: dict[str, int]) -> int:
     """Count (:Sensor)-[:HAS_LIMIT]->(:OperatingLimit) links.
 
-    Extracted SystemReference and ComponentReference nodes have HAS_LIMIT
-    edges too, so the HAS_LIMIT total can't show whether sensors were linked.
+    The load makes every Sensor link. Counting by pattern keeps the check
+    about sensors when the graph also holds HAS_LIMIT edges from other
+    labels, such as the SystemReference and ComponentReference edges an
+    older enrich extracted.
     """
     if rel_counts["HAS_LIMIT"] == 0:
         return 0

@@ -20,15 +20,23 @@ the conventional `system-prompt.md` file in the harness directory.
 
 ## The CLI runs it for you
 
-You normally do not run this app directly:
+You normally do not run this app directly. Use `agent.sh`, the supported route. It lives in `supervisor-agent/`, two
+folders up from this README, not in this `cdk` folder:
 
 ```bash
-agentcore build    # synthesizes the CloudFormation templates into agentcore/cdk/cdk.out
-agentcore deploy   # synthesizes, then deploys the stack for the selected target
-agentcore status   # reports the resources agentcore.json declares
+cd ../..
+./agent.sh deploy   # exports the deploy settings from demos/aircraft-fleet/.env, then runs agentcore deploy
+./agent.sh status   # runs agentcore status, which reports the resources agentcore.json declares
 ```
 
-`npm run build` compiles the app, and `npx cdk synth` / `npx cdk diff` work from this directory too.
+- **Deploy settings:** Synthesis runs `readDeployEnv` in `lib/cdk-stack.ts`. It fails unless the `NEO4J_*` and
+  `MEM_NEO4J_*` deploy settings are exported in the shell. `./agent.sh deploy` exports them from
+  `demos/aircraft-fleet/.env` before it calls `agentcore deploy`.
+- **Direct commands:** `agentcore build` synthesizes the CloudFormation templates into `agentcore/cdk/cdk.out`.
+  `agentcore deploy` synthesizes, then deploys the stack for the selected target. `npx cdk synth` and `npx cdk diff`
+  synthesize from this directory. Each of these synthesizes the app, so each fails at `readDeployEnv` unless you export
+  the deploy settings first. `agent.sh` has no build, synth, or diff command.
+- **Compile only:** `npm run build` compiles the app with `tsc` and needs no deploy settings.
 
 ## Extending the stack
 

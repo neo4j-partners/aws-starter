@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="940" viewBox="0 0 1600 940" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Aircraft Fleet Demo Architecture</title>
-  <desc>The pipeline builds the Neo4j fleet graph with Amazon Bedrock. One supervisor agent routes each question to a Maintenance Agent or an Operations Agent. The specialists read the graph directly with the Neo4j driver through two graph tools: graph_query_tool runs Text2Cypher, and vector_search_tool runs hybrid search over the manual chunks. The supervisor keeps conversation memory in a separate Neo4j database and calls Claude on Bedrock.</desc>
+  <desc>The pipeline builds the Neo4j fleet graph with Amazon Bedrock. One supervisor agent routes each question to a Maintenance Agent or an Operations Agent. The specialists read the graph directly with the Neo4j driver through two graph tools: graph_query_tool runs Text2Cypher, and vector_search_tool runs hybrid search over the manual chunks. The supervisor keeps conversation memory in a separate Neo4j database and calls Claude on Bedrock. The browser UI sends each question to the supervisor, relays its SSE stream, and looks up each tool call's evidence in the fleet graph with its own read-only Neo4j driver.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -70,6 +70,18 @@
   <path d="M310,420 H376" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
   <text x="343" y="410" text-anchor="middle" class="lbl">writes</text>
 
+  <!-- Browser UI -->
+  <rect x="380" y="610" width="300" height="170" rx="18" fill="#FFFFFF" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="530" y="646" text-anchor="middle" class="t" fill="#344054">Browser UI</text>
+  <text x="530" y="668" text-anchor="middle" class="m">ui/ · :8081</text>
+  <text x="530" y="704" text-anchor="middle" class="s">Starlette server, run locally</text>
+  <text x="530" y="726" text-anchor="middle" class="s">Relays the supervisor's SSE stream</text>
+  <text x="530" y="748" text-anchor="middle" class="s">Shows each tool call's evidence</text>
+
+  <!-- UI reads evidence from the fleet graph -->
+  <path d="M530,610 V564" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <text x="544" y="592" class="lbl" fill="#00594A">read-only evidence lookups</text>
+
   <!-- AgentCore boundary -->
   <rect x="736" y="232" width="590" height="560" rx="22" fill="#FFFBF5" stroke="#D97706" stroke-width="2" stroke-dasharray="9 6"/>
   <text x="760" y="262" class="lbl" fill="#8A4B08">Amazon Bedrock AgentCore</text>
@@ -111,6 +123,12 @@
 
   <!-- Graph tools to fleet graph (direct) -->
   <path d="M770,480 H684" fill="none" stroke="#008C72" stroke-width="3" marker-end="url(#a-teal)"/>
+
+  <!-- UI to supervisor and back -->
+  <path d="M680,686 H996" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <text x="866" y="676" text-anchor="middle" class="lbl">question, trace on</text>
+  <path d="M1000,730 H684" fill="none" stroke="#2E6DB4" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
+  <text x="866" y="720" text-anchor="middle" class="lbl">SSE events</text>
 
   <!-- Memory database -->
   <rect x="1380" y="380" width="190" height="260" rx="18" fill="#FDF2FA" stroke="#C11574" stroke-width="2.5" filter="url(#shadow)"/>

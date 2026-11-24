@@ -105,7 +105,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **`clean-enrichment`:** This command drops only the knowledge graph. It keeps the operational data.
 - **`debug-extract`:** This command runs the extractor on selected chunks. It does not write to Neo4j.
 - **`agent-samples`:** This command simulates an agent that sends Cypher and vector searches.
-- **`load-operational`:** This command loads without running `clean` first. It then relinks any enrichment already in the graph. Run `clean` before it, or use `./setup.sh load-operational`.
+- **`load-operational`:** This command loads without running `clean` first. It merges each node on its ID and keeps the enrichment already in the graph. It then relinks that enrichment. Run `clean` first only when the graph holds a different generated dataset. Nodes and relationships that the new CSVs lack would otherwise stay, and the leftover nodes fail `verify`'s count check. `clean` also deletes the enrichment. `./setup.sh load-operational` runs `clean` for you.
 
 ### generate-data
 

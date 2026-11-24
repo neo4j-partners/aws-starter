@@ -154,7 +154,7 @@ CloudWatch receives the Runtime logs under `/aws/bedrock-agentcore/`. The agent 
 | `./deploy.py status` | Shows the stack status and outputs |
 | `./deploy.py credentials` | Writes the credentials file |
 | `./deploy.py stack-name` | Prints the stack name for the chosen deployment |
-| `./deploy.py cleanup` | Deletes the stack, the Neo4j password secret, and, after a separate prompt, the ECR repository |
+| `./deploy.py cleanup` | Deletes the stack, the Runtime's CloudWatch log groups, the Neo4j password secret, and, after a separate prompt, the ECR repository |
 
 - **Named deployments:** `./deploy.py --env finance` deploys the stack `neo4j-mcp-server-finance` for the fraud memory agent.
 - **Credential sync:** `scripts/sync-credentials.sh` copies each deployment's credentials file to the samples that use it.

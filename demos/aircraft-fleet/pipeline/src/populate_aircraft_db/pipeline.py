@@ -702,6 +702,19 @@ def link_to_existing_graph(driver: Driver, database: str) -> None:
         "  [OK] %d ComponentReference -[:DESCRIBES_COMPONENT]-> Component", records[0]["count"]
     )
 
+    # Drop each OperatingLimit with no minValue and no maxValue, so no
+    # Sensor links to a limit without a value.
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (ol:OperatingLimit)
+        WHERE ol.minValue IS NULL AND ol.maxValue IS NULL
+        DETACH DELETE ol
+        RETURN count(*) AS count
+    """,
+        database_=database,
+    )
+    logger.info("  [OK] %d OperatingLimit with no value dropped", records[0]["count"])
+
     # Sensor -[:HAS_LIMIT]-> OperatingLimit
     # (same aircraft model, parameterName equals the Sensor type, ignoring case)
     records, _, _ = driver.execute_query(

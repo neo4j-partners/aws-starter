@@ -122,6 +122,7 @@ def test_cross_links_log_each_count(package_logs: pytest.LogCaptureFixture) -> N
             "AircraftModel -[:DESCRIBES_MODEL]-> Aircraft",
             "SystemReference -[:DESCRIBES_SYSTEM]-> System",
             "ComponentReference -[:DESCRIBES_COMPONENT]-> Component",
+            "OperatingLimit with no value dropped",
             "Sensor -[:HAS_LIMIT]-> OperatingLimit",
         ]
     ]

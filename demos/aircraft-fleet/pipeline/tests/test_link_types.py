@@ -239,14 +239,19 @@ CREATE (a)-[:HAS_SYSTEM]->(e:System {system_id: $model + '-E', type: 'Engine'})
 CREATE (e)-[:HAS_SENSOR]->(:Sensor {sensor_id: $model + '-SN1', type: 'EGT'})
 WITH 1 AS _
 UNWIND $limits AS ol
-CREATE (:OperatingLimit {name: ol.name, parameterName: ol.parameter, aircraftType: ol.model})
+CREATE (:OperatingLimit {
+    name: ol.name, parameterName: ol.parameter, aircraftType: ol.model,
+    minValue: ol.min, maxValue: ol.max
+})
 """
 
 _LIMITS = [
-    {"name": "EGT exact", "parameter": "EGT", "model": MODEL},
-    {"name": "EGT lower", "parameter": "egt", "model": MODEL},
-    {"name": "Vibration", "parameter": "Vibration", "model": MODEL},
-    {"name": "EGT other model", "parameter": "EGT", "model": MODEL + "-OTHER"},
+    {"name": "EGT exact", "parameter": "EGT", "model": MODEL, "max": "890"},
+    {"name": "EGT lower", "parameter": "egt", "model": MODEL, "min": "645"},
+    # A limit with no value is dropped before the link.
+    {"name": "EGT no value", "parameter": "EGT", "model": MODEL},
+    {"name": "Vibration", "parameter": "Vibration", "model": MODEL, "max": "3.5"},
+    {"name": "EGT other model", "parameter": "EGT", "model": MODEL + "-OTHER", "max": "890"},
 ]
 
 
@@ -268,6 +273,11 @@ def test_sensor_links_to_limits_on_parameter_name_ignoring_case(
         database_=database,
     )
     assert [r["limit"] for r in records] == ["EGT exact", "EGT lower"]
+    records, _, _ = driver.execute_query(
+        "MATCH (ol:OperatingLimit {name: 'EGT no value'}) RETURN count(ol) AS count",
+        database_=database,
+    )
+    assert records[0]["count"] == 0
 
 
 def test_a_database_with_other_nodes_is_skipped(driver: Driver, database: str) -> None:

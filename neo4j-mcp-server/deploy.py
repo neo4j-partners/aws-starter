@@ -1312,7 +1312,7 @@ Commands:
   status       Show stack status and outputs
   credentials  Generate .mcp-credentials.json with Gateway URL and JWT token
   stack-name   Print the resolved stack name (for scripts)
-  cleanup      Delete the stack and ECR repository
+  cleanup      Delete the stack, password secret, and ECR repository
   help         Show this help message
 
 Options:

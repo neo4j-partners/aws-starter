@@ -3,12 +3,12 @@
 An engineer who asks about tail N12345 and then asks "what about its
 hydraulics?" expects the agent to remember the tail. An engineer who said last
 week that they track the A320 fleet expects that preference to carry over.
-Both fleet agents keep that memory with Neo4j Agent Memory, in a Neo4j database
+The supervisor keeps that memory with Neo4j Agent Memory, in a Neo4j database
 of its own. The memory graph stays apart from the fleet graph, because memory
-labels in the fleet graph would reach the Text2Cypher schema prompt and the
-MCP server's `get_neo4j_schema` result.
+labels in the fleet graph would reach the schema in the specialist prompts and
+the Text2Cypher prompt.
 
-![Memory lifecycle: how both fleet agents open, use, and close conversation memory](../images/memory-lifecycle.svg)
+![The supervisor holds one shared memory client. Each request builds a session manager, restores history, answers, saves the turn, and closes the manager. Entity extraction runs in the background. Shutdown waits for running work, then closes the client.](../images/memory-lifecycle.svg)
 
 ## What memory holds
 
@@ -25,14 +25,11 @@ the user's original text.
 
 Opening a Neo4j driver and an extraction pipeline for every request would
 cost more than most answers. Sharing one session manager across requests would
-mix sessions. The agents split the two.
+mix sessions. The supervisor splits the two.
 
 - **SharedMemory:** Each process opens one `SharedMemory` on the first request that needs it. It holds the memory client and the event-loop thread that every manager runs on. A failed open is not kept, so the next request tries again.
-- **Per-request manager:** Each agent request builds its own `Neo4jSessionManager` on the shared client with `extract_entities=True`, `record_tool_calls=False`, and `defer_extraction=True`.
+- **Per-request manager:** Each request builds its own `Neo4jSessionManager` on the shared client with `extract_entities=True`, `record_tool_calls=False`, and `defer_extraction=True`.
 - **Close order:** The server closes the agent stream first. Strands then runs its `AfterInvocationEvent` hooks, which flush the turn, and only then does the server close the manager. A manager closed first would drop the flush.
-
-The GraphRAG agent's direct modes never open memory. They keep working while
-the memory database is down.
 
 ## Writes per turn
 
@@ -67,7 +64,7 @@ sends neither.
 
 ## The retrieval threshold
 
-Both agents set `RETRIEVAL_MIN_SCORE = 0.675`. The score is Neo4j's cosine
+The supervisor sets `RETRIEVAL_MIN_SCORE = 0.675`. The score is Neo4j's cosine
 vector score, `(1 + cosine) / 2`, so 0.675 is a cosine of 0.35.
 
 The value comes from a measurement on 2026-11-21 with Titan v2 entity
@@ -86,10 +83,10 @@ one.
 
 ## Password failures
 
-The two agents treat a rejected memory password differently.
-
-- **GraphRAG agent:** The process keeps the rejection until restart. The settings are read once, so a retry would send the same wrong password and could trigger an account lockout.
-- **Supervisor agent:** A rejected password retires the client and drops the settings. The next request reads the secret again and opens a new client. The retired client closes on a background thread after its last session ends, so no request waits for it.
+A rejected memory password may predate a secret rotation. So a rejection
+retires the client and drops the settings. The request then reads the secret
+again and builds once more with a new client. The retired client closes on a
+background thread after its last session ends, so no request waits for it.
 
 ## Shutdown
 
@@ -97,13 +94,15 @@ At shutdown, the server's lifespan closes the shared memory. No request opens
 memory after shutdown starts. `SharedMemory.close()` waits for the deferred
 extractions, so the last answers still get their entities.
 
-- **GraphRAG agent:** The close waits up to 30 seconds for extractions, gives cancelled tasks 5 seconds to unwind, and closes the driver within its 30-second request timeout. That is about 65 seconds, or about 95 seconds when a memory open is still in flight.
-- **Supervisor agent:** The close first waits up to 30 seconds for open sessions, then closes every client in parallel. It returns within about 100 seconds and logs any close still running.
+The close first waits up to 30 seconds for open sessions, then closes every
+client in parallel. It returns within about 100 seconds and logs any close
+still running. An extraction still running at that deadline is lost. The
+graph driver closes after the memory close, even if the memory close fails.
 
 ## The library pin
 
-Both agents pin `neo4j-agent-memory[strands]==0.8.0+fleet.8`. It is a wheel
-from the `neo4j-partners/agent-memory` releases, and `uv.lock` records its
-sha256. The agents use `SharedMemory`, deferred extraction, the background
+The supervisor pins `neo4j-agent-memory[strands]==0.8.0+fleet.9`. It is a
+wheel from the `neo4j-partners/agent-memory` releases, and `uv.lock` records
+its sha256. The supervisor uses `SharedMemory`, deferred extraction, the background
 hook, and the per-turn discard from that build. Changing the pin means
 checking those four behaviors again.

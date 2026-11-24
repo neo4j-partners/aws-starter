@@ -1,6 +1,6 @@
 # Pipeline Architecture
 
-The pipeline builds the fleet graph that both agents read. It joins two kinds
+The pipeline builds the fleet graph that the supervisor agent reads. It joins two kinds
 of data that never share a table: generated fleet records with tail numbers,
 and maintenance manuals that describe each aircraft model in prose. The graph
 is useful only when an agent can move from a sensor on one aircraft to the
@@ -113,7 +113,7 @@ operational graph with `link_to_existing_graph()`.
 | `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to the limit the manual defines. |
 
 - **Vector index:** `maintenanceChunkEmbeddings` covers `Chunk` embeddings with cosine similarity at the configured dimension.
-- **Fulltext index:** `maintenanceChunkText` covers `Chunk` text. The GraphRAG agent's hybrid search uses both indexes.
+- **Fulltext index:** `maintenanceChunkText` covers `Chunk` text. The Maintenance specialist's hybrid search uses both indexes.
 
 With the links in place, one query can start at a reading on one aircraft,
 step to its sensor, follow `HAS_LIMIT` to the manual's operating limit, and

@@ -51,7 +51,7 @@ if [[ "$LOAD_FULL_DATASET" == "true" ]]; then
 else
   # 30 aircraft covers every tail listed in the maintenance manuals.
   DEFAULT_AIRCRAFT=30
-  # 90 days gives the graphrag-agent maintenance queries enough data.
+  # 90 days gives the supervisor's maintenance queries enough data.
   # 30 aircraft x 90 days yields about 230 MaintenanceEvents and about
   # 778k readings. That is past Aura Free, so use a paid tier or a local
   # Neo4j.
@@ -112,7 +112,7 @@ case "$CMD" in
     uv run populate-aircraft-db clean
     uv run populate-aircraft-db setup
     uv run populate-aircraft-db verify --strict
-    echo "==> Done. Point neo4j-mcp-server/.env.fleet at this NEO4J_URI and run ./deploy.py --env fleet."
+    echo "==> Done. Next: run ./agent.sh start in ../supervisor-agent to ask questions."
     ;;
   generate)
     sync_deps

@@ -11,7 +11,7 @@ manuals, and links the two into one graph.
 - **Dataset:** The pipeline uses the Aircraft Digital Twin fleet. It holds aircraft, systems, sensors, readings, flights, maintenance events, and maintenance manuals.
 - **Five stages:** The pipeline generates data, loads it, enriches it from the manuals, builds indexes and cross-links, and verifies the result.
 - **Bedrock:** Stage 3 uses Bedrock Titan for embeddings and Bedrock Claude for entity extraction. No other stage calls a model.
-- **Consumers:** The GraphRAG agent and the Neo4j MCP server read the graph this pipeline writes. They need no code changes.
+- **Consumers:** The supervisor agent and the browser UI read the graph this pipeline writes. They need no code changes.
 - **Reuse:** You can swap in your own data and documents. The same five stages apply to any domain.
 
 ## Features
@@ -34,7 +34,7 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 ./setup.sh                  # install dependencies and run all five stages
 ```
 
-- **Shared `.env`:** The file lives in `demos/aircraft-fleet/`. The pipeline and both agents read it.
+- **Shared `.env`:** The file lives in `demos/aircraft-fleet/`. The pipeline, the supervisor agent, and the UI read it.
 - **Neo4j version:** The pipeline needs Neo4j 5.23 or later for its scoped `CALL (x) { ... }` subqueries. Aura runs a newer version.
 - **AWS credentials:** `LLM_PROVIDER=bedrock` is the default. Enrichment uses your AWS credentials from the environment or `~/.aws`.
 - **Dataset size:** Leave `LOAD_FULL_DATASET=false` for a small, fast run.
@@ -198,19 +198,10 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 | `generated/` | The CSV output and its stamp. It is git-ignored. |
 | `setup.sh` | One command that drives all five stages |
 
-## Connect the agents
+## Connect the supervisor
 
-- **MCP server:** In `neo4j-mcp-server/.env.fleet`, set `NEO4J_URI` to the value used here. Set `NEO4J_USERNAME` and `NEO4J_PASSWORD` to a read-only user. The [MCP server README](../../../neo4j-mcp-server/README.md#use-a-read-only-database-user) shows how to create one. Then run the full deploy from the repo root:
-
-```bash
-cd neo4j-mcp-server
-./deploy.py --env fleet                  # apply the new Neo4j settings
-./deploy.py --env fleet credentials      # refresh .mcp-credentials.fleet.json
-../scripts/sync-credentials.sh           # copy the credentials to demos/aircraft-fleet/
-```
-
-`./deploy.py redeploy` updates only the container image. It does not apply new
-Neo4j settings.
+- **Local runs:** The supervisor reads the same `NEO4J_*` settings from the shared `.env`, so it needs no extra setup. Run `./agent.sh start` in `../supervisor-agent/`.
+- **Deploys:** The deployed supervisor reads the graph as a read-only user. The [supervisor README](../supervisor-agent/README.md#create-the-secrets) shows how to create that user and its secret.
 
 ## See also
 

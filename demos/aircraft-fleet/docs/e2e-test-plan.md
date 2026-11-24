@@ -11,17 +11,415 @@ This is a working log, not just a reference. As you run the test:
 2. **Capture real evidence.** Paste the relevant command output, counts,
    and error text. A bare "worked" is not a result. Leave out account IDs,
    ARNs, and passwords.
-3. **Write the final summary.** When you finish (or stop early), complete the
-   "Run Summary" section at the bottom: overall status, what passed, what
+3. **Write the final summary.** When you finish or stop early, complete the
+   "Run Summary" section after the steps: overall status, what passed, what
    failed, root causes, and follow-ups.
 4. **Keep the checklist current.** Tick each box in the "Checklist" section
    the moment that step is verified, so progress is visible at a glance.
 
-Edit this file in place. One file is the plan, the log, and the report.
+Edit this file in place. One file is the plan, the log, and the report. The
+[History](#history) section keeps the runs of the earlier design.
 
 ---
 
 ## Test scope
+
+Validate the full demo path for the supervisor design:
+
+1. Configure the shared `.env`.
+2. Ingest data with the pipeline into Neo4j (`pipeline/`).
+3. Create the read-only user and the two deploy secrets.
+4. Run the supervisor agent locally against that graph (`supervisor-agent/`).
+5. Check the browser UI against the local supervisor (`ui/`).
+6. Deploy the supervisor to AgentCore Runtime and drive it remotely.
+7. Tear down cloud resources.
+
+The specialists read Neo4j directly with the Neo4j Python driver. All paths
+below are relative to `demos/aircraft-fleet/`.
+
+---
+
+## Checklist
+
+Tick each box only after the step's result is recorded below.
+
+- [ ] **0.** Prerequisites verified (uv, Python 3.12+, Node.js 20+, AWS
+      creds, Bedrock model access, reachable Neo4j)
+- [ ] **1.** Shared `.env` created and filled in
+- [ ] **2.** Pipeline deps synced (`cd pipeline && uv sync`)
+- [ ] **3.** Pipeline run end to end (`./setup.sh`) completed
+- [ ] **4.** Pipeline strict verify passed
+- [ ] **5.** Showcase queries run (`./setup.sh samples`)
+- [x] **6.** Read-only user `fleet_reader` created and checked
+- [x] **7.** Deploy secrets created (`uv run fleet-supervisor-secrets`) and
+      their ARN lines added to `.env`
+- [x] **8.** Supervisor deps synced (`cd supervisor-agent && uv sync`)
+- [x] **9.** Local supervisor started (`./agent.sh start`)
+- [x] **10.** Local single query answered (`uv run fleet-supervisor-cli "..."`)
+- [ ] **11.** Local routing verified (`./agent.sh test-maintenance`,
+      `./agent.sh test-operations`, and a question for both)
+- [ ] **12.** Browser UI answered a question with evidence
+- [ ] **13.** Runtime start check passed and the AgentCore project configured
+- [ ] **14.** Supervisor deployed (`./agent.sh deploy`)
+- [ ] **15.** Deployment reached `deployed` (`./agent.sh status`)
+- [ ] **16.** Cloud single query answered (`./agent.sh invoke-cloud "..."`)
+- [ ] **17.** Cloud load test ran (`./agent.sh load-test`)
+- [ ] **18.** Cloud resources destroyed (`./agent.sh destroy`)
+- [ ] **19.** Run Summary written
+
+---
+
+## Step 0: Prerequisites
+
+Confirm before starting:
+
+- `uv --version` and Python 3.12+ available. Node.js 20+ for the UI build
+  and the AgentCore CLI.
+- AWS credentials configured (`aws sts get-caller-identity` succeeds). If
+  using SSO: `aws sso login --sso-session <your-sso-session>`.
+- Bedrock model access enabled in the target region for
+  `global.anthropic.claude-sonnet-5-5` and Titan embeddings
+  (`amazon.titan-embed-text-v2:0`). The pipeline's extraction, the
+  supervisor and its specialists, Text2Cypher, and memory extraction all
+  default to Sonnet 5.5.
+- A reachable Neo4j instance for the fleet graph and a second one for
+  memory. Aura works well. Have the URIs, the admin username, and the
+  passwords ready.
+
+`AWS_REGION` is the one region setting, and it defaults to `us-east-1`. Set
+it once in the shared `.env` if you want another region, and confirm the
+models are enabled there. Record the region used.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 1: Configure the shared `.env`
+
+One `.env` at the `demos/aircraft-fleet/` root is read by the pipeline, the
+supervisor, and the UI.
+
+```bash
+cd demos/aircraft-fleet
+cp .env.sample .env
+# Edit .env: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, MEM_NEO4J_URI,
+# MEM_NEO4J_PASSWORD. Leave LOAD_FULL_DATASET=false for a fast run.
+# Keep the embedder aligned: default amazon.titan-embed-text-v2:0 at 1024
+# dims on both pipeline and agent. If you change it, set EMBED_MODEL_ID and
+# EMBED_DIMENSIONS to match on both sides.
+```
+
+`NEO4J_USERNAME` stays the admin user, because the pipeline writes as it.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 2: Sync pipeline dependencies
+
+```bash
+cd pipeline
+uv sync
+```
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 3: Run the ingestion pipeline
+
+```bash
+# from demos/aircraft-fleet/pipeline
+./setup.sh
+```
+
+This runs all five stages: generate CSVs, clean, load operational graph,
+enrich (chunk + Titan embeddings + Claude extraction over `manuals/`), index
++ fuse, strict verify. Stage 3 is the only stage that calls Bedrock.
+
+If credentials or model access fail mid-run, record the failing stage. To
+isolate stages: `./setup.sh generate`, `./setup.sh load-operational` (no LLM,
+no key), `./setup.sh load`, `./setup.sh verify`.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 4: Strict verify
+
+`./setup.sh` already runs `verify --strict`. Re-run it standalone to confirm
+a clean read-only pass:
+
+```bash
+./setup.sh verify
+```
+
+Expect a pass report and exit code 0.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 5: Showcase queries against the graph
+
+```bash
+./setup.sh samples
+```
+
+Simulates an agent issuing Cypher and vector searches against the loaded
+graph. Confirms the dual graph and the `maintenanceChunkEmbeddings` index are
+queryable.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 6: Create the read-only user
+
+Run the Cypher in the supervisor README's
+[Create the read-only user](../supervisor-agent/README.md#create-the-read-only-user)
+as the admin user against the `system` database. Then check the roles, try
+one write as `fleet_reader`, and read the aircraft count as `fleet_reader`.
+
+Record the roles and the write error code. Do not record the password.
+
+**Result:** PASS (2026-11-23).
+- **User:** `fleet_reader` exists on the fleet Aura instance with the roles
+  `PUBLIC`, `reader`, and `graphql_app_read_only_<AURA_ID>`.
+- **Write probe:** `CREATE (:ReaderProbe) RETURN 1` as `fleet_reader` was
+  refused with `42NFF`.
+- **Reads:** A read as `fleet_reader` counted 30 aircraft, and the schema
+  read worked.
+
+---
+
+## Step 7: Create the deploy secrets
+
+Add `NEO4J_READER_USERNAME=fleet_reader` and `NEO4J_READER_PASSWORD` to
+`.env`, then run from `supervisor-agent/`:
+
+```bash
+uv sync
+uv run fleet-supervisor-secrets --dry-run
+uv run fleet-supervisor-secrets
+```
+
+Add the two printed lines, `NEO4J_PASSWORD_SECRET_ARN=...` and
+`MEM_NEO4J_PASSWORD_SECRET_ARN=...`, to `.env`. Record the secret names and
+what the script did with each one. Do not record the ARNs.
+
+**Result:** PASS (2026-11-23). The run created `fleet/neo4j-reader` and
+`fleet/memory-neo4j` in `us-east-1`. The two ARN lines were appended to
+`.env`, and nothing else in the file changed.
+
+---
+
+## Step 8: Sync supervisor dependencies
+
+```bash
+cd ../supervisor-agent
+uv sync
+```
+
+**Result:** PASS (2026-11-23). `uv sync --frozen` installed the locked
+packages with no lock change.
+
+---
+
+## Step 9: Start the local supervisor
+
+Run in its own terminal. Ctrl+C or `./agent.sh stop` stops it. It serves
+`http://localhost:7071`.
+
+```bash
+# Terminal 1
+./agent.sh start
+```
+
+With the secret ARNs in `.env`, the startup log shows `Reading
+NEO4J_PASSWORD_SECRET_ARN from Secrets Manager` and the same line for
+`MEM_NEO4J_PASSWORD_SECRET_ARN`. Record both lines.
+
+**Result:** PASS (2026-11-23). The run started `uv run
+fleet-supervisor-server` on port 7171, with `AGENT_PORT=7171` and
+`FLEET_ENV_FILE` set to the shared `.env`. The log shows both `Reading ...
+from Secrets Manager` lines and no errors or warnings.
+
+---
+
+## Step 10: Local single query
+
+```bash
+# Terminal 2
+uv run fleet-supervisor-cli "How many aircraft are in the database?"
+```
+
+Expect a numeric answer consistent with the loaded dataset (default 30
+aircraft). To confirm the login, run `SHOW CURRENT USER` with the same login
+and expect `fleet_reader`.
+
+**Result:** PASS (2026-11-23). The supervisor routed to the Operations
+Agent, which made one `graph_query_tool` call. It answered **"The database
+has 30 aircraft."** in 20.2 seconds. `SHOW CURRENT USER` with the login from
+`NEO4J_PASSWORD_SECRET_ARN` returned `fleet_reader` with the roles in Step 6.
+
+---
+
+## Step 11: Verify local routing
+
+```bash
+./agent.sh test-maintenance        # routes to the Maintenance Agent
+./agent.sh test-operations         # routes to the Operations Agent
+uv run fleet-supervisor-cli "Compare maintenance fault counts with flight delay counts"
+uv run fleet-supervisor-cli "What is the hydraulic leak detection procedure?"
+```
+
+Expect the first to reach Maintenance, the second Operations, and the third
+both. The manual question should call `vector_search_tool`. Record the route,
+the tools, and the key figures for each.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 12: Check the browser UI
+
+Keep the Step 9 server running. In another terminal:
+
+```bash
+cd ../ui
+npm ci
+npm run build
+uv run --project ../supervisor-agent python server.py   # serves http://127.0.0.1:8081
+```
+
+Open the UI and select **Find aircraft with hydraulic system issues**. Expect
+the answer, the specialist and tool calls, and an evidence graph for each
+finished tool call.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 13: Check the Runtime start and configure the deploy
+
+Install the AgentCore CLI once with `npm install -g @aws/agentcore`. Then run
+from `supervisor-agent/`:
+
+```bash
+OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
+  uv run opentelemetry-instrument python -c "import fleet_supervisor.server; import boto3; boto3.client('sts', region_name='us-east-1')"
+./agent.sh configure
+```
+
+The first command repeats the Runtime's import order. `configure` installs
+the CDK dependencies in `agentcore/cdk`. Record the AgentCore CLI version.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 14: Deploy to AgentCore Runtime
+
+```bash
+./agent.sh deploy
+```
+
+The deploy builds a code zip and deploys the stack
+`AgentCore-fleetsupervisor-default`. It builds no Docker image. Record how
+long the deploy takes.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 15: Check the deployment
+
+```bash
+./agent.sh status
+```
+
+Expect the runtime `supervisor` with `deploymentState` set to `deployed`.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 16: Cloud single query
+
+```bash
+./agent.sh invoke-cloud "How many aircraft are in the database?"
+./agent.sh invoke-cloud "Which routes have the most delays?"
+```
+
+Expect the same count as Step 10.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 17: Cloud load test
+
+```bash
+./agent.sh load-test 5     # a random queries.txt question every 5s. Ctrl+C stops it.
+```
+
+Let it run for several questions across both domains. Record the questions,
+the routes, and any errors.
+
+**Result:** Not recorded yet.
+
+---
+
+## Step 18: Tear down
+
+```bash
+./agent.sh destroy
+```
+
+The command asks for confirmation. Pass `--yes` to skip the question. It
+checks that the active AWS credentials belong to the target's account, and
+then that the stack `AgentCore-fleetsupervisor-default` is gone. Record its
+final lines and the log groups it removed.
+
+Decide separately whether to remove the secrets and `fleet_reader`, as in
+the supervisor README's
+[Remove the secrets and the reader](../supervisor-agent/README.md#remove-the-secrets-and-the-reader),
+and whether to clean the Neo4j graph. Record both decisions.
+
+**Result:** Not recorded yet.
+
+---
+
+## Run Summary
+
+Fill this in at the end, or when stopping early.
+
+- **Date / operator:** The run started on 2026-11-23.
+- **Region(s) used:** `us-east-1`.
+- **Dataset size (LOAD_FULL_DATASET):** Not recorded yet.
+- **Neo4j target:** The graph is Aura `neo4j+s://<AURA_ID>.databases.neo4j.io`.
+  Memory is a second Aura instance. The supervisor reads as `fleet_reader`.
+- **Overall status:** In progress. Steps 6 to 10 passed.
+- **Steps failed or skipped (with reason):** Not recorded yet.
+- **Root causes and fixes:** Not recorded yet.
+- **Embedder alignment confirmed (pipeline vs agent):** Not recorded yet.
+- **Local vs cloud answers consistent:** Not recorded yet.
+- **Follow-up actions / issues to file:** Not recorded yet.
+- **Cloud resources confirmed destroyed:** Not recorded yet.
+
+---
+
+## History
+
+The sections below record runs of the earlier design. That design had a
+GraphRAG agent in `graphrag-agent/` and a supervisor that reached Neo4j
+through the Neo4j MCP server and AgentCore Gateway. Both are gone, so their
+commands no longer run. The records stay as they were written.
+
+### Run of 2026-11-21: GraphRAG agent and MCP supervisor
+
+#### Test scope
 
 Validate the full demo path:
 
@@ -37,7 +435,7 @@ All paths below are relative to `demos/aircraft-fleet/`.
 
 ---
 
-## Checklist
+#### Checklist
 
 Tick each box only after the step's result is recorded below.
 
@@ -70,7 +468,7 @@ Tick each box only after the step's result is recorded below.
 
 ---
 
-## Step 0: Prerequisites
+#### Step 0: Prerequisites
 
 Confirm before starting:
 
@@ -122,7 +520,7 @@ are enabled there. Record the region used.
 
 ---
 
-## Step 1: Configure the shared `.env`
+#### Step 1: Configure the shared `.env`
 
 One `.env` at the `demos/aircraft-fleet/` root is read by both projects.
 
@@ -152,7 +550,7 @@ test checkout.
 
 ---
 
-## Step 2: Sync pipeline dependencies
+#### Step 2: Sync pipeline dependencies
 
 ```bash
 cd pipeline
@@ -164,7 +562,7 @@ with no conflicts.
 
 ---
 
-## Step 3: Run the ingestion pipeline
+#### Step 3: Run the ingestion pipeline
 
 ```bash
 # from demos/aircraft-fleet/pipeline
@@ -204,7 +602,7 @@ and reported `Done in 9m 25s`.
 
 ---
 
-## Step 4: Strict verify
+#### Step 4: Strict verify
 
 `./setup.sh` already runs `verify --strict`. Re-run it standalone to confirm
 a clean read-only pass:
@@ -233,7 +631,7 @@ with `[OK] Verification passed.`
 
 ---
 
-## Step 5: Showcase queries against the graph
+#### Step 5: Showcase queries against the graph
 
 ```bash
 ./setup.sh samples
@@ -256,7 +654,7 @@ queryable.
 
 ---
 
-## Step 6: Sync agent dependencies
+#### Step 6: Sync agent dependencies
 
 ```bash
 cd ../graphrag-agent
@@ -268,7 +666,7 @@ uv sync
 
 ---
 
-## Step 7: Start the local agent server
+#### Step 7: Start the local agent server
 
 Run in its own terminal; Ctrl+C stops it. Serves `http://localhost:7070`.
 
@@ -293,7 +691,7 @@ If port 7070 is held: `lsof -ti :7070 | xargs kill`, then restart.
 
 ---
 
-## Step 8: Local single query
+#### Step 8: Local single query
 
 ```bash
 # Terminal 2
@@ -318,7 +716,7 @@ aircraft).
 
 ---
 
-## Step 9: Local full showcase
+#### Step 9: Local full showcase
 
 ```bash
 uv run fleet-demo
@@ -348,7 +746,7 @@ seconds, and all five sections ran.
 
 ---
 
-## Step 10: Set up the AgentCore CLI deploy
+#### Step 10: Set up the AgentCore CLI deploy
 
 Deployment uses the AgentCore CLI. Install it once:
 
@@ -385,7 +783,7 @@ Record the AgentCore CLI version and the two secret names. Do not record the ARN
 
 ---
 
-## Step 11: Deploy to AgentCore Runtime
+#### Step 11: Deploy to AgentCore Runtime
 
 ```bash
 # from demos/aircraft-fleet/graphrag-agent
@@ -407,7 +805,7 @@ minutes 20 seconds.
 
 ---
 
-## Step 12: Check the deployment
+#### Step 12: Check the deployment
 
 ```bash
 ./agent.sh status
@@ -422,7 +820,7 @@ resource, the runtime `graphrag_agent`, with `deploymentState` set to
 
 ---
 
-## Step 13: Cloud single query
+#### Step 13: Cloud single query
 
 ```bash
 ./agent.sh invoke-cloud "How many aircraft are in the database?"
@@ -437,7 +835,7 @@ opened memory with no timeout.
 
 ---
 
-## Step 14: Cloud full showcase
+#### Step 14: Cloud full showcase
 
 ```bash
 uv run fleet-demo --remote
@@ -476,7 +874,7 @@ Record whether the local and cloud answers match.
 
 ---
 
-## Step 15: Tear down
+#### Step 15: Tear down
 
 ```bash
 ./agent.sh destroy
@@ -502,7 +900,7 @@ than `./setup.sh clean`.
 
 ---
 
-## Step 17: Deploy the MCP server for the fleet graph
+#### Step 17: Deploy the MCP server for the fleet graph
 
 The supervisor reaches Neo4j through the MCP Gateway, not a direct driver.
 Point a `fleet` MCP deployment at the same `NEO4J_URI` the pipeline loaded.
@@ -533,7 +931,7 @@ minutes 27 seconds.
   The node count was 799,970. That is the 798,325 operational nodes, the
   1,644 enrichment nodes, and the one `Dataset` stamp node.
 
-## Step 18: Sync supervisor credentials
+#### Step 18: Sync supervisor credentials
 
 ```bash
 # from neo4j-mcp-server
@@ -550,7 +948,7 @@ quickstart and finance targets, because this run did not deploy them. It
 reported `Credentials synced to 1 of 3 directories.` Git ignores both
 credentials files.
 
-## Step 19: Start the supervisor locally
+#### Step 19: Start the supervisor locally
 
 ```bash
 cd ../demos/aircraft-fleet/supervisor-agent
@@ -564,7 +962,7 @@ from Secrets Manager and started with `global.anthropic.claude-sonnet-5-5`.
 `/ping` returned `{"status":"Healthy"}`. The run set `SSL_CERT_FILE` as in
 Step 0.
 
-## Step 20: Verify local routing
+#### Step 20: Verify local routing
 
 ```bash
 ./agent.sh test-maintenance        # routes to the Maintenance Agent
@@ -583,7 +981,7 @@ through the Gateway.
   delays: Weather 1,493, NAS 1,295, Maintenance 1,275, and Carrier 1,082.
   That matches the generator.
 
-## Step 21: Deploy and invoke the supervisor in the cloud
+#### Step 21: Deploy and invoke the supervisor in the cloud
 
 ```bash
 ./agent.sh configure
@@ -609,7 +1007,7 @@ through the Gateway.
   correct totals of 14,280 flights and 5,145 delays, and listed the top
   causes for each route.
 
-## Step 22: Tear down the supervisor and the MCP server
+#### Step 22: Tear down the supervisor and the MCP server
 
 ```bash
 ./agent.sh destroy
@@ -639,7 +1037,7 @@ supervisor server is stopped.
 
 ---
 
-## Run Summary
+#### Run Summary
 
 Fill this in at the end (or when stopping early).
 
@@ -736,7 +1134,7 @@ history.
 
 ---
 
-## Cloud Retest: 2026-11-22
+### Cloud Retest: 2026-11-22
 
 This run retested the cloud path at main `98064f6`. It covered the changes
 made after the 2026-11-21 run: the MCP secret entrypoint, the non-root
@@ -799,7 +1197,7 @@ to start, so the agent cloud steps did not run.
   the load test, and the cloud check of the user name read from the
   secret did not run.
 
-### Root cause
+#### Root cause
 
 Both Runtimes stop at import with `RecursionError: maximum recursion depth
 exceeded`. The stack trace ends in `ssl.py` at
@@ -822,7 +1220,7 @@ credential resolver.
 - **Why the 2026-11-21 run passed:** That run deployed before follow-up 1
   added `truststore`.
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. Fixed in commit 37c97c4. Each agent now skips the truststore injection
    when the HTTP stack is already imported, and logs one line. In the
@@ -852,7 +1250,7 @@ Cognito pools, IAM roles, log groups, ECR repositories, and secrets.
 `.env` and `.env.fleet` are back to the admin user without the secret
 ARNs. CloudWatch Transaction Search stays on.
 
-## Cloud Retest 2: 2026-11-22
+### Cloud Retest 2: 2026-11-22
 
 This run retested the cloud path at main `e16af89` to confirm the truststore
 fix from commit 37c97c4. It reused the graph from the 2026-11-21 run. Account
@@ -907,7 +1305,7 @@ separate bug.
   traceback. The supervisor log has no traceback for the
   `invoke-cloud` requests.
 
-### Root cause of the load test failure
+#### Root cause of the load test failure
 
 The supervisor fetches its Gateway token from AgentCore Identity on the
 request path. Identity needs the request's workload access token. The
@@ -926,7 +1324,7 @@ secrets `fleet/neo4j-reader` and `fleet/memory-neo4j` were force-deleted.
 The fleet MCP stack, `fleet_reader`, and the `.env` changes stayed in place
 for Cloud Retest 3.
 
-## Cloud Retest 3: 2026-11-22
+### Cloud Retest 3: 2026-11-22
 
 This run retested the agents at main `00222c9`. The GraphRAG agent moved to
 mcp 2.3.0. Both agent CDK apps moved to TypeScript 7.0.2 and `@types/node`
@@ -965,7 +1363,7 @@ typescript ~7.0.2, newer than the version this CLI vends (~5.9.3). Run
 true' to manage the CDK dependencies yourself.
 ```
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. The AgentCore CLI 1.2.0 refuses CDK pins newer than the versions it
    vends. The TypeScript 7.0.2 and `@types/node` 26.6.6 pins need a newer
@@ -996,7 +1394,7 @@ copies. The fleet credentials copies are removed. The fraud agent's
 `.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
 on, and the fleet graph is unchanged.
 
-## Cloud Retest 4: 2026-11-22
+### Cloud Retest 4: 2026-11-22
 
 This run retested the cloud path at main `9674a00`. Both agent CDK apps are
 back on TypeScript 5.9.3 and `@types/node` 24.13.3. The supervisor client
@@ -1055,7 +1453,7 @@ passed. The Runtime logs show no errors.
   a traceback, or "No workload access token". The supervisor log shows 10
   handled requests and 11 Gateway token fetches.
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. A SIGINT to the `load-test` process did not stop it between requests.
    The loop kept sending requests until a SIGTERM stopped it.
@@ -1084,7 +1482,7 @@ before it runs `create_reader.py`. The fraud agent's
 `.mcp-credentials.json` is unchanged. CloudWatch Transaction Search stays
 on, and the fleet graph is unchanged.
 
-## Cloud Retest 5: 2026-11-22
+### Cloud Retest 5: 2026-11-22
 
 This run retested the cloud path at main `85965ef`. It covered the fleet
 demo and the fraud memory agent. The run built the fleet MCP stack and the
@@ -1096,7 +1494,7 @@ and was destroyed cleanly, but it could not answer a query. Its NAMS memory
 workspace points at an external database that fails every request. The
 fraud deploy check also ran before the new runtime was READY.
 
-### Fleet
+#### Fleet
 
 - **Setup:** The run created `fleet_reader` again with the `reader` and
   `graphql_app_read_only_709ad5c7` roles. It created the secrets
@@ -1144,7 +1542,7 @@ fraud deploy check also ran before the new runtime was READY.
   lines. Neither log has a `RecursionError`, a `CERTIFICATE_VERIFY_FAILED`,
   a traceback, or "No workload access token".
 
-### Fraud
+#### Fraud
 
 - **Finance MCP deploy:** PASS. `./deploy.py --env finance` exited 0
   after 5 minutes 17 seconds. The stack reached `CREATE_COMPLETE`. All four
@@ -1178,7 +1576,7 @@ fraud deploy check also ran before the new runtime was READY.
   its confirmation. It exited 0 after 6 seconds. It removed 7 resources,
   including the runtime, the memory, and `.bedrock_agentcore.yaml`.
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. `./agent.sh deploy` in `fraud-memory-agent` fails on a first deploy.
    `verify_agentcore_runtime.py` checks the runtime status once. A new
@@ -1236,7 +1634,7 @@ repositories, and secrets. `.env`, `.env.fleet`, the fraud agent's
 pre-run copies. The fleet credentials copies, `.env.fleet.readonly`, and
 the fraud agent's toolkit files are removed. The fleet graph is unchanged.
 
-## Cloud Retest 6: 2026-11-22
+### Cloud Retest 6: 2026-11-22
 
 This run retested the cloud path at main `e1a8ab3`. It covered the fleet
 demo and the fraud memory agent. It checked the Retest 5 fixes and the new
@@ -1248,7 +1646,7 @@ fixes worked. Two fleet teardowns left their Runtime log groups behind.
 The fraud agent still cannot answer a query, because its NAMS workspace
 fails every request.
 
-### Fleet
+#### Fleet
 
 - **Setup:** The run created `fleet_reader` again with the `reader` and
   `graphql_app_read_only_709ad5c7` roles. It created the secrets
@@ -1299,7 +1697,7 @@ fails every request.
   recorded, so destroy will not remove the Runtime's log groups." Both
   Runtime log groups were still there 5 minutes later.
 
-### Fraud
+#### Fraud
 
 - **Finance MCP deploy:** PASS. `./deploy.py --env finance` exited 0
   after 5 minutes 16 seconds. The stack reached `CREATE_COMPLETE`. All four
@@ -1330,7 +1728,7 @@ fails every request.
   group, the `.bedrock_agentcore/` cache, and the Runtime log group. No
   toolkit files are left in the agent folder.
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. The GraphRAG and supervisor `./agent.sh destroy` cannot find the
    Runtime ID, so they keep the Runtime log group. Both read
@@ -1366,7 +1764,7 @@ roles, S3 buckets, log groups, ECR repositories, and secrets. `.env`,
 credentials copies and `.env.fleet.readonly` are removed. The fleet graph
 is unchanged.
 
-## Cloud Retest 7: 2026-11-22
+### Cloud Retest 7: 2026-11-22
 
 This run retested Retest 6 follow-up 1 at main `b81b0fc`. Commits 5301084
 and b81b0fc make the GraphRAG and supervisor `./agent.sh destroy` read the
@@ -1428,7 +1826,7 @@ backed-up local files match their pre-run hashes. The fleet credentials
 copies and `.env.fleet.readonly` are removed. The fleet graph is
 unchanged.
 
-## Cloud Retest 8: 2026-11-23
+### Cloud Retest 8: 2026-11-23
 
 This run retested the fraud memory agent in the cloud at main `c2fe929`.
 It deployed only the finance MCP server and the fraud memory agent, and
@@ -1557,7 +1955,7 @@ snapshot.
   deleted the MCP Runtime, the stack, the Runtime log group, the
   `neo4j-mcp-server` ECR repository, and the password secret.
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. `./agent.sh logs --errors` reported no failed traces for a session
    whose invoke failed. The Runtime handler returns errors inside an HTTP
@@ -1608,7 +2006,7 @@ under `/aws/bedrock-agentcore/runtimes/`, or a log group under
 changed during the run and were restored. All 11 backed-up local files
 match their pre-run hashes, and `.bedrock_agentcore.yaml` is absent.
 
-## Cloud Retest 9: 2026-11-23
+### Cloud Retest 9: 2026-11-23
 
 This run retested the fraud memory agent after the `fraud-fixes.md`
 work, on main `46a35ce` plus the uncommitted Phase 1 to 9 changes. The
@@ -1671,7 +2069,7 @@ back.
   after 4 minutes 20 seconds. It deleted the stack, the Runtime log
   group, the `neo4j-mcp-server` ECR repository, and the password secret.
 
-### Follow-ups from this run
+#### Follow-ups from this run
 
 1. The agent reported 206 transfers from 13914. The graph has 238.
    **Status:** The fraud agent now defaults to Sonnet 5.5. The next

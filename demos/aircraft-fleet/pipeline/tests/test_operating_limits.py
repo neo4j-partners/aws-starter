@@ -28,7 +28,8 @@ _NUMBER = re.compile(r"(?<![\d.])-?\d[\d,]*(?:\.\d+)?")
 # Blocks that only restate limits another block states. They get no rows.
 RESTATING_BLOCKS = {"quick-ref-engine", "egt-exceedance", "vibration-shutdown", "fuel-flow-range"}
 
-Fact = tuple[str, str, str, float | None, float | None]
+# Aircraft type, parameter, regime, unit, minimum, maximum.
+Fact = tuple[str, str, str, str, float | None, float | None]
 
 
 def _blocks(model: str) -> dict[str, str]:
@@ -49,6 +50,7 @@ def _fact(row: dict[str, str]) -> Fact:
         row["aircraftType"],
         row["parameterName"],
         row["regime"],
+        row["unit"],
         _value(row["minValue"]),
         _value(row["maxValue"]),
     )
@@ -67,6 +69,11 @@ def _cell(cell: str) -> tuple[float | None, float | None]:
     return (low, high[0]) if high else (None, low)
 
 
+def _cell_unit(cell: str) -> str:
+    """The unit after a limit cell's last number: "≥ 3.5 ips" gives "ips"."""
+    return re.sub(r"^.*\d", "", cell).strip()
+
+
 def _table(body: str) -> list[dict[str, str]]:
     """The rows of the Markdown table in a block, keyed by header cell."""
     lines = [line for line in body.splitlines() if line.startswith("|")]
@@ -77,8 +84,10 @@ def _table(body: str) -> list[dict[str, str]]:
     ]
 
 
-def _label(label: str) -> str:
-    return label.rpartition(" (")[0]
+def _label(label: str) -> tuple[str, str]:
+    """A row label's parameter and unit: "EGT (°C)" gives ("EGT", "°C")."""
+    parameter, _, unit = label.rpartition(" (")
+    return parameter, unit.removesuffix(")")
 
 
 _PHASE_REGIMES = {
@@ -105,52 +114,59 @@ def _manual_facts(model: str) -> set[Fact]:
     blocks = _blocks(model)
     facts: set[Fact] = set()
 
-    def add(parameter: str, regime: str, bounds: tuple[float | None, float | None]) -> None:
-        facts.add((model, parameter, regime, *bounds))
+    def add(
+        parameter: str, regime: str, unit: str, bounds: tuple[float | None, float | None]
+    ) -> None:
+        facts.add((model, parameter, regime, unit, *bounds))
 
     for row in _table(blocks["normal-parameters"]):
-        parameter = {"Vibration N1": "Vibration"}.get(
-            _label(row["Parameter"]), _label(row["Parameter"])
-        )
+        label, unit = _label(row["Parameter"])
+        parameter = {"Vibration N1": "Vibration"}.get(label, label)
         for column, regime in _PHASE_REGIMES.items():
             if row[column] != "—":
-                add(parameter, regime, _cell(row[column]))
+                add(parameter, regime, unit, _cell(row[column]))
     for row in _table(blocks["egt-limits"]):
-        add("EGT", _EGT_REGIMES[row["Parameter"]], _cell(row["Maximum"]))
+        maximum = row["Maximum"]
+        add("EGT", _EGT_REGIMES[row["Parameter"]], _cell_unit(maximum), _cell(maximum))
     trend = re.search(
         r"Advisory at (\d+)°C, Caution at (\d+)°C, and Warning at (\d+)°C", blocks["egt-trend-note"]
     )
     assert trend is not None
     for level, value in zip(("Advisory", "Caution", "Warning"), trend.groups(), strict=True):
-        add("EGT", f"Trend {level}", (float(value), None))
+        add("EGT", f"Trend {level}", "°C", (float(value), None))
     for row in _table(blocks["vibration-bands"]):
         if row["Level"] != "Normal":
-            add("Vibration", row["Level"], _cell(row["N1 Vibration"]))
+            band = row["N1 Vibration"]
+            add("Vibration", row["Level"], _cell_unit(band), _cell(band))
     for block in ("quick-ref-hydraulics", "quick-ref-avionics"):
         for row in _table(blocks[block]):
+            label, unit = _label(row["Parameter"])
             for level in ("Advisory", "Caution", "Warning"):
-                add(_BAND_PARAMETERS[_label(row["Parameter"])], level, _cell(row[level]))
+                add(_BAND_PARAMETERS[label], level, unit, _cell(row[level]))
     if "gearbox-oil-temperature" in blocks:
         [row] = _table(blocks["gearbox-oil-temperature"])
-        add("Gearbox Oil Temperature", "Caution", _cell(row["Caution (°C)"]))
-        add("Gearbox Oil Temperature", "All", _cell(row["Limit (°C)"]))
+        add("Gearbox Oil Temperature", "Caution", "°C", _cell(row["Caution (°C)"]))
+        add("Gearbox Oil Temperature", "All", "°C", _cell(row["Limit (°C)"]))
         outlet = re.search(
             r"operation above (\d+)°C is not permitted", blocks["gearbox-temperature-monitoring"]
         )
         assert outlet is not None
-        add("Gearbox Oil Outlet Temperature", "All", (None, float(outlet.group(1))))
+        add("Gearbox Oil Outlet Temperature", "All", "°C", (None, float(outlet.group(1))))
     fluid = blocks["hydraulic-fluid-temperature"]
     operating = re.search(r"operate from (-?\d+) to \+(\d+)°C\.", fluid)
     assert operating is not None
     add(
-        "Hydraulic Fluid Temperature", "All", (float(operating.group(1)), float(operating.group(2)))
+        "Hydraulic Fluid Temperature",
+        "All",
+        "°C",
+        (float(operating.group(1)), float(operating.group(2))),
     )
     if warning := re.search(r"Above (\d+)°C is a warning\.", fluid):
-        add("Hydraulic Fluid Temperature", "Warning", (float(warning.group(1)), None))
+        add("Hydraulic Fluid Temperature", "Warning", "°C", (float(warning.group(1)), None))
     if "hydraulic-water-content" in blocks:
         water = re.search(r"(\d+(?:\.\d+)?)% by volume", blocks["hydraulic-water-content"])
         assert water is not None
-        add("Water Content", "All", (None, float(water.group(1))))
+        add("Water Content", "All", "% by volume", (None, float(water.group(1))))
     return facts
 
 

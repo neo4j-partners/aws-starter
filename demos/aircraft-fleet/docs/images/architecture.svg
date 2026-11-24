@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="940" viewBox="0 0 1600 940" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Aircraft Fleet Demo Architecture</title>
-  <desc>The pipeline builds the Neo4j fleet graph with Amazon Bedrock. The GraphRAG agent reads the graph with a direct Neo4j driver. The supervisor agent reads it through the AgentCore Gateway and the Neo4j MCP server. Both agents keep conversation memory in a separate Neo4j database and call Claude on Bedrock.</desc>
+  <desc>The pipeline builds the Neo4j fleet graph with Amazon Bedrock. One supervisor agent routes each question to a Maintenance Agent or an Operations Agent. The specialists read the graph directly with the Neo4j driver through two graph tools: graph_query_tool runs Text2Cypher, and vector_search_tool runs hybrid search over the manual chunks. The supervisor keeps conversation memory in a separate Neo4j database and calls Claude on Bedrock.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -18,13 +18,12 @@
     <marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker>
     <marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker>
-    <marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker>
     <marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker>
   </defs>
 
   <rect width="1600" height="940" fill="#F7F8FA"/>
   <text x="800" y="54" text-anchor="middle" class="h1">Aircraft Fleet Demo Architecture</text>
-  <text x="800" y="84" text-anchor="middle" class="sub">One pipeline builds the graph. Two agents answer questions over it, each by a different path.</text>
+  <text x="800" y="84" text-anchor="middle" class="sub">One pipeline builds the graph. One supervisor answers questions over it with direct Neo4j tools.</text>
 
   <!-- Amazon Bedrock -->
   <rect x="380" y="118" width="940" height="80" rx="16" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
@@ -74,51 +73,44 @@
   <!-- AgentCore boundary -->
   <rect x="736" y="232" width="590" height="560" rx="22" fill="#FFFBF5" stroke="#D97706" stroke-width="2" stroke-dasharray="9 6"/>
   <text x="760" y="262" class="lbl" fill="#8A4B08">Amazon Bedrock AgentCore</text>
-  <text x="760" y="281" class="s">Agents run locally or on AgentCore Runtime</text>
+  <text x="760" y="281" class="s">The supervisor runs locally or on AgentCore Runtime</text>
 
   <!-- AgentCore to Bedrock -->
   <path d="M1180,232 V202" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
 
-  <!-- GraphRAG agent -->
-  <rect x="1050" y="300" width="250" height="160" rx="16" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1175" y="334" text-anchor="middle" class="t" fill="#00594A">GraphRAG agent</text>
-  <text x="1175" y="356" text-anchor="middle" class="m">graphrag-agent/ · :7070</text>
-  <text x="1070" y="388" class="s">graph_query_tool: Text2Cypher</text>
-  <text x="1070" y="410" class="s">vector_search_tool: hybrid search</text>
-  <text x="1070" y="438" class="s">One Strands agent</text>
-
   <!-- Supervisor agent -->
-  <rect x="1050" y="560" width="250" height="200" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1175" y="594" text-anchor="middle" class="t" fill="#1E3A5F">Supervisor agent</text>
-  <text x="1175" y="616" text-anchor="middle" class="m">supervisor-agent/ · :7071</text>
-  <rect x="1068" y="634" width="214" height="34" rx="9" fill="#EEF4FB" stroke="#B9CDE6"/>
-  <text x="1175" y="656" text-anchor="middle" class="pill">Maintenance Agent</text>
-  <rect x="1068" y="676" width="214" height="34" rx="9" fill="#EEF4FB" stroke="#B9CDE6"/>
-  <text x="1175" y="698" text-anchor="middle" class="pill">Operations Agent</text>
-  <text x="1175" y="740" text-anchor="middle" class="s">Specialists called as tools</text>
+  <rect x="1000" y="310" width="300" height="440" rx="16" fill="#FFFFFF" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1150" y="344" text-anchor="middle" class="t" fill="#1E3A5F">Supervisor agent</text>
+  <text x="1150" y="366" text-anchor="middle" class="m">supervisor-agent/ · :7071</text>
+  <text x="1150" y="394" text-anchor="middle" class="s">Specialists called as tools</text>
+  <rect x="1018" y="414" width="264" height="92" rx="10" fill="#EEF4FB" stroke="#B9CDE6"/>
+  <text x="1150" y="440" text-anchor="middle" class="pill" font-weight="700">Maintenance Agent</text>
+  <text x="1150" y="464" text-anchor="middle" class="m">graph_query_tool</text>
+  <text x="1150" y="484" text-anchor="middle" class="m">vector_search_tool</text>
+  <rect x="1018" y="522" width="264" height="72" rx="10" fill="#EEF4FB" stroke="#B9CDE6"/>
+  <text x="1150" y="548" text-anchor="middle" class="pill" font-weight="700">Operations Agent</text>
+  <text x="1150" y="572" text-anchor="middle" class="m">graph_query_tool</text>
+  <text x="1150" y="630" text-anchor="middle" class="s">A fresh specialist for each call</text>
+  <text x="1150" y="652" text-anchor="middle" class="s">Live graph schema in both prompts</text>
+  <text x="1150" y="690" text-anchor="middle" class="s">On AgentCore Runtime: CodeZip,</text>
+  <text x="1150" y="712" text-anchor="middle" class="s">Python 3.12, port 8080</text>
 
-  <!-- Neo4j MCP server -->
-  <rect x="770" y="440" width="200" height="96" rx="14" fill="#FFFFFF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
-  <text x="870" y="472" text-anchor="middle" font-size="17" font-weight="700" fill="#4A2EB0">Neo4j MCP server</text>
-  <text x="870" y="496" text-anchor="middle" class="m">get_neo4j_schema</text>
-  <text x="870" y="516" text-anchor="middle" class="m">read_neo4j_cypher</text>
+  <!-- Graph tools -->
+  <rect x="770" y="400" width="200" height="222" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="870" y="432" text-anchor="middle" font-size="17" font-weight="700" fill="#00594A">Graph tools</text>
+  <text x="870" y="454" text-anchor="middle" class="m">core/graph/</text>
+  <text x="790" y="490" class="lbl" fill="#00594A">Direct Neo4j driver</text>
+  <text x="790" y="522" class="s">Text2Cypher, read-only</text>
+  <text x="790" y="544" class="s">timeout and row cap</text>
+  <text x="790" y="576" class="s">Hybrid vector and</text>
+  <text x="790" y="598" class="s">fulltext chunk search</text>
 
-  <!-- Gateway -->
-  <rect x="770" y="620" width="200" height="90" rx="14" fill="#FFFFFF" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
-  <text x="870" y="652" text-anchor="middle" font-size="17" font-weight="700" fill="#8A4B08">AgentCore Gateway</text>
-  <text x="870" y="676" text-anchor="middle" class="s">Validates the JWT</text>
-  <text x="870" y="696" text-anchor="middle" class="s">Cognito OAuth2</text>
+  <!-- Specialists to graph tools -->
+  <path d="M1018,460 H974" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <path d="M1018,558 H974" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
 
-  <!-- GraphRAG to fleet graph (direct) -->
-  <path d="M1050,360 H684" fill="none" stroke="#008C72" stroke-width="3" marker-end="url(#a-teal)"/>
-  <text x="866" y="350" text-anchor="middle" class="lbl" fill="#00594A">Neo4j driver, direct</text>
-  <text x="866" y="382" text-anchor="middle" class="s">no MCP, no Gateway</text>
-
-  <!-- Supervisor to Gateway to MCP to graph -->
-  <path d="M1050,665 H974" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
-  <text x="1012" y="655" text-anchor="middle" class="lbl">MCP</text>
-  <path d="M870,620 V540" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
-  <path d="M770,488 H684" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
+  <!-- Graph tools to fleet graph (direct) -->
+  <path d="M770,480 H684" fill="none" stroke="#008C72" stroke-width="3" marker-end="url(#a-teal)"/>
 
   <!-- Memory database -->
   <rect x="1380" y="380" width="190" height="260" rx="18" fill="#FDF2FA" stroke="#C11574" stroke-width="2.5" filter="url(#shadow)"/>
@@ -132,18 +124,15 @@
   <text x="1475" y="606" text-anchor="middle" class="s">Separate from the</text>
   <text x="1475" y="624" text-anchor="middle" class="s">fleet graph</text>
 
-  <!-- Agents to memory -->
-  <path d="M1300,400 H1340 V460 H1376" fill="none" stroke="#C11574" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-pink)"/>
-  <path d="M1300,640 H1340 V580 H1376" fill="none" stroke="#C11574" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-pink)"/>
+  <!-- Supervisor to memory -->
+  <path d="M1300,510 H1376" fill="none" stroke="#C11574" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-pink)"/>
 
   <!-- Footer legend -->
   <rect x="40" y="830" width="1530" height="80" rx="16" fill="#FFFFFF" stroke="#E4E7EC"/>
   <circle cx="80" cy="870" r="15" fill="#2E6DB4"/><text x="80" y="875" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF">1</text>
   <text x="106" y="875" font-size="15" fill="#344054">The pipeline builds the graph.</text>
-  <circle cx="410" cy="870" r="15" fill="#008C72"/><text x="410" y="875" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF">2</text>
-  <text x="436" y="875" font-size="15" fill="#344054">The GraphRAG agent reads it directly.</text>
-  <circle cx="790" cy="870" r="15" fill="#7A5AF8"/><text x="790" y="875" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF">3</text>
-  <text x="816" y="875" font-size="15" fill="#344054">The supervisor reads it through MCP.</text>
-  <circle cx="1170" cy="870" r="15" fill="#C11574"/><text x="1170" y="875" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF">4</text>
-  <text x="1196" y="875" font-size="15" fill="#344054">Both agents keep memory in its own database.</text>
+  <circle cx="560" cy="870" r="15" fill="#008C72"/><text x="560" y="875" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF">2</text>
+  <text x="586" y="875" font-size="15" fill="#344054">The specialists read it directly with the Neo4j driver.</text>
+  <circle cx="1120" cy="870" r="15" fill="#C11574"/><text x="1120" y="875" text-anchor="middle" font-size="14" font-weight="700" fill="#FFFFFF">3</text>
+  <text x="1146" y="875" font-size="15" fill="#344054">The supervisor keeps memory in its own database.</text>
 </svg>

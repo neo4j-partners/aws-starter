@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="940" viewBox="0 0 1600 940" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Supervisor Agent Request Flow</title>
-  <desc>The client posts a question to the supervisor. The supervisor calls the Maintenance Agent, the Operations Agent, or both. Each specialist calls Gateway tools through GatewayTool, which sends a JWT to the AgentCore Gateway. The Gateway calls the Neo4j MCP server, which queries the fleet graph. Memory lives in its own database.</desc>
+  <desc>The client posts a question to the supervisor. The supervisor calls the Maintenance Agent, the Operations Agent, or both. The specialists query the Neo4j fleet graph directly with two graph tools. graph_query_tool writes read-only Cypher from the live schema with Text2Cypher. vector_search_tool runs hybrid vector and fulltext search over the manual chunks, and only the Maintenance Agent has it. The Neo4j password comes from the .env file locally or from Secrets Manager in the cloud. Memory lives in its own database.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
-    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
   </defs>
   <rect width="1600" height="940" fill="#F7F8FA"/>
   <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Supervisor Agent Request Flow</text>
-  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">The supervisor routes each question to one or both specialists. They read Neo4j through the MCP Gateway.</text>
+  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">The supervisor routes each question to one or both specialists. They query Neo4j directly with two graph tools.</text>
   <rect x="40" y="390" width="220" height="140" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
   <text x="150.0" y="422" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Client</text>
   <text x="150.0" y="448" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">agent.sh test-*</text>
@@ -20,15 +20,15 @@
   <text x="455.0" y="462" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the specialists</text>
   <text x="455.0" y="484" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Port 7071 locally</text>
   <path d="M260,440 H316" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
-  <rect x="267" y="412" width="43" height="21" rx="5" fill="#F7F8FA"/>
+  <rect x="266.5" y="412" width="43" height="21" rx="5" fill="#F7F8FA"/>
   <text x="288" y="427" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">POST</text>
   <path d="M320,490 H264" fill="none" stroke="#2E6DB4" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-blue)"/>
-  <rect x="272" y="501" width="36" height="21" rx="5" fill="#F7F8FA"/>
+  <rect x="272.0" y="501" width="36" height="21" rx="5" fill="#F7F8FA"/>
   <text x="290" y="516" font-size="13" font-weight="600" fill="#1E3A5F" text-anchor="middle">SSE</text>
   <rect x="660" y="230" width="260" height="170" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
   <text x="790.0" y="262" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Maintenance Agent</text>
   <text x="790.0" y="288" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">faults, components</text>
-  <text x="790.0" y="310" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sensors, reliability</text>
+  <text x="790.0" y="310" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sensors, manuals</text>
   <text x="790.0" y="332" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fresh Agent per call</text>
   <rect x="660" y="520" width="260" height="170" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
   <text x="790.0" y="552" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Operations Agent</text>
@@ -37,37 +37,34 @@
   <text x="790.0" y="622" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">schema and simple counts</text>
   <path d="M590,430 H625 V315 H656" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
   <path d="M590,490 H625 V605 H656" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
-  <rect x="990" y="360" width="240" height="200" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1110.0" y="392" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">GatewayTool</text>
-  <text x="1110.0" y="418" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">get_neo4j_schema</text>
-  <text x="1110.0" y="440" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read_neo4j_cypher</text>
-  <text x="1110.0" y="462" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">rebuilds and retries once</text>
-  <text x="1110.0" y="484" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">scrubs error results</text>
-  <path d="M920,315 H955 V430 H986" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
-  <path d="M920,605 H955 V490 H986" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
-  <rect x="1300" y="130" width="260" height="140" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1430.0" y="162" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">AgentCore Gateway</text>
-  <text x="1430.0" y="188" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">validates the JWT</text>
-  <text x="1430.0" y="210" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">exchanges it for a</text>
-  <text x="1430.0" y="232" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Runtime token</text>
-  <rect x="1300" y="380" width="260" height="140" rx="14" fill="#F3F0FF" stroke="#7A5AF8" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1430.0" y="412" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">Neo4j MCP server</text>
-  <text x="1430.0" y="438" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AgentCore Runtime</text>
-  <text x="1430.0" y="460" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet deployment</text>
-  <rect x="1300" y="630" width="260" height="120" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1430.0" y="662" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Neo4j fleet graph</text>
-  <text x="1430.0" y="688" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read-only Cypher</text>
-  <path d="M1230,410 H1265 V200 H1296" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
-  <rect x="1226" y="285" width="79" height="21" rx="5" fill="#F7F8FA"/>
-  <text x="1265" y="300" font-size="13" font-weight="600" fill="#4A2EB0" text-anchor="middle">MCP + JWT</text>
-  <path d="M1430,270 V376" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
-  <path d="M1430,520 V626" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
-  <rect x="990" y="620" width="240" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" stroke-dasharray="7 5" filter="url(#shadow)"/>
-  <text x="1110.0" y="652" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Gateway token</text>
-  <text x="1110.0" y="678" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">local: .mcp-credentials.json</text>
-  <text x="1110.0" y="700" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">cloud: AgentCore Identity</text>
-  <text x="1110.0" y="722" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet-gateway provider</text>
-  <path d="M1110,620 V564" fill="none" stroke="#D97706" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-orange)"/>
+  <rect x="990" y="170" width="260" height="150" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1120.0" y="202" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">vector_search_tool</text>
+  <text x="1120.0" y="228" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">hybrid search over chunks</text>
+  <text x="1120.0" y="250" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">vector and fulltext indexes</text>
+  <text x="1120.0" y="272" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Titan v2 query embedding</text>
+  <rect x="990" y="400" width="260" height="190" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1120.0" y="432" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">graph_query_tool</text>
+  <text x="1120.0" y="458" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Text2Cypher on Claude</text>
+  <text x="1120.0" y="480" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">live schema, TTL cache</text>
+  <text x="1120.0" y="502" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">EXPLAIN refuses writes</text>
+  <text x="1120.0" y="524" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">query timeout, row cap</text>
+  <path d="M920,260 H986" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <path d="M920,360 H955 V460 H986" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <path d="M920,605 H955 V540 H986" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1320" y="300" width="240" height="180" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1440.0" y="332" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Neo4j fleet graph</text>
+  <text x="1440.0" y="358" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Neo4j driver, read routing</text>
+  <text x="1440.0" y="380" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">operational graph</text>
+  <text x="1440.0" y="402" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">manual chunks</text>
+  <text x="1440.0" y="424" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">chunk indexes</text>
+  <path d="M1250,245 H1285 V360 H1316" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <path d="M1250,495 H1285 V420 H1316" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1320" y="600" width="240" height="140" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" filter="url(#shadow)"/>
+  <text x="1440.0" y="632" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Neo4j login</text>
+  <text x="1440.0" y="658" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">local: .env password</text>
+  <text x="1440.0" y="680" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">cloud: Secrets Manager</text>
+  <text x="1440.0" y="702" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">NEO4J_PASSWORD_SECRET_ARN</text>
+  <path d="M1440,600 V484" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
   <rect x="320" y="640" width="270" height="110" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
   <text x="455.0" y="672" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Memory database</text>
   <text x="455.0" y="698" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">history, entities, preferences</text>
@@ -77,12 +74,14 @@
   <text x="64" y="834" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Events the client receives</text>
   <text x="64" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">agent</text>
   <text x="64" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a specialist was called</text>
-  <text x="364" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">tool</text>
-  <text x="364" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a specialist called a Gateway tool</text>
-  <text x="664" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">chunk</text>
-  <text x="664" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">answer text</text>
-  <text x="964" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">complete</text>
-  <text x="964" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">the answer is done</text>
-  <text x="1264" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">error</text>
-  <text x="1264" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a generic failure message</text>
+  <text x="314" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">tool</text>
+  <text x="314" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a specialist called a graph tool</text>
+  <text x="564" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">tool_complete</text>
+  <text x="564" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a call ended, with trace on</text>
+  <text x="814" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">chunk</text>
+  <text x="814" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">answer text</text>
+  <text x="1064" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">complete</text>
+  <text x="1064" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">the answer is done</text>
+  <text x="1314" y="874" font-size="14" font-weight="600" fill="#16233A" text-anchor="start" font-family="Menlo, Consolas, monospace">error</text>
+  <text x="1314" y="896" font-size="13.5" font-weight="400" fill="#5C6470" text-anchor="start">a generic failure message</text>
 </svg>

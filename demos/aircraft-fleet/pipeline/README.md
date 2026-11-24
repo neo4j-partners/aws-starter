@@ -75,7 +75,7 @@ After stage 4, one database holds two subgraphs:
 | `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to each limit that the manual defines for its sensor type and model. Each limit covers one regime. |
 
 An agent can start from a sensor reading on one aircraft. It can move to the
-operating limit for that sensor and model. It can then pull the repair
+operating limits for that sensor and model. It can then pull the repair
 procedure text with vector search over the linked chunks.
 
 - **Empty limits:** `link_to_existing_graph()` deletes each `OperatingLimit` that has no `minValue` and no `maxValue`. It does this before it writes `HAS_LIMIT`.

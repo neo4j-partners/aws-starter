@@ -4,7 +4,7 @@ The pipeline builds the fleet graph that the supervisor agent reads. It joins tw
 of data that never share a table: generated fleet records with tail numbers,
 and maintenance manuals that describe each aircraft model in prose. The graph
 is useful only when an agent can move from a sensor on one aircraft to the
-limit the manual sets for that sensor, so the pipeline's last real job is to
+limits the manual sets for that sensor, so the pipeline's last real job is to
 link the two.
 
 ![Pipeline flow: generate, load, enrich, index and fuse, verify, with what each stage writes](../images/pipeline-flow.svg)

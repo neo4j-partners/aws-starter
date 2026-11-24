@@ -33,7 +33,7 @@
 #   ./cloud.sh               # Run full test suite
 #   ./cloud.sh token         # Check token status
 #   ./cloud.sh tools         # List available tools
-#   ./cloud.sh --env fleet tools   # List tools on the .env.fleet deployment
+#   ./cloud.sh --env finance tools # List tools on the .env.finance deployment
 #
 # NOTE:
 #   Tool names are prefixed with target name when accessed via Gateway.
@@ -55,7 +55,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MCP_ENV="${MCP_ENV:-}"
 if [[ "${1:-}" == "--env" ]]; then
     if [[ -z "${2:-}" ]]; then
-        echo "ERROR: --env requires a name, for example: --env fleet"
+        echo "ERROR: --env requires a name, for example: --env finance"
         exit 1
     fi
     MCP_ENV="$2"

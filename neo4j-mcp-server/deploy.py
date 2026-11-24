@@ -1325,14 +1325,13 @@ Multiple Deployments:
   Each deployment is one .env.NAME file, and the NAME suffix picks both the
   config and its credentials file, so the two cannot drift apart:
 
-    .env.fleet    ->  ./deploy.py --env fleet     ->  .mcp-credentials.fleet.json
     .env.finance  ->  ./deploy.py --env finance   ->  .mcp-credentials.finance.json
     .env          ->  ./deploy.py                 ->  .mcp-credentials.json
 
   The stack name is derived from the suffix, so each deployment is namespaced
   automatically and no .env.NAME file needs to set STACK_NAME:
 
-    ./deploy.py --env fleet   ->  neo4j-mcp-server-fleet
+    ./deploy.py --env finance ->  neo4j-mcp-server-finance
     ./deploy.py               ->  neo4j-mcp-server
 
   That name namespaces the Cognito domain, the IAM roles, the Gateway, and the
@@ -1374,9 +1373,9 @@ Examples:
   ./deploy.py credentials       # Generate credentials file for MCP clients
   ./deploy.py cleanup           # Remove everything
 
-  ./deploy.py --env fleet              # Deploy the .env.fleet deployment
-  ./deploy.py --env fleet credentials  # Write .mcp-credentials.fleet.json
-  ./deploy.py --env fleet status       # Status of the .env.fleet stack
+  ./deploy.py --env finance              # Deploy the .env.finance deployment
+  ./deploy.py --env finance credentials  # Write .mcp-credentials.finance.json
+  ./deploy.py --env finance status       # Status of the .env.finance stack
 """
 
 
@@ -1403,7 +1402,7 @@ def _extract_env_suffix(args: list[str]) -> tuple[str, list[str]]:
         arg = args[i]
         if arg == "--env":
             if i + 1 >= len(args):
-                log_error("--env requires a name, for example: --env fleet")
+                log_error("--env requires a name, for example: --env finance")
                 raise DeployError("--env is missing its value")
             suffix = args[i + 1]
             i += 2

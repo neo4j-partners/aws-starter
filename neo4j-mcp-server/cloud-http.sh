@@ -43,7 +43,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MCP_ENV="${MCP_ENV:-}"
 if [[ "${1:-}" == "--env" ]]; then
     if [[ -z "${2:-}" ]]; then
-        echo "ERROR: --env requires a name, for example: --env fleet"
+        echo "ERROR: --env requires a name, for example: --env finance"
         exit 1
     fi
     MCP_ENV="$2"

@@ -1,13 +1,19 @@
 # AgentCore CDK app
 
 This CDK app is managed by the AgentCore CLI. It deploys everything declared in `agentcore/agentcore.json` into AWS
-through the `@aws/agentcore-cdk` constructs. It is two files:
+through the `@aws/agentcore-cdk` constructs. The app has these files:
 
 - `bin/cdk.ts`: The entry point. It reads the project once (`readAgentCoreProject`), creates one stack per deployment
   target (`resolveTargetStacks`), and turns `agentcore.json` into the application's props (`transformAgentCoreJson`).
   Everything about how `agentcore.json` is interpreted lives in the library, so it changes with the library version, not
   with this file.
-- `lib/cdk-stack.ts`: `AgentCoreStack` instantiates one `AgentCoreApplication`. This is the file you edit.
+- `lib/cdk-stack.ts`: `AgentCoreStack` instantiates one `AgentCoreApplication`. It then adds the fleet graph and memory
+  settings to the `supervisor` Runtime and grants its role read access to the two password secrets. This is the file you
+  edit.
+- `test/cdk-stack.test.ts`: The synth tests for the stack's deploy settings and secret grants. `npm test` runs them.
+- `cdk.json`: The CDK CLI config. It runs the compiled entry point, `dist/bin/cdk.js`.
+- `package.json` and `package-lock.json`: The npm dependencies and the `build` and `test` scripts.
+- `tsconfig.json`: The TypeScript compiler settings.
 
 Harness settings are read from `harness.yaml`. Inline `systemPrompt` text overrides
 the conventional `system-prompt.md` file in the harness directory.
@@ -37,13 +43,16 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 const orders = new dynamodb.Table(this, 'Orders', {
   partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
 });
-const checkout = this.application.runtime('checkout'); // or this.application.harness('support')
-checkout.grantReadWrite(orders); // updates the runtime's execution role
-checkout.addEnvironmentVariable('ORDERS_TABLE', orders.tableName);
-orders.grantReadData(this.application.harness('support')); // any AWS L2 grant works too
+const runtime = this.application.runtimes.get(RUNTIME_NAME);
+if (runtime !== undefined) {
+  runtime.grant(['dynamodb:GetItem', 'dynamodb:PutItem'], [orders.tableArn]); // updates the runtime's execution role
+  runtime.addEnvironmentVariable('ORDERS_TABLE', orders.tableName);
+}
 ```
 
-Then run `agentcore deploy` again. An unknown name fails at synth and lists the names that exist.
+Then run `agentcore deploy` again. `runtimes.get` returns `undefined` for a name that `agentcore.json` does not declare.
+The stack checks for that case. `agent.sh destroy` removes the Runtime from the spec and deploys, so synth must still
+pass with no Runtime.
 
 If a runtime or harness is configured with an `executionRoleArn`, CDK cannot modify that imported role: every grant
 emits a synth-time warning listing the permissions that were not attached, and the role must already carry them.

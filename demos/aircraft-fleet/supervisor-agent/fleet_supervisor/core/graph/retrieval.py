@@ -59,6 +59,7 @@ def _require_env(name: str) -> str:
 
 
 _driver: Driver | None = None
+_auth: RotatingLoginAuthManager | None = None
 _driver_lock = threading.Lock()
 
 _UNAUTHORIZED = "Neo.ClientError.Security.Unauthorized"
@@ -152,15 +153,26 @@ def retry_on_rotated_login[T](auth: RotatingLoginAuthManager, call: Callable[[],
     return call()
 
 
-def get_driver() -> Driver:
-    """Return the process-wide Neo4j driver. It is a connection pool, created once."""
-    global _driver
+def _shared_driver() -> tuple[Driver, RotatingLoginAuthManager]:
+    """Return the process-wide driver and its auth manager, created together once."""
+    global _driver, _auth
     with _driver_lock:
-        if _driver is None:
+        if _driver is None or _auth is None:
             uri = _require_env("NEO4J_URI")
             logger.info("Connecting to Neo4j at %s", uri)
-            _driver = GraphDatabase.driver(uri, auth=RotatingLoginAuthManager())
-        return _driver
+            _auth = RotatingLoginAuthManager()
+            _driver = GraphDatabase.driver(uri, auth=_auth)
+        return _driver, _auth
+
+
+def get_driver() -> Driver:
+    """Return the process-wide Neo4j driver. It is a connection pool, created once."""
+    return _shared_driver()[0]
+
+
+def _with_rotated_login[T](call: Callable[[], T]) -> T:
+    """Run ``call`` on the shared driver through ``retry_on_rotated_login``."""
+    return retry_on_rotated_login(_shared_driver()[1], call)
 
 
 def _neo4j_database() -> str:
@@ -314,11 +326,15 @@ def vector_search(query: str, top_k: int = 5) -> str:
     text = fulltext_query(query)
     if not text:
         return "No relevant document chunks found."
-    result = _hybrid_retriever().search(
-        query_text=text,
-        query_vector=_embedder().embed_query(query),
-        top_k=top_k,
-        query_params={"max_entities": MAX_ENTITIES_PER_CHUNK},
+    # Embed outside the retried call, so a rotated login does not embed twice.
+    query_vector = _embedder().embed_query(query)
+    result = _with_rotated_login(
+        lambda: _hybrid_retriever().search(
+            query_text=text,
+            query_vector=query_vector,
+            top_k=top_k,
+            query_params={"max_entities": MAX_ENTITIES_PER_CHUNK},
+        )
     )
     hits = [item for item in result.items if item.content]
     if not hits:
@@ -333,9 +349,11 @@ def graph_query(question: str) -> str:
     The current cached schema is passed on every call, so a schema refresh
     reaches the Cypher prompt without rebuilding the retriever.
     """
-    result = _text2cypher_retriever().search(
-        query_text=question,
-        prompt_params={"schema": get_graph_schema()},
+    result = _with_rotated_login(
+        lambda: _text2cypher_retriever().search(
+            query_text=question,
+            prompt_params={"schema": get_graph_schema()},
+        )
     )
     if not result.items:
         return "The generated query returned no results."
@@ -354,10 +372,11 @@ def close() -> None:
     The cached retrievers hold the driver, so they are dropped too. The next
     call builds a new driver and new retrievers.
     """
-    global _driver
+    global _driver, _auth
     with _driver_lock:
         _hybrid_retriever.cache_clear()
         _text2cypher_retriever.cache_clear()
         if _driver is not None:
             _driver.close()
             _driver = None
+        _auth = None

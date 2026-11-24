@@ -96,6 +96,16 @@ def test_schema_cache_honors_ttl(monkeypatch) -> None:
     assert len(fetches) == 2
 
 
+@pytest.fixture
+def offline_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run the retriever call once and directly, with no shared driver.
+
+    These tests cover the result text. The login retry has its own tests.
+    """
+    monkeypatch.setattr(retrieval, "_with_rotated_login", lambda call: call())
+
+
+@pytest.mark.usefixtures("offline_graph")
 def test_graph_query_passes_current_schema(monkeypatch) -> None:
     seen: dict = {}
 
@@ -113,6 +123,7 @@ def test_graph_query_passes_current_schema(monkeypatch) -> None:
     }
 
 
+@pytest.mark.usefixtures("offline_graph")
 def test_graph_query_notes_truncation(monkeypatch) -> None:
     class FakeRetriever:
         def search(self, **_kwargs: object) -> SimpleNamespace:
@@ -175,6 +186,7 @@ def fake_drivers(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[FakeDriver]]:
     monkeypatch.setenv("NEO4J_URI", "neo4j+s://fleet.example.test")
     monkeypatch.setattr(retrieval.GraphDatabase, "driver", fake_driver)
     monkeypatch.setattr(retrieval, "_driver", None)
+    monkeypatch.setattr(retrieval, "_auth", None)
     retrieval._hybrid_retriever.cache_clear()
     retrieval._text2cypher_retriever.cache_clear()
     yield built

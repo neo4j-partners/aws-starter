@@ -1,17 +1,21 @@
 """Tests for the model-facing error results in ``core.graph.tools``.
 
-Retrieval calls are monkeypatched, so these tests never reach Neo4j.
+Most retrieval calls are monkeypatched, so those tests never reach Neo4j. The
+rotation tests run the real driver against a fake Bolt server.
 """
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
+from types import SimpleNamespace
 
 import neo4j
 import pytest
 from neo4j_graphrag.exceptions import Text2CypherRetrievalError
 
-from fleet_supervisor.core.graph import tools
+from fleet_supervisor.core.graph import retrieval, tools
+from tests.fake_bolt import FakeNeo4j
 
 ADDRESS = "10.1.2.3:7687"
 
@@ -179,3 +183,68 @@ def test_tool_description_states_the_top_k_bounds() -> None:
     schema = tools.vector_search_tool.tool_spec["inputSchema"]["json"]
     description = schema["properties"]["top_k"]["description"]
     assert f"from {tools.MIN_TOP_K} to {tools.MAX_TOP_K}" in description
+
+
+@pytest.fixture
+def tools_on_fake_neo4j(
+    fake_neo4j: FakeNeo4j, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[FakeNeo4j]:
+    """Point the shared driver at the fake server with a login it rejects.
+
+    The retrievers are replaced with ones that run one query on the shared
+    driver, so no Bedrock call is made.
+    """
+
+    class DriverRetriever:
+        def search(self, **_kwargs: object) -> SimpleNamespace:
+            retrieval.get_driver().execute_query("RETURN 1", database_="neo4j")
+            hit = SimpleNamespace(content="row", metadata={"chunk_index": 0, "entities": []})
+            return SimpleNamespace(items=[hit], metadata={})
+
+    monkeypatch.setenv("NEO4J_URI", fake_neo4j.uri)
+    monkeypatch.setenv("NEO4J_USERNAME", "reader")
+    monkeypatch.setenv("NEO4J_PASSWORD", "first-pw")
+    monkeypatch.setattr(retrieval, "_driver", None)
+    monkeypatch.setattr(retrieval, "_auth", None)
+    monkeypatch.setattr(retrieval, "_text2cypher_retriever", DriverRetriever)
+    monkeypatch.setattr(retrieval, "_hybrid_retriever", DriverRetriever)
+    monkeypatch.setattr(retrieval, "get_graph_schema", lambda: "schema")
+    monkeypatch.setattr(retrieval, "_embedder", lambda: SimpleNamespace(embed_query=lambda _q: []))
+    yield fake_neo4j
+    # Close only the driver. The retrievers here are fakes with no cache to clear.
+    if retrieval._driver is not None:
+        retrieval._driver.close()
+
+
+@pytest.mark.parametrize(
+    ("call", "expected"),
+    [
+        (lambda: tools.graph_query_tool("How many aircraft?"), "row"),
+        (lambda: tools.vector_search_tool("hydraulic leak"), "row"),
+    ],
+    ids=["graph_query_tool", "vector_search_tool"],
+)
+def test_a_rotated_password_recovers_in_the_same_tool_call(
+    tools_on_fake_neo4j: FakeNeo4j, monkeypatch: pytest.MonkeyPatch, call, expected: str
+) -> None:
+    """The driver opens a new connection, and Neo4j rejects its LOGON."""
+    assert retrieval._shared_driver()[1].get_auth().credentials == "first-pw"
+    monkeypatch.setenv("NEO4J_PASSWORD", "rotated-pw")
+
+    assert expected in call()
+    assert tools_on_fake_neo4j.logins == ["first-pw", "rotated-pw"]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: tools.graph_query_tool("How many aircraft?"),
+        lambda: tools.vector_search_tool("hydraulic leak"),
+    ],
+    ids=["graph_query_tool", "vector_search_tool"],
+)
+def test_a_password_still_wrong_fails_the_tool_call_after_one_attempt(
+    tools_on_fake_neo4j: FakeNeo4j, call
+) -> None:
+    assert call() == tools.UNAVAILABLE_RESULT
+    assert tools_on_fake_neo4j.logins == ["first-pw"]

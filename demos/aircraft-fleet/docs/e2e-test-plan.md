@@ -167,6 +167,8 @@ Expect a pass report and exit code 0.
 **Result:** PASS (2026-11-23). `verify --strict` exited 0 with
 `[OK] Verification passed`. Every required constraint was OK, the vector
 smoke test returned 1 result, and the data-quality orphan counts were all 0.
+This run came before verify gained the EGT limit check and the check for
+systems without a `SystemReference`, so it did not cover either one.
 
 ---
 

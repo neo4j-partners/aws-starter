@@ -22,7 +22,8 @@ dependencies = [
     # server.py and setup_secrets.py read ../.env with it, and agent.sh
     # parses ../.env with it for the deploy settings.
     "python-dotenv>=1.2.4",
-    # Imported directly by core/memory.py and core/graph/text2cypher.py.
+    # Imported directly by core/memory.py, core/graph/text2cypher.py, and
+    # ui/server.py.
     "pydantic>=2.14.4",
     # ui/server.py runs from this project's environment
     # (uv run --project ../supervisor-agent).

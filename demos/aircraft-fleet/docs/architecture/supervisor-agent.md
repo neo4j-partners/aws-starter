@@ -55,7 +55,11 @@ the choice follows the question's shape.
 The tools share one driver per process. It is a connection pool, created on
 first use. The login comes from `core/secrets.py`, which reads
 `NEO4J_PASSWORD_SECRET_ARN` when it is set and `NEO4J_USERNAME` and
-`NEO4J_PASSWORD` otherwise.
+`NEO4J_PASSWORD` otherwise. When Neo4j rejects the login as `Unauthorized`,
+the driver's `RotatingLoginAuthManager` in `core/graph/retrieval.py` reads
+the login again. The driver retries only when the login changed. A rotated
+password then recovers in the same request, and a wrong password fails at
+once.
 
 ![A sequence for one question. Claude picks the Maintenance specialist. The specialist calls graph_query_tool in a loop. The tool asks Claude for Cypher, checks it with EXPLAIN, and runs it read-only against Neo4j. The answer streams back to the user as SSE events.](../images/end-to-end-sequence.svg)
 

@@ -78,9 +78,14 @@ MEMORY_SECRET = SecretSpec(
 )
 SECRETS = (FLEET_SECRET, MEMORY_SECRET)
 
+# The admin user the pipeline writes as. The fleet secret must not hold it.
+ADMIN_USERNAME_VAR = "NEO4J_USERNAME"
+DEFAULT_ADMIN_USERNAME = "neo4j"
+
 # Every setting the script reads.
 SETTING_NAMES = (
     *(var for spec in SECRETS for var in (spec.username_var, spec.password_var)),
+    ADMIN_USERNAME_VAR,
     "AWS_REGION",
 )
 
@@ -136,7 +141,8 @@ def load_settings(env_file: Path, environ: Mapping[str, str] = os.environ) -> di
 def secret_values(settings: Mapping[str, str]) -> dict[str, str]:
     """Return the JSON ``SecretString`` for each secret, keyed by secret name.
 
-    Raises :class:`SetupError` that names every missing setting.
+    Raises :class:`SetupError` that names every missing setting, or when the
+    fleet secret's user is the admin user in ``NEO4J_USERNAME``.
     """
     missing: list[str] = []
     values: dict[str, str] = {}
@@ -151,6 +157,12 @@ def secret_values(settings: Mapping[str, str]) -> dict[str, str]:
             values[spec.name] = json.dumps({"username": username, "password": password})
     if missing:
         raise SetupError(f"Set {', '.join(missing)} in the env file.")
+    admin = settings.get(ADMIN_USERNAME_VAR) or DEFAULT_ADMIN_USERNAME
+    if settings[FLEET_SECRET.username_var] == admin:
+        raise SetupError(
+            f"{FLEET_SECRET.username_var} is the admin user in {ADMIN_USERNAME_VAR}. "
+            "Set it to the read-only user."
+        )
     return values
 
 

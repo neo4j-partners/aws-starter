@@ -206,6 +206,36 @@ def test_dry_run_reads_but_writes_nothing(
     _assert_no_values(out + err)
 
 
+@pytest.mark.parametrize(
+    ("admin_line", "reader"),
+    [
+        ("NEO4J_USERNAME=fleet_admin\n", "fleet_admin"),
+        ("", "neo4j"),
+    ],
+    ids=["named-admin", "default-admin"],
+)
+def test_refuses_the_admin_user_as_the_reader(
+    stubber: Stubber,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    admin_line: str,
+    reader: str,
+) -> None:
+    path = tmp_path / ".env"
+    text = ENV_TEXT.replace("NEO4J_USERNAME=neo4j\n", admin_line)
+    path.write_text(
+        text.replace(f"NEO4J_READER_USERNAME={READER_USER}", f"NEO4J_READER_USERNAME={reader}")
+    )
+
+    # The Stubber has no queued responses, so any AWS call would fail the test.
+    assert setup_secrets.main(["--env-file", str(path)]) == 1
+
+    out, err = capsys.readouterr()
+    assert "NEO4J_READER_USERNAME is the admin user in NEO4J_USERNAME" in err
+    assert reader not in out + err
+    _assert_no_values(out + err)
+
+
 def test_missing_settings_are_all_named_and_nothing_is_called(
     stubber: Stubber, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

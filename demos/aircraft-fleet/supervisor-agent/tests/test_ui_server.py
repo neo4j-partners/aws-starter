@@ -1,6 +1,7 @@
 """Tests for the fleet UI server's Neo4j driver, built in ``ui/server.py``."""
 
 import asyncio
+import copy
 import importlib.util
 import json
 from collections.abc import Callable
@@ -8,16 +9,13 @@ from contextlib import nullcontext
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
 from uuid import uuid4
 
 import neo4j
 import pytest
-from neo4j import ManagedTransaction
-from neo4j._sync.io._pool import IOPool
-from neo4j._sync.work.session import Session
 
 from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager
+from tests.fake_bolt import FakeNeo4j
 
 UI_DIR = Path(__file__).resolve().parents[2] / "ui"
 
@@ -85,10 +83,11 @@ def test_the_ui_driver_uses_the_rotating_login(
     auth = driver.kwargs.pop("auth")
     assert isinstance(auth, RotatingLoginAuthManager)
     assert auth.get_auth() == neo4j.basic_auth("reader", "first-pw")
+    assert state.auth is auth
     assert driver.kwargs == {
         "connection_timeout": 5,
         "connection_acquisition_timeout": 8,
-        "max_transaction_retry_time": 10,
+        "max_transaction_retry_time": 0,
     }
     assert driver.closed
 
@@ -102,55 +101,84 @@ def test_the_ui_runs_without_a_driver_when_the_login_is_missing(
     monkeypatch.setenv("NEO4J_URI", "neo4j+s://fleet.example.test")
     monkeypatch.setattr(ui_server.GraphDatabase, "driver", fail)
 
-    assert run_lifespan(ui_server).driver is None
+    state = run_lifespan(ui_server)
+    assert state.driver is None
+    assert state.auth is None
 
 
-def test_a_lookup_that_meets_a_rotated_password_retries_with_the_new_login(
-    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Run the real driver's retry loop, with the network calls stubbed out."""
-    managers: list[RotatingLoginAuthManager] = []
-    real_driver = ui_server.GraphDatabase.driver
+EVIDENCE_TURN = [
+    {"type": "tool_complete", "tool": "search_maintenance", "evidence_ids": ["ME0042"]},
+    {"type": "complete", "response": "Done."},
+]
 
-    def recording_driver(uri: str, **kwargs: Any) -> neo4j.Driver:
-        managers.append(kwargs["auth"])
-        return real_driver(uri, **kwargs)
 
-    passwords: list[str] = []
-    delays: list[float] = []
+def relay_frames(ui_server: ModuleType, state: SimpleNamespace) -> list[dict[str, Any]]:
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+    frames = ui_server.relay(turn, state.driver, state.auth)
+    return [json.loads(frame.removeprefix("data: ")) for frame in frames]
 
-    def open_transaction(session: Session, **_kwargs: Any) -> None:
-        login = managers[0].get_auth()
-        passwords.append(login.credentials)
-        if login.credentials == "first-pw":
-            # The secret was rotated before this lookup reached Neo4j.
-            monkeypatch.setenv("NEO4J_PASSWORD", "rotated-pw")
-            error = neo4j.exceptions.Neo4jError._hydrate_neo4j(
-                code="Neo.ClientError.Security.Unauthorized", message="rejected"
-            )
-            # The pool asks the auth manager whether the error is retryable.
-            IOPool.on_neo4j_error(
-                None, error, SimpleNamespace(auth_manager=managers[0], auth=login)
-            )
-            raise error
-        session._transaction = MagicMock(spec=ManagedTransaction)
 
-    monkeypatch.setenv("NEO4J_URI", "neo4j://fleet.example.test")
+@pytest.fixture
+def ui_on_fake_neo4j(
+    ui_server: ModuleType, fake_neo4j: FakeNeo4j, monkeypatch: pytest.MonkeyPatch
+) -> FakeNeo4j:
+    """Point the UI at the fake server with a login it rejects, and stub the supervisor."""
+    monkeypatch.setenv("NEO4J_URI", fake_neo4j.uri)
     monkeypatch.setenv("NEO4J_USERNAME", "reader")
     monkeypatch.setenv("NEO4J_PASSWORD", "first-pw")
-    monkeypatch.setattr(ui_server.GraphDatabase, "driver", recording_driver)
-    monkeypatch.setattr(Session, "_open_transaction", open_transaction)
-    monkeypatch.setattr("neo4j._sync.work.session.sleep", delays.append)
-
-    graphs: list[dict[str, list[dict[str, Any]]]] = []
-    run_lifespan(
-        ui_server,
-        lambda state: graphs.append(ui_server.load_evidence(state.driver, "neo4j", ["ME0042"])),
+    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext([]))
+    monkeypatch.setattr(
+        ui_server, "iter_events", lambda _chunks: iter(copy.deepcopy(EVIDENCE_TURN))
     )
+    return fake_neo4j
 
-    assert graphs == [{"nodes": [], "edges": []}]
-    assert passwords == ["first-pw", "rotated-pw"]
-    assert len(delays) == 1
+
+def test_a_lookup_that_meets_a_rotated_password_recovers_in_the_same_turn(
+    ui_server: ModuleType, ui_on_fake_neo4j: FakeNeo4j, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The real driver opens a new connection, and Neo4j rejects its LOGON."""
+    frames: list[list[dict[str, Any]]] = []
+
+    def rotate_then_relay(state: SimpleNamespace) -> None:
+        # The secret was rotated after the UI started.
+        monkeypatch.setenv("NEO4J_PASSWORD", "rotated-pw")
+        frames.append(relay_frames(ui_server, state))
+
+    run_lifespan(ui_server, rotate_then_relay)
+
+    assert frames == [
+        [
+            {
+                "type": "tool_complete",
+                "tool": "search_maintenance",
+                "graph": {"nodes": [], "edges": []},
+            },
+            {"type": "complete", "response": "Done."},
+        ]
+    ]
+    assert ui_on_fake_neo4j.logins == ["first-pw", "rotated-pw"]
+
+
+def test_a_lookup_with_a_password_still_wrong_marks_the_graph_unavailable(
+    ui_server: ModuleType, ui_on_fake_neo4j: FakeNeo4j
+) -> None:
+    frames: list[list[dict[str, Any]]] = []
+
+    run_lifespan(ui_server, lambda state: frames.append(relay_frames(ui_server, state)))
+
+    assert frames == [
+        [
+            {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},
+            {"type": "complete", "response": "Done."},
+        ]
+    ]
+    assert ui_on_fake_neo4j.logins == ["first-pw"]
+
+
+def static_login(monkeypatch: pytest.MonkeyPatch) -> RotatingLoginAuthManager:
+    monkeypatch.setenv("NEO4J_USERNAME", "reader")
+    monkeypatch.setenv("NEO4J_PASSWORD", "first-pw")
+    return RotatingLoginAuthManager()
 
 
 def test_a_failed_secret_read_marks_the_graph_unavailable(
@@ -169,7 +197,7 @@ def test_a_failed_secret_read_marks_the_graph_unavailable(
     monkeypatch.setattr(ui_server, "load_evidence", fail)
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
-    frames = list(ui_server.relay(turn, driver=object()))
+    frames = list(ui_server.relay(turn, driver=object(), auth=static_login(monkeypatch)))
 
     assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == [
         {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},
@@ -209,7 +237,7 @@ def test_a_node_with_no_id_marks_the_graph_unavailable_and_keeps_streaming(
     monkeypatch.setattr(ui_server, "iter_events", lambda _chunks: iter(events))
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
-    frames = list(ui_server.relay(turn, driver=OneNodeDriver()))
+    frames = list(ui_server.relay(turn, driver=OneNodeDriver(), auth=static_login(monkeypatch)))
 
     assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == [
         {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},

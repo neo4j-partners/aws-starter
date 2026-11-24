@@ -5,6 +5,7 @@ import logging
 import os
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing, contextmanager
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import UUID
@@ -12,7 +13,7 @@ from uuid import UUID
 # Import the supervisor package before TLS clients so it can set up truststore.
 from fleet_supervisor.client.transport import READ_TIMEOUT_S, iter_events
 from fleet_supervisor.core.config import ConfigError
-from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager
+from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager, retry_on_rotated_login
 
 # isort: split
 
@@ -45,10 +46,10 @@ class ChatRequest(BaseModel):
 async def lifespan(app: Starlette) -> AsyncIterator[None]:
     load_dotenv(os.environ.get("FLEET_ENV_FILE") or ROOT.parent / ".env")
     driver = None
+    auth = None
     if uri := os.getenv("NEO4J_URI"):
-        # The supervisor's graph tools use the same manager. It reads the
-        # secret again when Neo4j rejects the login, so a rotated password
-        # is picked up without restarting the UI.
+        # The supervisor's graph tools use the same manager. A lookup that
+        # Neo4j rejects reads the secret again through retry_on_rotated_login.
         auth = RotatingLoginAuthManager()
         try:
             # Read the login now, so a missing one turns evidence off at startup.
@@ -56,17 +57,17 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
         except ConfigError as error:
             # The page still works without the evidence graph.
             logger.warning("Fleet graph evidence is off: %s", error)
+            auth = None
         else:
             driver = GraphDatabase.driver(
                 uri,
                 auth=auth,
                 connection_timeout=5,
                 connection_acquisition_timeout=8,
-                # A lookup that meets a rotated password retries with the new
-                # login after about a second, so the graph still shows.
-                max_transaction_retry_time=10,
+                max_transaction_retry_time=0,
             )
     app.state.driver = driver
+    app.state.auth = auth
     try:
         yield
     finally:
@@ -114,7 +115,9 @@ def _frame(event: dict[str, Any]) -> str:
     return f"data: {json.dumps(event)}\n\n"
 
 
-def relay(turn: ChatRequest, driver: Driver | None) -> Iterator[str]:
+def relay(
+    turn: ChatRequest, driver: Driver | None, auth: RotatingLoginAuthManager | None
+) -> Iterator[str]:
     database = os.getenv("NEO4J_DATABASE", "neo4j")
     terminal = False
     try:
@@ -122,9 +125,11 @@ def relay(turn: ChatRequest, driver: Driver | None) -> Iterator[str]:
             for event in iter_events(chunks):
                 if event.get("type") == "tool_complete":
                     ids = event.pop("evidence_ids", [])
-                    if ids and driver is not None:
+                    if ids and driver is not None and auth is not None:
                         try:
-                            event["graph"] = load_evidence(driver, database, ids)
+                            event["graph"] = retry_on_rotated_login(
+                                auth, partial(load_evidence, driver, database, ids)
+                            )
                         except (ConfigError, DriverError, Neo4jError):
                             logger.exception("Fleet graph evidence lookup failed")
                             event["graph_unavailable"] = True
@@ -158,7 +163,7 @@ async def chat(request: Request) -> JSONResponse | StreamingResponse:
             status_code=400,
         )
     return StreamingResponse(
-        relay(turn, request.app.state.driver),
+        relay(turn, request.app.state.driver, request.app.state.auth),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

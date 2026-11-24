@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Fleet Deployment Topology</title>
-  <desc>One stack in one AWS account. AgentCore-fleetsupervisor-default holds the supervisor Runtime, which runs the supervisor and both specialists. The Runtime reads the fleet graph and the memory database with direct Neo4j drivers. It calls Claude and Titan on Bedrock and reads both Neo4j passwords from Secrets Manager at startup. Two Neo4j Aura databases hold the fleet graph and agent memory.</desc>
+  <desc>One stack in one AWS account. AgentCore-fleetsupervisor-default holds the supervisor Runtime, which runs the supervisor and both specialists. The Runtime reads the fleet graph and the memory database with direct Neo4j drivers. It calls Claude and Titan on Bedrock and reads both Neo4j logins from Secrets Manager at startup. Each secret holds a username and a password. Two Neo4j Aura databases hold the fleet graph and agent memory.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
@@ -43,7 +43,7 @@
   <rect x="460" y="455" width="340" height="130" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
   <text x="630.0" y="487" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Secrets Manager</text>
   <text x="630.0" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet and memory passwords</text>
-  <text x="630.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">JSON with a password key</text>
+  <text x="630.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">JSON with username and password</text>
   <text x="630.0" y="557" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read at startup</text>
   <rect x="830" y="455" width="360" height="130" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
   <text x="1010.0" y="487" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Bedrock</text>
@@ -73,4 +73,6 @@
   <rect x="1216" y="237" width="45" height="21" rx="5" fill="#F7F8FA"/>
   <text x="1238" y="252" font-size="12" font-weight="600" fill="#00594A" text-anchor="middle">read</text>
   <path d="M1190,360 H1240 V480 H1286" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <rect x="1184" y="430" width="104" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1236" y="445" font-size="12" font-weight="600" fill="#851651" text-anchor="middle">read and write</text>
 </svg>

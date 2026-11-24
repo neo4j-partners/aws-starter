@@ -125,7 +125,7 @@ def relay(turn: ChatRequest, driver: Driver | None) -> Iterator[str]:
                     if ids and driver is not None:
                         try:
                             event["graph"] = load_evidence(driver, database, ids)
-                        except (DriverError, Neo4jError):
+                        except (ConfigError, DriverError, Neo4jError):
                             logger.exception("Fleet graph evidence lookup failed")
                             event["graph_unavailable"] = True
                     elif ids:

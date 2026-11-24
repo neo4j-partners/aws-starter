@@ -2,11 +2,14 @@
 
 import asyncio
 import importlib.util
+import json
 from collections.abc import Callable
+from contextlib import nullcontext
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import neo4j
 import pytest
@@ -148,3 +151,27 @@ def test_a_lookup_that_meets_a_rotated_password_retries_with_the_new_login(
     assert graphs == [{"nodes": [], "edges": []}]
     assert passwords == ["first-pw", "rotated-pw"]
     assert len(delays) == 1
+
+
+def test_a_failed_secret_read_marks_the_graph_unavailable(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = [
+        {"type": "tool_complete", "tool": "search_maintenance", "evidence_ids": ["ME0042"]},
+        {"type": "complete", "response": "Done."},
+    ]
+
+    def fail(*_args: object) -> None:
+        raise ui_server.ConfigError("Could not read the Neo4j secret.")
+
+    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext([]))
+    monkeypatch.setattr(ui_server, "iter_events", lambda _chunks: iter(events))
+    monkeypatch.setattr(ui_server, "load_evidence", fail)
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=object()))
+
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == [
+        {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},
+        {"type": "complete", "response": "Done."},
+    ]

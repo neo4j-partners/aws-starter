@@ -27,11 +27,13 @@ import os
 import re
 import threading
 import time
+from collections.abc import Callable
 from functools import lru_cache
 
 import neo4j
 from neo4j import Driver, GraphDatabase
 from neo4j.auth_management import AuthManager
+from neo4j.exceptions import AuthError
 from neo4j_graphrag.embeddings import BedrockEmbeddings
 from neo4j_graphrag.llm import BedrockLLM
 from neo4j_graphrag.retrievers import HybridCypherRetriever
@@ -76,15 +78,20 @@ def _fresh_login() -> neo4j.Auth:
 class RotatingLoginAuthManager(AuthManager):
     """Give the driver the fleet graph login, and follow a rotated password.
 
-    When Neo4j rejects the login as ``Unauthorized``, the manager reads the
-    secret once. It asks the driver to retry only when the secret now holds a
-    different login. A rotated password then recovers after one retry in the
-    same request. A wrong password fails at once.
+    The manager reads the login once and caches it. ``reload`` reads it again.
 
-    ``AuthManagers.basic`` asks for a retry on every rejection. With a wrong
-    password, the driver would then retry with backoff until
-    ``max_transaction_retry_time``, about 30 s per query, and read the secret
-    on each attempt.
+    neo4j 6.4 calls ``handle_security_exception`` only for an error on a
+    connection that is already in the pool. When Neo4j rejects the login
+    while a new connection opens, the driver raises the ``AuthError`` at once
+    and never asks the manager. So callers run their Neo4j work through
+    ``retry_on_rotated_login``, which reloads the login and retries once.
+
+    For an ``Unauthorized`` error on a pooled connection, the manager reads
+    the secret once. It asks the driver to retry only when the secret now
+    holds a different login. ``AuthManagers.basic`` asks for a retry on every
+    rejection. With a wrong password, the driver would then retry with
+    backoff until ``max_transaction_retry_time``, about 30 s per query, and
+    read the secret on each attempt.
 
     The memory path recovers from a rotation in ``server._build_agent``.
     """
@@ -98,6 +105,14 @@ class RotatingLoginAuthManager(AuthManager):
             if self._auth is None:
                 self._auth = _fresh_login()
             return self._auth
+
+    def reload(self) -> bool:
+        """Read the login again, skipping the secrets cache. Return True if it changed."""
+        with self._lock:
+            login = _fresh_login()
+            changed = login != self._auth
+            self._auth = login
+            return changed
 
     def handle_security_exception(
         self, auth: neo4j.Auth, error: neo4j.exceptions.Neo4jError
@@ -114,6 +129,27 @@ class RotatingLoginAuthManager(AuthManager):
                 return False
             self._auth = login
             return True
+
+
+def retry_on_rotated_login[T](auth: RotatingLoginAuthManager, call: Callable[[], T]) -> T:
+    """Run ``call``, and run it once more if Neo4j rejected a login that has since rotated.
+
+    It retries only an ``Unauthorized`` ``AuthError``, and only when ``auth``
+    now holds a different login than the one ``call`` started with. Another
+    call may already have read the new login, or ``reload`` finds it in the
+    secret. A password that is still wrong raises after the one attempt. No
+    other error is retried. ``call`` runs again from the start, so it must be
+    safe to repeat.
+    """
+    started_with = auth.get_auth()
+    try:
+        return call()
+    except AuthError as error:
+        if error.code != _UNAUTHORIZED or (auth.get_auth() == started_with and not auth.reload()):
+            raise
+    # Outside the except block, so a second failure does not chain the first.
+    logger.warning("Neo4j rejected the fleet graph login; retrying with the rotated one")
+    return call()
 
 
 def get_driver() -> Driver:

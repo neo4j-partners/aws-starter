@@ -8,12 +8,15 @@ so a developer's shell cannot change what the tests see.
 
 import asyncio
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
+
+import pytest
 
 # Import the package before any test module imports boto3, so its truststore
 # injection runs first, as it does in the console scripts and the Runtime.
 import fleet_supervisor  # noqa: F401
+from tests.fake_bolt import FakeNeo4j
 
 _CLEARED_VARS = (
     "NEO4J_URI",
@@ -49,3 +52,10 @@ def collect(stream: AsyncIterator[dict[str, Any]]) -> list[dict[str, Any]]:
         return [event async for event in stream]
 
     return asyncio.run(_drain())
+
+
+@pytest.fixture
+def fake_neo4j() -> Iterator[FakeNeo4j]:
+    """A fake Neo4j on a local port that accepts only the password ``rotated-pw``."""
+    with FakeNeo4j(password="rotated-pw") as server:
+        yield server

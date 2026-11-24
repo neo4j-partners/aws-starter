@@ -19,6 +19,7 @@ from neo4j_graphrag.types import RetrieverResultItem
 from fleet_supervisor.core import secrets
 from fleet_supervisor.core.config import ConfigError
 from fleet_supervisor.core.graph import retrieval
+from tests.fake_bolt import FakeNeo4j
 
 
 @pytest.mark.parametrize(
@@ -227,6 +228,11 @@ def report_to_pool(manager: AuthManager, auth: neo4j.Auth) -> neo4j.exceptions.N
 
     neo4j 6.4.1 marks the error retryable only when the auth manager handled
     it. ``execute_query`` retries only retryable errors.
+
+    The driver calls this hook only for an error on a pooled connection. A
+    login rejected while a new connection opens never reaches it, so the
+    tests that use it do not cover that case. The fake-server tests below
+    cover it through ``retry_on_rotated_login``.
     """
     error = unauthorized()
     connection = SimpleNamespace(auth_manager=manager, auth=auth)
@@ -319,7 +325,7 @@ def test_a_login_another_connection_replaced_retries_without_a_read(
     assert rotating_secret.reads == 2
 
 
-def test_the_driver_retries_a_rotated_password_once(
+def test_a_pooled_connection_retries_a_rotated_password_once(
     fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
 ) -> None:
     manager = retrieval.get_driver().auth
@@ -332,7 +338,7 @@ def test_the_driver_retries_a_rotated_password_once(
     assert rotating_secret.reads == 2
 
 
-def test_the_driver_does_not_retry_a_wrong_password(
+def test_a_pooled_connection_does_not_retry_a_wrong_password(
     fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
 ) -> None:
     manager = retrieval.get_driver().auth
@@ -355,6 +361,150 @@ def test_other_security_errors_keep_the_login(
     assert manager.handle_security_exception(first, forbidden) is False
     assert manager.get_auth() is first
     assert rotating_secret.reads == 1
+
+
+def run_query(driver: neo4j.Driver) -> list[neo4j.Record]:
+    records, _, _ = driver.execute_query("RETURN 1", database_="neo4j")
+    return records
+
+
+def fake_server_driver(uri: str, manager: retrieval.RotatingLoginAuthManager) -> neo4j.Driver:
+    """A real driver with no retries of its own, so only the helper retries."""
+    return neo4j.GraphDatabase.driver(
+        uri, auth=manager, connection_timeout=2, max_transaction_retry_time=0
+    )
+
+
+def test_a_new_connection_with_a_rotated_password_recovers_in_the_same_call(
+    fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.RotatingLoginAuthManager()
+    assert manager.get_auth() == neo4j.basic_auth("reader", "first-pw")
+    rotating_secret.rotate("rotated-pw")
+
+    with fake_server_driver(fake_neo4j.uri, manager) as driver:
+        assert retrieval.retry_on_rotated_login(manager, lambda: run_query(driver)) == []
+
+    assert fake_neo4j.logins == ["first-pw", "rotated-pw"]
+    assert rotating_secret.reads == 2
+
+
+def test_the_driver_alone_does_not_recover_a_new_connection(
+    fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret
+) -> None:
+    """Shows why the helper exists: neo4j 6.4 never asks the manager here."""
+    manager = retrieval.RotatingLoginAuthManager()
+    manager.get_auth()
+    rotating_secret.rotate("rotated-pw")
+
+    with (
+        neo4j.GraphDatabase.driver(fake_neo4j.uri, auth=manager, connection_timeout=2) as driver,
+        pytest.raises(neo4j.exceptions.AuthError) as raised,
+    ):
+        run_query(driver)
+
+    assert not raised.value.is_retryable()
+    assert fake_neo4j.logins == ["first-pw"]
+    assert rotating_secret.reads == 1
+
+
+def test_a_password_still_wrong_after_reload_raises_after_one_attempt(
+    fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.RotatingLoginAuthManager()
+
+    with (
+        fake_server_driver(fake_neo4j.uri, manager) as driver,
+        pytest.raises(neo4j.exceptions.AuthError),
+    ):
+        retrieval.retry_on_rotated_login(manager, lambda: run_query(driver))
+
+    assert fake_neo4j.logins == ["first-pw"]
+    assert rotating_secret.reads == 2
+
+
+def test_a_rotated_password_that_is_also_wrong_raises_after_one_retry(
+    fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.RotatingLoginAuthManager()
+    manager.get_auth()
+    rotating_secret.rotate("another-wrong-pw")
+
+    with (
+        fake_server_driver(fake_neo4j.uri, manager) as driver,
+        pytest.raises(neo4j.exceptions.AuthError),
+    ):
+        retrieval.retry_on_rotated_login(manager, lambda: run_query(driver))
+
+    assert fake_neo4j.logins == ["first-pw", "another-wrong-pw"]
+
+
+def test_service_unavailable_is_not_retried(rotating_secret: FakeSecret) -> None:
+    with FakeNeo4j(password="rotated-pw") as stopped:
+        uri = stopped.uri
+    manager = retrieval.RotatingLoginAuthManager()
+    calls: list[int] = []
+
+    def query() -> list[neo4j.Record]:
+        calls.append(1)
+        return run_query(driver)
+
+    with (
+        fake_server_driver(uri, manager) as driver,
+        pytest.raises(neo4j.exceptions.ServiceUnavailable),
+    ):
+        retrieval.retry_on_rotated_login(manager, query)
+
+    assert len(calls) == 1
+    assert rotating_secret.reads == 1
+
+
+def test_a_login_another_call_already_rotated_retries_without_a_read(
+    rotating_secret: FakeSecret,
+) -> None:
+    manager = retrieval.RotatingLoginAuthManager()
+    attempts: list[str] = []
+
+    def query() -> str:
+        attempts.append(manager.get_auth().credentials)
+        if len(attempts) == 1:
+            # Another request reloads the rotated login while this one fails.
+            rotating_secret.rotate("rotated-pw")
+            assert manager.reload() is True
+            raise unauthorized()
+        return "ok"
+
+    assert retrieval.retry_on_rotated_login(manager, query) == "ok"
+    assert attempts == ["first-pw", "rotated-pw"]
+    assert rotating_secret.reads == 2
+
+
+def test_other_auth_errors_are_not_retried(rotating_secret: FakeSecret) -> None:
+    manager = retrieval.RotatingLoginAuthManager()
+    calls: list[int] = []
+
+    def query() -> None:
+        calls.append(1)
+        raise neo4j.exceptions.Neo4jError._hydrate_neo4j(
+            code="Neo.ClientError.Security.TokenExpired", message="expired"
+        )
+
+    with pytest.raises(neo4j.exceptions.AuthError):
+        retrieval.retry_on_rotated_login(manager, query)
+    assert len(calls) == 1
+    assert rotating_secret.reads == 1
+
+
+def test_reload_reports_whether_the_login_changed(rotating_secret: FakeSecret) -> None:
+    manager = retrieval.RotatingLoginAuthManager()
+    first = manager.get_auth()
+
+    assert manager.reload() is False
+    assert manager.get_auth() == first
+    rotating_secret.rotate("rotated-pw")
+    assert manager.reload() is True
+    assert manager.get_auth() == neo4j.basic_auth("reader", "rotated-pw")
+    assert rotating_secret.reads == 3
 
 
 def test_close_drops_the_driver_and_the_retrievers_that_hold_it(

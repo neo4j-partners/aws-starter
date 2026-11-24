@@ -107,8 +107,9 @@ cp .env.sample .env
 # Edit .env: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, MEM_NEO4J_URI,
 # MEM_NEO4J_PASSWORD. Leave LOAD_FULL_DATASET=false for a fast run.
 # Keep the embedder aligned: default amazon.titan-embed-text-v2:0 at 1024
-# dims on both pipeline and agent. If you change it, set EMBED_MODEL_ID and
-# EMBED_DIMENSIONS to match on both sides.
+# dims on both pipeline and agent. If you change it, set
+# BEDROCK_EMBEDDING_MODEL and BEDROCK_EMBEDDING_DIMENSIONS for the pipeline,
+# and EMBED_MODEL_ID and EMBED_DIMENSIONS to match for the agent.
 ```
 
 `NEO4J_USERNAME` stays the admin user, because the pipeline writes as it.

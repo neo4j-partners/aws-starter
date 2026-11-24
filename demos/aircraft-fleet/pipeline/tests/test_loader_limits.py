@@ -98,6 +98,9 @@ def _links(driver: Driver, database: str) -> list[tuple[list[str], str | None, s
     return [(record["labels"], record["type"], record["limit"]) for record in records]
 
 
+_VALUE_KEYS = ("minValue", "maxValue", "nominalValue")
+
+
 def _expected_limits() -> list[dict]:
     def value(cell: str) -> float | None:
         return float(cell) if cell else None
@@ -110,7 +113,7 @@ def _expected_limits() -> list[dict]:
                 "regime": row["regime"],
                 "aircraftType": row["aircraftType"],
                 "unit": row["unit"],
-                **{key: value(row[key]) for key in ("minValue", "maxValue") if row[key]},
+                **{key: value(row[key]) for key in _VALUE_KEYS if row[key]},
                 "labels": ["OperatingLimit"],
             }
             for row in ROWS
@@ -129,10 +132,7 @@ def test_load_replaces_leftover_limits_and_links(
     limits = _limits(driver, database)
     assert limits == _expected_limits()
     assert all(
-        isinstance(limit[key], float)
-        for limit in limits
-        for key in ("minValue", "maxValue")
-        if key in limit
+        isinstance(limit[key], float) for limit in limits for key in _VALUE_KEYS if key in limit
     )
     egt = sorted(row["name"] for row in ROWS if row["parameterName"] == "EGT")
     assert _links(driver, database) == [(["Sensor"], "EGT", name) for name in egt]

@@ -99,7 +99,7 @@
   <text x="1000.0" y="1022" font-size="18" font-weight="700" fill="#4A2EB0" text-anchor="middle">OperatingLimit</text>
   <text x="1000.0" y="1048" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">name, parameterName, regime</text>
   <text x="1000.0" y="1070" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraftType, unit</text>
-  <text x="1000.0" y="1092" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">minValue, maxValue</text>
+  <text x="1000.0" y="1092" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">minValue, maxValue, nominalValue</text>
   <path d="M1000,840 V986" fill="none" stroke="#7A5AF8" stroke-width="2.5" marker-end="url(#a-purple)"/>
   <rect x="964" y="895" width="72" height="21" rx="5" fill="#F7F8FA"/>
   <text x="1000" y="910" font-size="12" font-weight="600" fill="#4A2EB0" text-anchor="middle">HAS_LIMIT</text>

@@ -445,7 +445,8 @@ SET ol = {
     aircraftType: row.aircraftType,
     unit: row.unit,
     minValue: toFloat(row.minValue),
-    maxValue: toFloat(row.maxValue)
+    maxValue: toFloat(row.maxValue),
+    nominalValue: toFloat(row.nominalValue)
 }
 REMOVE ol:__Entity__:__KGBuilder__
 """

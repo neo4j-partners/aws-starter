@@ -89,12 +89,18 @@ file holds every limit the rendered manuals state and nothing else. Blocks
 that only restate a limit, such as `quick-ref-engine` and `egt-exceedance`,
 add no rows.
 
-The loader merges each row on `name` and stores `minValue` and `maxValue` as
-floats. It deletes each `OperatingLimit` the file doesn't name, and it removes
-any `__Entity__` or `__KGBuilder__` label an earlier extraction left. It then
-rebuilds every `Sensor -[:HAS_LIMIT]-> OperatingLimit` link. A sensor links to
-each limit of its aircraft's model whose `parameterName` matches its type,
-ignoring case.
+A row's `minValue` and `maxValue` are bounds. Its `nominalValue` is a typical
+reading the manual prints, not a bound. A cruise cell such as `87 (85-89)`
+gives a range and a nominal of 87. A lone number in an idle column gives only
+a nominal, such as the A320-200's Ground Idle N1Speed of 22. A lone number in
+the Max Continuous or Takeoff column is a maximum.
+
+The loader merges each row on `name` and stores `minValue`, `maxValue`, and
+`nominalValue` as floats. It deletes each `OperatingLimit` the file doesn't
+name, and it removes any `__Entity__` or `__KGBuilder__` label an earlier
+extraction left. It then rebuilds every `Sensor -[:HAS_LIMIT]-> OperatingLimit`
+link. A sensor links to each limit of its aircraft's model whose
+`parameterName` matches its type, ignoring case.
 
 ## Manual enrichment
 

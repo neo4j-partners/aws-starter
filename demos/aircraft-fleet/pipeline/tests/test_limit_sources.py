@@ -26,6 +26,7 @@ _COLUMNS = [
     "unit",
     "minValue",
     "maxValue",
+    "nominalValue",
     "sourceBlock",
     "sourceText",
 ]

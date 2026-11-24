@@ -13,7 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from generator.limits import LIMITS_FILE, OperatingLimit, operating_limit_rows, parse_cell
+from generator.limits import (
+    LIMITS_FILE,
+    OperatingLimit,
+    operating_limit_rows,
+    parse_cell,
+    phase_cell,
+)
 from generator.manuals import MANUAL_FILES, MANUALS_DIR
 from generator.specs import HARD_LIMIT_REGIMES, OPERATING_LIMIT_REGIMES
 from generator.writers import write_csv
@@ -28,8 +34,10 @@ _NUMBER = re.compile(r"(?<![\d.])-?\d[\d,]*(?:\.\d+)?")
 # Blocks that only restate limits another block states. They get no rows.
 RESTATING_BLOCKS = {"quick-ref-engine", "egt-exceedance", "vibration-shutdown", "fuel-flow-range"}
 
-# Aircraft type, parameter, regime, unit, minimum, maximum.
-Fact = tuple[str, str, str, str, float | None, float | None]
+# Aircraft type, parameter, regime, unit, minimum, maximum, nominal.
+Fact = tuple[str, str, str, str, float | None, float | None, float | None]
+# A limit's minimum, maximum, and nominal value.
+Values = tuple[float | None, float | None, float | None]
 
 
 def _blocks(model: str) -> dict[str, str]:
@@ -53,20 +61,28 @@ def _fact(row: dict[str, str]) -> Fact:
         row["unit"],
         _value(row["minValue"]),
         _value(row["maxValue"]),
+        _value(row["nominalValue"]),
     )
 
 
-def _cell(cell: str) -> tuple[float | None, float | None]:
-    """A limit cell's minimum and maximum, read the way a person reads it."""
+def _cell(cell: str, *, idle: bool = False) -> Values:
+    """A limit cell's minimum, maximum, and nominal, read the way a person reads it.
+
+    A cruise cell's leading number is a typical reading, and so is a lone
+    number in an idle column. Neither one is a bound.
+    """
     cell = cell.removesuffix("°C").removesuffix(" ips")
-    if cruise := re.fullmatch(r"\S+ \((.+)\)", cell):
-        cell = cruise.group(1)
+    nominal = None
+    if cruise := re.fullmatch(r"(\S+) \((.+)\)", cell):
+        nominal, cell = _numbers(cruise.group(1))[0], cruise.group(2)
     if cell.startswith("≥ "):
-        return _numbers(cell)[0], None
+        return _numbers(cell)[0], None, nominal
     if cell.startswith(("< ", "≤ ")):
-        return None, _numbers(cell)[0]
+        return None, _numbers(cell)[0], nominal
     low, *high = _numbers(cell)
-    return (low, high[0]) if high else (None, low)
+    if high:
+        return low, high[0], nominal
+    return (None, None, low) if idle else (None, low, nominal)
 
 
 def _cell_unit(cell: str) -> str:
@@ -97,6 +113,7 @@ _PHASE_REGIMES = {
     "Max Continuous": "Max Continuous Normal",
     "Takeoff (5 min)": "Takeoff Normal",
 }
+_IDLE_COLUMNS = {"Ground Idle", "Flight Idle"}
 _EGT_REGIMES = {
     "EGT (Takeoff, 5 min)": "Takeoff",
     "EGT (Max Continuous)": "Max Continuous",
@@ -114,17 +131,16 @@ def _manual_facts(model: str) -> set[Fact]:
     blocks = _blocks(model)
     facts: set[Fact] = set()
 
-    def add(
-        parameter: str, regime: str, unit: str, bounds: tuple[float | None, float | None]
-    ) -> None:
-        facts.add((model, parameter, regime, unit, *bounds))
+    def add(parameter: str, regime: str, unit: str, values: Values) -> None:
+        facts.add((model, parameter, regime, unit, *values))
 
     for row in _table(blocks["normal-parameters"]):
         label, unit = _label(row["Parameter"])
         parameter = {"Vibration N1": "Vibration"}.get(label, label)
         for column, regime in _PHASE_REGIMES.items():
             if row[column] != "—":
-                add(parameter, regime, unit, _cell(row[column]))
+                idle = column in _IDLE_COLUMNS
+                add(parameter, regime, unit, _cell(row[column], idle=idle))
     for row in _table(blocks["egt-limits"]):
         maximum = row["Maximum"]
         add("EGT", _EGT_REGIMES[row["Parameter"]], _cell_unit(maximum), _cell(maximum))
@@ -133,7 +149,7 @@ def _manual_facts(model: str) -> set[Fact]:
     )
     assert trend is not None
     for level, value in zip(("Advisory", "Caution", "Warning"), trend.groups(), strict=True):
-        add("EGT", f"Trend {level}", "°C", (float(value), None))
+        add("EGT", f"Trend {level}", "°C", (float(value), None, None))
     for row in _table(blocks["vibration-bands"]):
         if row["Level"] != "Normal":
             band = row["N1 Vibration"]
@@ -151,7 +167,7 @@ def _manual_facts(model: str) -> set[Fact]:
             r"operation above (\d+)°C is not permitted", blocks["gearbox-temperature-monitoring"]
         )
         assert outlet is not None
-        add("Gearbox Oil Outlet Temperature", "All", "°C", (None, float(outlet.group(1))))
+        add("Gearbox Oil Outlet Temperature", "All", "°C", (None, float(outlet.group(1)), None))
     fluid = blocks["hydraulic-fluid-temperature"]
     operating = re.search(r"operate from (-?\d+) to \+(\d+)°C\.", fluid)
     assert operating is not None
@@ -159,14 +175,14 @@ def _manual_facts(model: str) -> set[Fact]:
         "Hydraulic Fluid Temperature",
         "All",
         "°C",
-        (float(operating.group(1)), float(operating.group(2))),
+        (float(operating.group(1)), float(operating.group(2)), None),
     )
     if warning := re.search(r"Above (\d+)°C is a warning\.", fluid):
-        add("Hydraulic Fluid Temperature", "Warning", "°C", (float(warning.group(1)), None))
+        add("Hydraulic Fluid Temperature", "Warning", "°C", (float(warning.group(1)), None, None))
     if "hydraulic-water-content" in blocks:
         water = re.search(r"(\d+(?:\.\d+)?)% by volume", blocks["hydraulic-water-content"])
         assert water is not None
-        add("Water Content", "All", "% by volume", (None, float(water.group(1))))
+        add("Water Content", "All", "% by volume", (None, float(water.group(1)), None))
     return facts
 
 
@@ -195,7 +211,7 @@ def test_the_source_text_occurs_once_in_its_block(row: dict[str, str]) -> None:
 def test_the_source_text_states_the_values(row: dict[str, str]) -> None:
     numbers = _numbers(row["sourceText"])
 
-    for cell in (row["minValue"], row["maxValue"]):
+    for cell in (row["minValue"], row["maxValue"], row["nominalValue"]):
         if cell:
             assert float(cell) in numbers
 
@@ -215,15 +231,63 @@ def test_names_follow_the_graph_form() -> None:
 
 def test_every_row_has_a_value_and_every_hard_limit_a_maximum() -> None:
     for row in ROWS:
-        assert row["minValue"] or row["maxValue"], row["name"]
+        assert row["minValue"] or row["maxValue"] or row["nominalValue"], row["name"]
         if row["regime"] in HARD_LIMIT_REGIMES:
             assert row["maxValue"], row["name"]
 
 
 def test_values_are_plain_decimals() -> None:
     for row in ROWS:
-        for cell in (row["minValue"], row["maxValue"]):
+        for cell in (row["minValue"], row["maxValue"], row["nominalValue"]):
             assert re.fullmatch(r"(-?\d+(\.\d+)?)?", cell), (row["name"], cell)
+
+
+def _row(name: str) -> dict[str, str]:
+    [row] = [row for row in ROWS if row["name"] == name]
+    return row
+
+
+def test_lone_idle_cells_are_nominal_readings_with_no_bounds() -> None:
+    # The A320-200 manual prints one typical reading in each idle column.
+    nominal_only = {
+        row["name"]: row["nominalValue"]
+        for row in ROWS
+        if row["nominalValue"] and not (row["minValue"] or row["maxValue"])
+    }
+
+    assert nominal_only == {
+        "N1Speed Ground Idle Normal - A320-200": "22",
+        "N1Speed Flight Idle Normal - A320-200": "28",
+        "N2 Ground Idle Normal - A320-200": "58",
+        "N2 Flight Idle Normal - A320-200": "65",
+        "EGT Ground Idle Normal - A320-200": "380",
+        "EGT Flight Idle Normal - A320-200": "450",
+    }
+
+
+def test_every_cruise_row_carries_its_baseline_inside_its_bounds() -> None:
+    cruise = [row for row in ROWS if row["regime"] == "Cruise Normal"]
+
+    assert len(cruise) == 20
+    for row in cruise:
+        nominal = float(row["nominalValue"])
+        assert row["maxValue"], row["name"]
+        assert nominal < float(row["maxValue"]), row["name"]
+        if row["minValue"]:
+            assert float(row["minValue"]) < nominal, row["name"]
+
+
+def test_only_idle_and_cruise_rows_have_a_nominal() -> None:
+    regimes = {row["regime"] for row in ROWS if row["nominalValue"]}
+
+    assert regimes == {"Ground Idle Normal", "Flight Idle Normal", "Cruise Normal"}
+    assert sum(1 for row in ROWS if row["nominalValue"]) == 26
+
+
+def test_a_lone_takeoff_cell_stays_a_maximum() -> None:
+    row = _row("N1Speed Takeoff Normal - A320-200")
+
+    assert (row["minValue"], row["maxValue"], row["nominalValue"]) == ("", "104", "")
 
 
 def test_the_rows_are_sorted_by_aircraft_type_then_name() -> None:
@@ -283,6 +347,30 @@ def test_parse_cell_reads_each_cell_form(cell: str, expected: tuple) -> None:
     assert parse_cell(cell) == expected
 
 
+@pytest.mark.parametrize(
+    ("cell", "idle", "expected"),
+    [
+        ("22", True, (None, None, 22)),
+        ("22", False, (None, 22, None)),
+        ("87 (85-89)", False, (85, 89, 87)),
+        ("560 (< 580)", False, (None, 580, 560)),
+        ("0.8 (< 2.0)", False, (None, 2.0, 0.8)),
+        ("0.15-0.25", True, (0.15, 0.25, None)),
+        ("< 2.0", True, (None, 2.0, None)),
+        ("< 620", False, (None, 620, None)),
+    ],
+)
+def test_phase_cell_reads_each_normal_parameters_cell(
+    cell: str, idle: bool, expected: tuple
+) -> None:
+    assert phase_cell(cell, idle=idle) == expected
+
+
+def test_phase_cell_rejects_a_cell_with_no_limit() -> None:
+    with pytest.raises(ValueError, match="states no limit"):
+        phase_cell("—", idle=True)
+
+
 def test_parse_cell_rejects_a_cell_with_no_limit() -> None:
     with pytest.raises(ValueError, match="states no limit"):
         parse_cell("—")
@@ -293,4 +381,4 @@ def test_an_empty_value_is_an_empty_cell() -> None:
 
     row = limit.csv_row()
 
-    assert (row["minValue"], row["maxValue"]) == ("", "900")
+    assert (row["minValue"], row["maxValue"], row["nominalValue"]) == ("", "900", "")

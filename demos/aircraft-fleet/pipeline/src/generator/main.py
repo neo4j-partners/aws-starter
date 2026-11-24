@@ -580,7 +580,8 @@ def validate(
     """Check referential integrity of generated CSV files.
 
     Also check that operating_limits.csv has the expected header and row
-    count, and that each row has a numeric minValue or maxValue.
+    count, and that each row has a minValue, maxValue, or nominalValue. Each
+    value a row sets must be a number.
     """
     import csv as _csv
 
@@ -634,10 +635,11 @@ def validate(
         expected_rows = len(operating_limit_rows())
         if len(rows) != expected_rows:
             errors.append(f"{LIMITS_FILE}: {len(rows)} rows, expected {expected_rows}")
+        columns = ("minValue", "maxValue", "nominalValue")
         for i, row in enumerate(rows, start=2):
-            if not (row["minValue"] or row["maxValue"]):
-                errors.append(f"{LIMITS_FILE}:{i}: no minValue or maxValue")
-            for col in ("minValue", "maxValue"):
+            if not any(row[col] for col in columns):
+                errors.append(f"{LIMITS_FILE}:{i}: no minValue, maxValue, or nominalValue")
+            for col in columns:
                 if not (val := row[col]):
                     continue
                 try:

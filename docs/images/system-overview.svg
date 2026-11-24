@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>System Overview</title>
-  <desc>Clients reach Neo4j in one of two ways. Clients over MCP call the AgentCore Gateway with a JWT from Amazon Cognito. Databricks gets and refreshes the token through a Unity Catalog HTTP connection. Amazon Quick connects to the finance Gateway as a remote MCP server, with a Bearer token pasted by hand. The quickstart agent and the fraud memory agent fetch their own tokens and call Claude on Amazon Bedrock. The Gateway calls the Neo4j MCP server on AgentCore Runtime, which runs read-only Cypher on Neo4j. The fleet pipeline, the fleet supervisor, the fraud graph loader, and the SEC filings notebook use the Neo4j Python driver directly. The fleet pipeline, the fleet supervisor, and the SEC filings notebook also call Amazon Bedrock.</desc>
+  <desc>Clients reach Neo4j in one of two ways. Clients over MCP call the AgentCore Gateway with a JWT from Amazon Cognito. Databricks gets and refreshes the token through a Unity Catalog HTTP connection. Amazon Quick connects to the finance Gateway as a remote MCP server, with a Bearer token pasted by hand. The quickstart agent and the fraud memory agent fetch their own tokens and call Claude on Amazon Bedrock. The Gateway calls the Neo4j MCP server on AgentCore Runtime, which runs read-only Cypher on Neo4j. The fleet pipeline, the fleet UI, the fleet supervisor, the fraud graph loader, and the SEC filings notebook use the Neo4j Python driver directly. The fleet pipeline, the fleet supervisor, and the SEC filings notebook also call Amazon Bedrock. The fleet UI runs only read-only lookups. The fleet UI calls no model.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
     <marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker><marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-purple" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#7A5AF8"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
@@ -69,22 +69,26 @@
   <path d="M1320,400 H1376" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
   <rect x="40" y="670" width="1300" height="200" rx="18" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
   <text x="64" y="702" font-size="17" font-weight="700" fill="#16233A" text-anchor="start">Direct Neo4j driver, no MCP</text>
-  <rect x="70" y="725" width="290" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
-  <text x="215.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fleet pipeline</text>
-  <text x="215.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">builds the fleet graph</text>
-  <text x="215.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraft-fleet/pipeline</text>
-  <rect x="385" y="725" width="290" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="530.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fleet supervisor</text>
-  <text x="530.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, two specialists</text>
-  <text x="530.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Text2Cypher, hybrid search</text>
-  <rect x="700" y="725" width="290" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
-  <text x="845.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fraud graph loader</text>
-  <text x="845.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loads the fraud graph</text>
-  <text x="845.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fraud-amazon-quick</text>
-  <rect x="1015" y="725" width="290" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1160.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">SEC filings notebook</text>
-  <text x="1160.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">four GraphRAG levels</text>
-  <text x="1160.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sec-filings-graphrag</text>
+  <rect x="70" y="725" width="232" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="186.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fleet pipeline</text>
+  <text x="186.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">builds the fleet graph</text>
+  <text x="186.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraft-fleet/pipeline</text>
+  <rect x="322" y="725" width="232" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="438.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fleet UI</text>
+  <text x="438.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read-only evidence lookups</text>
+  <text x="438.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">aircraft-fleet/ui</text>
+  <rect x="574" y="725" width="232" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="690.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Fleet supervisor</text>
+  <text x="690.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Strands, two specialists</text>
+  <text x="690.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Text2Cypher, hybrid search</text>
+  <rect x="826" y="725" width="232" height="110" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="942.0" y="757" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fraud graph loader</text>
+  <text x="942.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loads the fraud graph</text>
+  <text x="942.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fraud-amazon-quick</text>
+  <rect x="1078" y="725" width="232" height="110" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1194.0" y="757" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">SEC filings notebook</text>
+  <text x="1194.0" y="783" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">four GraphRAG levels</text>
+  <text x="1194.0" y="805" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sec-filings-graphrag</text>
   <path d="M710,670 V634" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
   <path d="M1340,770 H1475 V504" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
   <rect x="1428" y="585" width="93" height="21" rx="5" fill="#F7F8FA"/>

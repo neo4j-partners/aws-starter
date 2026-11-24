@@ -31,9 +31,10 @@ The UI server logs in to the fleet graph the same way the supervisor's graph
 tools do, using the shared fleet `.env`. It reads `NEO4J_PASSWORD_SECRET_ARN`
 when that is set, and `NEO4J_USERNAME` and `NEO4J_PASSWORD` otherwise. It
 also reads `NEO4J_URI` and `NEO4J_DATABASE`. It uses the login for bounded,
-read-only evidence lookups. Use a read-only fleet login for the UI. The [Neo4j Visualization
-Library license](https://www.npmjs.com/package/@neo4j-nvl/base) covers use with
-Neo4j Aura or a commercial Neo4j product.
+read-only evidence lookups. Use a read-only fleet login for the UI. The
+[Neo4j Visualization Library
+license](https://www.npmjs.com/package/@neo4j-nvl/base) covers use with Neo4j
+Aura or a commercial Neo4j product.
 
 To use a deployed supervisor, set `AGENT_ARN` and `AWS_REGION` before starting
 the UI. Deploy the supervisor version with browser trace support first.

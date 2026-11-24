@@ -30,8 +30,8 @@ LOCAL_URL = f"http://localhost:{os.getenv('AGENT_PORT', '7071')}/invocations"
 READ_TIMEOUT_S = 300
 
 # Each call names one fixed Runtime user. "default" is what the AgentCore CLI
-# sends with `agentcore invoke`. The agent itself no longer needs the workload
-# access token that a named user brings.
+# sends with `agentcore invoke`. The agent needs no workload access token. The
+# ID stays until a cloud test settles it.
 RUNTIME_USER_ID = "default"
 
 

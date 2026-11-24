@@ -50,7 +50,9 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 | 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
 
 - **Sample fulltext indexes:** Stage 2 also creates four fulltext indexes for sample queries: `maintenance_search`, `delay_search`, `component_search`, and `document_search`.
-- **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`.
+- **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, `Removal`, and `OperatingLimit`.
+- **Limit file:** Stage 1 writes `operating_limits.csv` with one row for each limit the manuals state. `src/generator/limits.py` builds each row from the same specs that render the manuals' limit blocks, so each value is the one the manual prints. Each row also names its block and the exact line or sentence that states it.
+- **Limit load:** Stage 2 merges each row on `name` and stores the values as numbers. It deletes each `OperatingLimit` the file doesn't name. It then rebuilds every `Sensor -[:HAS_LIMIT]-> OperatingLimit` link.
 - **Extracted labels:** Stage 3 writes `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit`.
 - **Operating limits:** Each `OperatingLimit` has a `regime` from a closed list of 15 in `schema.OPERATING_LIMIT_REGIMES`. `EXTRACTION_PROMPT` takes the hard limits for Takeoff, Max Continuous, and Start only from the Maximum column of a manual's Operating Limits table. It gives a value from the Normal Operating Parameters table a `<regime> Normal` regime, such as `Takeoff Normal`.
 - **Model:** Extraction uses `global.anthropic.claude-sonnet-5-5` by default. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions.
@@ -126,7 +128,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **Your files:** Files you add to `generated/` are kept.
 - **Graph check:** `verify` compares the graph's `Dataset` node with the stamp, and the stamp with the current code. It also compares each operational label's node count with its CSV row count.
 - **Strict mode:** `verify --strict` fails on any mismatch, or when the stamp is missing.
-- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the cross links, the sensor limit check, the EGT limit check, and the check for systems without a `SystemReference`. The sensor limit check requires every `Sensor` to link to an `OperatingLimit`, except the `AirDataDisagree` sensors that the manuals give no limit. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
+- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the enrichment cross links, and the check for systems without a `SystemReference`. The operational and stamp checks still fail. So do the sensor limit check and the EGT limit check, because the load writes the limits. The sensor limit check requires every `Sensor` to link to an `OperatingLimit`, except the `AirDataDisagree` sensors that the manuals give no limit. `./setup.sh load-operational` uses it.
 
 ## Structured output on Bedrock
 

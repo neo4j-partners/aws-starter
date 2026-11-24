@@ -769,7 +769,9 @@ The trailing edge flap system uses:
 | Marginal | 7-8 | Filter and resample in 100 FH |
 | Unacceptable | 9 or worse | Flush system, replace filters |
 
+<!-- BEGIN GENERATED: hydraulic-water-content -->
 **Water Content:** Maximum 0.1% by volume
+<!-- END GENERATED: hydraulic-water-content -->
 
 ---
 
@@ -1071,7 +1073,9 @@ START: HYD SYS PRESS (System A or B) Warning
 
 The bands apply to every hydraulic system.
 
+<!-- BEGIN GENERATED: hydraulic-fluid-temperature -->
 **Fluid temperature:** System A, System B, and Standby each operate from -40 to +107°C.
+<!-- END GENERATED: hydraulic-fluid-temperature -->
 
 ### 10.2 Abbreviations and Acronyms
 

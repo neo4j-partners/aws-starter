@@ -22,7 +22,11 @@ FakeResult = tuple[list[dict[str, Any]], None, None]
 
 
 class FakeDriver:
-    """Answer verify's queries for a graph that holds only operational data."""
+    """Answer verify's queries for a graph that holds only operational data.
+
+    The operational data includes the loaded limits: every EGT maximum
+    matches, and every Sensor has a limit.
+    """
 
     def __init__(self, *, missing_label: str | None = None) -> None:
         self.label_counts = dict.fromkeys(loader.OPERATIONAL_LABELS, 2)
@@ -35,6 +39,20 @@ class FakeDriver:
             rows = [{"label": label, "count": n} for label, n in self.label_counts.items()]
         elif "type(r)" in query:
             rows = [{"rel_type": rel, "count": n} for rel, n in self.rel_counts.items()]
+        elif "NOT (s)-[:HAS_LIMIT]->(:OperatingLimit)" in query:
+            rows = []
+        elif "toUpper(trim(l.parameterName)) = 'EGT'" in query:
+            rows = [
+                {
+                    "model": model,
+                    "regime": regime.lower(),
+                    "name": f"EGT {regime} - {model}",
+                    "maxValue": float(maximum),
+                }
+                for (model, regime), maximum in loader.expected_egt_maximums().items()
+            ]
+        elif "(:Sensor)-[r:HAS_LIMIT]->(:OperatingLimit)" in query:
+            rows = [{"count": 2}]
         elif "SHOW INDEXES" in query:
             rows = []
         elif "SHOW CONSTRAINTS" in query:
@@ -78,6 +96,15 @@ def test_an_operational_failure_still_fails(capsys: pytest.CaptureFixture[str]) 
     assert "enrichment" not in failures
 
 
+def test_missing_operating_limits_fail(capsys: pytest.CaptureFixture[str]) -> None:
+    # The load writes the limits, so a graph without them fails even with
+    # no enrichment.
+    assert not _verify(FakeDriver(missing_label="OperatingLimit"), skip_enrichment=True)
+
+    failures = capsys.readouterr().out.split("Failures:")[1]
+    assert "[FAIL] OperatingLimit has no nodes" in failures
+
+
 def _run_cli(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -85,8 +112,8 @@ def _run_cli(
     *,
     code_reason: str | None = None,
 ) -> Any:
-    # Two rows per node CSV, matching the fake graph's operational counts.
-    for _, filename, _ in loader._NODE_DEFINITIONS:
+    # Two rows per counted CSV, matching the fake graph's operational counts.
+    for _, filename in loader._COUNTED_CSVS:
         (tmp_path / filename).write_text("id\n1\n2\n", encoding="utf-8")
     settings = SimpleNamespace(neo4j_uri="bolt://example", neo4j_database="db", data_dir=tmp_path)
     monkeypatch.setattr(loader_main, "Settings", lambda: settings)

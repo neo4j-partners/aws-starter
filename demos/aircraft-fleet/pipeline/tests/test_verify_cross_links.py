@@ -1,4 +1,4 @@
-"""verify's cross-link checks count the links each enrichment step writes."""
+"""verify's cross-link checks count the links the load and enrichment write."""
 
 from __future__ import annotations
 
@@ -41,6 +41,16 @@ def test_no_describes_component_links_fail() -> None:
     result = _check(_rel_counts(DESCRIBES_COMPONENT=0), sensor_limits=1)
 
     assert result.failures == ["ComponentReference -> Component has no links"]
+
+
+def test_skip_enrichment_warns_on_enrichment_links_only() -> None:
+    # The load writes the Sensor links, so they still fail without enrichment.
+    result = loader._VerifyResult(strict=True, skip_enrichment=True)
+
+    loader._check_cross_links(_rel_counts(DESCRIBES_MODEL=0), 0, result)
+
+    assert result.failures == ["Sensor -> OperatingLimit has no links"]
+    assert result.warnings == ["AircraftModel -> Aircraft has no links"]
 
 
 def test_no_sensor_limits_fail_although_other_has_limit_edges_exist() -> None:

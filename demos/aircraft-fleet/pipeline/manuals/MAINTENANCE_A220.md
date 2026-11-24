@@ -365,13 +365,17 @@ The reduction gearbox uses a dedicated oil supply circuit that is separate from 
 | Takeoff | 55 | 65-80 | 90 |
 
 **Oil Temperature (normal operating):**
+<!-- BEGIN GENERATED: gearbox-oil-temperature -->
 | Power Setting | Normal (°C) | Caution (°C) | Limit (°C) |
 |---------------|-------------|--------------|------------|
 | All power | 60-130 | 130-145 | 150 |
+<!-- END GENERATED: gearbox-oil-temperature -->
 
 **Chip Detector:** A dedicated magnetic chip detector (MCD) is installed in the gearbox oil scavenge circuit downstream of the gearbox sump. This chip detector is polled separately from the main engine oil chip detectors and generates a distinct CAS message (GBX CHIP DET) when activated. Do not conflate gearbox chip detector activations with main engine MCD activations. The inspection requirements differ, and a gearbox finding is recorded against the Reduction Gearbox. See ENG-BRG-003 in Section 7.
 
+<!-- BEGIN GENERATED: gearbox-temperature-monitoring -->
 **Temperature Monitoring:** A dedicated thermocouple monitors gearbox oil outlet temperature. This reading is displayed on the maintenance page and is used by the FADEC for oil system health trending. Sustained operation above 145°C requires investigation before further dispatch; operation above 150°C is not permitted.
+<!-- END GENERATED: gearbox-temperature-monitoring -->
 
 #### 3.5.2 Common Gearbox Fault Modes
 
@@ -861,7 +865,9 @@ Primary flight control surfaces use EHSAs in place of conventional hydromechanic
 | Marginal | 7-8 | Filter and resample in 100 FH |
 | Unacceptable | 9 or worse | Flush system, replace filters |
 
+<!-- BEGIN GENERATED: hydraulic-water-content -->
 **Water Content:** Maximum 0.1% by volume
+<!-- END GENERATED: hydraulic-water-content -->
 
 ---
 
@@ -1301,7 +1307,9 @@ START: GBX CHIP DET / GBX OIL PRESS / GBX OIL TEMP CAS Message
 
 The bands apply to every hydraulic system.
 
+<!-- BEGIN GENERATED: hydraulic-fluid-temperature -->
 **Fluid temperature:** The Left, Right, and Standby systems each operate from -40 to +107°C.
+<!-- END GENERATED: hydraulic-fluid-temperature -->
 
 ### 10.2 Abbreviations and Acronyms
 

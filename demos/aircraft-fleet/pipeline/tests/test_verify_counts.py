@@ -1,4 +1,4 @@
-"""verify compares each operational label's node count with its CSV row count."""
+"""verify compares each loaded label's node count with its CSV row count."""
 
 from __future__ import annotations
 
@@ -16,10 +16,10 @@ ROWS = 2
 
 
 def _write_csvs(data_dir: Path) -> dict[str, int]:
-    """Write every node CSV with ROWS records and return matching graph counts."""
-    for _, filename, _ in loader._NODE_DEFINITIONS:
+    """Write every counted CSV with ROWS records and return matching graph counts."""
+    for _, filename in loader._COUNTED_CSVS:
         (data_dir / filename).write_text('id,note\n1,"two\nlines"\n2,plain\n', encoding="utf-8")
-    return {label: ROWS for label, _, _ in loader._NODE_DEFINITIONS}
+    return {label: ROWS for label, _ in loader._COUNTED_CSVS}
 
 
 def _check(label_counts: dict[str, int], data_dir: Path, *, strict: bool = False):
@@ -45,6 +45,19 @@ def test_a_label_with_more_nodes_than_csv_rows_is_reported(tmp_path: Path) -> No
 
     assert result.warnings == [
         f"Aircraft has 3 nodes, but nodes_aircraft.csv in {tmp_path} has 2 rows"
+    ]
+
+
+def test_operating_limits_are_compared_with_their_csv(tmp_path: Path) -> None:
+    # The load writes the limits from operating_limits.csv, so extra limits
+    # left by an older graph show up here.
+    counts = _write_csvs(tmp_path)
+    counts["OperatingLimit"] = 5
+
+    result = _check(counts, tmp_path)
+
+    assert result.warnings == [
+        f"OperatingLimit has 5 nodes, but operating_limits.csv in {tmp_path} has 2 rows"
     ]
 
 

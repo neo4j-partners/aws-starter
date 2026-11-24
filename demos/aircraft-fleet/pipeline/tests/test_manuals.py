@@ -783,7 +783,7 @@ def test_a_band_row_rejects_a_sensor_that_is_bad_when_high() -> None:
     disagree = {s.type: s for s in sensors_for("Avionics", MODEL)}["AirDataDisagree"]
 
     with pytest.raises(ValueError, match="^sensor 'AirDataDisagree' is high, not low$"):
-        manuals._low_band_row(disagree)
+        manuals.low_band_row(disagree)
 
 
 @pytest.mark.parametrize("model", sorted(manuals.MANUAL_FILES))

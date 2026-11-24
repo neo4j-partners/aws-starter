@@ -710,7 +710,9 @@ Linear hydraulic actuator providing:
 **Testing Procedure:**
 1. Obtain fluid sample from reservoir drain
 2. Perform particle count analysis (NAS 1638 Class 6 max)
+<!-- BEGIN GENERATED: hydraulic-water-content -->
 3. Check water content (< 0.1% by volume)
+<!-- END GENERATED: hydraulic-water-content -->
 4. Verify fluid acidity (TAN < 1.5)
 
 **Corrective Actions:**
@@ -1013,7 +1015,9 @@ START: Low Hydraulic Pressure Warning
 
 The bands apply to every hydraulic system.
 
+<!-- BEGIN GENERATED: hydraulic-fluid-temperature -->
 **Fluid temperature:** The Green, Blue, and Yellow systems each operate from -40 to +100°C. Above 110°C is a warning.
+<!-- END GENERATED: hydraulic-fluid-temperature -->
 
 ### 10.2 Abbreviations and Acronyms
 

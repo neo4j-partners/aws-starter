@@ -55,6 +55,7 @@ def no_csv_load(monkeypatch: pytest.MonkeyPatch) -> None:
     """Skip the CSV loads, so only the Dataset node is written."""
     monkeypatch.setattr(loader, "load_nodes", lambda *args: 0)
     monkeypatch.setattr(loader, "load_relationships", lambda *args: None)
+    monkeypatch.setattr(loader, "load_operating_limits", lambda *args: None)
 
 
 def _datasets(driver: Driver, database: str) -> list[dict]:

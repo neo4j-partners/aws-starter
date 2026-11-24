@@ -1223,7 +1223,9 @@ START: Fan Blade Damage Reported/Suspected
 
 The bands apply to every hydraulic system.
 
+<!-- BEGIN GENERATED: hydraulic-fluid-temperature -->
 **Fluid temperature:** The Green, Blue, and Yellow systems each operate from -40 to +107°C.
+<!-- END GENERATED: hydraulic-fluid-temperature -->
 
 ### 10.2 Abbreviations and Acronyms
 

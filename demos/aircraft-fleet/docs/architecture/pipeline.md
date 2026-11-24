@@ -20,9 +20,8 @@ link the two.
 `./setup.sh` runs all five. Only stage 3 calls a model.
 `./setup.sh load-operational` builds the operational graph with no Bedrock
 access. It clears the database first, so there is no enrichment to relink.
-Its final check is `verify --strict --skip-enrichment`. The missing documents,
-chunks, and limits print as warnings, and an operational problem still fails
-the run. `uv run populate-aircraft-db load-operational` skips the
+Its final check is `verify --strict --skip-enrichment`. The missing documents
+and chunks print as warnings, and an operational problem still fails the run. `uv run populate-aircraft-db load-operational` skips the
 clear and relinks the enrichment an earlier full run left in the database.
 
 ## Generator
@@ -38,7 +37,7 @@ config, and code give the same CSVs.
 
 The stages run in order, and each reads what the earlier stages produced.
 
-1. **Fleet topology:** The generator creates aircraft with Engine, Avionics, and Hydraulics systems, then their components and sensors.
+1. **Fleet topology:** The generator creates aircraft with Engine, Avionics, and Hydraulics systems, then their components and sensors. It also writes `operating_limits.csv`, one row for each limit the manuals state.
 2. **Sensor readings:** Each sensor gets hourly values. A value is a baseline plus a drift toward the bad side, scaled by the operator, plus noise and occasional spikes.
 3. **Maintenance events:** A reading that enters a higher band may raise an event. The side of the band it crossed picks the fault and the part. Severity is MINOR, MAJOR, or CRITICAL.
 4. **Flight operations:** The generator schedules hub-and-spoke legs between airports, with delays. A CRITICAL event grounds its aircraft from the report hour to the end of that day, so those legs never appear.
@@ -79,6 +78,23 @@ The pipeline also creates the uniqueness constraints and lookup indexes for
 these labels. It also creates four fulltext indexes for sample queries:
 `maintenance_search`, `delay_search`, `component_search`, and
 `document_search`. One `Dataset` node holds the stamp for verify.
+
+### Operating limits
+
+`src/generator/limits.py` builds `operating_limits.csv` from the same specs
+that render the manuals' limit blocks. Each value is the one the manual
+prints, rounded as printed. Each row names the generated block that states
+the limit and the exact line or sentence inside it. A test checks that the
+file holds every limit the rendered manuals state and nothing else. Blocks
+that only restate a limit, such as `quick-ref-engine` and `egt-exceedance`,
+add no rows.
+
+The loader merges each row on `name` and stores `minValue` and `maxValue` as
+floats. It deletes each `OperatingLimit` the file doesn't name, and it removes
+any `__Entity__` or `__KGBuilder__` label an earlier extraction left. It then
+rebuilds every `Sensor -[:HAS_LIMIT]-> OperatingLimit` link. A sensor links to
+each limit of its aircraft's model whose `parameterName` matches its type,
+ignoring case.
 
 ## Manual enrichment
 
@@ -143,8 +159,9 @@ nonzero, so the same check works in CI. The one exception is
 `--skip-enrichment`, which keeps the enrichment checks as warnings.
 
 `verify --strict --skip-enrichment` keeps the counts, stamp, CSV comparison,
-operational constraints, and operational orphans as failures. It reports the
-embeddings, chunk indexes, search test, extracted-entity constraints, cross
-links, sensor limits, EGT limits, documents without chunks, and systems without a
-`SystemReference` as warnings. `./setup.sh load-operational`
+operational constraints, sensor limits, EGT limits, the `Sensor -[:HAS_LIMIT]->`
+cross link, and operational orphans as failures. It reports the embeddings,
+chunk indexes, search test, extracted-entity constraints, the other cross
+links, documents without chunks, and systems without a `SystemReference` as
+warnings. `./setup.sh load-operational`
 uses it, because that graph has no enrichment.

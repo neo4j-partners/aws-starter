@@ -141,7 +141,7 @@ this pipeline.
 ## Keep document context in every chunk
 
 - **The class:** `ContextPrependingSplitter` in `pipeline.py` wraps `FixedSizeSplitter`.
-- **What it adds:** It adds a `[DOCUMENT CONTEXT]` header with the aircraft type and title to every chunk.
+- **What it adds:** It adds a `[DOCUMENT CONTEXT]` header with the aircraft type, title and manual section to every chunk.
 - **Why it is needed:** `SimpleKGPipeline` passes document metadata only to the lexical graph builder. The header is the only place where the extractor sees the airframe model.
 - **Where it matters:** Chunks deep in engine sections often name only the engine.
 - **Table headers:** A chunk that starts inside a markdown table also gets the table's header row and separator after the context header. Without them, a chunk cut below a table's header holds values with no column names, such as an EGT row with no operating regimes.

@@ -31,7 +31,7 @@ from functools import lru_cache
 
 import neo4j
 from neo4j import Driver, GraphDatabase
-from neo4j.auth_management import AuthManagers
+from neo4j.auth_management import AuthManager
 from neo4j_graphrag.embeddings import BedrockEmbeddings
 from neo4j_graphrag.llm import BedrockLLM
 from neo4j_graphrag.retrievers import HybridCypherRetriever
@@ -59,19 +59,61 @@ def _require_env(name: str) -> str:
 _driver: Driver | None = None
 _driver_lock = threading.Lock()
 
+_UNAUTHORIZED = "Neo.ClientError.Security.Unauthorized"
+
 
 def _fresh_login() -> neo4j.Auth:
-    """Read the fleet graph login again, for the driver's auth manager.
+    """Read the fleet graph login again, skipping the secrets cache.
 
-    The driver calls this for its first connection, and again each time Neo4j
-    rejects the login as ``Unauthorized``. The cached secrets are dropped
-    first, so a password rotated in Secrets Manager is read again. The driver
-    then retries the query in the same request. The memory path recovers the
-    same way in ``server._build_agent``.
+    The cached secrets are dropped first, so a password rotated in Secrets
+    Manager is read again.
     """
     forget_secrets()
     login = neo4j_login()
     return neo4j.basic_auth(login.username, login.password)
+
+
+class RotatingLoginAuthManager(AuthManager):
+    """Give the driver the fleet graph login, and follow a rotated password.
+
+    When Neo4j rejects the login as ``Unauthorized``, the manager reads the
+    secret once. It asks the driver to retry only when the secret now holds a
+    different login. A rotated password then recovers after one retry in the
+    same request. A wrong password fails at once.
+
+    ``AuthManagers.basic`` asks for a retry on every rejection. With a wrong
+    password, the driver would then retry with backoff until
+    ``max_transaction_retry_time``, about 30 s per query, and read the secret
+    on each attempt.
+
+    The memory path recovers from a rotation in ``server._build_agent``.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._auth: neo4j.Auth | None = None
+
+    def get_auth(self) -> neo4j.Auth:
+        with self._lock:
+            if self._auth is None:
+                self._auth = _fresh_login()
+            return self._auth
+
+    def handle_security_exception(
+        self, auth: neo4j.Auth, error: neo4j.exceptions.Neo4jError
+    ) -> bool:
+        """Return True when the driver should retry with a new login."""
+        if error.code != _UNAUTHORIZED:
+            return False
+        with self._lock:
+            if self._auth is not None and self._auth != auth:
+                # Another connection already read the new login.
+                return True
+            login = _fresh_login()
+            if login == auth:
+                return False
+            self._auth = login
+            return True
 
 
 def get_driver() -> Driver:
@@ -81,7 +123,7 @@ def get_driver() -> Driver:
         if _driver is None:
             uri = _require_env("NEO4J_URI")
             logger.info("Connecting to Neo4j at %s", uri)
-            _driver = GraphDatabase.driver(uri, auth=AuthManagers.basic(_fresh_login))
+            _driver = GraphDatabase.driver(uri, auth=RotatingLoginAuthManager())
         return _driver
 
 

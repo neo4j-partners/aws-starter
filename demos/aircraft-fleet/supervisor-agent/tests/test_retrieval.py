@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import neo4j
 import pytest
+from neo4j._sync.io._pool import IOPool
 from neo4j.auth_management import AuthManager
 from neo4j_graphrag.types import RetrieverResultItem
 
@@ -42,12 +43,12 @@ def test_format_hit_includes_provenance() -> None:
             "aircraft_type": "A320-200",
             "title": "A320 AMM",
             "chunk_index": 7,
-            "entities": ["Fault: EGT Overtemp", "OperatingLimit: EGT - A320-200"],
+            "entities": ["Fault: EGT Overtemp", "OperatingLimit: EGT Takeoff - A320-200"],
         },
     )
     assert retrieval._format_hit(item) == (
         "[Source: AMM-A320-2024-001 | A320-200 | chunk 7 | score 0.912]\n"
-        "Entities: Fault: EGT Overtemp, OperatingLimit: EGT - A320-200\n"
+        "Entities: Fault: EGT Overtemp, OperatingLimit: EGT Takeoff - A320-200\n"
         "Check EGT margin."
     )
 
@@ -180,14 +181,28 @@ def fake_drivers(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[FakeDriver]]:
     retrieval._text2cypher_retriever.cache_clear()
 
 
+@dataclasses.dataclass
+class FakeSecret:
+    """The fleet secret's password history and how often it was read."""
+
+    passwords: list[str] = dataclasses.field(default_factory=lambda: ["first-pw"])
+    reads: int = 0
+
+    def rotate(self, password: str) -> None:
+        self.passwords.append(password)
+
+
 @pytest.fixture
-def rotating_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
-    """Serve the fleet secret from a fake Secrets Manager. Append to rotate it."""
-    passwords = ["first-pw"]
+def rotating_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeSecret]:
+    """Serve the fleet secret from a fake Secrets Manager."""
+    secret = FakeSecret()
 
     def get_secret_value(SecretId: str) -> dict[str, str]:
         assert SecretId == SECRET_ARN
-        return {"SecretString": json.dumps({"username": "reader", "password": passwords[-1]})}
+        secret.reads += 1
+        return {
+            "SecretString": json.dumps({"username": "reader", "password": secret.passwords[-1]})
+        }
 
     monkeypatch.setenv("NEO4J_PASSWORD_SECRET_ARN", SECRET_ARN)
     monkeypatch.setattr(
@@ -196,8 +211,27 @@ def rotating_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
         lambda service, region_name: SimpleNamespace(get_secret_value=get_secret_value),
     )
     secrets.forget_secrets()
-    yield passwords
+    yield secret
     secrets.forget_secrets()
+
+
+def unauthorized() -> neo4j.exceptions.Neo4jError:
+    """A real driver error for a rejected login, as the server reports it."""
+    return neo4j.exceptions.Neo4jError._hydrate_neo4j(
+        code="Neo.ClientError.Security.Unauthorized", message="rejected"
+    )
+
+
+def report_to_pool(manager: AuthManager, auth: neo4j.Auth) -> neo4j.exceptions.Neo4jError:
+    """Pass a rejected login through the driver's own pool hook.
+
+    neo4j 6.4.1 marks the error retryable only when the auth manager handled
+    it. ``execute_query`` retries only retryable errors.
+    """
+    error = unauthorized()
+    connection = SimpleNamespace(auth_manager=manager, auth=auth)
+    IOPool.on_neo4j_error(None, error, connection)
+    return error
 
 
 def test_get_driver_builds_one_driver_with_an_auth_manager(
@@ -243,29 +277,84 @@ def test_concurrent_first_calls_build_one_driver(
 
 
 def test_a_rejected_login_reads_the_rotated_secret(
-    fake_drivers: list[FakeDriver], rotating_secret: list[str]
+    fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
 ) -> None:
     manager = retrieval.get_driver().auth
     first = manager.get_auth()
     assert first == neo4j.basic_auth("reader", "first-pw")
     assert manager.get_auth() is first
+    assert rotating_secret.reads == 1
 
-    rotating_secret.append("rotated-pw")
+    rotating_secret.rotate("rotated-pw")
     # True tells the driver that the error is retryable. It then retries the
     # query with the login the manager now holds.
     assert manager.handle_security_exception(first, UNAUTHORIZED) is True
     assert manager.get_auth() == neo4j.basic_auth("reader", "rotated-pw")
+    assert rotating_secret.reads == 2
 
 
-def test_other_security_errors_keep_the_login(
-    fake_drivers: list[FakeDriver], rotating_secret: list[str]
+def test_a_rejected_login_that_did_not_change_fails_at_once(
+    fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
 ) -> None:
     manager = retrieval.get_driver().auth
     first = manager.get_auth()
-    rotating_secret.append("rotated-pw")
+    # False tells the driver not to retry, so the query fails right away.
+    assert manager.handle_security_exception(first, UNAUTHORIZED) is False
+    assert manager.get_auth() is first
+    assert rotating_secret.reads == 2
+
+
+def test_a_login_another_connection_replaced_retries_without_a_read(
+    fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.get_driver().auth
+    first = manager.get_auth()
+    rotating_secret.rotate("rotated-pw")
+    assert manager.handle_security_exception(first, UNAUTHORIZED) is True
+    assert rotating_secret.reads == 2
+
+    # A second connection still opened with the first login reports it late.
+    assert manager.handle_security_exception(first, UNAUTHORIZED) is True
+    assert manager.get_auth() == neo4j.basic_auth("reader", "rotated-pw")
+    assert rotating_secret.reads == 2
+
+
+def test_the_driver_retries_a_rotated_password_once(
+    fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.get_driver().auth
+    first = manager.get_auth()
+    rotating_secret.rotate("rotated-pw")
+    assert report_to_pool(manager, first).is_retryable()
+
+    # The retry opens with the rotated login, and Neo4j accepts it.
+    assert manager.get_auth() == neo4j.basic_auth("reader", "rotated-pw")
+    assert rotating_secret.reads == 2
+
+
+def test_the_driver_does_not_retry_a_wrong_password(
+    fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.get_driver().auth
+    first = manager.get_auth()
+    error = report_to_pool(manager, first)
+
+    # Not retryable, so execute_query raises it instead of backing off.
+    assert not error.is_retryable()
+    assert isinstance(error, neo4j.exceptions.AuthError)
+    assert rotating_secret.reads == 2
+
+
+def test_other_security_errors_keep_the_login(
+    fake_drivers: list[FakeDriver], rotating_secret: FakeSecret
+) -> None:
+    manager = retrieval.get_driver().auth
+    first = manager.get_auth()
+    rotating_secret.rotate("rotated-pw")
     forbidden = SimpleNamespace(code="Neo.ClientError.Security.Forbidden")
     assert manager.handle_security_exception(first, forbidden) is False
     assert manager.get_auth() is first
+    assert rotating_secret.reads == 1
 
 
 def test_close_drops_the_driver_and_the_retrievers_that_hold_it(

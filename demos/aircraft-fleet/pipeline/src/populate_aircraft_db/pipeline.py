@@ -50,6 +50,11 @@ class DocumentMeta:
     aircraft_type: str
     title: str
 
+    @property
+    def context(self) -> str:
+        """The [DOCUMENT CONTEXT] line for this manual, without a section."""
+        return f"[DOCUMENT CONTEXT] Aircraft Type: {self.aircraft_type} | Title: {self.title}"
+
 
 DOCUMENTS: list[DocumentMeta] = [
     DocumentMeta(
@@ -635,7 +640,7 @@ def debug_extract_chunks(
             chunk_overlap=chunk_overlap,
             approximate=True,
         ),
-        context=(f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}"),
+        context=meta.context,
         document_id=meta.document_id,
     )
     schema = build_extraction_schema()
@@ -737,9 +742,7 @@ def process_all_documents(
             # Update the splitter's context so every chunk the LLM sees starts
             # with the aircraft type.  The custom EXTRACTION_PROMPT instructs
             # the LLM to read this header.
-            splitter.context = (
-                f"[DOCUMENT CONTEXT] Aircraft Type: {meta.aircraft_type} | Title: {meta.title}"
-            )
+            splitter.context = meta.context
             splitter.document_id = meta.document_id
 
             await pipeline.run_async(

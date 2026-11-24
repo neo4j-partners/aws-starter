@@ -376,7 +376,7 @@ def _process_two_documents(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
             return None
 
     docs = [
-        SimpleNamespace(filename=f"{n}.md", aircraft_type="T", title="t", document_id=n)
+        pipeline.DocumentMeta(filename=f"{n}.md", document_id=n, aircraft_type="T", title="t")
         for n in ("DOC-1", "DOC-2")
     ]
     for doc in docs:

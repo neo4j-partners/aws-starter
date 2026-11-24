@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#132922">
+  <title>Aircraft Fleet Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/bundle.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">✈</span>
+      <div>
+        <h1>Aircraft Fleet Intelligence</h1>
+        <p>Neo4j <span aria-hidden="true">·</span> Amazon Bedrock AgentCore</p>
+      </div>
+    </div>
+    <button id="new-chat" type="button" class="secondary">New chat</button>
+  </header>
+
+  <main class="workspace">
+    <section class="panel chat" aria-labelledby="chat-heading">
+      <header class="panel-header"><h2 id="chat-heading">Fleet assistant</h2></header>
+      <div class="transcript" id="transcript" role="log" aria-label="Conversation">
+        <div id="welcome" class="welcome">
+          <h3>What would you like to investigate?</h3>
+          <button type="button" id="starter" class="starter">
+            <span>Find aircraft with hydraulic system issues</span>
+            <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+      </div>
+      <form id="chat-form" class="composer">
+        <label for="prompt" class="visually-hidden">Ask about the fleet</label>
+        <textarea id="prompt" name="prompt" rows="2" maxlength="8000" placeholder="Ask about the fleet…" required></textarea>
+        <button type="submit" id="send" class="primary" disabled>Send</button>
+      </form>
+      <p id="chat-status" class="visually-hidden" role="status"></p>
+    </section>
+
+    <section class="panel graph" aria-labelledby="graph-heading">
+      <header class="panel-header">
+        <div>
+          <h2 id="graph-heading">Graph evidence</h2>
+          <p id="graph-count">No evidence yet</p>
+        </div>
+        <button type="button" id="fit" class="secondary" disabled>Fit graph</button>
+      </header>
+      <div class="graph-stage">
+        <div id="canvas" aria-label="Interactive fleet graph"></div>
+        <div id="graph-empty" class="graph-empty">
+          <span class="graph-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <p>Fleet evidence appears here as tools return results.</p>
+        </div>
+        <aside id="node-details" class="node-details" aria-label="Selected graph entity" hidden></aside>
+      </div>
+      <ul class="legend" aria-label="Graph legend">
+        <li class="aircraft">Aircraft</li>
+        <li class="system">System</li>
+        <li class="component">Component</li>
+        <li class="maintenance">Maintenance event</li>
+        <li class="flight">Flight</li>
+      </ul>
+    </section>
+
+    <section class="panel trace" aria-labelledby="trace-heading">
+      <header class="panel-header">
+        <h2 id="trace-heading">Tool call trace</h2>
+        <button type="button" id="clear-selection" class="secondary" hidden>Show all evidence</button>
+      </header>
+      <p id="trace-empty" class="trace-empty">Specialist and tool calls appear here after you send a question.</p>
+      <ol id="trace-entries" class="trace-entries" aria-label="Calls for this question"></ol>
+    </section>
+  </main>
+</body>
+</html>

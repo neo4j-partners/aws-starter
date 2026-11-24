@@ -8,10 +8,31 @@ The client events:
 - ``{"type": "complete"}`` and ``{"type": "error", "error": ...}``: sent by the server
 """
 
-from collections.abc import Iterator
+import re
+from collections.abc import AsyncIterator, Iterator
+from time import monotonic
 from typing import Any
 
+from strands import Agent
+
 from fleet_supervisor.core.agents import SPECIALIST_NAMES
+from fleet_supervisor.core.tool_stream import (
+    RESULT_EVENT_KEY,
+    TRACE_STATE_KEY,
+    observe_tool_results,
+)
+
+FLEET_ID = re.compile(
+    r"\b(?:AC\d{4,}(?:-S\d{2}(?:-C\d{2})?)?|ME\d{4,}|FL\d{5,}|N\d{5}[A-Z]?)(?![\w-])"
+)
+GRAPH_ERROR_PREFIXES = (
+    "The generated Cypher query failed:",
+    "The query took too long and was stopped.",
+    "The graph database is unavailable right now.",
+    "The graph database returned an error.",
+    "The query could not be generated.",
+    "The search could not be run.",
+)
 
 
 class EventMapper:
@@ -21,9 +42,18 @@ class EventMapper:
     call is assembled, so each call is reported once per ``toolUseId``.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, trace: bool = False) -> None:
         self._seen_tool_ids: set[str] = set()
         self.specialists: list[str] = []
+        self._trace = trace
+        self._started: dict[str, tuple[str, float]] = {}
+
+    def stream(self, agent: Agent, prompt: str) -> AsyncIterator[dict[str, Any]]:
+        """Start the agent stream with individual tool results when requested."""
+        if self._trace:
+            observe_tool_results(agent)
+            return agent.stream_async(prompt, invocation_state={TRACE_STATE_KEY: True})
+        return agent.stream_async(prompt)
 
     def map(self, event: dict[str, Any]) -> Iterator[dict[str, Any]]:
         """Yield the client events for one Strands event."""
@@ -31,23 +61,76 @@ class EventMapper:
             # Events from inside a specialist. Only its graph tool calls are
             # forwarded. Its text reaches the user through the supervisor.
             inner = stream.get("data")
-            if isinstance(inner, dict) and (tool_use := inner.get("current_tool_use")):
-                yield from self._tool_event(tool_use)
+            if isinstance(inner, dict):
+                yield from self._map_tools(inner, stream.get("tool_use", {}).get("toolUseId"))
             return
 
         if "data" in event:
             yield {"type": "chunk", "data": event["data"]}
-        elif tool_use := event.get("current_tool_use"):
-            yield from self._tool_event(tool_use)
+        else:
+            yield from self._map_tools(event, None)
 
-    def _tool_event(self, tool_use: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    def _map_tools(self, event: dict[str, Any], parent_id: str | None) -> Iterator[dict[str, Any]]:
+        if tool_use := event.get("current_tool_use"):
+            yield from self._tool_event(tool_use, parent_id)
+        elif self._trace:
+            if result := event.get(RESULT_EVENT_KEY):
+                yield from self._tool_result(result, parent_id, event["duration_ms"])
+            elif message := event.get("message"):
+                # The result message also covers calls that were cancelled before execution.
+                for block in message.get("content", []):
+                    if result := block.get("toolResult"):
+                        yield from self._tool_result(result, parent_id)
+
+    def _tool_event(
+        self, tool_use: dict[str, Any], parent_id: str | None = None
+    ) -> Iterator[dict[str, Any]]:
         tool_id = tool_use.get("toolUseId")
         name = tool_use.get("name")
-        if not tool_id or not name or tool_id in self._seen_tool_ids:
+        if not tool_id or not name:
             return
-        self._seen_tool_ids.add(tool_id)
+        call_id = f"{parent_id}/{tool_id}" if parent_id else tool_id
+        if call_id in self._seen_tool_ids:
+            return
+        self._seen_tool_ids.add(call_id)
+        details = {}
+        if self._trace:
+            self._started[call_id] = (name, monotonic())
+            details = {"call_id": call_id, "parent_id": parent_id}
         if agent_name := SPECIALIST_NAMES.get(name):
             self.specialists.append(agent_name)
-            yield {"type": "agent", "name": agent_name}
+            yield {"type": "agent", "name": agent_name, **details}
         else:
-            yield {"type": "tool", "name": name}
+            yield {"type": "tool", "name": name, **details}
+
+    def _tool_result(
+        self, result: dict[str, Any], parent_id: str | None, duration_ms: int | None = None
+    ) -> Iterator[dict[str, Any]]:
+        tool_id = result["toolUseId"]
+        call_id = f"{parent_id}/{tool_id}" if parent_id else tool_id
+        if not (started := self._started.pop(call_id, None)):
+            return
+        name, start = started
+        is_graph_query = name.endswith("read_neo4j_cypher") or name in {
+            "graph_query",
+            "graph_query_tool",
+        }
+        is_graph_tool = is_graph_query or name in {"vector_search", "vector_search_tool"}
+        content = result.get("content", [])
+        failed = result["status"] == "error" or (
+            is_graph_tool
+            and any(item.get("text", "").startswith(GRAPH_ERROR_PREFIXES) for item in content)
+        )
+        event = {
+            "type": "tool_complete",
+            "call_id": call_id,
+            "status": "error" if failed else "success",
+            "duration_ms": duration_ms
+            if duration_ms is not None
+            else round((monotonic() - start) * 1000),
+        }
+        if is_graph_query and not failed:
+            # GraphRAG supplies row text and MCP can supply JSON blocks. Send only fleet IDs.
+            refs = dict.fromkeys(FLEET_ID.findall(str(content)[:100_000]))
+            event["evidence_ids"] = list(refs)[:30]
+        yield event

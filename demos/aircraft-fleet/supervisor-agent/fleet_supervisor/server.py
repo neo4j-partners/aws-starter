@@ -261,11 +261,11 @@ async def invoke(payload: Any, context):
             asyncio.to_thread(_build_agent, model, schema, session_id, user_id)
         )
         supervisor, _ = await asyncio.shield(build)
-        mapper = EventMapper()
+        mapper = EventMapper(trace=payload.get("trace") is True)
         # Strands flushes memory through a hook in the stream's finally. The
         # stream is closed here, so that flush ends before the manager
         # closes. A dropped stream would be closed later by the event loop.
-        stream = supervisor.stream_async(prompt)
+        stream = mapper.stream(supervisor, prompt)
         try:
             async for event in stream:
                 for client_event in mapper.map(event):

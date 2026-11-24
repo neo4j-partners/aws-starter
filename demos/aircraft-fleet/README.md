@@ -46,6 +46,9 @@ The [`supervisor-agent/`](./supervisor-agent/) project is a Strands supervisor w
 
 ## Quick start
 
+The [browser demo](./ui/) pairs the supervisor chat with a live evidence graph
+and a tool call trace.
+
 Check the [prerequisites](#prerequisites) first. `./setup.sh` needs AWS
 credentials with Bedrock access, and the default dataset needs a paid Aura tier
 or a local Neo4j.

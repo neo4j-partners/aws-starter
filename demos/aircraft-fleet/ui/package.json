@@ -1,0 +1,17 @@
+{
+  "name": "aircraft-fleet-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild static/app.js --bundle --format=esm --minify --outfile=static/bundle.js"
+  },
+  "dependencies": {
+    "@neo4j-nvl/base": "2.1.0",
+    "@neo4j-nvl/interaction-handlers": "2.1.0",
+    "dompurify": "3.4.13",
+    "marked": "18.0.11"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

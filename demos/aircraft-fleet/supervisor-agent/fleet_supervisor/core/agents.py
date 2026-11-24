@@ -28,6 +28,7 @@ from fleet_supervisor.core.prompts import (
     OPERATIONS_SYSTEM_PROMPT_TEMPLATE,
     SUPERVISOR_SYSTEM_PROMPT,
 )
+from fleet_supervisor.core.tool_stream import TRACE_STATE_KEY, observe_tool_results
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,10 @@ class SpecialistTool(AgentTool):
     async def stream(
         self, tool_use: ToolUse, invocation_state: dict[str, Any], **kwargs: Any
     ) -> ToolGenerator:
-        inner = self._wrap(self._build_agent())
+        agent = self._build_agent()
+        if invocation_state.get(TRACE_STATE_KEY):
+            observe_tool_results(agent)
+        inner = self._wrap(agent)
         async for event in inner.stream(tool_use, invocation_state, **kwargs):
             if isinstance(event, ToolResultEvent) and event.tool_result["status"] == "error":
                 logger.warning(

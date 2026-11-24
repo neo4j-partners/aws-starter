@@ -221,9 +221,9 @@ before forwarding, and injects the connection's credentials instead.
 2. **Tools > + Add tool > MCP Servers**.
 3. Choose **External MCP servers**, then select `<catalog>.<schema>.<service>`.
 4. Start with "get the Neo4j schema", which is the cheapest proof the tool call round-trips.
-5. Then ask something structural, for example "find every Customer that owns another Customer
-   through an OWNED_BY chain of two or more hops", to confirm the model writes Cypher and the
-   Gateway executes it.
+5. Then ask a question that follows relationships from the schema that step 4 returned. The right
+   question depends on the graph that the default deployment connects to. A question of two or
+   more hops confirms that the model writes Cypher and the Gateway executes it.
 
 Genie Code works the same way: Genie Code pane > **Settings** > **MCP Servers** > **Add Server** >
 **External MCP server**, then pick the connection. Note that this picker selects the *connection*,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from populate_aircraft_db import loader
 
 FakeResult = tuple[list[dict[str, Any]], None, None]
@@ -81,3 +83,12 @@ def test_the_sensor_count_skips_the_query_with_no_has_limit_edges() -> None:
 
     assert count == 0
     assert driver.queries == []
+
+
+def test_the_sensor_count_prints_as_a_load_link(capsys: pytest.CaptureFixture[str]) -> None:
+    _check(_rel_counts(), sensor_limits=40)
+
+    cross, load = capsys.readouterr().out.split("Load Link Checks:\n")
+
+    assert "Sensor" not in cross
+    assert load.splitlines() == ["  Sensor -> OperatingLimit: 40"]

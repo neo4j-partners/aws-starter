@@ -376,8 +376,9 @@ class ContextPrependingSplitter(TextSplitter):
     The metadata also holds ``startOffset`` and ``endOffset``, the range of
     the split text the chunk holds. A chunk that starts inside a table row
     holds that whole row, so its range starts at the row. A table header
-    added above a body row isn't in the range. Enrich links each operating
-    limit to the chunks whose range holds its source line.
+    added above a body row isn't in the range. Stage 4, after the chunk
+    indexes are built, links each operating limit to the chunks whose range
+    holds its source line.
 
     Set :attr:`context` and :attr:`document_id` before each call to
     ``pipeline.run_async()``. :attr:`context` is the context line without
@@ -1031,8 +1032,32 @@ def _get_existing_schema_tokens(driver: Driver, database: str) -> tuple[set[str]
     )
 
 
+# (heading, query, the labels and type the query names)
+_LinkSample = tuple[str, str, set[str]]
+
+
+def _print_link_samples(
+    driver: Driver, database: str, samples: list[_LinkSample], names: set[str]
+) -> None:
+    """Print each sample's src->tgt pairs, or (none).
+
+    A query runs only when names, the graph's labels and types, holds every
+    label and type it names.
+    """
+    for label, query, needed in samples:
+        if needed <= names:
+            rows, _, _ = driver.execute_query(query, database_=database)
+        else:
+            rows = []
+        if rows:
+            pairs = ", ".join(f"{r['src']}->{r['tgt']}" for r in rows)
+            print(f"    {label}: {pairs}")
+        else:
+            print(f"    {label}: (none)")
+
+
 def validate_enrichment(driver: Driver, database: str) -> None:
-    """Run sample queries to verify embeddings, entities, and cross-links."""
+    """Run sample queries to verify embeddings, entities, cross-links, and load links."""
 
     print(f"\nValidation (sample size {_SAMPLE_SIZE}):")
     labels, rel_types = _get_existing_schema_tokens(driver, database)
@@ -1078,8 +1103,7 @@ def validate_enrichment(driver: Driver, database: str) -> None:
         print("           or load CSV data before running enrichment-only validation.")
         return
 
-    # Each query runs only when the graph has the labels and type it names.
-    queries = [
+    cross_links: list[_LinkSample] = [
         (
             "Document -[:APPLIES_TO]-> Aircraft",
             "MATCH (d:Document)-[:APPLIES_TO]->(a:Aircraft) "
@@ -1093,11 +1117,29 @@ def validate_enrichment(driver: Driver, database: str) -> None:
             {"AircraftModel", "Aircraft", "DESCRIBES_MODEL"},
         ),
         (
+            "SystemReference -[:DESCRIBES_SYSTEM]-> System",
+            "MATCH (sr:SystemReference)-[:DESCRIBES_SYSTEM]->(s:System) "
+            f"RETURN sr.name AS src, s.name AS tgt LIMIT {_SAMPLE_SIZE}",
+            {"SystemReference", "System", "DESCRIBES_SYSTEM"},
+        ),
+        (
             "ComponentReference -[:DESCRIBES_COMPONENT]-> Component",
             "MATCH (cr:ComponentReference)-[:DESCRIBES_COMPONENT]->(c:Component) "
             f"RETURN cr.name AS src, c.name AS tgt LIMIT {_SAMPLE_SIZE}",
             {"ComponentReference", "Component", "DESCRIBES_COMPONENT"},
         ),
+        (
+            "OperatingLimit -[:FROM_CHUNK]-> Chunk",
+            "MATCH (ol:OperatingLimit)-[:FROM_CHUNK]->(c:Chunk) "
+            f"RETURN ol.name AS src, c.chunkId AS tgt LIMIT {_SAMPLE_SIZE}",
+            {"OperatingLimit", "Chunk", "FROM_CHUNK"},
+        ),
+    ]
+    print("\n  Cross-links to operational graph:")
+    _print_link_samples(driver, database, cross_links, labels | rel_types)
+
+    # 4. Links the stage 2 load writes
+    load_links: list[_LinkSample] = [
         (
             "Sensor -[:HAS_LIMIT]-> OperatingLimit",
             "MATCH (s:Sensor)-[:HAS_LIMIT]->(ol:OperatingLimit) "
@@ -1105,14 +1147,5 @@ def validate_enrichment(driver: Driver, database: str) -> None:
             {"Sensor", "OperatingLimit", "HAS_LIMIT"},
         ),
     ]
-    print("\n  Cross-links to operational graph:")
-    for label, query, names in queries:
-        if names <= labels | rel_types:
-            rows, _, _ = driver.execute_query(query, database_=database)
-        else:
-            rows = []
-        if rows:
-            pairs = ", ".join(f"{r['src']}->{r['tgt']}" for r in rows)
-            print(f"    {label}: {pairs}")
-        else:
-            print(f"    {label}: (none)")
+    print("\n  Load links from stage 2:")
+    _print_link_samples(driver, database, load_links, labels | rel_types)

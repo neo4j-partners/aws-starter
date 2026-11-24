@@ -76,6 +76,7 @@ ENRICHMENT_RELATIONSHIP_TYPES = [
     "DESCRIBES_MODEL",
     "DESCRIBES_SYSTEM",
     "DESCRIBES_COMPONENT",
+    "FROM_CHUNK",
 ]
 RELATIONSHIP_TYPES = [*OPERATIONAL_RELATIONSHIP_TYPES, *ENRICHMENT_RELATIONSHIP_TYPES]
 REQUIRED_INDEXES = [
@@ -1048,19 +1049,26 @@ def _sensor_limit_count(driver: Driver, database: str, rel_counts: dict[str, int
 def _check_cross_links(
     rel_counts: dict[str, int], sensor_limits: int, result: _VerifyResult
 ) -> None:
-    # (label, count, whether enrich makes the links). The load makes the
-    # Sensor links.
+    """Check the cross links enrich writes, then the Sensor links the load writes.
+
+    Enrich links the manual graph to the operational graph, so a missing
+    cross link is an enrichment failure. The stage 2 load writes every
+    Sensor -[:HAS_LIMIT]-> OperatingLimit link, so that count prints on its
+    own and fails even with skip_enrichment.
+    """
     cross_link_checks = [
-        ("Document -> Aircraft", rel_counts["APPLIES_TO"], True),
-        ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"], True),
-        ("SystemReference -> System", rel_counts["DESCRIBES_SYSTEM"], True),
-        ("ComponentReference -> Component", rel_counts["DESCRIBES_COMPONENT"], True),
-        ("Sensor -> OperatingLimit", sensor_limits, False),
+        ("Document -> Aircraft", rel_counts["APPLIES_TO"]),
+        ("AircraftModel -> Aircraft", rel_counts["DESCRIBES_MODEL"]),
+        ("SystemReference -> System", rel_counts["DESCRIBES_SYSTEM"]),
+        ("ComponentReference -> Component", rel_counts["DESCRIBES_COMPONENT"]),
     ]
     print("\nCross-Link Checks:")
-    for label, count, enrichment in cross_link_checks:
+    for label, count in cross_link_checks:
         print(f"  {label}: {count:,}")
-        result.check(count > 0, f"{label} has no links", enrichment=enrichment)
+        result.check(count > 0, f"{label} has no links", enrichment=True)
+    print("\nLoad Link Checks:")
+    print(f"  Sensor -> OperatingLimit: {sensor_limits:,}")
+    result.check(sensor_limits > 0, "Sensor -> OperatingLimit has no links")
 
 
 # Sensor types the manuals list only in the sensor inventory, with no
@@ -1223,8 +1231,9 @@ def _check_limit_chunks(
 ) -> None:
     """Check that every OperatingLimit has a FROM_CHUNK link to a Chunk.
 
-    Enrich links each limit to the chunks that hold its source text. A
-    failure names the unlinked count for each aircraft type. With no
+    Stage 4 links each limit to the chunks that hold its source text, after
+    the chunk indexes are built. enrich runs that step, and load-operational
+    runs it again. A failure names the unlinked count for each aircraft type. With no
     OperatingLimit or Chunk nodes the check is skipped, since the count
     checks already report them.
     """

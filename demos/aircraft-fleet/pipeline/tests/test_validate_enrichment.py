@@ -39,11 +39,16 @@ def test_cross_links_run_only_when_the_graph_has_their_labels_and_type(
     pipeline.validate_enrichment(driver, "db")
 
     out = capsys.readouterr().out
-    cross_links = out.split("Cross-links to operational graph:\n")[1].splitlines()
-    assert cross_links == [
+    after_cross = out.split("Cross-links to operational graph:\n")[1]
+    cross_section, load_section = after_cross.split("\n  Load links from stage 2:\n")
+    assert cross_section.splitlines() == [
         "    Document -[:APPLIES_TO]-> Aircraft: a->b",
         "    AircraftModel -[:DESCRIBES_MODEL]-> Aircraft: (none)",
+        "    SystemReference -[:DESCRIBES_SYSTEM]-> System: (none)",
         "    ComponentReference -[:DESCRIBES_COMPONENT]-> Component: (none)",
+        "    OperatingLimit -[:FROM_CHUNK]-> Chunk: (none)",
+    ]
+    assert load_section.splitlines() == [
         "    Sensor -[:HAS_LIMIT]-> OperatingLimit: a->b",
     ]
     assert [query.split(")")[0] for query in driver.cross_link_queries] == [

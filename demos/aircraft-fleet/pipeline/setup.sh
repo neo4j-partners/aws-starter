@@ -5,7 +5,7 @@
 #   ./setup.sh                 # full pipeline: sync, generate, clean, setup (enrich), verify
 #   ./setup.sh generate        # only (re)generate CSVs into generated/
 #   ./setup.sh load            # clean + setup (CSV load + GraphRAG enrichment, needs LLM key)
-#   ./setup.sh load-operational# clean + CSV load only (no LLM, no API key)
+#   ./setup.sh load-operational # clean + CSV load only (no LLM, no API key)
 #   ./setup.sh verify          # read-only graph verification (--strict)
 #   ./setup.sh clean           # delete all nodes/relationships
 #   ./setup.sh samples         # run showcase queries against the loaded graph

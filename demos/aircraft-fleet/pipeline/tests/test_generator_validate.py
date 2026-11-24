@@ -1,4 +1,7 @@
-"""generate-data validate checks every ID reference in the generated CSVs."""
+"""generate-data validate checks every ID reference in the generated CSVs.
+
+It also checks the operating limits file's header, row count, and values.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +12,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from generator.limits import LIMITS_FILE
 from generator.main import app, generate
 from generator.writers import CSV_COLUMNS
 
@@ -109,3 +113,50 @@ def test_a_renamed_reference_column_fails(copy: Path) -> None:
 
     assert result.exit_code == 1, result.output
     assert "rels_flight_delay.csv: missing column :END_ID(Delay)" in result.output
+
+
+def test_a_missing_limits_file_fails(copy: Path) -> None:
+    (copy / LIMITS_FILE).unlink()
+
+    result = runner.invoke(app, ["validate", str(copy)])
+
+    assert result.exit_code == 1, result.output
+    assert f"Missing file: {LIMITS_FILE}" in result.output
+
+
+def test_a_renamed_limits_column_fails(copy: Path) -> None:
+    path = copy / LIMITS_FILE
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    lines[0] = lines[0].replace("maxValue", "max_value")
+    path.write_text("".join(lines), encoding="utf-8")
+
+    result = runner.invoke(app, ["validate", str(copy)])
+
+    assert result.exit_code == 1, result.output
+    assert f"{LIMITS_FILE}: header" in result.output
+
+
+def test_a_missing_limits_row_fails(copy: Path) -> None:
+    path = copy / LIMITS_FILE
+    with path.open(newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS[LIMITS_FILE])
+        writer.writeheader()
+        writer.writerows(rows[1:])
+
+    result = runner.invoke(app, ["validate", str(copy)])
+
+    assert result.exit_code == 1, result.output
+    assert f"{LIMITS_FILE}: {len(rows) - 1} rows, expected {len(rows)}" in result.output
+
+
+@pytest.mark.parametrize("column", ["minValue", "maxValue"])
+@pytest.mark.parametrize("value", ["high", "nan", "inf"])
+def test_a_non_numeric_limit_value_fails(copy: Path, column: str, value: str) -> None:
+    _set_first_row(copy / LIMITS_FILE, column, value)
+
+    result = runner.invoke(app, ["validate", str(copy)])
+
+    assert result.exit_code == 1, result.output
+    assert f"{LIMITS_FILE}:2: {column}={value!r} is not a number" in result.output

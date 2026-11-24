@@ -3,7 +3,7 @@
 
 A minimal ReAct agent that connects to the Neo4j MCP server via AgentCore
 Gateway using the static `access_token` from `.mcp-credentials.json`. There is
-no token refresh, so it stops working once the token expires (~1 hour). Use it
+no token refresh, so it stops working once the token expires after 24 hours. Use it
 for quick tests and for learning the agent flow; use `agent.py` for anything
 long-running.
 

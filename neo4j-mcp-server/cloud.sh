@@ -15,7 +15,7 @@
 #
 # AUTHENTICATION:
 #   Uses pre-generated JWT token from .mcp-credentials.json
-#   Token expires after ~1 hour - refresh with './deploy.py credentials'
+#   Token expires after 24 hours - refresh with './deploy.py credentials'
 #
 # COMMANDS:
 #   (none)    Run full test suite

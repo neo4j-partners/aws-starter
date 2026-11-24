@@ -26,7 +26,7 @@ The [`pipeline/`](./pipeline/) project builds the Aircraft Digital Twin graph.
 - **Manual enrichment:** It chunks the maintenance manuals, embeds each chunk with Bedrock Titan, and extracts faults and procedures with Bedrock Claude. It links each operating limit to the chunks that state it.
 - **Graph fusion:** It links the extracted knowledge to the real aircraft, systems, and components.
 - **Indexes:** It creates the vector and fulltext chunk indexes that the Maintenance specialist searches.
-- **Checks:** It stamps each dataset and verifies node counts and stamps after every load. It also checks that every sensor has its limits and that every limit links to a manual chunk.
+- **Checks:** It stamps each dataset and verifies node counts and stamps after every load. It also checks that every sensor except `AirDataDisagree` has a limit. It checks that every limit links to a manual chunk.
 
 ### Supervisor agent
 

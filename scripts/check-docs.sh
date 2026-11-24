@@ -76,7 +76,7 @@ GATEWAY_PATTERN_PATHS=(
 # context-aware-graphrag-agent.
 RETIRED_OUTSIDE_E2E_HISTORY=(
     "fleet[-_]agent"
-    "(?<![-\\w])graphrag[-_]agent"
+    "(?<!context-aware-)graphrag[-_]agent"
     "fleet_graphrag"
     "(?<![-\\w])fleet-(server|cli|demo|invoke)(?![-\\w])"
 )

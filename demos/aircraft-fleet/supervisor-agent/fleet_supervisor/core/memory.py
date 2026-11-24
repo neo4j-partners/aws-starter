@@ -45,11 +45,13 @@ from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, Be
 from pydantic import SecretStr
 
 from fleet_supervisor.core.config import AWS_REGION, ConfigError
-from fleet_supervisor.core.secrets import Neo4jLogin, forget_secrets, login_from
+from fleet_supervisor.core.secrets import Neo4jLogin, forget_secret, login_from
 
 logger = logging.getLogger(__name__)
 
 MEM_NEO4J_URI = "MEM_NEO4J_URI"
+# The env var that holds the memory database's password secret ARN.
+MEM_NEO4J_PASSWORD_SECRET_ARN = "MEM_NEO4J_PASSWORD_SECRET_ARN"
 
 EMBEDDING_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
 EMBEDDING_DIMENSIONS = 1024
@@ -84,7 +86,7 @@ BackgroundHook = Callable[[str], Callable[[], None]]
 
 def memory_login() -> Neo4jLogin:
     """Return the memory database user name and password."""
-    return login_from("MEM_NEO4J_PASSWORD_SECRET_ARN", "MEM_NEO4J_USERNAME", "MEM_NEO4J_PASSWORD")
+    return login_from(MEM_NEO4J_PASSWORD_SECRET_ARN, "MEM_NEO4J_USERNAME", "MEM_NEO4J_PASSWORD")
 
 
 @dataclass
@@ -106,7 +108,7 @@ _settings_lock = threading.Lock()
 
 
 def forget_memory_settings(failed: MemorySettings) -> None:
-    """Drop the cached settings and secrets if they still hold ``failed``'s password.
+    """Drop the cached settings and memory secret if they still hold ``failed``'s password.
 
     Concurrent requests can fail with the same old password. The first one
     drops it, and the next build reads the password again. A later one finds
@@ -118,7 +120,7 @@ def forget_memory_settings(failed: MemorySettings) -> None:
     with _settings_lock:
         if _settings is not None and _same_password(_settings, failed):
             _settings = None
-            forget_secrets()
+            forget_secret(MEM_NEO4J_PASSWORD_SECRET_ARN)
     _retire_shared(failed)
 
 

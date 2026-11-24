@@ -10,8 +10,8 @@ The secret value is a JSON object with a ``password`` key, the same shape as
 an AWS database credentials secret. An optional ``username`` key names the
 Neo4j user, so the user and its password always come from the same place.
 Without it, the user name variable applies. Other keys are ignored. Each
-secret is read once per process, until :func:`forget_secrets` drops the cached
-values.
+secret is read once per process, until :func:`forget_secret` drops its cached
+value.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from functools import cache
+import threading
 from typing import NamedTuple
 
 import boto3
@@ -78,9 +78,26 @@ def neo4j_login() -> Neo4jLogin:
     return login_from(NEO4J_PASSWORD_SECRET_ARN, "NEO4J_USERNAME", "NEO4J_PASSWORD")
 
 
-@cache
+# The secrets read so far, keyed by (secret ARN, ARN variable). Read and
+# change it only under _secrets_lock. The fetch itself runs outside the lock.
+_secrets: dict[tuple[str, str], _SecretLogin] = {}
+_secrets_lock = threading.Lock()
+
+
 def _read_secret(secret_arn: str, secret_arn_var: str) -> _SecretLogin:
-    """Fetch one secret once per process. A failure is not cached."""
+    """Return one secret, fetched once per process. A failure is not cached."""
+    key = (secret_arn, secret_arn_var)
+    with _secrets_lock:
+        if (secret := _secrets.get(key)) is not None:
+            return secret
+    secret = _fetch_secret(secret_arn, secret_arn_var)
+    with _secrets_lock:
+        _secrets[key] = secret
+    return secret
+
+
+def _fetch_secret(secret_arn: str, secret_arn_var: str) -> _SecretLogin:
+    """Fetch one secret from Secrets Manager."""
     region = _arn_region(secret_arn, secret_arn_var)
     logger.info("Reading %s from Secrets Manager", secret_arn_var)
     try:
@@ -99,13 +116,15 @@ def _read_secret(secret_arn: str, secret_arn_var: str) -> _SecretLogin:
     raise ConfigError(f"Could not read the secret in {secret_arn_var} ({failure}).")
 
 
-def forget_secrets() -> None:
-    """Drop the cached secrets, so the next read fetches each one again.
+def forget_secret(secret_arn_var: str) -> None:
+    """Drop the cached secret named by ``secret_arn_var``, so the next read fetches it again.
 
     Call it when a database rejects a password, in case the secret was
-    rotated after it was cached.
+    rotated after it was cached. Other secrets stay cached.
     """
-    _read_secret.cache_clear()
+    with _secrets_lock:
+        for key in [key for key in _secrets if key[1] == secret_arn_var]:
+            del _secrets[key]
 
 
 def _failure_class(error: ClientError | BotoCoreError) -> str:

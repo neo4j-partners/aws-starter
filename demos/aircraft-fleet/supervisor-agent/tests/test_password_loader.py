@@ -22,7 +22,7 @@ def _clean(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(ARN_VAR, raising=False)
     monkeypatch.delenv(USERNAME_VAR, raising=False)
     monkeypatch.delenv(PASSWORD_VAR, raising=False)
-    secrets._read_secret.cache_clear()
+    secrets._secrets.clear()
 
 
 def _fake_secrets_manager(
@@ -223,11 +223,11 @@ def test_failure_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     assert login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR).password == "s3cret"
 
 
-def test_forget_secrets_reads_the_secret_again(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_forget_secret_reads_the_secret_again(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(ARN_VAR, ARN)
     calls = _fake_secrets_manager(monkeypatch)
     login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR)
-    secrets.forget_secrets()
+    secrets.forget_secret(ARN_VAR)
     login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR)
     assert [c for c in calls if "secret_id" in c] == [{"secret_id": ARN}, {"secret_id": ARN}]
 
@@ -251,11 +251,28 @@ def test_neo4j_login_names_both_fleet_vars() -> None:
         secrets.neo4j_login()
 
 
-def test_forget_secrets_drops_the_fleet_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_forget_secret_drops_the_fleet_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NEO4J_PASSWORD_SECRET_ARN", ARN)
     calls = _fake_secrets_manager(monkeypatch)
     secrets.neo4j_login()
     secrets.neo4j_login()
-    secrets.forget_secrets()
+    secrets.forget_secret(secrets.NEO4J_PASSWORD_SECRET_ARN)
     secrets.neo4j_login()
     assert [c for c in calls if "secret_id" in c] == [{"secret_id": ARN}, {"secret_id": ARN}]
+
+
+def test_forget_secret_keeps_the_other_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(ARN_VAR, ARN)
+    monkeypatch.setenv("NEO4J_PASSWORD_SECRET_ARN", ARN)
+    calls = _fake_secrets_manager(monkeypatch)
+    login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR)
+    secrets.neo4j_login()
+    secrets.forget_secret(secrets.NEO4J_PASSWORD_SECRET_ARN)
+    login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR)
+    secrets.neo4j_login()
+    # Two reads at the start, then one for the fleet secret alone.
+    assert len([c for c in calls if "secret_id" in c]) == 3
+    secrets.forget_secret(ARN_VAR)
+    secrets.neo4j_login()
+    login_from(ARN_VAR, USERNAME_VAR, PASSWORD_VAR)
+    assert len([c for c in calls if "secret_id" in c]) == 4

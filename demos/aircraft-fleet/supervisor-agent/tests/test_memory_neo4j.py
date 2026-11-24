@@ -83,12 +83,12 @@ def local_memory(monkeypatch: pytest.MonkeyPatch, database: str) -> Iterator[Non
     monkeypatch.setattr(memory, "_retired", set())
     monkeypatch.setattr(memory, "_closers", set())
     monkeypatch.setattr(memory, "_shutting_down", False)
-    secrets._read_secret.cache_clear()
+    secrets._secrets.clear()
     try:
         yield
     finally:
         memory.close_shared_memory()
-        secrets._read_secret.cache_clear()
+        secrets._secrets.clear()
 
 
 def _wait_until_idle() -> bool:

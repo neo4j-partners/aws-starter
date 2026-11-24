@@ -37,7 +37,7 @@ def _clean(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(memory, "_retired", set())
     monkeypatch.setattr(memory, "_closers", set())
     monkeypatch.setattr(memory, "_shutting_down", False)
-    secrets._read_secret.cache_clear()
+    secrets._secrets.clear()
 
 
 @pytest.fixture
@@ -425,12 +425,24 @@ def test_a_late_failure_with_the_old_password_keeps_the_new_settings(
     memory.forget_memory_settings(failed)
     rebuilt = memory.memory_settings()
     forgotten: list[bool] = []
-    monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
+    monkeypatch.setattr(memory, "forget_secret", lambda _var: forgotten.append(True))
 
     memory.forget_memory_settings(failed)
 
     assert memory.memory_settings() is rebuilt
     assert forgotten == []
+
+
+def test_a_memory_rejection_forgets_only_the_memory_secret(
+    monkeypatch: pytest.MonkeyPatch, memory_on
+) -> None:
+    failed = memory.memory_settings()
+    forgotten: list[str] = []
+    monkeypatch.setattr(memory, "forget_secret", forgotten.append)
+
+    memory.forget_memory_settings(failed)
+
+    assert forgotten == ["MEM_NEO4J_PASSWORD_SECRET_ARN"]
 
 
 def test_a_failure_after_another_request_dropped_the_settings_does_nothing(
@@ -439,7 +451,7 @@ def test_a_failure_after_another_request_dropped_the_settings_does_nothing(
     failed = memory.memory_settings()
     memory.forget_memory_settings(failed)
     forgotten: list[bool] = []
-    monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
+    monkeypatch.setattr(memory, "forget_secret", lambda _var: forgotten.append(True))
 
     memory.forget_memory_settings(failed)
 

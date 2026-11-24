@@ -42,7 +42,7 @@ from neo4j_graphrag.types import RetrieverResultItem
 
 from fleet_supervisor.core.config import AWS_REGION, MODEL_ID, ConfigError, graph_settings
 from fleet_supervisor.core.graph.text2cypher import BoundedText2CypherRetriever
-from fleet_supervisor.core.secrets import forget_secrets, neo4j_login
+from fleet_supervisor.core.secrets import NEO4J_PASSWORD_SECRET_ARN, forget_secret, neo4j_login
 
 logger = logging.getLogger(__name__)
 
@@ -65,21 +65,28 @@ _driver_lock = threading.Lock()
 _UNAUTHORIZED = "Neo.ClientError.Security.Unauthorized"
 
 
+def _login() -> neo4j.Auth:
+    """Return the fleet graph login, from the secrets cache when it holds it."""
+    login = neo4j_login()
+    return neo4j.basic_auth(login.username, login.password)
+
+
 def _fresh_login() -> neo4j.Auth:
     """Read the fleet graph login again, skipping the secrets cache.
 
-    The cached secrets are dropped first, so a password rotated in Secrets
-    Manager is read again.
+    Only the fleet secret is dropped first, so a password rotated in Secrets
+    Manager is read again and the memory secret stays cached.
     """
-    forget_secrets()
-    login = neo4j_login()
-    return neo4j.basic_auth(login.username, login.password)
+    forget_secret(NEO4J_PASSWORD_SECRET_ARN)
+    return _login()
 
 
 class RotatingLoginAuthManager(AuthManager):
     """Give the driver the fleet graph login, and follow a rotated password.
 
-    The manager reads the login once and caches it. ``reload`` reads it again.
+    The manager takes the login from the secrets cache once and keeps it, so
+    the first query reads no secret that startup already read. ``reload``
+    reads the secret again.
 
     neo4j 6.4 calls ``handle_security_exception`` only for an error on a
     connection that is already in the pool. When Neo4j rejects the login
@@ -104,7 +111,7 @@ class RotatingLoginAuthManager(AuthManager):
     def get_auth(self) -> neo4j.Auth:
         with self._lock:
             if self._auth is None:
-                self._auth = _fresh_login()
+                self._auth = _login()
             return self._auth
 
     def reload(self) -> bool:
@@ -307,7 +314,8 @@ def get_graph_schema() -> str:
     """Live Neo4j schema string, cached for ``SCHEMA_TTL_S`` seconds.
 
     The TTL lets a running server pick up a pipeline reload without a restart.
-    A failure raises and caches nothing, so the next call tries again.
+    A rotated login is read again and the fetch retried once. A failure
+    raises and caches nothing, so the next call tries again.
     """
     global _schema_cache
     with _schema_lock:
@@ -315,7 +323,7 @@ def get_graph_schema() -> str:
         if _schema_cache is not None and now - _schema_cache[0] < graph_settings.schema_ttl_s:
             return _schema_cache[1]
         logger.info("Fetching Neo4j schema")
-        schema = get_schema(get_driver(), database=_neo4j_database())
+        schema = _with_rotated_login(lambda: get_schema(get_driver(), database=_neo4j_database()))
         _schema_cache = (now, schema)
         logger.info("Schema cached (%d bytes)", len(schema))
         return schema

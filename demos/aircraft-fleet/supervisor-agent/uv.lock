@@ -42,7 +42,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.127" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "neo4j", specifier = ">=6.3.1" },
-    { name = "neo4j-agent-memory", extras = ["strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" },
+    { name = "neo4j-agent-memory", extras = ["strands"], url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.10/neo4j_agent_memory-0.8.0%2Bfleet.10-py3-none-any.whl" },
     { name = "neo4j-graphrag", extras = ["bedrock"], specifier = ">=1.24" },
     { name = "pydantic", specifier = ">=2.14.4" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
@@ -771,8 +771,8 @@ wheels = [
 
 [[package]]
 name = "neo4j-agent-memory"
-version = "0.8.0+fleet.9"
-source = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl" }
+version = "0.8.0+fleet.10"
+source = { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.10/neo4j_agent_memory-0.8.0%2Bfleet.10-py3-none-any.whl" }
 dependencies = [
     { name = "neo4j" },
     { name = "pydantic" },
@@ -780,7 +780,7 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.9/neo4j_agent_memory-0.8.0%2Bfleet.9-py3-none-any.whl", hash = "sha256:3071e71b917d2114550c30d980df5e456d23fe2a3e29a220041823480dc374c4" },
+    { url = "https://github.com/neo4j-partners/agent-memory/releases/download/python-v0.8.0%2Bfleet.10/neo4j_agent_memory-0.8.0%2Bfleet.10-py3-none-any.whl", hash = "sha256:a3502423c12c81671f8ce8dbd2ba4cd9bd7d1b28bd7c97ea49a5aef6084a7d19" },
 ]
 
 [package.optional-dependencies]

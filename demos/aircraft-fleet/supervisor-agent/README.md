@@ -73,7 +73,7 @@ covers the read-only guard, hybrid search, and the errors the model sees.
 
 ![The supervisor reads its memory password at startup and opens one shared memory client on the first request. Each request builds a session manager, restores history, entities, and preferences, answers, saves the turn, and closes the manager. Entity extraction runs in the background. Shutdown waits for running work, then closes every memory client.](../docs/images/memory-lifecycle.svg)
 
-- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.9, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
+- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.10, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
 - **Extraction model:** The extractor runs on Claude Sonnet 5.5. It sends no temperature and lets the model choose the tool, because Sonnet 5.5 rejects both.
 - **What it stores:** Memory keeps the user and assistant text of each turn. It does not store specialist calls.
 - **One client per process:** The client opens on the first request and closes at shutdown. Each request gets its own session manager on it.

@@ -22,14 +22,6 @@ from typing import Any
 from strands import Agent
 
 from fleet_supervisor.core.agents import SPECIALIST_NAMES
-from fleet_supervisor.core.graph.tools import (
-    DATABASE_ERROR_RESULT,
-    QUERY_ERROR_PREFIX,
-    QUERY_FAILED_RESULT,
-    SEARCH_FAILED_RESULT,
-    TIMEOUT_RESULT,
-    UNAVAILABLE_RESULT,
-)
 from fleet_supervisor.core.tool_stream import (
     RESULT_EVENT_KEY,
     TRACE_STATE_KEY,
@@ -38,16 +30,6 @@ from fleet_supervisor.core.tool_stream import (
 
 FLEET_ID = re.compile(
     r"\b(?:AC\d{4,}(?:-S\d{2}(?:-C\d{2})?)?|ME\d{4,}|FL\d{5,}|N\d{5}[A-Z]?)(?![\w-])"
-)
-# The graph tools report failures as text, so a result that starts with one
-# of these is a failure even when its status is success.
-GRAPH_ERROR_PREFIXES = (
-    QUERY_ERROR_PREFIX,
-    TIMEOUT_RESULT,
-    UNAVAILABLE_RESULT,
-    DATABASE_ERROR_RESULT,
-    QUERY_FAILED_RESULT,
-    SEARCH_FAILED_RESULT,
 )
 
 
@@ -127,13 +109,7 @@ class EventMapper:
         if not (started := self._started.pop(call_id, None)):
             return
         name, start = started
-        is_graph_query = name == "graph_query_tool"
-        is_graph_tool = is_graph_query or name == "vector_search_tool"
-        content = result.get("content", [])
-        failed = result["status"] == "error" or (
-            is_graph_tool
-            and any(item.get("text", "").startswith(GRAPH_ERROR_PREFIXES) for item in content)
-        )
+        failed = result["status"] == "error"
         event = {
             "type": "tool_complete",
             "call_id": call_id,
@@ -142,8 +118,9 @@ class EventMapper:
             if duration_ms is not None
             else round((monotonic() - start) * 1000),
         }
-        if is_graph_query and not failed:
+        if name == "graph_query_tool" and not failed:
             # The graph query returns row text. Send only the fleet IDs in it.
+            content = result.get("content", [])
             refs = dict.fromkeys(FLEET_ID.findall(str(content)[:100_000]))
             event["evidence_ids"] = list(refs)[:30]
         yield event

@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import neo4j
 import pytest
 from neo4j_graphrag.exceptions import Text2CypherRetrievalError
+from strands.types.events import ToolResultEvent
 
 from fleet_supervisor.core.graph import retrieval, tools
 from tests.fake_bolt import FakeNeo4j
@@ -31,6 +32,14 @@ def _raise(error: BaseException):
     return fail
 
 
+def _error_text(result: object) -> str:
+    """Return the text of an error result, failing if the status is not error."""
+    assert isinstance(result, dict)
+    assert result["status"] == "error"
+    (item,) = result["content"]
+    return item["text"]
+
+
 def test_graph_query_result_passes_through(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tools, "graph_query", lambda question: "42")
     assert tools.graph_query_tool("How many aircraft?") == "42"
@@ -41,7 +50,8 @@ def test_text2cypher_error_is_returned_for_self_correction(
 ) -> None:
     error = Text2CypherRetrievalError("Failed to get search result: Invalid input 'MATCHH'")
     monkeypatch.setattr(tools, "graph_query", _raise(error))
-    result = tools.graph_query_tool("q")
+    result = _error_text(tools.graph_query_tool("q"))
+    assert result.startswith(tools.QUERY_ERROR_PREFIX)
     assert "Invalid input 'MATCHH'" in result
     assert "Rephrase the question" in result
 
@@ -51,14 +61,14 @@ def test_statement_error_is_returned_for_self_correction(
 ) -> None:
     error = _server_error("Neo.ClientError.Statement.ArgumentError", "bad argument to toInteger")
     monkeypatch.setattr(tools, "graph_query", _raise(error))
-    result = tools.graph_query_tool("q")
+    result = _error_text(tools.graph_query_tool("q"))
     assert "Neo.ClientError.Statement.ArgumentError: bad argument to toInteger" in result
 
 
 def test_query_error_text_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     error = _server_error("Neo.ClientError.Statement.SyntaxError", "x" * 5000)
     monkeypatch.setattr(tools, "graph_query", _raise(error))
-    assert len(tools.graph_query_tool("q")) < 700
+    assert len(_error_text(tools.graph_query_tool("q"))) < 700
 
 
 @pytest.mark.parametrize(
@@ -109,7 +119,10 @@ def test_driver_errors_get_fixed_results(
     monkeypatch.setattr(tools, "graph_query", _raise(error))
     monkeypatch.setattr(tools, "vector_search", _raise(error))
     with caplog.at_level("INFO", logger="fleet_supervisor"):
-        results = [tools.graph_query_tool("q"), tools.vector_search_tool("q")]
+        results = [
+            _error_text(tools.graph_query_tool("q")),
+            _error_text(tools.vector_search_tool("q")),
+        ]
     assert results == [expected, expected]
     # The model never sees the address, and INFO records do not carry it.
     assert all(ADDRESS not in result for result in results)
@@ -125,7 +138,7 @@ def test_vector_search_query_errors_are_not_the_models(
 ) -> None:
     error = _server_error("Neo.ClientError.Statement.SyntaxError", "index missing")
     monkeypatch.setattr(tools, "vector_search", _raise(error))
-    assert tools.vector_search_tool("q") == tools.DATABASE_ERROR_RESULT
+    assert _error_text(tools.vector_search_tool("q")) == tools.DATABASE_ERROR_RESULT
 
 
 BEDROCK_DETAIL = (
@@ -142,7 +155,10 @@ def test_other_exceptions_get_fixed_results(
     monkeypatch.setattr(tools, "graph_query", _raise(error))
     monkeypatch.setattr(tools, "vector_search", _raise(error))
     with caplog.at_level("ERROR", logger="fleet_supervisor"):
-        results = [tools.graph_query_tool("q"), tools.vector_search_tool("q")]
+        results = [
+            _error_text(tools.graph_query_tool("q")),
+            _error_text(tools.vector_search_tool("q")),
+        ]
     assert results == [tools.QUERY_FAILED_RESULT, tools.SEARCH_FAILED_RESULT]
     # No account ID or ARN text reaches the model.
     for result in results:
@@ -152,6 +168,88 @@ def test_other_exceptions_get_fixed_results(
     assert [r.levelname for r in caplog.records] == ["ERROR", "ERROR"]
     assert all(r.exc_info for r in caplog.records)
     assert "123456789012" in caplog.text
+
+
+def _stream_result(decorated, tool_input: dict[str, object]) -> dict:
+    """Run a tool the way an Agent does and return its final tool result."""
+
+    async def run() -> list:
+        tool_use = {"toolUseId": "call-1", "name": decorated.tool_name, "input": tool_input}
+        return [event async for event in decorated.stream(tool_use, {})]
+
+    *_, last = asyncio.run(run())
+    assert isinstance(last, ToolResultEvent)
+    return last.tool_result
+
+
+@pytest.mark.parametrize(
+    ("decorated", "tool_input", "patched", "error", "expected"),
+    [
+        (
+            tools.graph_query_tool,
+            {"question": "q"},
+            "graph_query",
+            neo4j.exceptions.ServiceUnavailable("down"),
+            tools.UNAVAILABLE_RESULT,
+        ),
+        (
+            tools.graph_query_tool,
+            {"question": "q"},
+            "graph_query",
+            RuntimeError(BEDROCK_DETAIL),
+            tools.QUERY_FAILED_RESULT,
+        ),
+        (
+            tools.vector_search_tool,
+            {"query": "q"},
+            "vector_search",
+            RuntimeError(BEDROCK_DETAIL),
+            tools.SEARCH_FAILED_RESULT,
+        ),
+    ],
+    ids=["graph_unavailable", "graph_failed", "search_failed"],
+)
+def test_a_failing_tool_gives_strands_an_error_status(
+    monkeypatch: pytest.MonkeyPatch,
+    decorated,
+    tool_input: dict[str, object],
+    patched: str,
+    error: Exception,
+    expected: str,
+) -> None:
+    monkeypatch.setattr(tools, patched, _raise(error))
+    assert _stream_result(decorated, tool_input) == {
+        "toolUseId": "call-1",
+        "status": "error",
+        "content": [{"text": expected}],
+    }
+
+
+def test_a_query_error_gives_strands_an_error_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = _server_error("Neo.ClientError.Statement.SyntaxError", "Invalid input 'MATCHH'")
+    monkeypatch.setattr(tools, "graph_query", _raise(error))
+    result = _stream_result(tools.graph_query_tool, {"question": "q"})
+    assert result["status"] == "error"
+    assert _error_text(result).startswith(tools.QUERY_ERROR_PREFIX)
+
+
+@pytest.mark.parametrize(
+    ("decorated", "tool_input", "patched"),
+    [
+        (tools.graph_query_tool, {"question": "q"}, "graph_query"),
+        (tools.vector_search_tool, {"query": "q"}, "vector_search"),
+    ],
+    ids=["graph_query_tool", "vector_search_tool"],
+)
+def test_a_successful_tool_gives_strands_a_success_status(
+    monkeypatch: pytest.MonkeyPatch, decorated, tool_input: dict[str, object], patched: str
+) -> None:
+    monkeypatch.setattr(tools, patched, lambda *args: "AC1001")
+    assert _stream_result(decorated, tool_input) == {
+        "toolUseId": "call-1",
+        "status": "success",
+        "content": [{"text": "AC1001"}],
+    }
 
 
 @pytest.mark.parametrize("name", ["graph_query", "vector_search"])
@@ -287,5 +385,5 @@ def test_a_rotated_password_embeds_a_manual_search_once(
 def test_a_password_still_wrong_fails_the_tool_call_after_one_attempt(
     tools_on_fake_neo4j: FakeNeo4j, call
 ) -> None:
-    assert call() == tools.UNAVAILABLE_RESULT
+    assert _error_text(call()) == tools.UNAVAILABLE_RESULT
     assert tools_on_fake_neo4j.logins == ["first-pw"]

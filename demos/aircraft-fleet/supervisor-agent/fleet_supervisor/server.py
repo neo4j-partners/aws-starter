@@ -50,6 +50,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 from neo4j_agent_memory import MemorySettings  # noqa: E402
 from strands import Agent  # noqa: E402
 from strands.models import BedrockModel  # noqa: E402
+from strands.types.exceptions import SessionException  # noqa: E402
 
 from fleet_supervisor.core.agents import build_supervisor  # noqa: E402
 from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
@@ -64,6 +65,7 @@ from fleet_supervisor.core.memory import (  # noqa: E402
     forget_memory_settings,
     memory_settings,
     password_rejected,
+    reload_memory_login,
 )
 from fleet_supervisor.core.model import build_model  # noqa: E402
 from fleet_supervisor.core.secrets import neo4j_login  # noqa: E402
@@ -200,6 +202,27 @@ def _build_agent_once(
     return supervisor, session
 
 
+async def _late_write_rejected(error: BaseException, session: MemorySession | None) -> bool:
+    """Handle a memory write Neo4j rejected after the agent was built.
+
+    Strands flushes memory at the end of the turn, after the answer has
+    streamed. If Neo4j rejects the memory login there, the password may have
+    rotated since the client opened. This reads the memory secret again into
+    the client's auth manager and logs a warning. The message stays queued,
+    and the session's close writes it again under the same message id with
+    the new login. Returns False, and does nothing, for any other error.
+    """
+    if session is None or not isinstance(error, SessionException) or not password_rejected(error):
+        return False
+    rotated = await asyncio.to_thread(reload_memory_login, session.settings)
+    logger.warning(
+        "Neo4j rejected the memory login on a late write; %s. "
+        "The session's close writes the message again.",
+        "read the rotated password" if rotated else "the password has not changed",
+    )
+    return True
+
+
 async def _close_after_build(build: asyncio.Task[tuple[Agent, MemorySession | None]]) -> None:
     """Wait for the build to finish, then close the memory session it returned."""
     try:
@@ -260,11 +283,13 @@ async def invoke(payload: Any, context):
         build = asyncio.create_task(
             asyncio.to_thread(_build_agent, model, schema, session_id, user_id)
         )
-        supervisor, _ = await asyncio.shield(build)
+        supervisor, session = await asyncio.shield(build)
         mapper = EventMapper(trace=payload.get("trace") is True)
         # Strands flushes memory through a hook in the stream's finally. The
         # stream is closed here, so that flush ends before the manager
         # closes. A dropped stream would be closed later by the event loop.
+        # A finished turn raises a failed flush from the loop below, and a
+        # disconnect raises it from the close.
         stream = mapper.stream(supervisor, prompt)
         try:
             async for event in stream:
@@ -276,9 +301,15 @@ async def invoke(payload: Any, context):
             # generator closes. So log it here and close without yielding.
             try:
                 await stream.aclose()
-            except Exception:
-                logger.exception("The agent stream failed while closing")
+            except Exception as error:
+                if not await _late_write_rejected(error, session):
+                    logger.exception("The agent stream failed while closing")
             raise
+        except SessionException as error:
+            # The answer has streamed. A rejected memory login is retried
+            # when the session closes, so the request still completes.
+            if not await _late_write_rejected(error, session):
+                raise
         finally:
             await stream.aclose()
         logger.info("Session %s handled by %s", session_id, mapper.specialists or "supervisor only")

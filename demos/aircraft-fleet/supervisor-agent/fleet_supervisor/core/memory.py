@@ -14,6 +14,12 @@ The settings are built once per process. If Neo4j rejects the password,
 password again. A request that failed with a password another request
 already replaced leaves the newer settings in place.
 
+The settings also carry an auth manager, which the memory driver asks for
+the login on each new connection. :func:`reload_memory_login` reads the
+memory secret again into that manager. A write that Neo4j rejected after
+the agent was built then succeeds when its session closes, on the same
+client.
+
 One :class:`SharedMemory` holds the memory client and its event-loop thread
 for the process. It opens on the first request. Each request gets a
 :class:`MemorySession` with its own session manager on that client, and the
@@ -25,6 +31,7 @@ closes every client at shutdown, and no request opens one after it starts.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import logging
 import os
@@ -33,6 +40,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+import neo4j
+from neo4j.auth_management import AsyncAuthManager
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory import MemorySettings
 from neo4j_agent_memory.config.settings import ExtractionConfig, ExtractorType, Neo4jConfig
@@ -45,6 +54,7 @@ from neo4j_agent_memory.llm.adapters.bedrock import BedrockEmbeddingProvider, Be
 from pydantic import SecretStr
 
 from fleet_supervisor.core.config import AWS_REGION, ConfigError
+from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager
 from fleet_supervisor.core.secrets import Neo4jLogin, forget_secret, login_from
 
 logger = logging.getLogger(__name__)
@@ -87,6 +97,45 @@ BackgroundHook = Callable[[str], Callable[[], None]]
 def memory_login() -> Neo4jLogin:
     """Return the memory database user name and password."""
     return login_from(MEM_NEO4J_PASSWORD_SECRET_ARN, "MEM_NEO4J_USERNAME", "MEM_NEO4J_PASSWORD")
+
+
+class MemoryLoginAuthManager(AsyncAuthManager):
+    """Give the async memory driver the memory login, and follow a rotated password.
+
+    It wraps a :class:`RotatingLoginAuthManager` on the memory secret, so a
+    fresh read drops only ``MEM_NEO4J_PASSWORD_SECRET_ARN`` from the cache
+    and the fleet secret stays cached. neo4j 6.4 wraps any ``auth`` that is
+    not an ``AsyncAuthManager`` in a static one, so the async driver needs
+    this class rather than the sync manager. Each call runs on a worker
+    thread, because a secret read blocks on Secrets Manager and must not
+    stall the memory client's event loop.
+    """
+
+    def __init__(self) -> None:
+        self.rotating = RotatingLoginAuthManager(memory_login, MEM_NEO4J_PASSWORD_SECRET_ARN)
+
+    async def get_auth(self) -> neo4j.Auth:
+        return await asyncio.to_thread(self.rotating.get_auth)
+
+    async def handle_security_exception(
+        self, auth: neo4j.Auth, error: neo4j.exceptions.Neo4jError
+    ) -> bool:
+        return await asyncio.to_thread(self.rotating.handle_security_exception, auth, error)
+
+
+def reload_memory_login(settings: MemorySettings) -> bool:
+    """Read the memory secret again for the client that opened with ``settings``. Blocks.
+
+    Call it when Neo4j rejected the memory login after the agent was built.
+    The driver then uses the new login on its next connection, so the
+    session's close can write the message again. Returns True if the login
+    changed, and False when it did not or ``settings`` has no
+    :class:`MemoryLoginAuthManager`.
+    """
+    manager = settings.neo4j.auth_manager
+    if not isinstance(manager, MemoryLoginAuthManager):
+        return False
+    return manager.rotating.reload()
 
 
 @dataclass
@@ -210,6 +259,10 @@ def _build_memory_settings() -> MemorySettings:
             username=login.username,
             password=SecretStr(login.password),
             database=os.environ.get("MEM_NEO4J_DATABASE") or "neo4j",
+            # The driver logs in with the manager, not the password above.
+            # The password still identifies these settings' client to
+            # forget_memory_settings.
+            auth_manager=MemoryLoginAuthManager(),
         ),
         # Provider instances, so the region and dimensions are set here and
         # not left to package defaults.

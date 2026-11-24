@@ -88,6 +88,11 @@ retires the client and drops the settings. The request then reads the secret
 again and builds once more with a new client. The retired client closes on a
 background thread after its last session ends, so no request waits for it.
 
+Neo4j can also reject the end-of-turn write, after the answer has streamed.
+The memory auth manager then reads the secret again, and the server logs a
+warning. The message stays queued, and the session's close writes it again
+under the same message ID with the new login.
+
 ## Shutdown
 
 At shutdown, the server's lifespan closes the shared memory. No request opens
@@ -101,8 +106,8 @@ graph driver closes after the memory close, even if the memory close fails.
 
 ## The library pin
 
-The supervisor pins `neo4j-agent-memory[strands]==0.8.0+fleet.9`. It is a
+The supervisor pins `neo4j-agent-memory[strands]==0.8.0+fleet.10`. It is a
 wheel from the `neo4j-partners/agent-memory` releases, and `uv.lock` records
 its sha256. The supervisor uses `SharedMemory`, deferred extraction, the background
-hook, and the per-turn discard from that build. Changing the pin means
-checking those four behaviors again.
+hook, the per-turn discard, and the `Neo4jConfig` auth manager from that build.
+Changing the pin means checking those five behaviors again.

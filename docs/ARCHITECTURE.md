@@ -32,9 +32,11 @@ The two access paths serve different needs.
 
 | Path | Projects | How they reach Neo4j |
 |------|----------|----------------------|
-| MCP through the Gateway | Quickstart agent, fraud memory agent | Cognito token, AgentCore Gateway, AgentCore Runtime, Neo4j MCP server |
+| MCP through the Gateway | Quickstart agent, fraud memory agent, Databricks, Amazon Quick | Cognito token, AgentCore Gateway, AgentCore Runtime, Neo4j MCP server |
 | Direct driver | Fleet pipeline, fleet supervisor agent, fraud graph loader, SEC filings notebook | Neo4j Python driver over Bolt |
 
+- **Databricks:** Databricks reaches the default deployment's Gateway through a Unity Catalog HTTP connection. Databricks gets and refreshes the tokens itself with the Cognito client credentials.
+- **Amazon Quick:** Amazon Quick connects to the finance Gateway as a remote MCP connector. You paste its bearer token in by hand. The token lasts 24 hours.
 - **Read-only MCP server:** The deployed MCP server runs with `NEO4J_READ_ONLY=true`. Agents on the MCP path get two tools, `get_neo4j_schema` and `read_neo4j_cypher`.
 - **Writes:** Every write to Neo4j happens on the direct-driver path. The fleet pipeline and the fraud graph loader populate their graphs this way.
 
@@ -170,7 +172,7 @@ The CDK stack in `cdk/neo4j_mcp_stack.py` builds every resource. Each resource n
 | Resource server | `cognito.CfnUserPoolResourceServer` | Defines the `{stack}-mcp/invoke` scope |
 | Machine client | `cognito.CfnUserPoolClient` | M2M client with a secret and 24-hour tokens |
 | Custom resource role | `iam.Role` | Lets the Lambdas call Cognito, AgentCore Identity, and Secrets Manager |
-| Agent execution role | `iam.Role` | Gives the Runtime ECR pull, logs, X-Ray, metrics, and workload tokens |
+| Agent execution role | `iam.Role` | Gives the Runtime ECR pull, logs, X-Ray, metrics, workload tokens, and read access to the Neo4j password secret |
 | Gateway execution role | `iam.Role` | Lets the Gateway get OAuth2 tokens and invoke this Runtime only |
 | OAuth provider function | `lambda_.Function` | Creates the OAuth2 credential provider |
 | Runtime health check function | `lambda_.Function` | Waits for the Runtime to reach `READY` |

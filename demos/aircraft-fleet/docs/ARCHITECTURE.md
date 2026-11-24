@@ -7,7 +7,7 @@ live in rows and the limits live in prose. This demo puts both into one Neo4j
 graph, links them, and answers questions over that graph with one supervisor
 agent and two specialists.
 
-![The pipeline builds the Neo4j fleet graph. One supervisor routes each question to a Maintenance or Operations specialist. The specialists read the graph directly with the Neo4j driver. The supervisor keeps conversation memory in a separate Neo4j database.](images/architecture.svg)
+![The pipeline builds the Neo4j fleet graph. One supervisor routes each question to a Maintenance or Operations specialist. The specialists read the graph directly with the Neo4j driver. The supervisor keeps conversation memory in a separate Neo4j database. The browser UI relays the supervisor's stream and looks up each tool call's evidence in the fleet graph.](images/architecture.svg)
 
 ## Components
 
@@ -57,7 +57,7 @@ All diagrams are SVG files in [`images/`](images/).
 
 | Diagram | Shows |
 |---------|-------|
-| [`architecture.svg`](images/architecture.svg) | The pipeline, the supervisor and its specialists, and the two databases |
+| [`architecture.svg`](images/architecture.svg) | The pipeline, the supervisor and its specialists, the browser UI, and the two databases |
 | [`pipeline-flow.svg`](images/pipeline-flow.svg) | The five pipeline stages and what each one writes |
 | [`generator-flow.svg`](images/generator-flow.svg) | How `generate-data` builds one dataset from one seed |
 | [`data-model.svg`](images/data-model.svg) | The operational graph's labels and relationships |

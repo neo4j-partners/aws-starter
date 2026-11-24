@@ -4,7 +4,7 @@ This demo builds an aircraft fleet graph in Neo4j and answers questions about
 it with a supervisor agent on Amazon Bedrock. One pipeline builds the graph.
 One supervisor agent and its two specialists read it.
 
-![The pipeline builds the Neo4j fleet graph. One supervisor routes each question to a Maintenance or Operations specialist. The specialists read the graph directly with the Neo4j driver. The supervisor keeps conversation memory in a separate Neo4j database.](docs/images/architecture.svg)
+![The pipeline builds the Neo4j fleet graph. One supervisor routes each question to a Maintenance or Operations specialist. The specialists read the graph directly with the Neo4j driver. The supervisor keeps conversation memory in a separate Neo4j database. The browser UI relays the supervisor's stream and looks up each tool call's evidence in the fleet graph.](docs/images/architecture.svg)
 
 ## Overview
 
@@ -158,7 +158,7 @@ The diagrams live in [`docs/images/`](./docs/images/) as SVG files.
 
 | Diagram | Shows |
 |---------|-------|
-| [`architecture.svg`](docs/images/architecture.svg) | The pipeline, the supervisor and its specialists, and the two databases |
+| [`architecture.svg`](docs/images/architecture.svg) | The pipeline, the supervisor and its specialists, the browser UI, and the two databases |
 | [`pipeline-flow.svg`](docs/images/pipeline-flow.svg) | The five pipeline stages and what each one writes |
 | [`dual-graph.svg`](docs/images/dual-graph.svg) | The operational graph, the knowledge graph, and the links between them |
 | [`supervisor-request-flow.svg`](docs/images/supervisor-request-flow.svg) | One request through the supervisor, a specialist, and its graph tools |

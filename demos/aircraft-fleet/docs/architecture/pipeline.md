@@ -57,7 +57,7 @@ The stamp is how later steps tell a current dataset from a stale one.
 - **Skip when current:** `generate --if-stale` skips the run when the stamp matches the config, the code hash, and the runtime versions. `./setup.sh load` uses it.
 - **Recorded in the graph:** The loader copies the stamp onto `Dataset {id: 'current'}`.
 - **Checked by verify:** `verify` reports a stamp that no longer matches the code, and a `Dataset` node that no longer matches the CSVs. `verify --strict` exits 1 on either.
-- **Reference checks:** `generate-data validate` checks every `rels_*` reference column and each reading's `sensor_id` against the node files. It also reports duplicate IDs, missing files, and missing columns, and exits 1 on any of them.
+- **Reference checks:** `generate-data validate` checks every `rels_*` reference column and each reading's `sensor_id` against the node files. It also reports duplicate IDs, missing files, and missing columns. It checks that `operating_limits.csv` has the expected header, one row for each limit that `limits.py` builds, and a numeric `minValue` or `maxValue` on every row. Any failure prints `Found N validation error(s)` and exits 1.
 
 ## Operational data model
 
@@ -150,7 +150,8 @@ Stage 5 reads the graph and prints a report of warnings and failures.
 - **Schema:** The constraints and the two chunk indexes must exist.
 - **Embeddings:** Every chunk must have an embedding of the configured dimension.
 - **Search:** A vector search smoke test must succeed.
-- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, `DESCRIBES_COMPONENT`, and `HAS_LIMIT` links must each exist. The `HAS_LIMIT` count includes only the links from a `Sensor` to an `OperatingLimit`.
+- **Cross links:** The `APPLIES_TO`, `DESCRIBES_MODEL`, `DESCRIBES_SYSTEM`, and `DESCRIBES_COMPONENT` links must each exist. The report lists them under Cross-Link Checks.
+- **Load links:** The `Sensor -[:HAS_LIMIT]-> OperatingLimit` links must exist. The stage 2 load writes them, so the report lists them apart, under Load Link Checks. A missing link fails even with `--skip-enrichment`.
 - **Sensor limits:** Every `Sensor` must have a `HAS_LIMIT` link to an `OperatingLimit`. `AirDataDisagree` sensors are exempt, because the manuals list them only in the sensor inventory. A failure gives the unlinked count for each sensor type.
 - **Limit chunks:** Every `OperatingLimit` must have a `FROM_CHUNK` link to a `Chunk`. A failure gives the unlinked count for each aircraft type.
 - **EGT limits:** Each aircraft type needs an EGT limit for each regime that the generator's `ENGINE_SPECS` gives a maximum. Those regimes are Takeoff, Max Continuous, and Start when the spec has a start maximum. Each `maxValue` must equal the generator's maximum. An EGT limit for a regime with no generator maximum fails, such as an A320-200 Start limit.
@@ -162,9 +163,9 @@ nonzero, so the same check works in CI. The one exception is
 
 `verify --strict --skip-enrichment` keeps the counts, stamp, CSV comparison,
 operational constraints, sensor limits, EGT limits, the `Sensor -[:HAS_LIMIT]->`
-cross link, and operational orphans as failures. It reports the document,
+load link, and operational orphans as failures. It reports the document,
 chunk, and `AircraftModel` counts, the embeddings, chunk indexes, search test,
-extracted-entity constraints, the other cross links, the limit chunk check,
+extracted-entity constraints, the cross links, the limit chunk check,
 documents without chunks, and systems without a `SystemReference` as
 warnings. `./setup.sh load-operational`
 uses it, because that graph has no enrichment.

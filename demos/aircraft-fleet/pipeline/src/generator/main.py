@@ -696,7 +696,7 @@ def validate(
             console.print(f"  [dim]… and {len(errors) - 20} more[/dim]")
         raise typer.Exit(1)
     else:
-        console.print("[green]✓ All referential integrity checks passed.[/green]\n")
+        console.print("[green]✓ All validation checks passed.[/green]\n")
 
 
 if __name__ == "__main__":

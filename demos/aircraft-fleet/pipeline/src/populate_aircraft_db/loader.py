@@ -989,6 +989,44 @@ def _check_cross_links(
         result.check(count > 0, f"{label} has no links", enrichment=True)
 
 
+# Sensor types the manuals list only in the sensor inventory, with no
+# operating limit, so enrichment links them to none.
+SENSOR_TYPES_WITHOUT_LIMITS = ("AirDataDisagree",)
+
+
+def _check_sensor_limit_coverage(
+    driver: Driver, database: str, existing_labels: set[str], result: _VerifyResult
+) -> None:
+    """Check that every Sensor has a HAS_LIMIT link to an OperatingLimit.
+
+    Types in SENSOR_TYPES_WITHOUT_LIMITS are exempt. A failure names the
+    unlinked count for each type. With no Sensor or OperatingLimit nodes the
+    check is skipped, since the count checks already report them.
+    """
+    if not {"Sensor", "OperatingLimit"} <= existing_labels:
+        return
+    records, _, _ = driver.execute_query(
+        """
+        MATCH (s:Sensor)
+        WHERE NOT s.type IN $exempt
+          AND NOT (s)-[:HAS_LIMIT]->(:OperatingLimit)
+        RETURN s.type AS type, count(s) AS count
+        ORDER BY type
+        """,
+        exempt=list(SENSOR_TYPES_WITHOUT_LIMITS),
+        database_=database,
+    )
+    unlinked = {row["type"]: row["count"] for row in records}
+    total = sum(unlinked.values())
+    print(f"\nSensors without OperatingLimit: {total:,}")
+    for sensor_type, count in unlinked.items():
+        print(f"  {sensor_type}: {count:,}")
+    by_type = ", ".join(f"{sensor_type} {count:,}" for sensor_type, count in unlinked.items())
+    result.check(
+        total == 0, f"Sensors without OperatingLimit: {total:,} ({by_type})", enrichment=True
+    )
+
+
 # The first number in a limit value such as "950", "< 950" or "1,060".
 _LIMIT_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
@@ -1156,6 +1194,7 @@ def verify(
         result=result,
     )
     _check_cross_links(rel_counts, _sensor_limit_count(driver, database, rel_counts), result)
+    _check_sensor_limit_coverage(driver, database, set(label_counts), result)
     _check_egt_limits(driver, database, set(label_counts), result)
     _check_data_quality(driver, database, set(label_counts), set(relationship_counts), result)
     return _print_summary(result)

@@ -135,7 +135,7 @@ this pipeline.
 
 - **The need:** The `neo4j-graphrag` entity extractor asks its LLM for JSON that matches a schema through `response_format`.
 - **The class:** `StructuredBedrockLLM` is a small subclass of `BedrockLLM`. It answers that request through Bedrock Converse tool use.
-- **How it works:** It declares the target schema as a tool and offers it with `toolChoice` set to `auto`. Claude Sonnet 5.5 rejects a forced tool choice. A reply with no valid tool call is retried once. The tool input is the structured result.
+- **How it works:** It declares the target schema as a tool and offers it with `toolChoice` set to `auto`. Claude Sonnet 5.5 rejects a forced tool choice. If the reply has no tool call, or its tool arguments fail validation against the `response_format` model, the call is retried once. The tool input is the structured result.
 - **Reuse:** You can copy this subclass into any Bedrock and `neo4j-graphrag` pipeline.
 
 ## Keep document context in every chunk

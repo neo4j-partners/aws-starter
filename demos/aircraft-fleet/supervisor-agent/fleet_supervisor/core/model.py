@@ -1,9 +1,4 @@
-"""Bedrock model settings shared by the supervisor and its specialists.
-
-``thinking_request_fields`` and ``build_bedrock_model`` match the signatures
-of the shared factory in graphrag-agent's ``agent/model.py``, so this module
-can switch to it with an import change.
-"""
+"""Bedrock model settings shared by the supervisor and its specialists."""
 
 from strands.models import BedrockModel, CacheConfig
 

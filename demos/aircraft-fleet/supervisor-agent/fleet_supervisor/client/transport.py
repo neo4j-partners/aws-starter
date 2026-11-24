@@ -3,9 +3,6 @@
 The server streams ``data: {...}`` events: ``chunk``, ``agent``, ``tool``,
 ``error``, and ``complete``. Both transports yield the same bytes, so one
 parser handles them.
-
-This mirrors graphrag-agent's ``client/transport.py`` and adds the ``agent``
-event. Replace it with the shared transport once that one exists.
 """
 
 import codecs

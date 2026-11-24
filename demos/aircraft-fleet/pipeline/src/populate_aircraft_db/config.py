@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _PKG_DIR = Path(__file__).resolve().parent
 _PIPELINE_DIR = _PKG_DIR.parent.parent
 _LAB_SETUP_DIR = _PIPELINE_DIR.parent
-# Shared aircraft-fleet root .env, read by both pipeline/ and graphrag-agent/.
+# Shared aircraft-fleet root .env, read by pipeline/, supervisor-agent/, and ui/.
 _ENV_FILE = _LAB_SETUP_DIR / ".env"
 # Same defaults setup.sh exports as DATA_DIR and DOCUMENT_DIR.
 _DATA_DIR = _PIPELINE_DIR / "generated"

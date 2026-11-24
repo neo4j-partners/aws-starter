@@ -757,6 +757,30 @@ def debug_extract_chunks(
 # ---------------------------------------------------------------------------
 
 
+class ManualWriteError(RuntimeError):
+    """The Neo4j write failed for one or more maintenance manuals."""
+
+
+async def _writer_error(pipeline: Any, run_id: str) -> str | None:
+    """Return the Neo4j writer's error for a pipeline run, or None if it succeeded.
+
+    ``Neo4jWriter`` catches a Neo4j ``ClientError``, logs it, and returns a
+    ``FAILURE`` status instead of raising, so ``run_async`` still returns.
+    Entity resolution runs after the writer, so the writer is not a leaf
+    task and its result is missing from ``PipelineResult.result``. The
+    pipeline's result store keeps every task's result by run ID. A missing
+    writer result counts as a failure, so a manual is never reported as
+    written without the writer saying so.
+    """
+    store = pipeline.runner.pipeline.store
+    result = await store.get_result_for_component(run_id, "writer")
+    if result is None:
+        return "the pipeline recorded no writer result"
+    if result.get("status") == "SUCCESS":
+        return None
+    return (result.get("metadata") or {}).get("error") or f"writer status {result.get('status')}"
+
+
 def process_all_documents(
     driver: Driver,
     database: str,
@@ -778,6 +802,10 @@ def process_all_documents(
     When *enrich_sample_size* > 0 the input text for each document is truncated
     so that approximately that many chunks are produced.  Useful for quick test
     runs without processing the full manuals.
+
+    A manual whose Neo4j write fails is logged with its error, and the other
+    manuals still run. After the last manual, :class:`ManualWriteError` names
+    every manual that failed.
     """
     pipeline, splitter = _create_pipeline(
         driver,
@@ -800,7 +828,8 @@ def process_all_documents(
     else:
         max_chars = 0  # 0 = unlimited
 
-    async def _run_all():
+    async def _run_all() -> list[str]:
+        failed: list[str] = []
         for meta in DOCUMENTS:
             logger.info("Processing: %s", meta.filename, extra={"blank_before": True})
             filepath = document_dir / meta.filename
@@ -819,7 +848,7 @@ def process_all_documents(
             splitter.context = meta.context
             splitter.document_id = meta.document_id
 
-            await pipeline.run_async(
+            result = await pipeline.run_async(
                 text=text,
                 document_metadata={
                     "documentId": meta.document_id,
@@ -829,9 +858,23 @@ def process_all_documents(
                     "path": meta.filename,
                 },
             )
+            if error := await _writer_error(pipeline, result.run_id):
+                logger.error(
+                    "  [FAIL] Neo4j write failed for %s (%s): %s",
+                    meta.document_id,
+                    meta.filename,
+                    error,
+                )
+                failed.append(meta.document_id)
+                continue
             logger.info("  [OK] Pipeline complete for %s", meta.document_id)
+        return failed
 
-    asyncio.run(_run_all())
+    if failed := asyncio.run(_run_all()):
+        raise ManualWriteError(
+            f"The Neo4j write failed for {len(failed)} of {len(DOCUMENTS)} "
+            f"manuals: {', '.join(failed)}"
+        )
 
 
 # ---------------------------------------------------------------------------

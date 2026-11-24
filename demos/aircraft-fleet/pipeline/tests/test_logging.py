@@ -404,9 +404,15 @@ def test_load_phase_records_have_no_empty_messages(
 
 
 def _process_two_documents(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    class FakeStore:
+        async def get_result_for_component(self, run_id: str, name: str) -> dict[str, str]:
+            return {"status": "SUCCESS"}
+
     class FakePipeline:
-        async def run_async(self, **kwargs: Any) -> None:
-            return None
+        runner = SimpleNamespace(pipeline=SimpleNamespace(store=FakeStore()))
+
+        async def run_async(self, **kwargs: Any) -> SimpleNamespace:
+            return SimpleNamespace(run_id="run")
 
     docs = [
         pipeline.DocumentMeta(filename=f"{n}.md", document_id=n, aircraft_type="T", title="t")

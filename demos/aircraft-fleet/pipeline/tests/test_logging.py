@@ -424,7 +424,6 @@ def _process_two_documents(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
         tmp_path,
         provider="bedrock",
         openai_api_key=None,
-        anthropic_api_key=None,
         llm_model="m",
         llm_max_tokens=1,
         embedding_model="e",

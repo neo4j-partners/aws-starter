@@ -69,14 +69,9 @@ export DATA_DIR="$SCRIPT_DIR/generated"
 export DOCUMENT_DIR="$SCRIPT_DIR/manuals"
 mkdir -p "$DATA_DIR"
 
-UV_SYNC_EXTRA=""
-if [[ "${LLM_PROVIDER:-bedrock}" == "anthropic" ]]; then
-  UV_SYNC_EXTRA="--extra anthropic"
-fi
-
 sync_deps() {
-  echo "==> uv sync ${UV_SYNC_EXTRA}"
-  uv sync ${UV_SYNC_EXTRA}
+  echo "==> uv sync"
+  uv sync
 }
 
 # Extra arguments, such as --if-stale, go to generate-data generate.

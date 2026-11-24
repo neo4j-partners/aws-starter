@@ -418,7 +418,6 @@ def _create_llm_client(
     provider: str,
     *,
     openai_key: str | None = None,
-    anthropic_key: str | None = None,
     region: str | None = None,
     llm_model: str,
     embedding_model: str,
@@ -472,33 +471,6 @@ def _create_llm_client(
 
         def embed(text: str) -> list[float]:
             resp = client.embeddings.create(
-                model=embedding_model,
-                input=text,
-                dimensions=embedding_dimensions,
-            )
-            return resp.data[0].embedding
-
-    elif provider == "anthropic":
-        import anthropic
-        from openai import OpenAI
-
-        anth_client = anthropic.Anthropic(api_key=anthropic_key)
-        oai_client = OpenAI(api_key=openai_key)
-
-        def chat(system: str, user: str) -> str:
-            resp = anth_client.messages.create(
-                model=llm_model,
-                max_tokens=_CHAT_MAX_TOKENS,
-                thinking=_CLAUDE_THINKING,
-                output_config=_CLAUDE_OUTPUT_CONFIG,
-                system=system,
-                messages=[{"role": "user", "content": user}],
-            )
-            # With thinking on, a thinking block comes before the text.
-            return next((block.text for block in resp.content if block.type == "text"), "")
-
-        def embed(text: str) -> list[float]:
-            resp = oai_client.embeddings.create(
                 model=embedding_model,
                 input=text,
                 dimensions=embedding_dimensions,
@@ -668,7 +640,6 @@ def run_agent_samples(
     *,
     provider: str,
     openai_key: str | None = None,
-    anthropic_key: str | None = None,
     region: str | None = None,
     llm_model: str,
     embedding_model: str,
@@ -679,7 +650,6 @@ def run_agent_samples(
     chat_fn, embed_fn = _create_llm_client(
         provider,
         openai_key=openai_key,
-        anthropic_key=anthropic_key,
         region=region,
         llm_model=llm_model,
         embedding_model=embedding_model,

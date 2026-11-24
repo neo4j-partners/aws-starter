@@ -54,7 +54,6 @@ def _debug_extract(chunk_indexes: list[int]) -> bool:
         chunk_indexes=chunk_indexes,
         provider="bedrock",
         openai_api_key=None,
-        anthropic_api_key=None,
         region="us-east-1",
         llm_model="model",
         llm_max_tokens=1024,

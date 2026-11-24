@@ -43,12 +43,12 @@ below are relative to `demos/aircraft-fleet/`.
 
 Tick each box only after the step's result is recorded below.
 
-- [ ] **0.** Prerequisites verified (uv, Python 3.12+, Node.js 20+, AWS
+- [x] **0.** Prerequisites verified (uv, Python 3.12+, Node.js 20+, AWS
       creds, Bedrock model access, reachable Neo4j)
-- [ ] **1.** Shared `.env` created and filled in
-- [ ] **2.** Pipeline deps synced (`cd pipeline && uv sync`)
-- [ ] **3.** Pipeline run end to end (`./setup.sh`) completed
-- [ ] **4.** Pipeline strict verify passed
+- [x] **1.** Shared `.env` created and filled in
+- [x] **2.** Pipeline deps synced (`cd pipeline && uv sync`)
+- [x] **3.** Pipeline run end to end (`./setup.sh`) completed
+- [x] **4.** Pipeline strict verify passed
 - [ ] **5.** Showcase queries run (`./setup.sh samples`)
 - [x] **6.** Read-only user `fleet_reader` created and checked
 - [x] **7.** Deploy secrets created (`uv run fleet-supervisor-secrets`) and
@@ -90,7 +90,9 @@ Confirm before starting:
 it once in the shared `.env` if you want another region, and confirm the
 models are enabled there. Record the region used.
 
-**Result:** Not recorded yet.
+**Result:** PASS (2026-11-23). The region was `us-east-1`. Step 3's
+enrich stage called Bedrock there, and `npm ci` and `npm run build` ran for
+the UI. Tool versions were not recorded.
 
 ---
 
@@ -111,7 +113,8 @@ cp .env.sample .env
 
 `NEO4J_USERNAME` stays the admin user, because the pipeline writes as it.
 
-**Result:** Not recorded yet.
+**Result:** PASS (2026-11-23). The run used the shared `.env` with the
+default dataset, `LOAD_FULL_DATASET=false`.
 
 ---
 
@@ -122,7 +125,8 @@ cd pipeline
 uv sync
 ```
 
-**Result:** Not recorded yet.
+**Result:** PASS (2026-11-23). `./setup.sh` ran `uv sync` itself before
+the stages.
 
 ---
 
@@ -141,7 +145,10 @@ If credentials or model access fail mid-run, record the failing stage. To
 isolate stages: `./setup.sh generate`, `./setup.sh load-operational` (no LLM,
 no key), `./setup.sh load`, `./setup.sh verify`.
 
-**Result:** Not recorded yet.
+**Result:** PASS (2026-11-23). `./setup.sh` exited 0. The graph has
+799,954 nodes, with 227 `MaintenanceEvent`, 5,145 `Delay`, 337 `Chunk`, and
+5 `Document` nodes. The `maintenanceChunkEmbeddings` and
+`maintenanceChunkText` indexes exist.
 
 ---
 
@@ -156,7 +163,9 @@ a clean read-only pass:
 
 Expect a pass report and exit code 0.
 
-**Result:** Not recorded yet.
+**Result:** PASS (2026-11-23). `verify --strict` exited 0 with
+`[OK] Verification passed`. Every required constraint was OK, the vector
+smoke test returned 1 result, and the data-quality orphan counts were all 0.
 
 ---
 
@@ -397,10 +406,11 @@ Fill this in at the end, or when stopping early.
 
 - **Date / operator:** The run started on 2026-11-23.
 - **Region(s) used:** `us-east-1`.
-- **Dataset size (LOAD_FULL_DATASET):** Not recorded yet.
+- **Dataset size (LOAD_FULL_DATASET):** `false`, the default. The graph has
+  799,954 nodes.
 - **Neo4j target:** The graph is Aura `neo4j+s://<AURA_ID>.databases.neo4j.io`.
   Memory is a second Aura instance. The supervisor reads as `fleet_reader`.
-- **Overall status:** In progress. Steps 6 to 10 passed.
+- **Overall status:** In progress. Steps 0 to 4 and 6 to 10 passed.
 - **Steps failed or skipped (with reason):** Not recorded yet.
 - **Root causes and fixes:** Not recorded yet.
 - **Embedder alignment confirmed (pipeline vs agent):** Not recorded yet.

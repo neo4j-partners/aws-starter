@@ -83,7 +83,7 @@ one.
 
 ## Password failures
 
-A rejected memory password may predate a secret rotation. So a rejection
+The secret may have been rotated since the process read it. So a rejection
 retires the client and drops the settings. The request then reads the secret
 again and builds once more with a new client. The retired client closes on a
 background thread after its last session ends, so no request waits for it.

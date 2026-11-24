@@ -115,7 +115,7 @@ deploy. Local runs read the same secrets once their ARNs are in `../.env`.
 ### Create the read-only user
 
 Run this Cypher as the admin user against the `system` database of the fleet
-graph. Pick a new password that does not start with `-`.
+graph.
 
 ```cypher
 CREATE USER fleet_reader SET PASSWORD '<new-password>' CHANGE NOT REQUIRED;

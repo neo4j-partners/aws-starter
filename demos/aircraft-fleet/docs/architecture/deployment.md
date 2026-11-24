@@ -30,10 +30,10 @@ covers steps 2 and 3.
 
 - **Package:** The Runtime is a CodeZip on Python 3.12 for arm64, with `main.py` as the entrypoint on port 8080.
 - **Settings:** The deploy reads the Neo4j URIs, user names, and database names from the shared `../.env` and passes them to the Runtime. Synth refuses a URI that does not use `neo4j+s://` or `bolt+s://`.
-- **Secrets:** `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` name the fleet and memory secrets. Each secret is a JSON object with a `password` key and an optional `username` key. The Runtime reads each secret once per process. When Neo4j rejects the memory password, the next request reads the memory secret again.
+- **Secrets:** `NEO4J_PASSWORD_SECRET_ARN` and `MEM_NEO4J_PASSWORD_SECRET_ARN` name the fleet and memory secrets. Each secret is a JSON object with a `password` key and an optional `username` key. The Runtime reads each secret once per process. When Neo4j rejects the memory password, the same request reads the memory secret again and builds once more.
 - **User names:** A secret's `username` key replaces `NEO4J_USERNAME` or `MEM_NEO4J_USERNAME`. The shared `.env` names the admin user the pipeline writes as, and the fleet secret names the read-only user the Runtime reads as.
 - **IAM:** The CDK stack grants `secretsmanager:GetSecretValue` on exactly those two ARNs and checks that each is a complete secret ARN. It grants no `kms:Decrypt`, so the secrets must use the AWS managed key.
-- **Secret guard:** The deploy refuses to run when a `.env*`, `.mcp-credentials*.json`, `credentials*.json`, or `*.pem` file sits in the agent folder, because the CodeZip would ship it.
+- **Secret guard:** The deploy refuses to run when a `.env*`, `.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem` file or a `venv/` folder sits in the agent folder, because the CodeZip would ship it.
 
 ## Runtime start and TLS
 

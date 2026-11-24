@@ -223,6 +223,7 @@ def _resolve_llm_credentials(settings: Settings) -> _LLMCredentials:
 def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> None:
     """Run the enrichment pipeline: chunk, embed, extract entities, and link."""
     from .pipeline import (
+        UnlinkedLimitsError,
         check_limit_nodes,
         clear_enrichment_data,
         limit_sources,
@@ -289,7 +290,16 @@ def _run_enrich(driver: Driver, settings: Settings, creds: _LLMCredentials) -> N
 
     print("\nLinking to existing graph...")
     link_to_existing_graph(driver, settings.neo4j_database)
-    link_limits_to_chunks(driver, settings.neo4j_database, sources)
+    if unlinked := link_limits_to_chunks(driver, settings.neo4j_database, sources):
+        message = f"{len(unlinked)} operating limits have no chunk: {', '.join(unlinked)}"
+        # A sampled run truncates each manual, so limits past the sample
+        # are expected to have no chunk.
+        if not settings.enrich_sample_size:
+            raise UnlinkedLimitsError(message)
+        print(
+            f"  [WARN] {message}. Sampling skipped their source documents, "
+            f"with ENRICH_SAMPLE_SIZE={settings.enrich_sample_size}."
+        )
 
     validate_enrichment(driver, settings.neo4j_database)
 
@@ -457,7 +467,11 @@ def load_operational_cmd() -> None:
         print("Linking existing enrichment to operational graph...")
         link_to_existing_graph(driver, settings.neo4j_database)
         sources = limit_sources(settings.data_dir, settings.document_dir)
-        link_limits_to_chunks(driver, settings.neo4j_database, sources)
+        if unlinked := link_limits_to_chunks(driver, settings.neo4j_database, sources):
+            print(
+                f"  [WARN] {len(unlinked)} operating limits have no chunk: "
+                f"{', '.join(unlinked)}. The next enrich relinks them."
+            )
 
         validate_enrichment(driver, settings.neo4j_database)
 

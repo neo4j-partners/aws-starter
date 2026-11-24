@@ -994,13 +994,21 @@ def check_limit_nodes(driver: Driver, database: str, sources: list[LimitSource])
         )
 
 
-def link_limits_to_chunks(driver: Driver, database: str, sources: list[LimitSource]) -> None:
+class UnlinkedLimitsError(RuntimeError):
+    """Enrichment left one or more operating limits with no chunk."""
+
+
+def link_limits_to_chunks(driver: Driver, database: str, sources: list[LimitSource]) -> list[str]:
     """Link each OperatingLimit by FROM_CHUNK to the chunks of its source text.
 
     A limit links to every chunk of its manual whose range holds the whole
     source text. When none does, it links to the chunks that overlap it. A
     chunk's range starts at its own text, so a table header the splitter
     repeats at the top of a chunk never counts.
+
+    Returns the names of the limits left with no chunk, sorted. The caller
+    decides whether that fails the run. The counts line carries ``[OK]`` only
+    when every limit has a chunk.
     """
     records, _, _ = driver.execute_query(
         """
@@ -1019,18 +1027,21 @@ def link_limits_to_chunks(driver: Driver, database: str, sources: list[LimitSour
         }
         RETURN count(ol) AS limits,
                sum(size(chunks)) AS links,
-               sum(CASE WHEN chunks = [] THEN 1 ELSE 0 END) AS unlinked
+               collect(CASE WHEN chunks = [] THEN ol.name END) AS unlinked
         """,
         sources=_source_params(sources),
         database_=database,
     )
     row = records[0]
+    unlinked = sorted(row["unlinked"])
     logger.info(
-        "  [OK] %d OperatingLimit -[:FROM_CHUNK]-> Chunk (%d limits, %d with no chunk)",
+        "  %s%d OperatingLimit -[:FROM_CHUNK]-> Chunk (%d limits, %d with no chunk)",
+        "" if unlinked else "[OK] ",
         row["links"],
         row["limits"],
-        row["unlinked"],
+        len(unlinked),
     )
+    return unlinked
 
 
 # ---------------------------------------------------------------------------

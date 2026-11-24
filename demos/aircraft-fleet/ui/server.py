@@ -128,6 +128,11 @@ def relay(turn: ChatRequest, driver: Driver | None) -> Iterator[str]:
                         except (ConfigError, DriverError, Neo4jError):
                             logger.exception("Fleet graph evidence lookup failed")
                             event["graph_unavailable"] = True
+                        except Exception:
+                            # Any other lookup failure, such as a node with no ID,
+                            # costs only the graph. The answer keeps streaming.
+                            logger.error("Fleet graph evidence could not be built", exc_info=True)
+                            event["graph_unavailable"] = True
                     elif ids:
                         event["graph_unavailable"] = True
                 yield _frame(event)

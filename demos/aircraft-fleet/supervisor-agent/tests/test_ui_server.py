@@ -175,3 +175,44 @@ def test_a_failed_secret_read_marks_the_graph_unavailable(
         {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},
         {"type": "complete", "response": "Done."},
     ]
+
+
+class NodeWithoutId:
+    """An Aircraft node that has no ``aircraft_id`` property."""
+
+    labels = frozenset({"Aircraft"})
+
+    def __getitem__(self, key: str) -> Any:
+        raise KeyError(key)
+
+    def get(self, _key: str) -> None:
+        return None
+
+
+class OneNodeDriver:
+    """Returns one path that holds only ``NodeWithoutId``."""
+
+    def execute_query(self, *_args: object, **_kwargs: object) -> tuple[list, None, None]:
+        path = SimpleNamespace(nodes=[NodeWithoutId()], relationships=[])
+        return [{"path": path}], None, None
+
+
+def test_a_node_with_no_id_marks_the_graph_unavailable_and_keeps_streaming(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = [
+        {"type": "tool_complete", "tool": "search_maintenance", "evidence_ids": ["N12345"]},
+        {"type": "chunk", "data": "Two aircraft."},
+        {"type": "complete", "response": "Two aircraft."},
+    ]
+    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext([]))
+    monkeypatch.setattr(ui_server, "iter_events", lambda _chunks: iter(events))
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=OneNodeDriver()))
+
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == [
+        {"type": "tool_complete", "tool": "search_maintenance", "graph_unavailable": True},
+        {"type": "chunk", "data": "Two aircraft."},
+        {"type": "complete", "response": "Two aircraft."},
+    ]

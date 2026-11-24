@@ -10,7 +10,6 @@ from generator.specs import (
     COMPONENT_ALIASES,
     COMPONENT_TYPES_BY_SYSTEM,
     COMPONENTS_BY_SYSTEM,
-    SENSOR_TYPES,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,41 +69,6 @@ COMPONENT_ALIASES_TEXT = "; ".join(
     if len(spec.aliases()) > 1
 )
 
-# The fleet sensor types, which the Sensor HAS_LIMIT join matches to
-# OperatingLimit parameterName.
-SENSOR_PARAMETER_NAMES = ", ".join(sensor_type for sensor_type, _, _ in SENSOR_TYPES)
-
-# The closed list of OperatingLimit regimes, from the manuals' limit tables.
-# Entity resolution merges limits by name and keeps one node's properties,
-# so the name carries the regime and each regime names one kind of limit:
-# - Takeoff, Max Continuous, Start: hard limits, from the Operating Limits
-#   table's Maximum column.
-# - "<regime> Normal": normal ranges, one per column of the Normal Operating
-#   Parameters table and its Quick Reference copy.
-# - Trend Advisory, Trend Caution, Trend Warning: the Digital Twin
-#   trend-averaged EGT thresholds.
-# - Advisory, Caution, Warning: band thresholds, such as vibration, DC bus
-#   voltage, and hydraulic pressure.
-# - All: a stated limit whose text names no regime.
-OPERATING_LIMIT_REGIMES: list[str] = [
-    "Takeoff",
-    "Max Continuous",
-    "Start",
-    "Ground Idle Normal",
-    "Flight Idle Normal",
-    "Cruise Normal",
-    "Max Continuous Normal",
-    "Takeoff Normal",
-    "Trend Advisory",
-    "Trend Caution",
-    "Trend Warning",
-    "Advisory",
-    "Caution",
-    "Warning",
-    "All",
-]
-OPERATING_LIMIT_REGIMES_TEXT = ", ".join(OPERATING_LIMIT_REGIMES)
-
 # (label, property) pairs, one uniqueness constraint each.
 CONSTRAINTS: list[tuple[str, str]] = [
     ("Aircraft", "aircraft_id"),
@@ -119,6 +83,8 @@ CONSTRAINTS: list[tuple[str, str]] = [
     ("Removal", "removal_id"),
     ("Document", "documentId"),
     ("Chunk", "chunkId"),
+    # The load writes the generated limits, and enrich keeps them.
+    ("OperatingLimit", "name"),
     # The load records its generator stamp on one Dataset node, id 'current'.
     ("Dataset", "id"),
 ]
@@ -148,7 +114,6 @@ EXTRACTION_CONSTRAINTS: list[tuple[str, str]] = [
     ("ComponentReference", "name"),
     ("Fault", "name"),
     ("MaintenanceProcedure", "name"),
-    ("OperatingLimit", "name"),
 ]
 
 # SHOW CONSTRAINTS reports a node uniqueness constraint as UNIQUENESS on
@@ -414,75 +379,12 @@ def build_extraction_schema():
             ],
             additional_properties=False,
         ),
-        NodeType(
-            label="OperatingLimit",
-            description="An operating parameter limit for an aircraft system.",
-            properties=[
-                PropertyType(
-                    name="name",
-                    type="STRING",
-                    description=(
-                        "Unique identifier combining parameter, regime, and aircraft "
-                        "type, e.g. 'EGT Takeoff - A320-200' for the hard limit and "
-                        "'EGT Takeoff Normal - A320-200' for the normal range. "
-                        "Use the regime value word for word. "
-                        "Always append ' - <aircraft type>'."
-                    ),
-                ),
-                PropertyType(
-                    name="parameterName",
-                    type="STRING",
-                    description=(
-                        f"Fleet sensor type when the limit is for one: {SENSOR_PARAMETER_NAMES}. "
-                        "Use Vibration for N1 and N2 vibration. "
-                        "Otherwise the parameter's words from the text, e.g. Oil Pressure, "
-                        "led by its subsystem when it has one, e.g. Gearbox Oil Pressure. "
-                        "Never qualify a sensor type."
-                    ),
-                ),
-                PropertyType(name="unit", type="STRING", description="Unit of measurement"),
-                PropertyType(
-                    name="regime",
-                    type="STRING",
-                    description=(
-                        f"Operating regime or level, exactly one of: "
-                        f"{OPERATING_LIMIT_REGIMES_TEXT}. "
-                        "Use All for a stated limit whose text names no regime."
-                    ),
-                ),
-                PropertyType(
-                    name="minValue",
-                    type="STRING",
-                    description=(
-                        "Lowest allowed value, a number from the text. "
-                        "Set minValue or maxValue on every limit."
-                    ),
-                ),
-                PropertyType(
-                    name="maxValue",
-                    type="STRING",
-                    description=(
-                        "Highest allowed value, a number from the text. For Takeoff, "
-                        "Max Continuous, and Start it is the hard limit from the "
-                        "Operating Limits table's Maximum column. A Normal Operating "
-                        "Parameters bound uses a '<regime> Normal' regime instead."
-                    ),
-                ),
-                PropertyType(
-                    name="aircraftType",
-                    type="STRING",
-                    description="Aircraft type, e.g. A320-200",
-                ),
-            ],
-            additional_properties=False,
-        ),
     ]
     relationship_types = [
         RelationshipType(label="HAS_SYSTEM"),
         RelationshipType(label="HAS_COMPONENT"),
         RelationshipType(label="HAS_FAULT"),
         RelationshipType(label="HAS_PROCEDURE"),
-        RelationshipType(label="HAS_LIMIT"),
         RelationshipType(label="CORRECTED_BY"),
     ]
     patterns = [
@@ -509,12 +411,6 @@ def build_extraction_schema():
             target="MaintenanceProcedure",
         ),
         Pattern(source="Fault", relationship="CORRECTED_BY", target="MaintenanceProcedure"),
-        Pattern(source="SystemReference", relationship="HAS_LIMIT", target="OperatingLimit"),
-        Pattern(
-            source="ComponentReference",
-            relationship="HAS_LIMIT",
-            target="OperatingLimit",
-        ),
     ]
     constraints = [
         ConstraintType(
@@ -529,19 +425,8 @@ def build_extraction_schema():
             "ComponentReference",
             "Fault",
             "MaintenanceProcedure",
-            "OperatingLimit",
         )
     ]
-    # Entity resolution merges same-name limits and discards the later
-    # properties, so a limit needs its regime to keep a name of its own.
-    constraints.append(
-        ConstraintType(
-            type=GraphConstraintType.EXISTENCE,
-            node_type="OperatingLimit",
-            property_names=("regime",),
-            relationship_type=None,
-        )
-    )
 
     return GraphSchema(
         node_types=tuple(node_types),

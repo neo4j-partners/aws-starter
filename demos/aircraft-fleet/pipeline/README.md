@@ -51,8 +51,8 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 
 - **Sample fulltext indexes:** Stage 2 also creates four fulltext indexes for sample queries: `maintenance_search`, `delay_search`, `component_search`, and `document_search`.
 - **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`.
-- **Extracted labels:** Stage 3 writes `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit`.
-- **Operating limits:** Each `OperatingLimit` has a `regime` from a closed list of 15 in `schema.OPERATING_LIMIT_REGIMES`. `EXTRACTION_PROMPT` takes the hard limits for Takeoff, Max Continuous, and Start only from the Maximum column of a manual's Operating Limits table. It gives a value from the Normal Operating Parameters table a `<regime> Normal` regime, such as `Takeoff Normal`.
+- **Extracted labels:** Stage 3 writes `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, and `MaintenanceProcedure`.
+- **Operating limits:** Enrich doesn't extract limits. The load writes each `OperatingLimit` from `generated/operating_limits.csv`, and enrich keeps those nodes. Each CSV row names the generated block and the exact line or sentence of the manual that states the limit. Enrich finds that text in the block and links the limit by `FROM_CHUNK` to each chunk that holds it whole. When no chunk holds it whole, the limit links to the chunks that overlap it. A table header that a chunk repeats doesn't count, and neither does a block that restates a limit, such as `egt-exceedance` or `quick-ref-engine`.
 - **Model:** Extraction uses `global.anthropic.claude-sonnet-5-5` by default. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions.
 
 ## The dual graph
@@ -62,7 +62,7 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 After stage 4, one database holds two subgraphs:
 
 - **Operational graph:** This graph comes from the CSVs. It holds each aircraft by tail number, with its systems, components, sensors, readings, flights, and maintenance events.
-- **Knowledge graph:** The LLM extracts this graph from the manuals. It holds model-level systems, components, faults, procedures, and operating limits.
+- **Knowledge graph:** The LLM extracts this graph from the manuals. It holds model-level systems, components, faults, and procedures.
 
 `link_to_existing_graph()` writes these relationships between them:
 
@@ -78,8 +78,7 @@ An agent can start from a sensor reading on one aircraft. It can move to the
 operating limits for that sensor and model. It can then pull the repair
 procedure text with vector search over the linked chunks.
 
-- **Empty limits:** `link_to_existing_graph()` deletes each `OperatingLimit` that has no `minValue` and no `maxValue`. It does this before it writes `HAS_LIMIT`.
-- **Model scope:** Entity names include the aircraft type. Entity resolution stays inside one model, so each model keeps its own limits.
+- **Model scope:** Entity names include the aircraft type, so entity resolution stays inside one model.
 
 ## Commands
 
@@ -126,7 +125,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **Your files:** Files you add to `generated/` are kept.
 - **Graph check:** `verify` compares the graph's `Dataset` node with the stamp, and the stamp with the current code. It also compares each operational label's node count with its CSV row count.
 - **Strict mode:** `verify --strict` fails on any mismatch, or when the stamp is missing.
-- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the cross links, the sensor limit check, the EGT limit check, and the check for systems without a `SystemReference`. The sensor limit check requires every `Sensor` to link to an `OperatingLimit`, except the `AirDataDisagree` sensors that the manuals give no limit. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
+- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the cross links, the sensor limit check, the EGT limit check, the limit chunk check, and the check for systems without a `SystemReference`. The sensor limit check requires every `Sensor` to link to an `OperatingLimit`, except the `AirDataDisagree` sensors that the manuals give no limit. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
 
 ## Structured output on Bedrock
 

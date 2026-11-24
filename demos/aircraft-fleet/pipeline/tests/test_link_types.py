@@ -1,4 +1,4 @@
-"""Reference nodes and operating limits link on exact type, ignoring case.
+"""Reference nodes link on exact type, ignoring case, and limits are left alone.
 
 This test writes to Neo4j, so it runs only when NEO4J_TEST_URI points at a
 local server. Set NEO4J_TEST_PASSWORD, and optionally NEO4J_TEST_USERNAME
@@ -232,52 +232,41 @@ def test_component_links_only_within_its_parent_system_type(driver: Driver, data
     ]
 
 
-# One aircraft with an engine EGT sensor, and operating limits.
+# One aircraft with an engine EGT sensor, linked to one of two loaded limits.
 _SENSOR_SETUP = """
 CREATE (a:Aircraft {aircraft_id: $model + '-A', model: $model})
 CREATE (a)-[:HAS_SYSTEM]->(e:System {system_id: $model + '-E', type: 'Engine'})
-CREATE (e)-[:HAS_SENSOR]->(:Sensor {sensor_id: $model + '-SN1', type: 'EGT'})
-WITH 1 AS _
-UNWIND $limits AS ol
+CREATE (e)-[:HAS_SENSOR]->(s:Sensor {sensor_id: $model + '-SN1', type: 'EGT'})
+CREATE (s)-[:HAS_LIMIT]->(:OperatingLimit {
+    name: 'EGT Takeoff - ' + $model, parameterName: 'EGT', aircraftType: $model,
+    maxValue: 890.0
+})
 CREATE (:OperatingLimit {
-    name: ol.name, parameterName: ol.parameter, aircraftType: ol.model,
-    minValue: ol.min, maxValue: ol.max
+    name: 'EGT All - ' + $model, parameterName: 'EGT', aircraftType: $model
 })
 """
 
-_LIMITS = [
-    {"name": "EGT exact", "parameter": "EGT", "model": MODEL, "max": "890"},
-    {"name": "EGT lower", "parameter": "egt", "model": MODEL, "min": "645"},
-    # A limit with no value is dropped before the link.
-    {"name": "EGT no value", "parameter": "EGT", "model": MODEL},
-    {"name": "Vibration", "parameter": "Vibration", "model": MODEL, "max": "3.5"},
-    {"name": "EGT other model", "parameter": "EGT", "model": MODEL + "-OTHER", "max": "890"},
-]
 
-
-def test_sensor_links_to_limits_on_parameter_name_ignoring_case(
-    driver: Driver, database: str
-) -> None:
-    driver.execute_query(_SENSOR_SETUP, model=MODEL, limits=_LIMITS, database_=database)
+def test_cross_links_leave_the_loaded_limits_alone(driver: Driver, database: str) -> None:
+    """The load writes the limits and their sensor links, so enrich adds and drops none."""
+    driver.execute_query(_SENSOR_SETUP, model=MODEL, database_=database)
 
     link_to_existing_graph(driver, database)
 
     records, _, _ = driver.execute_query(
         """
-        MATCH (s:Sensor)-[:HAS_LIMIT]->(ol:OperatingLimit)
-        WHERE s.sensor_id STARTS WITH $model
-        RETURN ol.name AS limit
+        MATCH (ol:OperatingLimit) WHERE ol.aircraftType = $model
+        OPTIONAL MATCH (s:Sensor)-[:HAS_LIMIT]->(ol)
+        RETURN ol.name AS limit, count(s) AS sensors
         ORDER BY limit
         """,
         model=MODEL,
         database_=database,
     )
-    assert [r["limit"] for r in records] == ["EGT exact", "EGT lower"]
-    records, _, _ = driver.execute_query(
-        "MATCH (ol:OperatingLimit {name: 'EGT no value'}) RETURN count(ol) AS count",
-        database_=database,
-    )
-    assert records[0]["count"] == 0
+    assert [(r["limit"], r["sensors"]) for r in records] == [
+        (f"EGT All - {MODEL}", 0),
+        (f"EGT Takeoff - {MODEL}", 1),
+    ]
 
 
 def test_a_database_with_other_nodes_is_skipped(driver: Driver, database: str) -> None:

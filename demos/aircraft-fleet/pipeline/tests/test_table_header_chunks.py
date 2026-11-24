@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import re
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from neo4j_graphrag.components.types import TextChunks
 from populate_aircraft_db.config import Settings
 from populate_aircraft_db.pipeline import (
     ContextPrependingSplitter,
+    held_start,
     markdown_tables,
     read_manual_text,
     with_table_header,
@@ -38,14 +40,17 @@ class _Rewriting(FixedSizeSplitter):
         return result
 
 
-def _split(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+def _split_chunks(text: str, chunk_size: int, chunk_overlap: int) -> TextChunks:
     splitter = ContextPrependingSplitter(
         FixedSizeSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap, approximate=True),
         context=CONTEXT,
         document_id="doc",
     )
-    result = asyncio.run(splitter.run(text))
-    return [chunk.text for chunk in result.chunks]
+    return asyncio.run(splitter.run(text))
+
+
+def _split(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+    return [chunk.text for chunk in _split_chunks(text, chunk_size, chunk_overlap).chunks]
 
 
 def _body(chunk: str) -> str:
@@ -117,6 +122,48 @@ def test_a_chunk_starting_outside_a_table_is_unchanged() -> None:
     tables = markdown_tables(TEXT)
     start = TEXT.index("After")
     assert with_table_header(TEXT, start, len(TEXT), tables) == TEXT[start:]
+
+
+@pytest.mark.parametrize(
+    ("at", "held_at", "needs_header"),
+    [
+        pytest.param("400 |", "| EGT", True, id="body-row"),
+        pytest.param("| N1", "| N1", True, id="row-start"),
+        pytest.param("------|---------|", HEADER, False, id="separator"),
+        pytest.param(HEADER, HEADER, False, id="header-row"),
+        pytest.param("After", "After", False, id="outside"),
+    ],
+)
+def test_held_start_moves_to_the_row_or_header_start(
+    at: str, held_at: str, needs_header: bool
+) -> None:
+    tables = markdown_tables(TEXT)
+    held, table = held_start(TEXT, TEXT.index(at), len(TEXT), tables)
+    assert held == TEXT.index(held_at)
+    assert (table is not None) == needs_header
+
+
+@pytest.mark.parametrize("manual", MANUALS, ids=lambda path: path.stem)
+def test_each_chunk_records_the_range_of_text_it_holds(manual: Path) -> None:
+    """A chunk's text ends with its range, and only an added table header comes between."""
+    chunk_size = Settings.model_fields["chunk_size"].default
+    chunk_overlap = Settings.model_fields["chunk_overlap"].default
+    text = read_manual_text(manual)
+    chunks = _split_chunks(text, chunk_size, chunk_overlap).chunks
+    tables = markdown_tables(text)
+    headers = {text[table.start : table.body_start] for table in tables}
+    for chunk in chunks:
+        start, end = chunk.metadata["startOffset"], chunk.metadata["endOffset"]
+        held = text[start:end]
+        body = _body(chunk.text)
+        assert body.endswith(held)
+        assert body[: len(body) - len(held)] in headers | {""}
+    assert chunks[0].metadata["startOffset"] == 0
+    assert chunks[-1].metadata["endOffset"] == len(text)
+    # Consecutive ranges overlap or touch, so every character is held.
+    assert all(
+        b.metadata["startOffset"] <= a.metadata["endOffset"] for a, b in itertools.pairwise(chunks)
+    )
 
 
 def test_the_splitter_puts_the_header_after_the_context_line() -> None:

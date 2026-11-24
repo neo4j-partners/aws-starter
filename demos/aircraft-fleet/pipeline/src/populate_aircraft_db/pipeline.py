@@ -413,7 +413,8 @@ filter or a fuel nozzle. Never invent other values.
 8. OPERATING LIMITS: Emit an OperatingLimit only when the text gives a \
 numeric minValue or maxValue. Set `regime` to exactly one of \
 {OPERATING_LIMIT_REGIMES_TEXT}, and use the same words in the name. Use All \
-when the text names no regime.
+for a stated limit whose text names no regime. Skip nominal, design, and \
+capacity values, such as a pump's flow rate or a system's operating pressure.
 - Hard limits: Takeoff, Max Continuous, and Start come only from the \
 Operating Limits table, the one with Normal, Caution, and Maximum columns. \
 Set maxValue from its Maximum column, e.g. "EGT Takeoff - A320-200" with \

@@ -352,7 +352,7 @@ def test_concurrent_rejections_of_one_password_read_it_again_once(supervisor, mo
     monkeypatch.setattr(server, "memory_settings", memory.memory_settings)
     monkeypatch.setattr(server, "forget_memory_settings", memory.forget_memory_settings)
     forgotten: list[bool] = []
-    monkeypatch.setattr(memory, "forget_secrets", lambda: forgotten.append(True))
+    monkeypatch.setattr(memory, "forget_secret", lambda _var: forgotten.append(True))
 
     def new_manager(session_id, user_id, settings, background_hook):
         manager = FakeManager(settings=settings)
@@ -424,7 +424,7 @@ def test_a_rejected_restore_forgets_the_password_its_client_used(supervisor, mon
     monkeypatch.delenv("MEM_NEO4J_PASSWORD_SECRET_ARN", raising=False)
     monkeypatch.setenv("MEM_NEO4J_URI", "bolt://127.0.0.1:37687")
     monkeypatch.setenv("MEM_NEO4J_PASSWORD", "p1")
-    monkeypatch.setattr(memory, "forget_secrets", lambda: None)
+    monkeypatch.setattr(memory, "forget_secret", lambda _var: None)
     for name in ("memory_settings", "forget_memory_settings", "build_session_manager"):
         monkeypatch.setattr(server, name, getattr(memory, name))
     clients: list[FakeMemoryClient] = []

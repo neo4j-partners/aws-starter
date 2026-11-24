@@ -190,6 +190,7 @@ def test_schema_cache_honors_ttl(monkeypatch) -> None:
 
     monkeypatch.setattr(retrieval, "_schema_cache", None)
     monkeypatch.setattr(retrieval, "get_driver", object)
+    monkeypatch.setattr(retrieval, "_with_rotated_login", lambda call: call())
     monkeypatch.setattr(retrieval, "get_schema", fake_get_schema)
     monkeypatch.setattr(retrieval.time, "monotonic", lambda: clock[0])
     monkeypatch.setattr(
@@ -333,9 +334,9 @@ def rotating_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeSecret]:
         "client",
         lambda service, region_name: SimpleNamespace(get_secret_value=get_secret_value),
     )
-    secrets.forget_secrets()
+    secrets._secrets.clear()
     yield secret
-    secrets.forget_secrets()
+    secrets._secrets.clear()
 
 
 def unauthorized() -> neo4j.exceptions.Neo4jError:
@@ -627,6 +628,90 @@ def test_reload_reports_whether_the_login_changed(rotating_secret: FakeSecret) -
     assert manager.reload() is True
     assert manager.get_auth() == neo4j.basic_auth("reader", "rotated-pw")
     assert rotating_secret.reads == 3
+
+
+def test_the_first_query_uses_the_login_startup_read(rotating_secret: FakeSecret) -> None:
+    # server.main reads the login once before the server starts.
+    secrets.neo4j_login()
+    assert rotating_secret.reads == 1
+
+    manager = retrieval.RotatingLoginAuthManager()
+    assert manager.get_auth() == neo4j.basic_auth("reader", "first-pw")
+    assert rotating_secret.reads == 1
+
+    rotating_secret.rotate("rotated-pw")
+    assert manager.reload() is True
+    assert rotating_secret.reads == 2
+    assert manager.get_auth() == neo4j.basic_auth("reader", "rotated-pw")
+    assert rotating_secret.reads == 2
+
+
+def test_a_fleet_rotation_keeps_the_memory_secret(
+    rotating_secret: FakeSecret, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    memory_secret = secrets._SecretLogin("memory-user", "memory-pw")
+    monkeypatch.setitem(
+        secrets._secrets, (SECRET_ARN, "MEM_NEO4J_PASSWORD_SECRET_ARN"), memory_secret
+    )
+    manager = retrieval.RotatingLoginAuthManager()
+    manager.get_auth()
+    rotating_secret.rotate("rotated-pw")
+
+    assert manager.reload() is True
+    assert secrets._secrets[(SECRET_ARN, "MEM_NEO4J_PASSWORD_SECRET_ARN")] is memory_secret
+
+
+@pytest.fixture
+def schema_on_fake_server(
+    fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[list[str]]:
+    """Point the shared driver at the fake server, with a schema fetch that runs one query.
+
+    Yields the passwords each fetch attempt started with.
+    """
+    manager = retrieval.RotatingLoginAuthManager()
+    attempts: list[str] = []
+
+    def fake_get_schema(driver: neo4j.Driver, database: str) -> str:
+        attempts.append(manager.get_auth().credentials)
+        run_query(driver)
+        return "schema"
+
+    with fake_server_driver(fake_neo4j.uri, manager) as driver:
+        monkeypatch.setattr(retrieval, "_driver", driver)
+        monkeypatch.setattr(retrieval, "_auth", manager)
+        monkeypatch.setattr(retrieval, "_schema_cache", None)
+        monkeypatch.setattr(retrieval, "get_schema", fake_get_schema)
+        yield attempts
+
+
+def test_a_schema_fetch_recovers_from_a_rotated_login(
+    schema_on_fake_server: list[str], fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret
+) -> None:
+    retrieval._auth.get_auth()
+    rotating_secret.rotate("rotated-pw")
+
+    assert retrieval.get_graph_schema() == "schema"
+
+    assert schema_on_fake_server == ["first-pw", "rotated-pw"]
+    assert fake_neo4j.logins == ["first-pw", "rotated-pw"]
+    assert rotating_secret.reads == 2
+    assert retrieval._schema_cache is not None
+
+
+def test_a_failed_schema_fetch_caches_nothing(
+    schema_on_fake_server: list[str], fake_neo4j: FakeNeo4j, rotating_secret: FakeSecret
+) -> None:
+    with pytest.raises(neo4j.exceptions.AuthError):
+        retrieval.get_graph_schema()
+
+    # The secret still holds the rejected password, so there is no retry.
+    assert schema_on_fake_server == ["first-pw"]
+    assert retrieval._schema_cache is None
+
+    rotating_secret.rotate("rotated-pw")
+    assert retrieval.get_graph_schema() == "schema"
+    assert retrieval._schema_cache is not None
 
 
 def test_close_drops_the_driver_and_the_retrievers_that_hold_it(

@@ -148,6 +148,7 @@ Folder: [`patterns/gateway-rbac-interceptor/`](./patterns/gateway-rbac-intercept
 
 ## Documentation
 
+- **[`docs/PROJECT-WALKTHROUGH.md`](docs/PROJECT-WALKTHROUGH.md):** This walkthrough names each part of the repository, shows how the parts connect, and links to their READMEs.
 - **[`CLAUDE.md`](CLAUDE.md):** This file lists detailed commands for Claude Code and for developers.
 - **[`demos/aircraft-fleet/README.md`](demos/aircraft-fleet/README.md):** This walkthrough builds a GraphRAG ingest pipeline on Bedrock, loads the aircraft digital twin graph into Neo4j, and runs an agent over it.
 

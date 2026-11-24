@@ -92,7 +92,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 | `./setup.sh` | Install dependencies, generate, clean, load, enrich, fuse, and `verify --strict` |
 | `./setup.sh generate` | Stage 1 only |
 | `./setup.sh load` | Regenerate if stale, clean, then stages 2 to 5. This needs Bedrock or LLM access. |
-| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 and relinking only. This makes no model calls. It ends with `verify --strict --skip-enrichment`. Missing enrichment prints as warnings, and an operational problem fails the run. |
+| `./setup.sh load-operational` | Regenerate if stale, clean, then stage 2 only. This makes no model calls. It ends with `verify --strict --skip-enrichment`. Missing enrichment prints as warnings, and an operational problem fails the run. |
 | `./setup.sh verify` | Stage 5 only, with `--strict`. It is read-only. It needs the CSVs in `generated/`, so run `./setup.sh generate` first in a fresh clone. |
 | `./setup.sh clean` | Delete all nodes and relationships |
 | `./setup.sh samples` | Run showcase queries against the loaded graph |
@@ -105,7 +105,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **`clean-enrichment`:** This command drops only the knowledge graph. It keeps the operational data.
 - **`debug-extract`:** This command runs the extractor on selected chunks. It does not write to Neo4j.
 - **`agent-samples`:** This command simulates an agent that sends Cypher and vector searches.
-- **`load-operational`:** This command loads without running `clean` first. Run `clean` before it, or use `./setup.sh load-operational`.
+- **`load-operational`:** This command loads without running `clean` first. It then relinks any enrichment already in the graph. Run `clean` before it, or use `./setup.sh load-operational`.
 
 ### generate-data
 

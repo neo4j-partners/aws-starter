@@ -1021,10 +1021,11 @@ def _retry_stack_delete(aws: Aws, cfg: Config) -> bool:
 
 
 def cmd_cleanup(aws: Aws, cfg: Config) -> None:
-    log_step("Cleanup: Delete Stack and ECR Repository")
+    log_step("Cleanup: Delete Stack, Secret, and ECR Repository")
 
     log_info("This will delete:")
     log_info(f"  - AgentCore runtime and CDK stack: {cfg.stack_name}")
+    log_info("  - CloudWatch log groups of the AgentCore runtime")
     log_info(f"  - Secrets Manager secret: {secret_name(cfg)}")
     log_info(f"  - ECR repository: {cfg.ecr_repo_name} (confirmed separately)")
     print()

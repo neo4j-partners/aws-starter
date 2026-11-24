@@ -103,7 +103,7 @@ works in any Bedrock and `neo4j-graphrag` pipeline.
 
 ## Fusion and indexes
 
-![The dual graph: the operational graph, the knowledge graph, and the five link types between them](../images/dual-graph.svg)
+![The dual graph: the operational graph, the knowledge graph, and the links between them](../images/dual-graph.svg)
 
 Stage 4 creates the chunk indexes and then links the knowledge graph to the
 operational graph with `link_to_existing_graph()`.

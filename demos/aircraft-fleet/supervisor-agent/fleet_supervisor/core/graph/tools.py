@@ -107,7 +107,7 @@ def vector_search_tool(query: str, top_k: int = 5, aircraft_type: str | None = N
     answer lives in document text. For exact lookups or counts, use
     graph_query_tool instead. Each chunk starts with a [Source: ...] line that
     names its document ID, aircraft type, and chunk number, and an Entities
-    line lists the faults, components, and limits extracted from it.
+    line lists the faults, components, and limits linked to it.
 
     Args:
         query: Natural-language search text.

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Pipeline Flow</title>
-  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Generate also writes the operating limits to a CSV, and load writes them with their Sensor HAS_LIMIT links. Enrich repeats each table's header in every chunk cut from it, extracts faults and procedures, and links each limit to the chunks that state it. Verify also checks the EGT limits against the generator's specs and checks that every System has a SystemReference. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
+  <desc>The pipeline runs five stages: generate CSVs, load the operational graph, enrich from the manuals with Bedrock, index and fuse the two graphs, and verify. Generate also writes the operating limits to a CSV, and load writes them with their Sensor HAS_LIMIT links. Enrich repeats each table's header in every chunk cut from it and extracts faults and procedures. Index and fuse also links each limit to the chunks that state it. Verify also checks the EGT limits against the generator's specs. It checks that every System has a SystemReference and that every limit has a chunk. Stages 2 to 4 write the Neo4j fleet graph, which the supervisor agent and the UI read, and stage 5 checks it.</desc>
   <style>
     .h1 { font-size: 32px; font-weight: 700; fill: #16233A; }
     .sub { font-size: 17px; fill: #5C6470; }
@@ -81,9 +81,7 @@
   <text x="680" y="426" class="s">Embeds each chunk</text>
   <text x="680" y="452" class="s">Extracts faults and</text>
   <text x="680" y="472" class="s">procedures</text>
-  <text x="680" y="498" class="s">Links each limit to the</text>
-  <text x="680" y="518" class="s">chunks that state it</text>
-  <text x="680" y="544" class="s">Merges same-name entities</text>
+  <text x="680" y="498" class="s">Merges same-name entities</text>
 
   <circle cx="1006" cy="256" r="18" fill="#2E6DB4"/><text x="1006" y="262" text-anchor="middle" class="num">4</text>
   <text x="1034" y="263" class="t">Index and fuse</text>
@@ -93,21 +91,24 @@
   <text x="990" y="386" class="s">Links manual entities to</text>
   <text x="990" y="406" class="s">real aircraft, systems,</text>
   <text x="990" y="426" class="s">and components</text>
+  <text x="990" y="452" class="s">Links each limit to the</text>
+  <text x="990" y="472" class="s">chunks that state it</text>
 
   <circle cx="1316" cy="256" r="18" fill="#2E6DB4"/><text x="1316" y="262" text-anchor="middle" class="num">5</text>
   <text x="1344" y="263" class="t">Verify</text>
   <text x="1300" y="296" class="m">loader.py · pipeline.py</text>
   <text x="1300" y="334" class="s">Node counts match CSVs</text>
-  <text x="1300" y="360" class="s">Graph stamp matches</text>
-  <text x="1300" y="380" class="s">the CSV stamp</text>
-  <text x="1300" y="406" class="s">Cross links exist</text>
-  <text x="1300" y="432" class="s">Every System has a</text>
-  <text x="1300" y="452" class="s">SystemReference</text>
-  <text x="1300" y="478" class="s">EGT limits match</text>
-  <text x="1300" y="498" class="s">the generator's specs</text>
-  <text x="1300" y="524" class="s">--strict fails on warnings,</text>
-  <text x="1300" y="544" class="s">but --skip-enrichment keeps</text>
-  <text x="1300" y="564" class="s">enrichment checks as warnings</text>
+  <text x="1300" y="358" class="s">Graph stamp matches</text>
+  <text x="1300" y="378" class="s">the CSV stamp</text>
+  <text x="1300" y="402" class="s">Cross links exist</text>
+  <text x="1300" y="426" class="s">Every System has a</text>
+  <text x="1300" y="446" class="s">SystemReference</text>
+  <text x="1300" y="470" class="s">EGT limits match</text>
+  <text x="1300" y="490" class="s">the generator's specs</text>
+  <text x="1300" y="514" class="s">Every limit has a chunk</text>
+  <text x="1300" y="538" class="s">--strict fails on warnings,</text>
+  <text x="1300" y="558" class="s">but --skip-enrichment keeps</text>
+  <text x="1300" y="578" class="s">enrichment checks as warnings</text>
 
   <!-- Stage arrows -->
   <path d="M310,345 H346" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>

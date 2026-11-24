@@ -505,22 +505,18 @@ def debug_extract_cmd(
     except ValueError as exc:
         raise typer.BadParameter("--chunks must be a comma-separated list of integers") from exc
 
-    try:
-        passed = debug_extract_chunks(
-            settings.document_dir,
-            filename=document,
-            chunk_indexes=chunk_indexes,
-            provider=creds.provider,
-            openai_api_key=creds.openai_key,
-            region=creds.region,
-            llm_model=creds.llm_model,
-            llm_max_tokens=creds.llm_max_tokens,
-            chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap,
-        )
-    except ImportError as exc:
-        print(f"[FAIL] {exc}")
-        raise typer.Exit(code=1) from exc
+    passed = debug_extract_chunks(
+        settings.document_dir,
+        filename=document,
+        chunk_indexes=chunk_indexes,
+        provider=creds.provider,
+        openai_api_key=creds.openai_key,
+        region=creds.region,
+        llm_model=creds.llm_model,
+        llm_max_tokens=creds.llm_max_tokens,
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+    )
     if not passed:
         raise typer.Exit(code=1)
 

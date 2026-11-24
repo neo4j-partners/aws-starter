@@ -708,12 +708,12 @@ Linear hydraulic actuator providing:
 - Chemical contamination (wrong fluid type)
 
 **Testing Procedure:**
+<!-- BEGIN GENERATED: hydraulic-water-content -->
 1. Obtain fluid sample from reservoir drain
 2. Perform particle count analysis (NAS 1638 Class 6 max)
-<!-- BEGIN GENERATED: hydraulic-water-content -->
 3. Check water content (< 0.1% by volume)
-<!-- END GENERATED: hydraulic-water-content -->
 4. Verify fluid acidity (TAN < 1.5)
+<!-- END GENERATED: hydraulic-water-content -->
 
 **Corrective Actions:**
 - Flush and filter if particle count elevated

@@ -556,9 +556,22 @@ def water_content_line(model: str) -> str:
     return template.format(maximum=HYDRAULIC_WATER_CONTENT_MAX[model])
 
 
+# The A320 block holds its whole testing procedure. Block markers inside the
+# numbered list would split it into separate lists when the manual renders.
+_A320_TESTING_PROCEDURE = (
+    "1. Obtain fluid sample from reservoir drain\n"
+    "2. Perform particle count analysis (NAS 1638 Class 6 max)\n"
+    "{water_content}\n"
+    "4. Verify fluid acidity (TAN < 1.5)"
+)
+
+
 def _hydraulic_water_content(model: str, engine: EngineSpec, stats: Stats) -> str:
     """§6: the hydraulic fluid's water content limit."""
-    return water_content_line(model)
+    line = water_content_line(model)
+    if model == "A320-200":
+        return _A320_TESTING_PROCEDURE.format(water_content=line)
+    return line
 
 
 # The section 7 text of each code, from the B737 manual: description, ATA

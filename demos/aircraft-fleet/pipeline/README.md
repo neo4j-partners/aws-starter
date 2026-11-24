@@ -20,10 +20,10 @@ manuals, and links the two into one graph.
 - **Stamped datasets:** Each run records its settings and code hash. The load copies the stamp into the graph, and `verify` checks it.
 - **Safe regeneration:** A failed or stopped generate run keeps the previous CSVs. A lock stops two runs from writing the same folder.
 - **Structured output on Bedrock:** `StructuredBedrockLLM` gets schema-valid JSON from Claude through Converse tool use.
-- **Document context in every chunk:** `ContextPrependingSplitter` puts the aircraft model in front of every chunk, so extraction labels each entity correctly.
+- **Document context in every chunk:** `ContextPrependingSplitter` puts the aircraft model in front of every chunk, so extraction labels each entity correctly. It also repeats a markdown table's header row in every chunk cut from that table.
 - **Graph fusion:** Typed relationships link the extracted knowledge to the real aircraft, systems, components, and sensors.
 - **Hybrid search indexes:** The pipeline creates a vector index and a fulltext index over the manual chunks.
-- **Strict verification:** `verify --strict` exits with a nonzero code on any warning, so it works in CI.
+- **Strict verification:** `verify --strict` turns warnings into failures and exits with a nonzero code. That makes it usable in CI. With `--skip-enrichment`, the enrichment checks stay warnings.
 
 ## Quick start
 
@@ -49,8 +49,10 @@ cp ../.env.sample ../.env   # set NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 | 4. Index and fuse | `schema.py`, `pipeline.py` | The `maintenanceChunkEmbeddings` vector index, the `maintenanceChunkText` fulltext index, and the links between the two graphs |
 | 5. Verify | `loader.py`, `pipeline.py` | A pass or fail report |
 
+- **Sample fulltext indexes:** Stage 2 also creates four fulltext indexes for sample queries: `maintenance_search`, `delay_search`, `component_search`, and `document_search`.
 - **Operational labels:** Stage 2 writes `Aircraft`, `System`, `Component`, `Sensor`, `Reading`, `Flight`, `Airport`, `Delay`, `MaintenanceEvent`, and `Removal`.
 - **Extracted labels:** Stage 3 writes `AircraftModel`, `SystemReference`, `ComponentReference`, `Fault`, `MaintenanceProcedure`, and `OperatingLimit`.
+- **Operating limits:** Each `OperatingLimit` has a `regime` from a closed list of 15 in `schema.OPERATING_LIMIT_REGIMES`. `EXTRACTION_PROMPT` takes the hard limits for Takeoff, Max Continuous, and Start only from the Maximum column of a manual's Operating Limits table. It gives a value from the Normal Operating Parameters table a `<regime> Normal` regime, such as `Takeoff Normal`.
 - **Model:** Extraction uses `global.anthropic.claude-sonnet-5-5` by default. Embeddings use `amazon.titan-embed-text-v2:0` with 1024 dimensions.
 
 ## The dual graph
@@ -70,12 +72,13 @@ After stage 4, one database holds two subgraphs:
 | `AircraftModel -[:DESCRIBES_MODEL]-> Aircraft` | A model entity from the manual links to each aircraft of that model. |
 | `SystemReference -[:DESCRIBES_SYSTEM]-> System` | A system in the manual links to the real system. |
 | `ComponentReference -[:DESCRIBES_COMPONENT]-> Component` | A component in the manual links to the installed component. |
-| `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to the limit that the manual defines. |
+| `Sensor -[:HAS_LIMIT]-> OperatingLimit` | A live sensor links to each limit that the manual defines for its sensor type and model. Each limit covers one regime. |
 
 An agent can start from a sensor reading on one aircraft. It can move to the
 operating limit for that sensor and model. It can then pull the repair
 procedure text with vector search over the linked chunks.
 
+- **Empty limits:** `link_to_existing_graph()` deletes each `OperatingLimit` that has no `minValue` and no `maxValue`. It does this before it writes `HAS_LIMIT`.
 - **Model scope:** Entity names include the aircraft type. Entity resolution stays inside one model, so each model keeps its own limits.
 
 ## Commands
@@ -123,7 +126,7 @@ Run these from `demos/aircraft-fleet/pipeline/`:
 - **Your files:** Files you add to `generated/` are kept.
 - **Graph check:** `verify` compares the graph's `Dataset` node with the stamp, and the stamp with the current code. It also compares each operational label's node count with its CSV row count.
 - **Strict mode:** `verify --strict` fails on any mismatch, or when the stamp is missing.
-- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, and the cross links. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
+- **Operational-only graphs:** `verify --strict --skip-enrichment` reports the enrichment checks as warnings. Those cover documents, chunks, embeddings, the chunk indexes, the extracted-entity constraints, the cross links, the EGT limit check, and the check for systems without a `SystemReference`. The operational and stamp checks still fail. `./setup.sh load-operational` uses it.
 
 ## Structured output on Bedrock
 
@@ -141,6 +144,7 @@ this pipeline.
 - **What it adds:** It adds a `[DOCUMENT CONTEXT]` header with the aircraft type and title to every chunk.
 - **Why it is needed:** `SimpleKGPipeline` passes document metadata only to the lexical graph builder. The header is the only place where the extractor sees the airframe model.
 - **Where it matters:** Chunks deep in engine sections often name only the engine.
+- **Table headers:** A chunk that starts inside a markdown table also gets the table's header row and separator after the context header. Without them, a chunk cut below a table's header holds values with no column names, such as an EGT row with no operating regimes.
 - **The prompt:** `EXTRACTION_PROMPT` tells the model to read the header and keep the airframe model apart from the engine model.
 
 ## Configuration
@@ -177,7 +181,7 @@ The pipeline reads the shared `.env` in `demos/aircraft-fleet/`.
 
 1. **Replace stage 1:** Use your own structured data source. Update the constraints and indexes in `schema.py`.
 2. **Replace `manuals/`:** Add your own documents. Update the `DOCUMENTS` list and the `[DOCUMENT CONTEXT]` header in `pipeline.py`.
-3. **Redefine the extraction schema:** Edit `build_extraction_schema` in `schema.py` and the rules in `EXTRACTION_PROMPT`.
+3. **Redefine the extraction schema:** Edit `build_extraction_schema` and `OPERATING_LIMIT_REGIMES` in `schema.py`, and the rules in `EXTRACTION_PROMPT`. The `verify` EGT limit check in `loader.py` compares extracted limits with the generator's `ENGINE_SPECS`, so replace it too.
 4. **Rewrite the fusion Cypher:** Edit `link_to_existing_graph()` so it joins your two graphs on their shared keys.
 
 `StructuredBedrockLLM` and `ContextPrependingSplitter` work unchanged.

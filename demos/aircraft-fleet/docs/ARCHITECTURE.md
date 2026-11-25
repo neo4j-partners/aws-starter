@@ -65,4 +65,4 @@ All diagrams are SVG files in [`images/`](images/).
 | [`supervisor-request-flow.svg`](images/supervisor-request-flow.svg) | One request through the supervisor, a specialist, and its graph tools |
 | [`end-to-end-sequence.svg`](images/end-to-end-sequence.svg) | One question through the Maintenance specialist, Text2Cypher, and Neo4j |
 | [`memory-lifecycle.svg`](images/memory-lifecycle.svg) | How the supervisor opens, uses, and closes conversation memory |
-| [`deployment-topology.svg`](images/deployment-topology.svg) | The one stack, the AWS services, and the two Neo4j databases |
+| [`deployment-topology.svg`](images/deployment-topology.svg) | The supervisor stack, the hosted UI stack, the AWS services, and the two Neo4j databases |

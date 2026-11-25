@@ -112,3 +112,46 @@ on port 8080. Each base image is pinned by version and digest. The
 `.dockerignore` in `demos/aircraft-fleet/` lets in only the files the image
 needs. It always leaves out `.env` files, `.mcp-credentials*.json`, and the
 AgentCore CLI state.
+
+## Deploy to the cloud
+
+`./deploy.sh` hosts this UI on AWS Lambda against the deployed supervisor. The
+[fleet README](../README.md#deploy-the-ui-to-the-cloud) lists the prerequisites
+and the steps. The CDK app is in [`infra/`](./infra/), and its stack is
+`FleetUi`.
+
+```bash
+./deploy.sh deploy                     # build the image, deploy FleetUi, print the URL
+./deploy.sh add-user you@example.com   # Cognito emails them a temporary password
+./deploy.sh status                     # show the stack and the URL
+./deploy.sh destroy [--yes]            # delete the stack and its users
+```
+
+The stack holds these resources:
+
+- **Function:** The function is an arm64 container image built from `ui/Dockerfile`, with `demos/aircraft-fleet/` as the build context. Lambda Web Adapter runs the app on port 8080 in response stream mode. The function gets 2048 MB and the 15-minute Lambda maximum, which covers the stream reader's 300-second wait for each read.
+- **Function URL:** The URL has no IAM auth and streams the response. The app checks the Cognito session itself.
+- **User pool:** Self sign-up is off, so only `./deploy.sh add-user` adds users. Users sign in with their email address on the Cognito managed login page, at the domain prefix `fleet-ui-<account ID>`.
+- **App client:** The client is public, with no secret. It uses the authorization code grant with the `openid` scope. Its callback is the function URL plus `auth/callback`, and its sign-out URL is the function URL.
+- **Session length:** The app's session is the verified ID token, so a sign-in lasts as long as the ID token. The stack sets it to one hour.
+- **Client ID parameter:** The SSM parameter `/fleet-ui/FleetUi/cognito-client-id` holds the app client ID. The function gets the parameter's name in `COGNITO_CLIENT_ID_PARAMETER` and reads the ID at startup. The client needs the function URL, so the function cannot take the client ID directly without a dependency cycle.
+- **Role:** The role can invoke only the `AGENT_ARN` runtime on its `DEFAULT` endpoint, read only the `NEO4J_PASSWORD_SECRET_ARN` secret and the client ID parameter, and write the function's logs. It has no managed policies.
+- **Logs:** The function logs to its own log group, kept for two weeks.
+
+The deploy reads `AGENT_ARN`, `NEO4J_URI`, `NEO4J_USERNAME`,
+`NEO4J_DATABASE`, and `NEO4J_PASSWORD_SECRET_ARN` from the shared `.env`. A
+value exported in the shell wins. It stops when `AGENT_ARN` or the secret ARN
+is missing, and synth stops on a malformed value. The stack deploys to the
+runtime's account and region, and the deploy checks that the AWS credentials
+belong to that account. It uses the account's existing CDK bootstrap.
+
+Destroy deletes the stack, the user pool and its users, and the log group. The
+image stays in the CDK bootstrap repository, as every CDK image asset does.
+
+Run the stack's tests from `infra/`. They synthesize the stack against a stub
+image, so they need no Docker and no AWS access.
+
+```bash
+npm ci
+npm test
+```

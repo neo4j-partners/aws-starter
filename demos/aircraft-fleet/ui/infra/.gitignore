@@ -1,0 +1,12 @@
+# The repository's Python rules ignore lib/, but here it holds the stack.
+!lib/
+
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# CDK output
+cdk.out/
+.cdk.staging/

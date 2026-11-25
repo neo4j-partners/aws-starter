@@ -88,14 +88,14 @@ Each of these was checked in the code or the AWS docs.
 
 **Outcome:** After `./agent.sh deploy`, `uv run fleet-client ask --cloud "..."` and `uv run fleet-client ui --cloud` reach the deployed runtime with no manual edit. The same commands without `--cloud` reach the local supervisor, even with `AGENT_ARN` in `.env`.
 
-- [ ] `./agent.sh deploy` writes `AGENT_ARN` and `AWS_REGION` to the shared `.env` after a successful deploy. It replaces old values and leaves every other line unchanged.
+- [x] `./agent.sh deploy` writes `AGENT_ARN` and `AWS_REGION` to the shared `.env` after a successful deploy. It replaces old values and leaves every other line unchanged.
 - [x] `./agent.sh destroy` removes `AGENT_ARN` after a successful teardown. It keeps `AWS_REGION` (decided 2026-11-24).
-- [ ] A failed deploy or destroy leaves `.env` unchanged.
-- [ ] The UI chooses local or cloud from an explicit mode setting, not from whether `AGENT_ARN` is set.
-- [ ] `fleet-client ask` runs the CLI, and `fleet-client ui` runs the UI. Both load the shared `.env` and honor `FLEET_ENV_FILE`.
-- [ ] `--cloud` without an `AGENT_ARN` stops with a message that says to run `./agent.sh deploy`.
-- [ ] Tests cover the `.env` line edits, the mode choice, and the missing-ARN message.
-- [ ] Steps 2 and 3 of the fleet README and the UI README describe the new commands.
+- [x] A failed deploy or destroy leaves `.env` unchanged.
+- [x] The UI chooses local or cloud from an explicit mode setting, not from whether `AGENT_ARN` is set.
+- [x] `fleet-client ask` runs the CLI, and `fleet-client ui` runs the UI. Both load the shared `.env` and honor `FLEET_ENV_FILE`.
+- [x] `--cloud` without an `AGENT_ARN` stops with a message that says to run `./agent.sh deploy`.
+- [x] Tests cover the `.env` line edits, the mode choice, and the missing-ARN message.
+- [x] Steps 2 and 3 of the fleet README and the UI README describe the new commands.
 
 **Done when:** `uv run pytest` passes. A real run shows the CLI and the UI answering in both modes, against the local server and runtime version 4.
 
@@ -113,7 +113,7 @@ Each of these was checked in the code or the AWS docs.
 - [x] The function's timeout covers the stream reader's 300-second wait.
 - [x] Commands deploy, check, and destroy the UI stack, and print the URL after a deploy. `ui/deploy.sh` also has `add-user`.
 - [x] CDK tests check streaming mode, the role's scope, and that self sign-up is off.
-- [ ] The UI README, the deployment doc, and the topology diagram show the hosted UI. The READMEs and the deployment doc are done. The topology diagram is left for later.
+- [x] The UI README, the deployment doc, and the topology diagram show the hosted UI.
 
 **Done when:**
 

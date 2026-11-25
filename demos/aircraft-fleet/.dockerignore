@@ -1,0 +1,25 @@
+# The build context for ui/Dockerfile. Everything is left out except the
+# files the image is built from.
+*
+# CDK stages the context from these rules, so the Dockerfile must be listed.
+!ui/Dockerfile
+!supervisor-agent/pyproject.toml
+!supervisor-agent/uv.lock
+!supervisor-agent/fleet_supervisor/
+!ui/package.json
+!ui/package-lock.json
+!ui/server.py
+!ui/auth.py
+!ui/evidence.py
+!ui/static/
+
+# Never send these, even from inside an allowed folder.
+**/.env*
+**/.mcp-credentials*.json
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/node_modules
+**/.venv
+# The image builds its own bundle.
+ui/static/bundle.js

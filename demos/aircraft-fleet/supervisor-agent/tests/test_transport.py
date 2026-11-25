@@ -56,6 +56,24 @@ def test_collect_records_errors_and_skips_junk():
     assert not result.ok
 
 
+def test_the_cli_ignores_the_followups_event(capsys):
+    events = iter_events(
+        [
+            sse(
+                {"type": "chunk", "data": "Two aircraft."},
+                {"type": "followups", "questions": ["Which tails?"]},
+                {"type": "complete"},
+            )
+        ]
+    )
+
+    result = collect(events, on_event=cli.print_event)
+
+    assert result.text == "Two aircraft."
+    assert result.ok
+    assert capsys.readouterr().out == "Two aircraft.\n"
+
+
 def test_queries_file_sets_expected_agent_from_headers():
     queries = load_queries()
     assert [q.number for q in queries] == list(range(1, 34))

@@ -1,12 +1,15 @@
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
+import { renderFollowUps } from './followups.js';
 import { EvidenceGraph } from './graph.js';
 
 const transcript = document.getElementById('transcript');
 const welcome = document.getElementById('welcome');
 const promptInput = document.getElementById('prompt');
 const send = document.getElementById('send');
+const starterForm = document.getElementById('starter-form');
 const starter = document.getElementById('starter');
+const starterSend = document.getElementById('starter-send');
 const chatStatus = document.getElementById('chat-status');
 const traceEntries = document.getElementById('trace-entries');
 const traceEmpty = document.getElementById('trace-empty');
@@ -118,6 +121,10 @@ async function* streamEvents(response) {
 function updateComposer() {
   send.disabled = Boolean(controller || !promptInput.value.trim());
   starter.disabled = Boolean(controller);
+  starterSend.disabled = Boolean(controller);
+  for (const followup of transcript.querySelectorAll('.followup')) {
+    followup.disabled = Boolean(controller);
+  }
 }
 
 async function sendQuestion(question) {
@@ -132,6 +139,7 @@ async function sendQuestion(question) {
   appendMessage('user', question);
   const answer = appendMessage('assistant', 'Working…');
   let text = '';
+  let followups = [];
   let complete = false;
 
   try {
@@ -162,6 +170,9 @@ async function sendQuestion(question) {
         case 'tool_complete':
           finishCall(event);
           break;
+        case 'followups':
+          followups = event.questions;
+          break;
         case 'complete':
           complete = true;
           break;
@@ -174,6 +185,8 @@ async function sendQuestion(question) {
       FORBID_TAGS: ['img', 'style'],
     });
     answer.classList.add('formatted');
+    const links = renderFollowUps(document, followups, sendQuestion);
+    if (links) answer.after(links);
     transcript.scrollTop = transcript.scrollHeight;
   } catch (error) {
     if (turn.signal.aborted) return;
@@ -207,9 +220,11 @@ promptInput.addEventListener('keydown', event => {
     sendQuestion(promptInput.value.trim());
   }
 });
-starter.addEventListener('click', () => sendQuestion(
-  'Find aircraft with hydraulic system issues. Show up to five maintenance events with their event IDs, aircraft tail numbers, faults, and corrective actions. Include the event IDs in the graph query results.',
-));
+// Each option's text is its short label, and its value is the full prompt.
+starterForm.addEventListener('submit', event => {
+  event.preventDefault();
+  sendQuestion(starter.value);
+});
 clearSelection.addEventListener('click', () => setSelection(null));
 document.getElementById('new-chat').addEventListener('click', () => {
   controller?.abort();

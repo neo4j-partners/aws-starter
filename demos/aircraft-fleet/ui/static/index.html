@@ -26,10 +26,20 @@
       <div class="transcript" id="transcript" role="log" aria-label="Conversation">
         <div id="welcome" class="welcome">
           <h3>What would you like to investigate?</h3>
-          <button type="button" id="starter" class="starter">
-            <span>Find aircraft with hydraulic system issues</span>
-            <span aria-hidden="true">↗</span>
-          </button>
+          <form id="starter-form" class="starter">
+            <label for="starter">Starter question</label>
+            <div class="starter-row">
+              <select id="starter" name="starter">
+                <option value="Find aircraft with hydraulic system issues. Show up to five maintenance events with their event IDs, aircraft tail numbers, faults, and corrective actions. Include the event IDs in the graph query results.">Find aircraft with hydraulic system issues</option>
+                <option value="Show me the critical severity maintenance events and which aircraft they affected. Show up to ten events with their event IDs, aircraft tail numbers, and faults. Include the event IDs and tail numbers in the graph query results.">Show critical maintenance events</option>
+                <option value="Which aircraft have had repeated failures of the same component type? Show up to five aircraft with their tail numbers, component IDs, and maintenance event IDs. Include those IDs in the graph query results.">Find repeated component failures</option>
+                <option value="Find weather-related delays longer than 60 minutes. Show up to ten flights with their flight IDs, flight numbers, aircraft tail numbers, and delay minutes. Include the flight IDs in the graph query results.">Find weather delays over an hour</option>
+                <option value="For maintenance events whose fault is 'Vibration exceedance', what corrective actions were taken, and what does the manual say the engine-vibration troubleshooting procedure is? Show up to five events with their event IDs and aircraft tail numbers. Include the event IDs in the graph query results.">Compare vibration fixes with the manual</option>
+                <option value="Which aircraft have both maintenance events and flight delays? Show up to five aircraft with their tail numbers, maintenance event IDs, and delayed flight IDs. Include those IDs in the graph query results.">Link maintenance events to flight delays</option>
+              </select>
+              <button type="submit" id="starter-send" class="primary">Ask</button>
+            </div>
+          </form>
         </div>
       </div>
       <form id="chat-form" class="composer">

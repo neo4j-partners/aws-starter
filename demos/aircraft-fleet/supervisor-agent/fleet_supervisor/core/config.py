@@ -56,6 +56,16 @@ def _env_float(name: str, default: float) -> float:
         raise ValueError(f"{name} must be a number, got {raw!r}") from None
 
 
+# Suggested follow-up questions come from one small structured call after each
+# UI answer. Haiku 4.5 is fast and cheap enough for a three-question list.
+FOLLOWUP_MODEL_ID = os.getenv(
+    "FOLLOWUP_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+)
+# The answer has already streamed when the call starts, so a slow call only
+# delays the links and the end of the turn. Past this bound, no links are sent.
+FOLLOWUP_TIMEOUT_S = _env_float("FOLLOWUP_TIMEOUT_S", 5.0)
+
+
 @dataclass(frozen=True, slots=True)
 class GraphSettings:
     """Settings for the graph tools in :mod:`core.graph`, resolved by :meth:`from_env`.

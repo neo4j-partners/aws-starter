@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild static/app.js --bundle --format=esm --minify --outfile=static/bundle.js"
+    "build": "esbuild static/app.js --bundle --format=esm --minify --outfile=static/bundle.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@neo4j-nvl/base": "2.1.0",

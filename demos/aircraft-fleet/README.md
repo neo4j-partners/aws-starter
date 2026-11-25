@@ -42,6 +42,7 @@ The [`supervisor-agent/`](./supervisor-agent/) project is a Strands supervisor w
 
 The [`ui/`](./ui/) project pairs the supervisor chat with a live evidence graph
 and a tool call trace. Select a finished tool call to highlight its evidence.
+Each answer ends with suggested follow-up questions that you can select to ask.
 
 ## Quick start
 
@@ -157,7 +158,7 @@ supervisor by default, even when `.env` sets `AGENT_ARN`. Add `--cloud` to use
 the supervisor deployed in [Step 3](#step-3-deploy-to-agentcore-runtime), as in
 `uv run fleet-client ask --cloud "..."` or `uv run fleet-client ui --cloud`.
 
-See the [UI README](./ui/README.md) for the starter question and the UI
+See the [UI README](./ui/README.md) for the starter questions and the UI
 settings.
 
 ## Deploy the UI to the cloud

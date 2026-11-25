@@ -8,6 +8,10 @@ The client events:
 - ``{"type": "tool_complete", "call_id": ..., "status": ..., "duration_ms": ...}``:
   a specialist or graph tool call finished. A successful graph query also
   carries ``evidence_ids``, the fleet IDs in its result. Sent only with trace on.
+- ``{"type": "followups", "questions": [...]}``: up to three suggested follow-up
+  questions, sent by the server after the answer and before ``complete``. Sent
+  only when the payload has ``"followups": true``, and only when the follow-up
+  call succeeds. Clients that do not know the event ignore it.
 - ``{"type": "complete"}`` and ``{"type": "error", "error": ...}``: sent by the server
 
 With trace on, the ``agent`` and ``tool`` events also carry ``call_id`` and

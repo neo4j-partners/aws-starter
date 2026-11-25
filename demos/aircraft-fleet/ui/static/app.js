@@ -2,6 +2,8 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { renderFollowUps } from './followups.js';
 import { EvidenceGraph } from './graph.js';
+import { MemoryView } from './memory.js';
+import { ViewTabs } from './views.js';
 
 const transcript = document.getElementById('transcript');
 const welcome = document.getElementById('welcome');
@@ -15,6 +17,26 @@ const traceEntries = document.getElementById('trace-entries');
 const traceEmpty = document.getElementById('trace-empty');
 const clearSelection = document.getElementById('clear-selection');
 const graph = new EvidenceGraph();
+const memory = new MemoryView(
+  document,
+  document.getElementById('memory-entries'),
+  document.getElementById('memory-note'),
+  document.getElementById('memory-count'),
+);
+const fit = document.getElementById('fit');
+const graphCount = document.getElementById('graph-count');
+const memoryCount = document.getElementById('memory-count');
+// The header shows the active view's count, and Fit graph only with the graph.
+new ViewTabs(
+  [document.getElementById('evidence-tab'), document.getElementById('memory-tab')],
+  [document.getElementById('evidence-view'), document.getElementById('memory-view')],
+  index => {
+    const showingMemory = index === 1;
+    graphCount.hidden = showingMemory;
+    memoryCount.hidden = !showingMemory;
+    fit.hidden = showingMemory;
+  },
+);
 const calls = new Map();
 let sessionId = crypto.randomUUID();
 let controller;
@@ -132,6 +154,7 @@ async function sendQuestion(question) {
   const turn = new AbortController();
   controller = turn;
   resetTrace();
+  memory.waiting();
   welcome.hidden = true;
   promptInput.value = '';
   updateComposer();
@@ -170,6 +193,9 @@ async function sendQuestion(question) {
         case 'tool_complete':
           finishCall(event);
           break;
+        case 'memory':
+          memory.show(event.entries);
+          break;
         case 'followups':
           followups = event.questions;
           break;
@@ -202,6 +228,7 @@ async function sendQuestion(question) {
           status.textContent = 'Result unavailable';
         }
       }
+      memory.finish();
       chatStatus.textContent = complete ? 'Response complete' : 'Response ended';
       updateComposer();
       promptInput.focus();
@@ -236,6 +263,7 @@ document.getElementById('new-chat').addEventListener('click', () => {
   chatStatus.textContent = 'New conversation';
   graph.reset();
   resetTrace();
+  memory.reset();
   updateComposer();
   promptInput.focus();
 });

@@ -54,7 +54,7 @@ from strands.types.exceptions import SessionException  # noqa: E402
 
 from fleet_supervisor.core.agents import build_supervisor  # noqa: E402
 from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
-from fleet_supervisor.core.events import EventMapper  # noqa: E402
+from fleet_supervisor.core.events import EventMapper, memory_event  # noqa: E402
 from fleet_supervisor.core.followups import suggest_followups  # noqa: E402
 from fleet_supervisor.core.graph import close, get_graph_schema  # noqa: E402
 from fleet_supervisor.core.memory import (  # noqa: E402
@@ -293,9 +293,16 @@ async def invoke(payload: Any, context):
         # disconnect raises it from the close.
         stream = mapper.stream(supervisor, prompt)
         answer: list[str] = []
+        # The session manager recalls memory when the prompt is added, before
+        # the first model call. So the recall is ready by the first client
+        # event. Only the traced UI asks for it.
+        unsent_recall = session if payload.get("trace") is True else None
         try:
             async for event in stream:
                 for client_event in mapper.map(event):
+                    if unsent_recall is not None:
+                        yield memory_event(unsent_recall.manager.last_recall)
+                        unsent_recall = None
                     if client_event["type"] == "chunk":
                         answer.append(client_event["data"])
                     yield client_event
@@ -316,6 +323,8 @@ async def invoke(payload: Any, context):
                 raise
         finally:
             await stream.aclose()
+        if unsent_recall is not None:
+            yield memory_event(unsent_recall.manager.last_recall)
         logger.info("Session %s handled by %s", session_id, mapper.specialists or "supervisor only")
         # Only clients that ask for follow-ups get the extra model call.
         if (

@@ -73,7 +73,7 @@ covers the read-only guard, hybrid search, and the errors the model sees.
 
 ![The supervisor reads its memory password at startup and opens one shared memory client on the first request. Each request builds a session manager, restores history, entities, and preferences, answers, saves the turn, and closes the manager. Entity extraction runs in the background. Shutdown waits for running work, then closes every memory client.](../docs/images/memory-lifecycle.svg)
 
-- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.10, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
+- **Package:** Memory uses `neo4j-agent-memory` 0.8.0+fleet.11, a build of the `neo4j-partners/agent-memory` fork. `pyproject.toml` pins the wheel URL, and `uv.lock` records its sha256.
 - **Extraction model:** The extractor runs on Claude Sonnet 5.5. It sends no temperature and lets the model choose the tool, because Sonnet 5.5 rejects both.
 - **What it stores:** Memory keeps the user and assistant text of each turn. It does not store specialist calls.
 - **One client per process:** The client opens on the first request and closes at shutdown. Each request gets its own session manager on it.
@@ -90,12 +90,13 @@ covers the read-only guard, hybrid search, and the errors the model sees.
 - **Startup check:** The server reads both logins before it serves. A missing setting, a bad secret ARN, or a missing IAM grant stops startup.
 - **Server:** `./agent.sh start` runs `uv run fleet-supervisor-server` on port 7071. Set `AGENT_PORT` to change it.
 - **Runtime entrypoint:** `uv run python main.py` starts the same server on port 8080, the port AgentCore Runtime uses.
-- **Browser UI:** The [UI](../ui/) shows the answer, the specialist and tool calls, and the graph evidence for each call.
+- **Browser UI:** The [UI](../ui/) shows the answer, the specialist and tool calls, the graph evidence for each call, and the memory recalled for the question.
 
 ### Events
 
 | Event | Meaning |
 |-------|---------|
+| `{"type": "memory", "entries": [...]}` | The memory entries recalled for the question, sent first with trace on |
 | `{"type": "agent", "name": ...}` | A specialist was called |
 | `{"type": "tool", "name": ...}` | A specialist called a graph tool |
 | `{"type": "chunk", "data": ...}` | Text of the supervisor's answer |
@@ -106,6 +107,15 @@ covers the read-only guard, hybrid search, and the errors the model sees.
 A payload with `"trace": true` adds a `call_id` and a `parent_id` to the
 `agent` and `tool` events. It also adds a `tool_complete` event when a
 specialist or graph tool call finishes. The UI uses the trace.
+
+A traced payload also gets one `memory` event before any other event. It
+lists the long-term memory entries the session manager recalled for the
+question, which are the entries the model saw. Each entry has `kind`, `id`,
+`type`, `text`, and `score`. The `kind` is `entity`, `preference`, or `fact`.
+The `score` is the vector similarity, or `null` when the search gives none.
+The list is empty when nothing was recalled. The recall covers only the
+payload's `user_id`, or `anonymous` when the payload has none. The CLI ignores
+the event.
 
 A payload with `"followups": true` adds the `followups` event. After the
 answer, the server makes one small structured call to `FOLLOWUP_MODEL_ID`.

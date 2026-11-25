@@ -74,6 +74,19 @@ def test_the_cli_ignores_the_followups_event(capsys):
     assert capsys.readouterr().out == "Two aircraft.\n"
 
 
+def test_the_cli_ignores_the_memory_event(capsys):
+    memory = {"type": "memory", "entries": [{"kind": "entity", "id": "e-1", "text": "N12345"}]}
+    events = iter_events(
+        [sse(memory, {"type": "chunk", "data": "Two aircraft."}, {"type": "complete"})]
+    )
+
+    result = collect(events, on_event=cli.print_event)
+
+    assert result.text == "Two aircraft."
+    assert result.ok
+    assert capsys.readouterr().out == "Two aircraft.\n"
+
+
 def test_queries_file_sets_expected_agent_from_headers():
     queries = load_queries()
     assert [q.number for q in queries] == list(range(1, 34))

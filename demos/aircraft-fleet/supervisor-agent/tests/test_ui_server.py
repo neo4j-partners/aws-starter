@@ -291,6 +291,28 @@ def test_the_followups_event_is_relayed_before_complete(
     assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == events
 
 
+MEMORY = {
+    "type": "memory",
+    "entries": [
+        {"kind": "entity", "id": "e-1", "type": "AIRCRAFT", "text": "N12345", "score": 0.9}
+    ],
+}
+
+
+def test_the_memory_event_is_relayed_unchanged(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = [MEMORY, {"type": "chunk", "data": "Two aircraft"}, {"type": "complete"}]
+    monkeypatch.setattr(
+        ui_server, "supervisor_stream", lambda _turn, _user_id: nullcontext(iter(events))
+    )
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=None, auth=None))
+
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == events
+
+
 ARN = "arn:aws:bedrock-agentcore:us-east-1:0:runtime/fleet"
 
 
@@ -351,6 +373,22 @@ def test_cloud_mode_asks_for_followups_and_relays_them(
     frames = list(ui_server.relay(turn, driver=None, auth=None))
 
     assert json.loads(fake.kwargs["payload"])["followups"] is True
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == events
+
+
+def test_cloud_mode_asks_for_the_trace_and_relays_the_memory_event(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = [MEMORY, {"type": "chunk", "data": "Two aircraft"}, {"type": "complete"}]
+    fake = _FakeRuntimeClient(sse(*events))
+    monkeypatch.setattr(transport.boto3, "client", lambda *args, **kwargs: fake)
+    monkeypatch.setenv("FLEET_SUPERVISOR_MODE", "cloud")
+    monkeypatch.setenv("AGENT_ARN", ARN)
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=None, auth=None))
+
+    assert json.loads(fake.kwargs["payload"])["trace"] is True
     assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == events
 
 

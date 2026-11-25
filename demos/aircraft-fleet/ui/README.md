@@ -3,7 +3,8 @@
 The browser shows the supervisor's answer, an interactive Neo4j graph, and
 the specialist and tool calls for the current question. Select a completed
 tool call to highlight its evidence. Each answer ends with up to three
-suggested follow-up questions. Start a new chat to clear the graph and
+suggested follow-up questions. The Memory view shows the memory the
+supervisor recalled for the question. Start a new chat to clear the graph and
 open a new AgentCore conversation.
 
 From `demos/aircraft-fleet/`, start the configured supervisor in one terminal.
@@ -44,6 +45,17 @@ are disabled while a question runs. They come from a short model call after
 the answer, so they appear a moment later. When that call fails or runs
 slow, the answer shows with no links. `static/followups.js` renders them as
 text. Run its tests from `ui/` with `npm test`.
+
+The graph panel has two views. **Current evidence** is the graph. **Memory**
+lists the long-term memory entries the supervisor recalled for the question,
+which are the entries the model saw. Each entry shows its kind, its type, its
+text, and its similarity score when it has one. A question that recalled
+nothing shows an empty view with a short note. The view clears when the next
+question starts and on New chat. Arrow keys, Home, and End move between the
+two tabs. The supervisor sends the entries in a `memory` stream event, so the
+UI never connects to the memory database. `static/memory.js` renders the
+entries as text, and `static/views.js` switches the views. `npm test` covers
+both.
 
 The UI server logs in to the fleet graph the same way the supervisor's graph
 tools do, using the shared fleet `.env`. It reads `NEO4J_PASSWORD_SECRET_ARN`

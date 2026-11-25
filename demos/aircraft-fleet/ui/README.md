@@ -26,10 +26,16 @@ uv run fleet-client ui
 From `ui/`, `uv run --project ../supervisor-agent python server.py` also starts
 the UI against the local supervisor.
 
-Open [http://127.0.0.1:8081](http://127.0.0.1:8081) and select **Find
-aircraft with hydraulic system issues**. The starter question asks the agent
-to include maintenance event IDs so the canvas can show the paths from
-aircraft through systems and components to those events.
+Open [http://127.0.0.1:8081](http://127.0.0.1:8081). Pick a question from
+the **Starter question** list and select **Ask**. The first one is **Find
+aircraft with hydraulic system issues**.
+
+The six starters cover maintenance, operations, the manuals, and a question
+that spans both domains. Each starter asks the agent to include event, flight,
+or component IDs in its graph query results. The canvas uses those IDs to draw
+the paths from aircraft through systems and components to events and flights.
+The list lives in `static/index.html`. Each option's text is its label, and
+its value is the full prompt.
 
 The UI server logs in to the fleet graph the same way the supervisor's graph
 tools do, using the shared fleet `.env`. It reads `NEO4J_PASSWORD_SECRET_ARN`

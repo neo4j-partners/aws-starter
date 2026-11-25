@@ -6,7 +6,9 @@ const transcript = document.getElementById('transcript');
 const welcome = document.getElementById('welcome');
 const promptInput = document.getElementById('prompt');
 const send = document.getElementById('send');
+const starterForm = document.getElementById('starter-form');
 const starter = document.getElementById('starter');
+const starterSend = document.getElementById('starter-send');
 const chatStatus = document.getElementById('chat-status');
 const traceEntries = document.getElementById('trace-entries');
 const traceEmpty = document.getElementById('trace-empty');
@@ -118,6 +120,7 @@ async function* streamEvents(response) {
 function updateComposer() {
   send.disabled = Boolean(controller || !promptInput.value.trim());
   starter.disabled = Boolean(controller);
+  starterSend.disabled = Boolean(controller);
 }
 
 async function sendQuestion(question) {
@@ -207,9 +210,11 @@ promptInput.addEventListener('keydown', event => {
     sendQuestion(promptInput.value.trim());
   }
 });
-starter.addEventListener('click', () => sendQuestion(
-  'Find aircraft with hydraulic system issues. Show up to five maintenance events with their event IDs, aircraft tail numbers, faults, and corrective actions. Include the event IDs in the graph query results.',
-));
+// Each option's text is its short label, and its value is the full prompt.
+starterForm.addEventListener('submit', event => {
+  event.preventDefault();
+  sendQuestion(starter.value);
+});
 clearSelection.addEventListener('click', () => setSelection(null));
 document.getElementById('new-chat').addEventListener('click', () => {
   controller?.abort();

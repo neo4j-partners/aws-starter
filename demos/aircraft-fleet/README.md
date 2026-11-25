@@ -119,27 +119,8 @@ uv sync
 uv run fleet-client ask "Compare fault counts with delay counts"
 ```
 
-To use the browser UI, keep the server running. In a second terminal, build
-the UI once from `demos/aircraft-fleet/ui/`:
-
-```bash
-npm ci
-npm run build
-```
-
-Then start it from `demos/aircraft-fleet/supervisor-agent/`:
-
-```bash
-uv run fleet-client ui       # serves http://127.0.0.1:8081
-```
-
-Both `fleet-client` commands read the shared `.env`. They use the local
-supervisor by default, even when `.env` sets `AGENT_ARN`. Add `--cloud` to use
-the supervisor deployed in [Step 3](#step-3-deploy-to-agentcore-runtime), as in
-`uv run fleet-client ask --cloud "..."` or `uv run fleet-client ui --cloud`.
-
-See the [UI README](./ui/README.md) for the starter question and the UI
-settings.
+`fleet-client ask` uses the local supervisor by default. To use the browser UI,
+see [Run the UI locally](#run-the-ui-locally).
 
 ## Step 3: Deploy to AgentCore Runtime
 
@@ -153,6 +134,61 @@ both passwords from Secrets Manager. Run these steps from
 
 See the [supervisor agent README](./supervisor-agent/README.md) for routing,
 the deploy settings, load testing, and teardown.
+
+## Run the UI locally
+
+Keep the supervisor from Step 2 running. In a second terminal, build the UI
+once from `demos/aircraft-fleet/ui/`:
+
+```bash
+npm ci
+npm run build
+```
+
+Then start it from `demos/aircraft-fleet/supervisor-agent/`:
+
+```bash
+uv run fleet-client ui           # serves http://127.0.0.1:8081
+uv run fleet-client ui --cloud   # the same UI against the deployed supervisor
+```
+
+Both `fleet-client` commands read the shared `.env`. They use the local
+supervisor by default, even when `.env` sets `AGENT_ARN`. Add `--cloud` to use
+the supervisor deployed in [Step 3](#step-3-deploy-to-agentcore-runtime), as in
+`uv run fleet-client ask --cloud "..."` or `uv run fleet-client ui --cloud`.
+
+See the [UI README](./ui/README.md) for the starter question and the UI
+settings.
+
+## Deploy the UI to the cloud
+
+The hosted UI runs on AWS Lambda behind a public function URL that streams
+each answer. Users sign in through Cognito. The function calls the supervisor
+deployed in Step 3 and reads the fleet graph with the read-only login.
+
+Check these first:
+
+- **Supervisor:** Deploy it with Step 3. That deploy writes `AGENT_ARN` to `.env`.
+- **Secret:** `NEO4J_PASSWORD_SECRET_ARN` in `.env` must name the read-only fleet secret from `fleet-supervisor-secrets`. The secret must be in the runtime's region.
+- **Tools:** You need Docker, Node.js 20 or later, and AWS credentials for the runtime's account.
+- **Bootstrap:** The runtime's account and region need the CDK bootstrap stack, `CDKToolkit`. The deploy does not bootstrap.
+
+Run these commands from `demos/aircraft-fleet/ui/`:
+
+```bash
+./deploy.sh deploy                     # build the image, deploy FleetUi, print the URL
+./deploy.sh add-user you@example.com   # Cognito emails them a temporary password
+./deploy.sh status                     # show the stack and the URL
+./deploy.sh destroy                    # delete the stack and its users
+```
+
+1. **Deploy:** `./deploy.sh deploy` deploys to the runtime's region. The first deploy builds the image and takes several minutes.
+2. **Add users:** Self sign-up is off, so add each user with `./deploy.sh add-user EMAIL`. The script never prints a password.
+3. **Open the URL:** Open the URL the deploy printed and sign in. The first sign-in asks for a new password. A sign-in lasts one hour.
+4. **Destroy:** `./deploy.sh destroy` deletes the stack, the user pool, and its users. It asks first, and `--yes` skips the prompt.
+
+See the [UI README](./ui/README.md#deploy-to-the-cloud) for what the stack
+holds.
 
 ## Keep the embedder the same
 

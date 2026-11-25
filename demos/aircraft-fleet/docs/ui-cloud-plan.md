@@ -137,19 +137,19 @@ Each of these was checked in the code or the AWS docs.
 
 ## Phase 2: The UI on Lambda with response streaming
 
-**Status:** Pending
+**Status:** In progress. The stack, its commands, and its tests are built (2b). The app side is in 2a. Nothing is deployed yet.
 
 **Outcome:** One command deploys the UI. A signed-in user opens the function URL and gets a streamed answer and the evidence graph from the deployed supervisor. A request without a login gets no answer and causes no Bedrock or Neo4j call.
 
-- [ ] Measure the UI's installed dependency size to settle zip vs container image.
-- [ ] A `ui/` CDK app defines the function, the streaming function URL, the Cognito user pool and app client, and the role.
-- [ ] The role can invoke only the fleet runtime and read only the fleet login secret.
+- [x] Measure the UI's installed dependency size to settle zip vs container image. The deps install to 283 MB for Linux arm64, so the function is an arm64 container image.
+- [x] A `ui/` CDK app defines the function, the streaming function URL, the Cognito user pool and app client, and the role.
+- [x] The role can invoke only the fleet runtime and read only the fleet login secret.
 - [ ] The app requires a Cognito session on every route except login and its callback.
 - [ ] The UI sends the signed-in user's ID as `user_id`.
-- [ ] The function's timeout covers the stream reader's 300-second wait.
-- [ ] Commands deploy, check, and destroy the UI stack, and print the URL after a deploy.
-- [ ] CDK tests check streaming mode, the role's scope, and that self sign-up is off.
-- [ ] The UI README, the deployment doc, and the topology diagram show the hosted UI.
+- [x] The function's timeout covers the stream reader's 300-second wait.
+- [x] Commands deploy, check, and destroy the UI stack, and print the URL after a deploy. `ui/deploy.sh` also has `add-user`.
+- [x] CDK tests check streaming mode, the role's scope, and that self sign-up is off.
+- [ ] The UI README, the deployment doc, and the topology diagram show the hosted UI. The READMEs and the deployment doc are done. The topology diagram is left for later.
 
 **Done when:**
 

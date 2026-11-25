@@ -143,14 +143,16 @@ All answered on 2026-11-24.
 
 ## Phase 5: Reset both databases and rebuild
 
-**Status:** Pending. It waits for Phase 4, so the supervisor runs on fleet.11 both locally and in the cloud before the reset.
+**Status:** In progress. Both databases were reset on 2026-11-24 and the pipeline verify passes. The hosted checks wait for the redeploy.
+
+**Notes:** The memory database reset deleted all 305 nodes and their relationships, leaving 0 of each. It kept the indexes and the 15 constraints, because the reset deleted data only. All indexes, including `entity_embedding_idx` and `fact_embedding_idx`, are ONLINE. The deleted `SchemaMigration` markers record only data backfills, so an empty database needs none. The fleet graph rebuild ran `./setup.sh` in 11 minutes and exited 0, and `verify --strict` passed. It loaded 798,587 operational nodes, the same as the CSVs, and 1,691 enrichment nodes: 337 Chunk and 5 Document nodes, with all 337 chunks embedded. Both maintenance chunk indexes are ONLINE. The total is 800,278 nodes, against 799,954 on 2026-11-23. The difference is in the extracted entities, such as Fault and MaintenanceProcedure, which vary from run to run.
 
 **Outcome:** The fleet graph and the memory database hold only data built under fleet.11, so every stored fact has an owner.
 
-- [ ] Delete every node, relationship, index, and constraint in the memory database. The instance, its login, and its secret stay.
-- [ ] Rebuild the fleet graph with `./setup.sh`, which cleans and loads it. The instance, the `fleet_reader` user and its role, and the secret stay.
-- [ ] The pipeline's verify step passes.
-- [ ] Each reset gets its own approval, naming the instance it deletes from.
+- [x] Delete every node and relationship in the memory database, and keep its indexes and constraints. The instance, its login, and its secret stay.
+- [x] Rebuild the fleet graph with `./setup.sh`, which cleans and loads it. The instance, the `fleet_reader` user and its role, and the secret stay.
+- [x] The pipeline's verify step passes.
+- [x] Each reset gets its own approval, naming the instance it deletes from.
 
 **Done when:**
 

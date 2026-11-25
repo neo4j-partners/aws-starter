@@ -317,6 +317,61 @@ describe('image context', () => {
   });
 });
 
+describe('image context with a .dockerignore allowlist', () => {
+  /**
+   * The same shape as demos/aircraft-fleet/.dockerignore: leave everything out, then let in
+   * only what the image is built from. CDK stages the context from these rules, and its own
+   * "!Dockerfile" rule matches only a Dockerfile at the context root, so ui/Dockerfile must be
+   * listed.
+   */
+  const DOCKERIGNORE = [
+    '*',
+    `!${DOCKERFILE}`,
+    '!supervisor-agent/pyproject.toml',
+    '!ui/server.py',
+    '!ui/static/',
+    '**/.env*',
+  ].join('\n');
+
+  let allowlistContext: string;
+  let allowlistOutdir: string;
+  let staged: string;
+
+  before(() => {
+    allowlistContext = mkdtempSync(join(tmpdir(), 'fleet-ui-allowlist-context-'));
+    allowlistOutdir = mkdtempSync(join(tmpdir(), 'fleet-ui-allowlist-cdk-out-'));
+    writeFile(join(allowlistContext, '.dockerignore'), `${DOCKERIGNORE}\n`);
+    writeFile(join(allowlistContext, DOCKERFILE), 'FROM scratch\n');
+    for (const file of ['supervisor-agent/pyproject.toml', 'ui/server.py', 'ui/static/app.js', '.env', 'ui/.env']) {
+      writeFile(join(allowlistContext, file), 'stub\n');
+    }
+    const settings = readUiSettings(DEPLOY_ENV);
+    const app = new App({ outdir: allowlistOutdir });
+    new FleetUiStack(app, STACK_NAME, { env: runtimeLocation(settings.agentArn), settings, imageContext: allowlistContext });
+    app.synth();
+    const assets = JSON.parse(readFileSync(join(allowlistOutdir, `${STACK_NAME}.assets.json`), 'utf-8'));
+    const [image] = Object.values(assets.dockerImages) as { source: { directory: string } }[];
+    staged = join(allowlistOutdir, image.source.directory);
+  });
+
+  after(() => {
+    rmSync(allowlistContext, { recursive: true, force: true });
+    rmSync(allowlistOutdir, { recursive: true, force: true });
+  });
+
+  it('stages ui/Dockerfile and the allowed files', () => {
+    for (const file of [DOCKERFILE, 'supervisor-agent/pyproject.toml', 'ui/server.py', 'ui/static/app.js']) {
+      assert.ok(existsSync(join(staged, file)), `${file} is missing from the staged build context`);
+    }
+  });
+
+  it('leaves .env out of the staged build context', () => {
+    for (const file of ['.env', 'ui/.env']) {
+      assert.ok(!existsSync(join(staged, file)), `${file} was copied into cdk.out`);
+    }
+  });
+});
+
 describe('readUiSettings', () => {
   function problems(env: Record<string, string | undefined>): string {
     try {

@@ -2,13 +2,15 @@
 
 This runs before any test module imports ``fleet_supervisor``. It points
 ``FLEET_ENV_FILE`` at an empty file so the real aircraft-fleet .env is never
-loaded. It also clears the fleet graph, graph settings, and memory variables,
-so a developer's shell cannot change what the tests see.
+loaded. It also clears the fleet graph, graph settings, memory, and
+supervisor mode variables, so a developer's shell cannot change what the tests
+see.
 """
 
 import asyncio
 import os
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -38,6 +40,8 @@ _CLEARED_VARS = (
     "MEM_NEO4J_DATABASE",
     "MEM_NEO4J_PASSWORD_SECRET_ARN",
     "MEMORY_API_KEY",
+    "AGENT_ARN",
+    "FLEET_SUPERVISOR_MODE",
 )
 
 os.environ["FLEET_ENV_FILE"] = os.devnull
@@ -52,6 +56,26 @@ def collect(stream: AsyncIterator[dict[str, Any]]) -> list[dict[str, Any]]:
         return [event async for event in stream]
 
     return asyncio.run(_drain())
+
+
+@pytest.fixture
+def fleet_env_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[str], Path]:
+    """Return a function that writes a shared .env and points ``FLEET_ENV_FILE`` at it.
+
+    Loading the file sets variables outside monkeypatch, so the variables it
+    may set are recorded first and restored after the test.
+    """
+    for name in ("AGENT_ARN", "AWS_REGION", "AGENT_PORT", "FLEET_SUPERVISOR_MODE"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
+
+    def write(text: str) -> Path:
+        path = tmp_path / ".env"
+        path.write_text(text)
+        monkeypatch.setenv("FLEET_ENV_FILE", str(path))
+        return path
+
+    return write
 
 
 @pytest.fixture

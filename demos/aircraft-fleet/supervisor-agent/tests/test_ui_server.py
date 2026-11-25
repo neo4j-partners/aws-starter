@@ -266,3 +266,80 @@ def test_a_stream_that_fails_partway_ends_with_an_error(
         {"type": "chunk", "data": "Two aircraft"},
         {"type": "error", "error": "Could not reach the fleet supervisor."},
     ]
+
+
+ARN = "arn:aws:bedrock-agentcore:us-east-1:0:runtime/fleet"
+
+
+@pytest.fixture
+def opened_streams(ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Record the supervisor each turn opens, in place of the two stream sources."""
+    calls: list[tuple[Any, ...]] = []
+    monkeypatch.setattr(
+        ui_server, "stream_local", lambda _payload, _session_id, url: calls.append(("local", url))
+    )
+    monkeypatch.setattr(
+        ui_server,
+        "stream_deployed",
+        lambda _payload, arn, region, _session_id: calls.append(("cloud", arn, region)),
+    )
+    return calls
+
+
+def open_turn(ui_server: ModuleType) -> None:
+    ui_server.supervisor_stream(ui_server.ChatRequest(prompt="hi", session_id=uuid4()))
+
+
+def test_an_unset_mode_relays_the_local_supervisor_even_with_an_agent_arn(
+    ui_server: ModuleType, opened_streams: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AGENT_ARN", ARN)
+    monkeypatch.delenv("AGENT_PORT", raising=False)
+    monkeypatch.delenv("FLEET_SUPERVISOR_URL", raising=False)
+
+    open_turn(ui_server)
+
+    assert opened_streams == [("local", "http://127.0.0.1:7071/invocations")]
+
+
+def test_cloud_mode_relays_the_deployed_supervisor(
+    ui_server: ModuleType, opened_streams: list[tuple[Any, ...]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FLEET_SUPERVISOR_MODE", "cloud")
+    monkeypatch.setenv("AGENT_ARN", ARN)
+    monkeypatch.setenv("AWS_REGION", "us-west-2")
+
+    open_turn(ui_server)
+
+    assert opened_streams == [("cloud", ARN, "us-west-2")]
+
+
+def test_the_ui_reads_cloud_mode_and_the_arn_from_the_env_file(
+    ui_server: ModuleType,
+    opened_streams: list[tuple[Any, ...]],
+    fleet_env_file: Callable[[str], Path],
+) -> None:
+    fleet_env_file(f"FLEET_SUPERVISOR_MODE=cloud\nAGENT_ARN={ARN}\nAWS_REGION=us-east-1\n")
+
+    run_lifespan(ui_server)
+    open_turn(ui_server)
+
+    assert opened_streams == [("cloud", ARN, "us-east-1")]
+
+
+def test_cloud_mode_without_an_agent_arn_stops_the_ui_at_startup(
+    ui_server: ModuleType, fleet_env_file: Callable[[str], Path]
+) -> None:
+    fleet_env_file("FLEET_SUPERVISOR_MODE=cloud\n")
+
+    with pytest.raises(ui_server.ConfigError, match=r"AGENT_ARN is not set.*\./agent\.sh deploy"):
+        run_lifespan(ui_server)
+
+
+def test_an_unknown_mode_stops_the_ui_at_startup(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FLEET_SUPERVISOR_MODE", "remote")
+
+    with pytest.raises(ui_server.ConfigError, match="must be local or cloud, not 'remote'"):
+        run_lifespan(ui_server)

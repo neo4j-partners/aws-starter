@@ -19,8 +19,12 @@ The frontend build uses Node.js 20 or later.
 cd ui
 npm ci
 npm run build
-uv run --project ../supervisor-agent python server.py
+cd ../supervisor-agent
+uv run fleet-client ui
 ```
+
+From `ui/`, `uv run --project ../supervisor-agent python server.py` also starts
+the UI against the local supervisor.
 
 Open [http://127.0.0.1:8081](http://127.0.0.1:8081) and select **Find
 aircraft with hydraulic system issues**. The starter question asks the agent
@@ -39,8 +43,16 @@ lookup, and only the graph is lost. Use a read-only fleet login for the UI. The
 license](https://www.npmjs.com/package/@neo4j-nvl/base) covers use with Neo4j
 Aura or a commercial Neo4j product.
 
-To use a deployed supervisor, set `AGENT_ARN` and `AWS_REGION` before starting
-the UI. Deploy the supervisor version with browser trace support first.
-The UI uses the same AWS credential chain and AgentCore invoke permissions as
-the [cloud CLI](../supervisor-agent/README.md). `FLEET_SUPERVISOR_URL` overrides
-the local invocation URL, and `FLEET_UI_PORT` overrides the UI's port.
+To use the deployed supervisor, run `uv run fleet-client ui --cloud` from
+`supervisor-agent/`. It reads `AGENT_ARN` and `AWS_REGION` from the shell or
+the shared `.env`. Without `AGENT_ARN`, it stops and says to run
+`./agent.sh deploy`. Deploy the supervisor version with browser trace support
+first. The UI uses the same AWS credential chain and AgentCore invoke
+permissions as the [cloud CLI](../supervisor-agent/README.md).
+
+The UI picks its supervisor from `FLEET_SUPERVISOR_MODE`, which is `local` or
+`cloud`. `fleet-client ui` sets it from the `--cloud` flag. When the setting is
+unset, the UI uses the local supervisor, even when `AGENT_ARN` is set. In cloud
+mode, a missing `AGENT_ARN` stops the UI at startup. `FLEET_ENV_FILE` names a
+different `.env`. `FLEET_SUPERVISOR_URL` overrides the local invocation URL,
+and `FLEET_UI_PORT` overrides the UI's port.

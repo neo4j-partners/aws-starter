@@ -42,6 +42,7 @@ dependencies = [
 [project.scripts]
 fleet-supervisor-server = "fleet_supervisor.server:main"
 fleet-supervisor-cli = "fleet_supervisor.client.cli:main"
+fleet-client = "fleet_supervisor.client.fleet_client:main"
 fleet-supervisor-invoke = "fleet_supervisor.client.invoke:main"
 fleet-supervisor-secrets = "fleet_supervisor.setup_secrets:main"
 

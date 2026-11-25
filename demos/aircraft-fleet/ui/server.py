@@ -44,6 +44,8 @@ class ChatRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: Starlette) -> AsyncIterator[None]:
     load_dotenv(os.environ.get("FLEET_ENV_FILE") or ROOT.parent / ".env")
+    # Check the mode now, so a cloud mode with no ARN stops the UI at startup.
+    supervisor_mode()
     driver = None
     auth = None
     if uri := os.getenv("NEO4J_URI"):
@@ -74,11 +76,30 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
             driver.close()
 
 
+def supervisor_mode() -> str:
+    """Return ``local`` or ``cloud`` from ``FLEET_SUPERVISOR_MODE``. Unset means local.
+
+    The mode is explicit, so an ``AGENT_ARN`` in the shared .env does not move
+    a local run to the cloud. Cloud mode needs ``AGENT_ARN``.
+    """
+    mode = os.getenv("FLEET_SUPERVISOR_MODE") or "local"
+    if mode not in {"local", "cloud"}:
+        raise ConfigError(f"FLEET_SUPERVISOR_MODE must be local or cloud, not {mode!r}.")
+    if mode == "cloud" and not os.getenv("AGENT_ARN"):
+        raise ConfigError(
+            "FLEET_SUPERVISOR_MODE is cloud, but AGENT_ARN is not set. Deploy the "
+            "supervisor with ./agent.sh deploy, or set AGENT_ARN in the shared .env."
+        )
+    return mode
+
+
 def supervisor_stream(turn: ChatRequest) -> AbstractContextManager[Iterator[dict[str, Any]]]:
     payload = {"prompt": turn.prompt, "trace": True}
     session_id = str(turn.session_id)
-    if arn := os.getenv("AGENT_ARN"):
-        return stream_deployed(payload, arn, os.getenv("AWS_REGION"), session_id)
+    if supervisor_mode() == "cloud":
+        return stream_deployed(
+            payload, os.environ["AGENT_ARN"], os.getenv("AWS_REGION"), session_id
+        )
     port = os.getenv("AGENT_PORT", "7071")
     url = os.getenv("FLEET_SUPERVISOR_URL", f"http://127.0.0.1:{port}/invocations")
     return stream_local(payload, session_id, url)

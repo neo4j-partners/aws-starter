@@ -116,20 +116,30 @@ uv sync
 ./agent.sh start             # serves http://localhost:7071
 ./agent.sh test-maintenance
 ./agent.sh test-operations
-uv run fleet-supervisor-cli "Compare fault counts with delay counts"
+uv run fleet-client ask "Compare fault counts with delay counts"
 ```
 
-To use the browser UI, keep the server running and start the UI in a second
-terminal from `demos/aircraft-fleet/ui/`:
+To use the browser UI, keep the server running. In a second terminal, build
+the UI once from `demos/aircraft-fleet/ui/`:
 
 ```bash
 npm ci
 npm run build
-uv run --project ../supervisor-agent python server.py   # serves http://127.0.0.1:8081
 ```
 
-See the [UI README](./ui/README.md) for the starter question and for using a
-deployed supervisor.
+Then start it from `demos/aircraft-fleet/supervisor-agent/`:
+
+```bash
+uv run fleet-client ui       # serves http://127.0.0.1:8081
+```
+
+Both `fleet-client` commands read the shared `.env`. They use the local
+supervisor by default, even when `.env` sets `AGENT_ARN`. Add `--cloud` to use
+the supervisor deployed in [Step 3](#step-3-deploy-to-agentcore-runtime), as in
+`uv run fleet-client ask --cloud "..."` or `uv run fleet-client ui --cloud`.
+
+See the [UI README](./ui/README.md) for the starter question and the UI
+settings.
 
 ## Step 3: Deploy to AgentCore Runtime
 

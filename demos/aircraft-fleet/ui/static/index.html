@@ -53,26 +53,39 @@
     <section class="panel graph" aria-labelledby="graph-heading">
       <header class="panel-header">
         <div>
-          <h2 id="graph-heading">Graph evidence</h2>
+          <h2 id="graph-heading">Evidence</h2>
           <p id="graph-count">No evidence yet</p>
+          <p id="memory-count" hidden>No memory yet</p>
+        </div>
+        <div class="view-tabs" role="tablist" aria-label="Evidence views">
+          <button type="button" role="tab" id="evidence-tab" aria-controls="evidence-view" aria-selected="true">Current evidence</button>
+          <button type="button" role="tab" id="memory-tab" aria-controls="memory-view" aria-selected="false" tabindex="-1">Memory</button>
         </div>
         <button type="button" id="fit" class="secondary" disabled>Fit graph</button>
       </header>
-      <div class="graph-stage">
-        <div id="canvas" aria-label="Interactive fleet graph"></div>
-        <div id="graph-empty" class="graph-empty">
-          <span class="graph-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <p>Fleet evidence appears here as tools return results.</p>
+      <div class="views">
+        <div id="evidence-view" class="view" role="tabpanel" aria-labelledby="evidence-tab">
+          <div class="graph-stage">
+            <div id="canvas" aria-label="Interactive fleet graph"></div>
+            <div id="graph-empty" class="graph-empty">
+              <span class="graph-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+              <p>Fleet evidence appears here as tools return results.</p>
+            </div>
+            <aside id="node-details" class="node-details" aria-label="Selected graph entity" hidden></aside>
+          </div>
+          <ul class="legend" aria-label="Graph legend">
+            <li class="aircraft">Aircraft</li>
+            <li class="system">System</li>
+            <li class="component">Component</li>
+            <li class="maintenance">Maintenance event</li>
+            <li class="flight">Flight</li>
+          </ul>
         </div>
-        <aside id="node-details" class="node-details" aria-label="Selected graph entity" hidden></aside>
+        <div id="memory-view" class="view memory-view" role="tabpanel" aria-labelledby="memory-tab" tabindex="0" inert>
+          <p id="memory-note" class="memory-note">The memory recalled for each question appears here.</p>
+          <ol id="memory-entries" class="memory-entries" aria-label="Recalled memory entries"></ol>
+        </div>
       </div>
-      <ul class="legend" aria-label="Graph legend">
-        <li class="aircraft">Aircraft</li>
-        <li class="system">System</li>
-        <li class="component">Component</li>
-        <li class="maintenance">Maintenance event</li>
-        <li class="flight">Flight</li>
-      </ul>
     </section>
 
     <section class="panel trace" aria-labelledby="trace-heading">

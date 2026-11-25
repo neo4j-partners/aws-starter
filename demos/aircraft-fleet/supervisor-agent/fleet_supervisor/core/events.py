@@ -12,6 +12,11 @@ The client events:
   questions, sent by the server after the answer and before ``complete``. Sent
   only when the payload has ``"followups": true``, and only when the follow-up
   call succeeds. Clients that do not know the event ignore it.
+- ``{"type": "memory", "entries": [...]}``: the long-term memory entries recalled
+  for the question, as the model saw them. Each entry has ``kind``, ``id``,
+  ``type``, ``text`` and ``score``. Sent by the server once per request, after
+  recall and before any other event. The list is empty when nothing was
+  recalled. Sent only with trace on. Clients that do not know the event ignore it.
 - ``{"type": "complete"}`` and ``{"type": "error", "error": ...}``: sent by the server
 
 With trace on, the ``agent`` and ``tool`` events also carry ``call_id`` and
@@ -19,10 +24,12 @@ With trace on, the ``agent`` and ``tool`` events also carry ``call_id`` and
 """
 
 import re
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterable, Iterator
+from dataclasses import asdict
 from time import monotonic
 from typing import Any
 
+from neo4j_agent_memory.integrations.strands import RecalledEntry
 from strands import Agent
 
 from fleet_supervisor.core.agents import SPECIALIST_NAMES
@@ -35,6 +42,11 @@ from fleet_supervisor.core.tool_stream import (
 FLEET_ID = re.compile(
     r"\b(?:AC\d{4,}(?:-S\d{2}(?:-C\d{2})?)?|ME\d{4,}|FL\d{5,}|N\d{5}[A-Z]?)(?![\w-])"
 )
+
+
+def memory_event(entries: Iterable[RecalledEntry]) -> dict[str, Any]:
+    """Return the client event for the entries one recall put in the model's context."""
+    return {"type": "memory", "entries": [asdict(entry) for entry in entries]}
 
 
 class EventMapper:

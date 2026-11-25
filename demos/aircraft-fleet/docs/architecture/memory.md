@@ -17,9 +17,13 @@ the Text2Cypher prompt.
 - **Session and user:** The session ID comes from the AgentCore session header. A local call without the header gets a fresh ID. The user ID comes from the payload and defaults to `anonymous`.
 
 Before each user message reaches the model, the session manager searches the
-user's long-term entities and preferences. It prepends the hits above the
-retrieval threshold in a `<user_context>` block. The stored message is always
-the user's original text.
+user's long-term entities and preferences. Each search covers only that
+user's entries. It prepends the hits above the retrieval threshold in a
+`<user_context>` block. The stored message is always the user's original text.
+
+The manager keeps the entries it last recalled. For a traced request, the
+server sends them to the client as a `memory` event before any other event.
+The UI shows them in its Memory view.
 
 ## One client per process, one manager per request
 
@@ -106,8 +110,9 @@ graph driver closes after the memory close, even if the memory close fails.
 
 ## The library pin
 
-The supervisor pins `neo4j-agent-memory[strands]==0.8.0+fleet.10`. It is a
+The supervisor pins `neo4j-agent-memory[strands]==0.8.0+fleet.11`. It is a
 wheel from the `neo4j-partners/agent-memory` releases, and `uv.lock` records
 its sha256. The supervisor uses `SharedMemory`, deferred extraction, the background
-hook, the per-turn discard, and the `Neo4jConfig` auth manager from that build.
-Changing the pin means checking those five behaviors again.
+hook, the per-turn discard, the `Neo4jConfig` auth manager, user-scoped recall,
+and the manager's `last_recall` from that build. Changing the pin means
+checking those seven behaviors again.

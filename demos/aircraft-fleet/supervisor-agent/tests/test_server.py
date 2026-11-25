@@ -10,6 +10,7 @@ import pytest
 from botocore.exceptions import ClientError
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
+from neo4j_agent_memory.integrations.strands import Neo4jSessionManager, RecalledEntry
 from strands.types.exceptions import SessionException
 
 from fleet_supervisor import server
@@ -774,6 +775,167 @@ def test_a_failed_followup_call_leaves_the_answer_intact(supervisor, monkeypatch
         {"type": "complete"},
     ]
     assert "Follow-up questions failed" in caplog.text
+
+
+# Recalled entries for two users. A fake session manager recalls only its own
+# user's entries, as the fleet.11 session manager does.
+STORED_RECALL = {
+    "alice": (
+        RecalledEntry("entity", "e-1", "AIRCRAFT", "N12345", 0.91),
+        RecalledEntry("preference", "p-1", "format", "Prefers tables", None),
+    ),
+    "bob": (RecalledEntry("entity", "e-2", "FAULT", "Hydraulic leak", 0.84),),
+    "anonymous": (RecalledEntry("fact", "f-1", "OPERATES", "AC1001 OPERATES FL00001", 0.8),),
+}
+
+
+def test_the_session_manager_exposes_its_last_recall():
+    """The fakes below stand in for this property of the fleet.11 manager."""
+    assert isinstance(Neo4jSessionManager.last_recall, property)
+
+
+class RecallingSession:
+    """A memory session whose manager recalls its user's entries when the prompt arrives."""
+
+    def __init__(self, user_id: str) -> None:
+        self.user_id = user_id
+        self.last_recall: tuple[RecalledEntry, ...] = ()
+        self.closed = 0
+
+    @property
+    def manager(self) -> "RecallingSession":
+        return self
+
+    def recall(self) -> None:
+        self.last_recall = STORED_RECALL.get(self.user_id, ())
+
+    def close(self) -> None:
+        self.closed += 1
+
+
+class TracedSupervisor:
+    """A supervisor that accepts the trace hooks and recalls before its first event."""
+
+    def __init__(self, manager: RecallingSession | None, events: list[dict]) -> None:
+        self.manager = manager
+        self.events = events
+
+    def add_middleware(self, *_args) -> None:
+        pass
+
+    async def stream_async(self, prompt: str, invocation_state: dict | None = None):
+        yield {"init_event_loop": True}
+        if self.manager is not None:
+            self.manager.recall()
+        for event in self.events:
+            yield event
+
+
+@pytest.fixture
+def recall(monkeypatch, supervisor):
+    """Build a recalling session per request; record the sessions by user."""
+    sessions: dict[str, RecallingSession] = {}
+    fake = SimpleNamespace(sessions=sessions, events=list(supervisor.events))
+
+    def fake_build_session_manager(session_id, user_id, settings, background_hook):
+        sessions[user_id] = RecallingSession(user_id)
+        return sessions[user_id]
+
+    def fake_build_supervisor(model, schema, manager=None):
+        return TracedSupervisor(manager, fake.events)
+
+    monkeypatch.setattr(server, "build_session_manager", fake_build_session_manager)
+    monkeypatch.setattr(server, "build_supervisor", fake_build_supervisor)
+    return fake
+
+
+def traced(user_id: str | None = None) -> dict:
+    payload = {"prompt": "q", "trace": True}
+    if user_id is not None:
+        payload["user_id"] = user_id
+    return payload
+
+
+def test_the_recall_is_sent_before_the_first_event(recall):
+    events = collect(server.invoke(traced("alice"), SimpleNamespace(session_id="s1")))
+
+    assert [event["type"] for event in events] == ["memory", "agent", "chunk", "complete"]
+    assert events[0] == {
+        "type": "memory",
+        "entries": [
+            {"kind": "entity", "id": "e-1", "type": "AIRCRAFT", "text": "N12345", "score": 0.91},
+            {
+                "kind": "preference",
+                "id": "p-1",
+                "type": "format",
+                "text": "Prefers tables",
+                "score": None,
+            },
+        ],
+    }
+    assert recall.sessions["alice"].closed == 1
+
+
+def test_an_empty_recall_still_sends_the_event(recall):
+    events = collect(server.invoke(traced("carol"), SimpleNamespace(session_id="s1")))
+
+    assert events[0] == {"type": "memory", "entries": []}
+
+
+def test_the_recall_is_sent_when_the_stream_sends_no_events(recall):
+    recall.events.clear()
+
+    events = collect(server.invoke(traced("bob"), SimpleNamespace(session_id="s1")))
+
+    assert [event["type"] for event in events] == ["memory", "complete"]
+    assert [entry["id"] for entry in events[0]["entries"]] == ["e-2"]
+
+
+@pytest.mark.parametrize("trace", [None, False, "true"], ids=["unset", "false", "string"])
+def test_no_recall_event_without_trace(recall, trace):
+    payload = {"prompt": "q", "user_id": "alice"}
+    if trace is not None:
+        payload["trace"] = trace
+
+    events = collect(server.invoke(payload, SimpleNamespace(session_id="s1")))
+
+    assert "memory" not in [event["type"] for event in events]
+
+
+def test_no_recall_event_without_memory(supervisor, monkeypatch):
+    monkeypatch.setattr(
+        server, "build_supervisor", lambda model, schema, manager=None: TracedSupervisor(None, [])
+    )
+
+    events = collect(server.invoke(traced("alice"), SimpleNamespace(session_id="s1")))
+
+    assert events == [{"type": "complete"}]
+
+
+def test_each_user_recall_holds_only_that_users_entries(recall):
+    """Two users ask in turn, and a third request has no user."""
+    sent = {
+        user: collect(server.invoke(traced(user), SimpleNamespace(session_id=f"s-{user}")))[0]
+        for user in ("alice", "bob", None)
+    }
+
+    ids = {user: {entry["id"] for entry in event["entries"]} for user, event in sent.items()}
+    assert ids == {"alice": {"e-1", "p-1"}, "bob": {"e-2"}, None: {"f-1"}}
+    assert set(recall.sessions) == {"alice", "bob", "anonymous"}
+
+
+def test_concurrent_users_each_get_their_own_recall(recall):
+    async def ask_both() -> list[list[dict]]:
+        async def ask(user: str) -> list[dict]:
+            invoke = server.invoke(traced(user), SimpleNamespace(session_id=f"s-{user}"))
+            return [event async for event in invoke]
+
+        return await asyncio.gather(ask("alice"), ask("bob"))
+
+    alice, bob = asyncio.run(ask_both())
+
+    assert [entry["id"] for entry in alice[0]["entries"]] == ["e-1", "p-1"]
+    assert [entry["id"] for entry in bob[0]["entries"]] == ["e-2"]
 
 
 def test_model_and_schema_are_read_on_every_request(supervisor):

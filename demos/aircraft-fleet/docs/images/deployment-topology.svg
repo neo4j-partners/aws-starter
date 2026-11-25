@@ -1,14 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="680" viewBox="0 0 1600 680" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1090" viewBox="0 0 1600 1090" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif">
   <title>Fleet Deployment Topology</title>
-  <desc>One stack in one AWS account. The AgentCore CLI deploys AgentCore-fleetsupervisor-default, which holds the supervisor Runtime. The Runtime runs the supervisor and both specialists. It reads the fleet graph and the memory database with direct Neo4j drivers. It calls Claude and Titan on Bedrock. It reads both Neo4j logins from Secrets Manager at startup. Before the deploy, fleet-supervisor-secrets creates the two secrets, fleet/neo4j-reader and fleet/memory-neo4j. Each secret holds a username and a password. When Neo4j rejects a password, the Runtime reads that secret again. The Runtime writes its logs to CloudWatch Logs. Teardown removes the Runtime and its log groups. Two Neo4j Aura databases hold the fleet graph and agent memory.</desc>
+  <desc>Two stacks in one AWS account. The AgentCore CLI deploys AgentCore-fleetsupervisor-default, which holds the supervisor Runtime. The Runtime runs the supervisor and both specialists. It reads the fleet graph and the memory database with direct Neo4j drivers. It calls Claude and Titan on Bedrock. It reads both Neo4j logins from Secrets Manager at startup. Before the deploy, fleet-supervisor-secrets creates the two secrets, fleet/neo4j-reader and fleet/memory-neo4j. Each secret holds a username and a password. When Neo4j rejects a password, the Runtime reads that secret again. The optional FleetUi stack, deployed by ui/deploy.sh, hosts the browser UI. The browser signs in on the Cognito managed login page and calls a public function URL that streams each answer. The URL invokes the UI function, a container image that Lambda Web Adapter runs. The function reads the app client ID from an SSM parameter, exchanges the sign-in code with Cognito, and calls the supervisor Runtime. It reads the fleet reader secret and looks up each answer's evidence in the fleet graph, read only. The Runtime writes its logs to CloudWatch Logs. Teardown removes the Runtime and its log groups, and ui/deploy.sh destroy removes the FleetUi stack. Two Neo4j Aura databases hold the fleet graph and agent memory.</desc>
   <defs>
     <filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#101828" flood-opacity="0.10"/></filter>
-    <marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker>
+    <marker id="a-teal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#008C72"/></marker><marker id="a-orange" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#D97706"/></marker><marker id="a-pink" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#C11574"/></marker><marker id="a-slate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#667085"/></marker><marker id="a-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#2E6DB4"/></marker>
   </defs>
-  <rect width="1600" height="680" fill="#F7F8FA"/>
-  <text x="800" y="54" text-anchor="middle" font-size="32" font-weight="700" fill="#16233A">Fleet Deployment Topology</text>
-  <text x="800" y="84" text-anchor="middle" font-size="17" fill="#5C6470">One stack, two Neo4j databases. The Runtime reads both Neo4j passwords from Secrets Manager.</text>
-  <rect x="30" y="120" width="360" height="530" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <rect width="1600" height="1090" fill="#F7F8FA"/>
+  <text x="800" y="54" font-size="32" font-weight="700" fill="#16233A" text-anchor="middle">Fleet Deployment Topology</text>
+  <text x="800" y="84" font-size="17" font-weight="400" fill="#5C6470" text-anchor="middle">Two stacks, two Neo4j databases. The Runtime and the UI function read their Neo4j logins from Secrets Manager.</text>
+  <rect x="30" y="120" width="360" height="690" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
   <text x="50" y="152" font-size="17" font-weight="700" fill="#344054" text-anchor="start">Developer machine, in order</text>
   <rect x="50" y="172" width="320" height="112" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
   <text x="210.0" y="204" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">1  Load the graph</text>
@@ -25,11 +25,25 @@
   <text x="210.0" y="482" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">supervisor-agent/agent.sh deploy</text>
   <text x="210.0" y="504" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Neo4j settings and secret ARNs</text>
   <text x="210.0" y="526" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">from ../.env</text>
-  <rect x="50" y="550" width="320" height="90" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" filter="url(#shadow)"/>
-  <text x="210.0" y="580" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Teardown</text>
-  <text x="210.0" y="604" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">supervisor-agent/agent.sh destroy</text>
-  <text x="210.0" y="626" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">removes the Runtime and its logs</text>
-  <rect x="410" y="120" width="830" height="530" rx="14" fill="#FFFFFF" stroke="#D97706" stroke-width="1.5"/>
+  <rect x="50" y="550" width="320" height="112" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="582" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">4  Hosted UI, optional</text>
+  <text x="210.0" y="608" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">ui/deploy.sh deploy</text>
+  <text x="210.0" y="630" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">AGENT_ARN and the secret ARN</text>
+  <text x="210.0" y="652" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">ui/deploy.sh add-user EMAIL</text>
+  <rect x="50" y="676" width="320" height="112" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" stroke-dasharray="7 5" filter="url(#shadow)"/>
+  <text x="210.0" y="708" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Teardown</text>
+  <text x="210.0" y="734" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">ui/deploy.sh destroy</text>
+  <text x="210.0" y="756" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">supervisor-agent/agent.sh destroy</text>
+  <text x="210.0" y="778" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">each removes its stack and logs</text>
+  <rect x="30" y="840" width="360" height="220" rx="14" fill="#FFFFFF" stroke="#667085" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="50" y="872" font-size="17" font-weight="700" fill="#344054" text-anchor="start">User</text>
+  <rect x="50" y="886" width="320" height="150" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="210.0" y="918" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">Browser</text>
+  <text x="210.0" y="944" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">opens the function URL</text>
+  <text x="210.0" y="966" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">signs in on the Cognito page</text>
+  <text x="210.0" y="988" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">gets each answer as it streams</text>
+  <text x="210.0" y="1010" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">and the evidence graph</text>
+  <rect x="410" y="120" width="830" height="940" rx="14" fill="#FFFFFF" stroke="#D97706" stroke-width="1.5"/>
   <text x="430" y="152" font-size="17" font-weight="700" fill="#8A4B08" text-anchor="start">AWS account, us-east-1</text>
   <rect x="440" y="170" width="770" height="242" rx="14" fill="#FAFCFF" stroke="#2E6DB4" stroke-width="1.5" stroke-dasharray="7 5"/>
   <text x="460" y="198" font-size="15" font-weight="700" fill="#1E3A5F" text-anchor="start">AgentCore-fleetsupervisor-default stack, from the AgentCore CLI</text>
@@ -51,40 +65,84 @@
   <text x="590.0" y="535" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">fleet/memory-neo4j</text>
   <text x="590.0" y="557" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">JSON with username and password</text>
   <text x="590.0" y="579" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read at startup, again on rejection</text>
-  <rect x="735" y="455" width="230" height="150" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
-  <text x="850.0" y="487" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">CloudWatch Logs</text>
-  <text x="850.0" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Runtime log groups</text>
-  <text x="850.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">./agent.sh logs reads them</text>
-  <text x="850.0" y="557" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">destroy deletes them</text>
-  <rect x="980" y="455" width="210" height="150" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1085.0" y="487" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Bedrock</text>
-  <text x="1085.0" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Claude Sonnet 5.5</text>
-  <text x="1085.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Titan Text Embeddings v2</text>
-  <text x="1085.0" y="557" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">1024 dimensions</text>
-  <path d="M1085,400 V451" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="735" y="455" width="205" height="150" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="837.5" y="487" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">CloudWatch Logs</text>
+  <text x="837.5" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Runtime log groups</text>
+  <text x="837.5" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">./agent.sh logs reads them</text>
+  <text x="837.5" y="557" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">destroy deletes them</text>
+  <rect x="990" y="455" width="200" height="150" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1090.0" y="487" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Amazon Bedrock</text>
+  <text x="1090.0" y="513" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Claude Sonnet 5.5</text>
+  <text x="1090.0" y="535" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Titan Text Embeddings v2</text>
+  <text x="1090.0" y="557" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">1024 dimensions</text>
+  <path d="M1090,400 V451" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
   <path d="M905,400 V451" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
   <path d="M855,400 V433 H590 V451" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
-  <rect x="662" y="423" width="117" height="21" rx="5" fill="#F7F8FA"/>
+  <rect x="661.5" y="423" width="117" height="21" rx="5" fill="#F7F8FA"/>
   <text x="720" y="438" font-size="12" font-weight="600" fill="#344054" text-anchor="middle">GetSecretValue</text>
-  <rect x="1270" y="120" width="300" height="530" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <rect x="440" y="650" width="770" height="380" rx="14" fill="#FAFCFF" stroke="#2E6DB4" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="460" y="678" font-size="15" font-weight="700" fill="#1E3A5F" text-anchor="start">FleetUi stack, from the CDK app in ui/infra</text>
+  <rect x="460" y="700" width="220" height="130" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="570.0" y="732" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">Function URL</text>
+  <text x="570.0" y="758" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">public, auth NONE</text>
+  <text x="570.0" y="780" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">RESPONSE_STREAM</text>
+  <text x="570.0" y="802" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the app checks the session</text>
+  <rect x="760" y="700" width="430" height="130" rx="14" fill="#EEF4FB" stroke="#2E6DB4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="975.0" y="732" font-size="18" font-weight="700" fill="#1E3A5F" text-anchor="middle">UI function</text>
+  <text x="975.0" y="758" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">arm64 container image, 2048 MB</text>
+  <text x="975.0" y="780" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">Lambda Web Adapter, port 8080</text>
+  <text x="975.0" y="802" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">relays the supervisor's stream</text>
+  <rect x="460" y="870" width="240" height="145" rx="14" fill="#FFF7ED" stroke="#D97706" stroke-width="2" filter="url(#shadow)"/>
+  <text x="580.0" y="902" font-size="18" font-weight="700" fill="#8A4B08" text-anchor="middle">Cognito user pool</text>
+  <text x="580.0" y="928" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">managed login page</text>
+  <text x="580.0" y="950" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">admin-created users only</text>
+  <text x="580.0" y="972" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">public client, code + PKCE</text>
+  <text x="580.0" y="994" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">a sign-in lasts one hour</text>
+  <rect x="760" y="870" width="240" height="145" rx="14" fill="#F2F4F7" stroke="#667085" stroke-width="2" filter="url(#shadow)"/>
+  <text x="880.0" y="902" font-size="18" font-weight="700" fill="#344054" text-anchor="middle">SSM parameter</text>
+  <text x="880.0" y="928" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">/fleet-ui/FleetUi/</text>
+  <text x="880.0" y="950" font-size="13" font-weight="400" fill="#5C6470" text-anchor="middle" font-family="Menlo, Consolas, monospace">cognito-client-id</text>
+  <text x="880.0" y="972" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the app client ID</text>
+  <text x="880.0" y="994" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">read once at startup</text>
+  <path d="M370,925 H422 V765 H456" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-start="url(#a-blue)" marker-end="url(#a-blue)"/>
+  <path d="M370,965 H456" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <path d="M680,765 H756" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <path d="M965,700 V404" fill="none" stroke="#2E6DB4" stroke-width="2.5" marker-end="url(#a-blue)"/>
+  <rect x="895" y="618" width="140" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="965" y="633" font-size="12" font-weight="600" fill="#1E3A5F" text-anchor="middle">InvokeAgentRuntime</text>
+  <path d="M790,700 V628 H640 V609" fill="none" stroke="#667085" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#a-slate)"/>
+  <rect x="656.5" y="618" width="117" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="715" y="633" font-size="12" font-weight="600" fill="#344054" text-anchor="middle">GetSecretValue</text>
+  <path d="M790,830 V850 H600 V866" fill="none" stroke="#D97706" stroke-width="2.5" marker-end="url(#a-orange)"/>
+  <rect x="640" y="840" width="110" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="695" y="855" font-size="12" font-weight="600" fill="#8A4B08" text-anchor="middle">code for tokens</text>
+  <path d="M880,830 V866" fill="none" stroke="#667085" stroke-width="2.5" marker-end="url(#a-slate)"/>
+  <rect x="890" y="838" width="96" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="938" y="853" font-size="12" font-weight="600" fill="#344054" text-anchor="middle">GetParameter</text>
+  <rect x="1270" y="120" width="300" height="940" rx="14" fill="#FFFFFF" stroke="#008C72" stroke-width="1.5" stroke-dasharray="7 5"/>
   <text x="1290" y="152" font-size="17" font-weight="700" fill="#00594A" text-anchor="start">Neo4j Aura</text>
-  <rect x="1290" y="175" width="260" height="190" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1420.0" y="207" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fleet graph</text>
-  <text x="1420.0" y="233" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">operational graph</text>
-  <text x="1420.0" y="255" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">knowledge graph</text>
-  <text x="1420.0" y="277" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loaded by the pipeline</text>
-  <text x="1420.0" y="299" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the supervisor only reads it</text>
-  <rect x="1290" y="395" width="260" height="195" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
-  <text x="1420.0" y="427" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Memory database</text>
-  <text x="1420.0" y="453" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j-agent-memory</text>
-  <text x="1420.0" y="475" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sessions, messages,</text>
-  <text x="1420.0" y="497" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">entities, preferences</text>
-  <text x="1420.0" y="519" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">kept apart from</text>
-  <text x="1420.0" y="541" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the fleet graph</text>
-  <path d="M1190,260 H1286" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
-  <rect x="1216" y="237" width="45" height="21" rx="5" fill="#F7F8FA"/>
-  <text x="1238" y="252" font-size="12" font-weight="600" fill="#00594A" text-anchor="middle">read</text>
-  <path d="M1190,360 H1240 V480 H1286" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
-  <rect x="1184" y="430" width="104" height="21" rx="5" fill="#F7F8FA"/>
-  <text x="1236" y="445" font-size="12" font-weight="600" fill="#851651" text-anchor="middle">read and write</text>
+  <rect x="1290" y="175" width="260" height="195" rx="14" fill="#FDF2FA" stroke="#C11574" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1420.0" y="207" font-size="18" font-weight="700" fill="#851651" text-anchor="middle">Memory database</text>
+  <text x="1420.0" y="233" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">neo4j-agent-memory</text>
+  <text x="1420.0" y="255" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">sessions, messages,</text>
+  <text x="1420.0" y="277" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">entities, preferences</text>
+  <text x="1420.0" y="299" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">kept apart from</text>
+  <text x="1420.0" y="321" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the fleet graph</text>
+  <rect x="1290" y="440" width="260" height="360" rx="14" fill="#E8F6F2" stroke="#008C72" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1420.0" y="472" font-size="18" font-weight="700" fill="#00594A" text-anchor="middle">Fleet graph</text>
+  <text x="1420.0" y="498" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">operational graph</text>
+  <text x="1420.0" y="520" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">knowledge graph</text>
+  <text x="1420.0" y="542" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">loaded by the pipeline</text>
+  <text x="1420.0" y="586" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">the Runtime and the UI</text>
+  <text x="1420.0" y="608" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">only read it, as the</text>
+  <text x="1420.0" y="630" font-size="14" font-weight="400" fill="#5C6470" text-anchor="middle">fleet reader login</text>
+  <path d="M1190,260 H1286" fill="none" stroke="#C11574" stroke-width="2.5" marker-end="url(#a-pink)"/>
+  <rect x="1184" y="237" width="104" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1236" y="252" font-size="12" font-weight="600" fill="#851651" text-anchor="middle">read and write</text>
+  <path d="M1190,360 H1240 V520 H1286" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1215.5" y="497" width="45" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1238" y="512" font-size="12" font-weight="600" fill="#00594A" text-anchor="middle">read</text>
+  <path d="M1190,765 H1286" fill="none" stroke="#008C72" stroke-width="2.5" marker-end="url(#a-teal)"/>
+  <rect x="1202" y="742" width="72" height="21" rx="5" fill="#F7F8FA"/>
+  <text x="1238" y="757" font-size="12" font-weight="600" fill="#00594A" text-anchor="middle">evidence</text>
 </svg>

@@ -213,7 +213,7 @@ The diagrams live in [`docs/images/`](./docs/images/) as SVG files.
 | [`data-model.svg`](docs/images/data-model.svg) | The operational node labels and relationship types, including the operating limits |
 | [`generator-flow.svg`](docs/images/generator-flow.svg) | The six data generator stages, atomic publish, and the output checks |
 | [`end-to-end-sequence.svg`](docs/images/end-to-end-sequence.svg) | One question through the Maintenance specialist, Text2Cypher, and Neo4j |
-| [`deployment-topology.svg`](docs/images/deployment-topology.svg) | The one stack, the AWS services, and the two Neo4j databases |
+| [`deployment-topology.svg`](docs/images/deployment-topology.svg) | The supervisor stack, the hosted UI stack, the AWS services, and the two Neo4j databases |
 
 ## More detail
 

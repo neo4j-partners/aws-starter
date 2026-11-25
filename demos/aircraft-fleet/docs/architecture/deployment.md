@@ -7,7 +7,7 @@ before it can answer. The Runtime reads both Neo4j passwords from
 Secrets Manager, so no password appears in a template, an environment
 variable, or a deployment package.
 
-![One AgentCore CLI stack holds the supervisor Runtime. Before the deploy, the developer creates the two Neo4j secrets. The Runtime reads the fleet graph and the memory database directly. It calls Claude and Titan on Bedrock. It reads both Neo4j passwords from Secrets Manager and writes its logs to CloudWatch Logs.](../images/deployment-topology.svg)
+![One AgentCore CLI stack holds the supervisor Runtime. Before the deploy, the developer creates the two Neo4j secrets. The Runtime reads the fleet graph and the memory database directly. It calls Claude and Titan on Bedrock. It reads both Neo4j passwords from Secrets Manager and writes its logs to CloudWatch Logs. The optional FleetUi stack hosts the browser UI. The browser signs in on the Cognito managed login page and opens a public function URL that streams each answer. The URL invokes the UI function, which Lambda Web Adapter runs. The function reads the app client ID from an SSM parameter and calls the supervisor Runtime. It reads the fleet reader secret and looks up each answer's evidence in the fleet graph, read only.](../images/deployment-topology.svg)
 
 | Stack | Deployed by | Holds |
 |-------|-------------|-------|

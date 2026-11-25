@@ -12,13 +12,13 @@
 #   ./agent.sh test-maintenance   Test with maintenance query
 #   ./agent.sh test-operations    Test with operations query
 #   ./agent.sh configure          Create the AgentCore project in agentcore/
-#   ./agent.sh deploy             Deploy to AgentCore Runtime
+#   ./agent.sh deploy             Deploy to AgentCore Runtime, and write its ARN to ../.env
 #   ./agent.sh status             Check deployment status
 #   ./agent.sh logs               Show recent runtime logs
 #   ./agent.sh invoke-cloud           Send default question to deployed agent
 #   ./agent.sh invoke-cloud "prompt"  Send custom question to deployed agent
 #   ./agent.sh load-test [N]      Cloud load test, a random query every N s (5)
-#   ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)
+#   ./agent.sh destroy [--yes]    Remove from AgentCore (asks first), and its ARN from ../.env
 #
 # The cloud commands use the AgentCore CLI (npm install -g @aws/agentcore).
 # The project lives in agentcore/. Its runtime's codeLocation is this folder,
@@ -90,14 +90,14 @@ print_usage() {
     echo "  ./agent.sh test-maintenance   Test with maintenance query"
     echo "  ./agent.sh test-operations    Test with operations query"
     echo "  ./agent.sh configure          Create the AgentCore project in agentcore/"
-    echo "  ./agent.sh deploy             Deploy to AgentCore Runtime"
+    echo "  ./agent.sh deploy             Deploy to AgentCore Runtime, and write its ARN to ../.env"
     echo "  ./agent.sh status             Check deployment status"
     echo "  ./agent.sh logs [30m]         Show runtime logs from the last 30 minutes"
     echo "  ./agent.sh invoke-cloud       Send default question to deployed agent"
     echo "  ./agent.sh invoke-cloud \"q\"   Send custom question to deployed agent"
     echo "  ./agent.sh load-test          Cloud load test (random queries every 5s)"
     echo "  ./agent.sh load-test 10       Cloud load test with custom interval"
-    echo "  ./agent.sh destroy [--yes]    Remove from AgentCore (asks first)"
+    echo "  ./agent.sh destroy [--yes]    Remove from AgentCore (asks first), and its ARN from ../.env"
     echo "  ./agent.sh help               Show this help message"
     echo ""
     echo "Examples:"
@@ -197,15 +197,138 @@ ensure_no_secrets_in_zip() {
 }
 
 # Print the deployed runtime ARN: AGENT_ARN if set, else from
-# `agentcore status --json`. The match is on the ARN format because the
-# status JSON layout is not documented.
+# `agentcore status --json`.
 runtime_arn() {
     if [ -n "${AGENT_ARN:-}" ]; then
         echo "$AGENT_ARN"
         return
     fi
-    agentcore status --json 2>/dev/null \
+    deployed_runtime_arn
+}
+
+# Print the runtime ARN that `agentcore status --json` reports for target
+# $1, by default $TARGET, or nothing. The match is on the ARN format because
+# the status JSON layout is not documented. An endpoint ARN goes on past
+# runtime/<id>, so it does not match.
+deployed_runtime_arn() {
+    agentcore status --json --target "${1:-$TARGET}" 2>/dev/null \
         | jq -r '[.. | strings | select(test("^arn:aws[a-z0-9-]*:bedrock-agentcore:[^:]+:[0-9]+:runtime/[^/]+$"))][0] // empty'
+}
+
+# Print the target that `agentcore deploy` with these arguments deploys to:
+# the --target value, or $TARGET.
+deploy_target() {
+    local target="$TARGET"
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --target) target="${2:-}"; shift ;;
+            --target=*) target="${1#--target=}" ;;
+        esac
+        shift
+    done
+    echo "$target"
+}
+
+# Edit $SHARED_ENV in place. `set NAME VALUE ...` replaces the value on every
+# NAME= line, keeping an `export` and the spacing around the =, and appends
+# NAME=VALUE when there is none. `remove NAME
+# ...` deletes every NAME= line. A commented-out line is not a NAME= line.
+# Every other byte stays as it was. The new file goes to a temporary file
+# next to it and then replaces it in one rename, with the same mode. So a
+# failed edit leaves the file as it was. A link is followed, so the file it
+# points to is edited. Nothing in the file is printed, because it holds
+# passwords. The edit prints one line that names the variables.
+edit_shared_env() {
+    ensure_deps
+    uv run --quiet python - "$SHARED_ENV" "$@" <<'PY'
+import contextlib
+import os
+import re
+import sys
+import tempfile
+from pathlib import Path
+
+path = Path(sys.argv[1]).resolve()
+action, *args = sys.argv[2:]
+values = dict(zip(args[::2], args[1::2], strict=True)) if action == "set" else dict.fromkeys(args)
+names = "|".join(re.escape(name) for name in values).encode()
+assignment = re.compile(rb"[ \t]*(?:export[ \t]+)?(" + names + rb")[ \t]*=[ \t]*")
+
+old = path.read_bytes()
+lines = []
+found = set()
+for line in old.splitlines(keepends=True):
+    if not (match := assignment.match(line)):
+        lines.append(line)
+        continue
+    name = match[1].decode()
+    found.add(name)
+    if action == "set":
+        ending = line[len(line.rstrip(b"\r\n")) :]
+        lines.append(match[0] + values[name].encode() + ending)
+if action == "set" and (missing := [name for name in values if name not in found]):
+    if lines and not lines[-1].endswith((b"\n", b"\r")):
+        lines.append(b"\n")
+    lines.extend(f"{name}={values[name]}\n".encode() for name in missing)
+
+new = b"".join(lines)
+if new != old:
+    mode = path.stat().st_mode & 0o7777
+    fd, temp = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.")
+    try:
+        with os.fdopen(fd, "wb") as file:
+            file.write(new)
+            file.flush()
+            os.fsync(file.fileno())
+        os.chmod(temp, mode)
+        os.replace(temp, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temp)
+        raise
+
+listed = " and ".join(values)
+if action == "set":
+    print(f"Wrote {listed} to {path}")
+elif found:
+    print(f"Removed {' and '.join(name for name in values if name in found)} from {path}")
+else:
+    print(f"{path} has no {listed} line to remove")
+PY
+}
+
+# Write the ARN and region of the runtime just deployed to target $1 into
+# $SHARED_ENV, so the clients reach it with no manual edit. The region is
+# the one the ARN names. With no ARN to write, the file stays as it was and
+# the run fails, although the deploy itself finished.
+record_deployed_runtime() {
+    local arn region
+    arn=$(deployed_runtime_arn "$1") || arn=""
+    if [ -z "$arn" ]; then
+        echo -e "${RED}ERROR: the deploy finished, but agentcore status shows no runtime ARN for target '$1'.${NC}"
+        echo "$SHARED_ENV is unchanged. Run './agent.sh status', then set AGENT_ARN and AWS_REGION there."
+        exit 1
+    fi
+    IFS=: read -r _ _ _ region _ <<<"$arn"
+    if ! edit_shared_env set AGENT_ARN "$arn" AWS_REGION "$region"; then
+        echo -e "${RED}ERROR: could not write AGENT_ARN and AWS_REGION to $SHARED_ENV. It is unchanged.${NC}"
+        echo "Set AGENT_ARN=$arn and AWS_REGION=$region there."
+        exit 1
+    fi
+}
+
+# Remove AGENT_ARN from $SHARED_ENV once nothing is deployed, so no client
+# reaches for a runtime that is gone. AWS_REGION stays. It is the one
+# region that the pipeline, the local server, and the secrets script also
+# read, so removing it could move them to the default region.
+forget_deployed_runtime() {
+    if [ ! -f "$SHARED_ENV" ]; then
+        return
+    fi
+    if ! edit_shared_env remove AGENT_ARN; then
+        echo -e "${RED}ERROR: could not remove AGENT_ARN from $SHARED_ENV. It is unchanged.${NC}"
+        exit 1
+    fi
 }
 
 # Create agentcore/ the way `agentcore create` and `agentcore add runtime`
@@ -664,6 +787,7 @@ case "${1:-help}" in
         agentcore deploy "${@:2}"
         echo ""
         echo -e "${GREEN}Deployment complete!${NC}"
+        record_deployed_runtime "$(deploy_target "${@:2}")"
         echo "Run './agent.sh status' to check status"
         echo "Run './agent.sh invoke-cloud \"your question\"' to test"
         ;;
@@ -725,6 +849,7 @@ case "${1:-help}" in
             echo -e "${YELLOW}Stack $STACK_NAME does not exist in $stack_region, so there is nothing to remove.${NC}"
             echo ""
             report_remaining
+            forget_deployed_runtime
             exit 0
         fi
         if [ "${2:-}" != "--yes" ]; then
@@ -753,6 +878,7 @@ case "${1:-help}" in
         end_spec_restore
         echo ""
         report_remaining "$RUNTIME_ID"
+        forget_deployed_runtime
         ;;
 
     help|--help|-h)

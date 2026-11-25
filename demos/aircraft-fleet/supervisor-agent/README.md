@@ -216,6 +216,9 @@ OTEL_TRACES_EXPORTER=none OTEL_METRICS_EXPORTER=none OTEL_LOGS_EXPORTER=none \
 - **Code zip:** The zip holds this folder except `.git`, `.venv`, `agentcore/`, `__pycache__`, `.pytest_cache`, `.DS_Store`, and `node_modules`. The runtime runs `main.py`.
 - **Secret guard:** `./agent.sh deploy` refuses to run if any `.env*`, `.mcp-credentials*.json`, `.agentcore.json`, `credentials*.json`, or `*.pem` file, or a `venv/` folder, is inside this folder.
 - **CDK dependencies:** `deploy` and `destroy` run `npm ci` in `agentcore/cdk` when the install is missing, incomplete, or older than `package-lock.json`. `configure` always runs it.
+- **Runtime ARN:** After a successful deploy, the script reads the runtime ARN from `agentcore status --json`. It writes `AGENT_ARN` and `AWS_REGION` to `demos/aircraft-fleet/.env`, so the clients reach the runtime with no manual edit. The region is the one the ARN names.
+- **The .env edit:** The script replaces the value on each existing `AGENT_ARN` or `AWS_REGION` line and appends a line that is missing. Every other line stays as it was. It always writes `demos/aircraft-fleet/.env` and does not read `FLEET_ENV_FILE`.
+- **No ARN:** A failed deploy leaves `.env` unchanged. When the deploy succeeds but the status shows no runtime ARN, `.env` also stays unchanged, and the script exits with an error.
 - **Invoke permission:** Deployed calls name no Runtime user, because the agent needs no workload access token. Its `agentcore.json` declares no credentials, memories, or gateways. That covers `fleet-supervisor-cli --remote`, `fleet-supervisor-invoke`, `load-test`, and the UI with `AGENT_ARN` set. The caller's IAM identity needs only `bedrock-agentcore:InvokeAgentRuntime`.
 
 ### Remove the deployment
@@ -229,6 +232,7 @@ CloudWatch log groups.
 - **No stack:** When CloudFormation shows no stack, there is nothing to remove. It skips the question and the deploy and goes straight to the final check.
 - **Final check:** It reads `agentcore status` and looks up the stack in AWS by name. If anything remains, it prints the command that deletes it and exits with an error.
 - **Log groups:** The stack delete keeps the runtime's log group, `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`. Before it removes anything, destroy reads the runtime ID from the stack's `AWS::BedrockAgentCore::Runtime` resource. The AgentCore CLI does not record the ID locally. After the final check passes, it deletes each log group that starts with `<runtime-id>-` and prints `Removed` or `Not found` for each. A failed delete does not stop the others, but destroy then exits 1 and names the group. When the stack has no single matching Runtime, or the stack was already gone, destroy leaves the log groups alone.
+- **Shared .env:** After the final check passes, destroy removes the `AGENT_ARN` lines from `demos/aircraft-fleet/.env`. It keeps `AWS_REGION`, because the pipeline, the local server, and the secrets script read it too. A destroy that stops early leaves `.env` unchanged.
 - **Lost local state:** If `agentcore/.cli/` is lost, destroy still deletes the stack. The runtime ID comes from the stack, so the log groups are still removed.
 
 If a log group delete fails, or destroy could not read the runtime ID, remove the group by hand after the stack is gone. Use the Region from `agentcore/aws-targets.json`. The failure lines name the group, and the AWS Console lists it under CloudWatch log groups.

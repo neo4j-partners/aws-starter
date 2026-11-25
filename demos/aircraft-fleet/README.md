@@ -139,7 +139,7 @@ both passwords from Secrets Manager. Run these steps from
 
 1. **Create the read-only user:** Create `fleet_reader` on the fleet graph with the Cypher in [Create the read-only user](./supervisor-agent/README.md#create-the-read-only-user).
 2. **Create the secrets:** Add `NEO4J_READER_USERNAME` and `NEO4J_READER_PASSWORD` to `.env`, run `uv run fleet-supervisor-secrets`, and add the two ARN lines it prints to `.env`.
-3. **Deploy:** Run `./agent.sh deploy`, then `./agent.sh invoke-cloud "What are the most common maintenance faults?"`.
+3. **Deploy:** Run `./agent.sh deploy`. When the deploy succeeds, it writes the runtime's `AGENT_ARN` and `AWS_REGION` to `.env`. Then run `./agent.sh invoke-cloud "What are the most common maintenance faults?"`.
 
 See the [supervisor agent README](./supervisor-agent/README.md) for routing,
 the deploy settings, load testing, and teardown.

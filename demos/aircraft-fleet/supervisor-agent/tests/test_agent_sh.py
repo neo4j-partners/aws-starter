@@ -199,6 +199,29 @@ CLEAN_STATUS = json.dumps(
         ]
     }
 )
+# What `agentcore status --json` reports once the Runtime is deployed. CLI
+# 1.2.0 puts each ARN under "arn". The endpoint ARN goes on past the
+# Runtime ID, so it is not the Runtime ARN.
+DEPLOYED_STATUS = json.dumps(
+    {
+        "resources": [
+            {
+                "resourceType": "runtime",
+                "name": "supervisor",
+                "children": [
+                    {
+                        "resourceType": "runtime-endpoint",
+                        "name": "DEFAULT",
+                        "deploymentState": "deployed",
+                        "arn": f"{RUNTIME_ARN}/runtime-endpoint/DEFAULT",
+                    }
+                ],
+                "deploymentState": "deployed",
+                "arn": RUNTIME_ARN,
+            }
+        ]
+    }
+)
 
 
 def _stack_resources(*resources: tuple[object, object, object]) -> str:
@@ -279,7 +302,9 @@ def run_agent(
         "HOME": os.environ["HOME"],
         "STUB_LOG": str(project.parent / "calls.log"),
         "STUB_PYTHON": sys.executable,
-        "STUB_STATUS_JSON": CLEAN_STATUS,
+        # A deploy reads the ARN of the Runtime it deployed. Everything else
+        # reads a status with nothing deployed.
+        "STUB_STATUS_JSON": DEPLOYED_STATUS if args[:1] == ("deploy",) else CLEAN_STATUS,
         "STUB_STACK_RESOURCES": DEPLOYED_RESOURCES,
         **stub_env,
     }
@@ -599,8 +624,9 @@ def test_deploy_needs_no_credentials_file_and_leaves_the_spec_unchanged(project:
     result = run_agent(project, "deploy")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    # No credential is declared and nothing is looked up in AWS.
-    assert calls(project) == ["agentcore deploy"]
+    # No credential is declared. The one lookup is the status that names the
+    # deployed Runtime's ARN.
+    assert calls(project) == ["agentcore deploy", "agentcore status --json --target default"]
     assert spec.read_bytes() == tracked
     assert not (project / "agentcore" / ".env.local").exists()
     assert not list((project.parent / "tmp").iterdir())
@@ -613,6 +639,260 @@ def test_a_value_exported_in_the_shell_wins_over_the_shared_env(project: Path) -
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert deploy_env(project) == {**DEPLOY_SETTINGS, "MEM_NEO4J_DATABASE": "exported"}
+
+
+# The two lines a deploy appends to a shared .env that has neither.
+WRITTEN = f"AGENT_ARN={RUNTIME_ARN}\nAWS_REGION=us-west-2\n".encode()
+OLD_ARN = f"arn:aws:bedrock-agentcore:us-east-1:{ACCOUNT}:runtime/fleetsupervisor_old-AbCdE12345"
+
+
+def write_shared_env(project: Path, content: bytes) -> Path:
+    """Write ../.env as raw bytes, and add the venv that deploy checks for."""
+    (project / ".venv").mkdir(exist_ok=True)
+    env_file = project.parent / ".env"
+    env_file.write_bytes(content)
+    return env_file
+
+
+def leftover_temp_files(project: Path) -> list[Path]:
+    return [path for path in project.parent.iterdir() if path.name.startswith(".env.")]
+
+
+def assert_no_secret_printed(result: subprocess.CompletedProcess[str]) -> None:
+    for secret in ("fleet-password", "memory-password"):
+        assert secret not in result.stdout + result.stderr
+
+
+def test_deploy_appends_the_runtime_arn_and_region_to_the_shared_env(project: Path) -> None:
+    ready_to_deploy(project)
+    env_file = project.parent / ".env"
+    before = env_file.read_bytes()
+
+    result = run_agent(project, "deploy")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_bytes() == before + WRITTEN
+    assert f"Wrote AGENT_ARN and AWS_REGION to {env_file.resolve()}" in result.stdout
+    assert_no_secret_printed(result)
+    assert leftover_temp_files(project) == []
+
+
+# Only the value on each AGENT_ARN and AWS_REGION line changes. A comment,
+# a longer name, line endings, and the last line with no newline stay.
+def test_deploy_replaces_the_old_values_and_leaves_every_other_byte(project: Path) -> None:
+    lines = [
+        b"# AGENT_ARN=a commented line stays\n",
+        b"NEO4J_PASSWORD='fleet-password'\r\n",
+        b"export AGENT_ARN=" + OLD_ARN.encode() + b"\n",
+        b"\n",
+        b"  AWS_REGION = us-east-1\r\n",
+        b"MODEL_ID=global.anthropic.claude-sonnet-5-5  # caf\xc3\xa9\n",
+        b"AGENT_ARN=older\n",
+        b"AGENT_ARN_NOTE=not the same name\n",
+        b"LAST=no newline",
+    ]
+    env_file = write_shared_env(project, b"".join(lines))
+    arn = RUNTIME_ARN.encode()
+    lines[2] = b"export AGENT_ARN=" + arn + b"\n"
+    lines[4] = b"  AWS_REGION = us-west-2\r\n"
+    lines[6] = b"AGENT_ARN=" + arn + b"\n"
+
+    result = run_agent(project, "deploy")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_bytes() == b"".join(lines)
+    assert_no_secret_printed(result)
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        (b"", WRITTEN),
+        (b"MODEL_ID=m", b"MODEL_ID=m\n" + WRITTEN),
+        (b"MODEL_ID=m\r\n", b"MODEL_ID=m\r\n" + WRITTEN),
+        (b"AWS_REGION=us-east-1", f"AWS_REGION=us-west-2\nAGENT_ARN={RUNTIME_ARN}\n".encode()),
+    ],
+)
+def test_deploy_appends_the_missing_lines_after_a_newline(
+    project: Path, before: bytes, after: bytes
+) -> None:
+    env_file = write_shared_env(project, before)
+
+    result = run_agent(project, "deploy")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_bytes() == after
+
+
+def test_deploy_keeps_the_shared_env_mode_and_link(project: Path, tmp_path: Path) -> None:
+    (project / ".venv").mkdir()
+    target = tmp_path / "fleet.env"
+    target.write_bytes(b"MODEL_ID=m\n")
+    # Not 0600, the mode a new temporary file gets.
+    target.chmod(0o640)
+    link = project.parent / ".env"
+    link.symlink_to(target)
+
+    result = run_agent(project, "deploy")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert link.is_symlink()
+    assert target.read_bytes() == b"MODEL_ID=m\n" + WRITTEN
+    assert stat.S_IMODE(target.stat().st_mode) == 0o640
+
+
+def test_deploy_reads_the_arn_even_with_agent_arn_exported(project: Path) -> None:
+    env_file = write_shared_env(project, b"")
+
+    result = run_agent(project, "deploy", AGENT_ARN=OLD_ARN)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_bytes() == WRITTEN
+
+
+@pytest.mark.parametrize("args", [("--target", "staging"), ("--target=staging",)])
+def test_deploy_reads_the_arn_of_the_target_it_deployed(
+    project: Path, args: tuple[str, ...]
+) -> None:
+    write_shared_env(project, b"")
+
+    result = run_agent(project, "deploy", *args)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(project) == [
+        f"agentcore deploy {' '.join(args)}",
+        "agentcore status --json --target staging",
+    ]
+
+
+def test_a_failed_deploy_leaves_the_shared_env_unchanged(project: Path) -> None:
+    ready_to_deploy(project)
+    env_file = project.parent / ".env"
+    before = env_file.read_bytes()
+
+    result = run_agent(project, "deploy", STUB_DEPLOY_EXIT="1")
+
+    assert result.returncode == 1
+    assert env_file.read_bytes() == before
+    assert calls(project) == ["agentcore deploy"]
+
+
+@pytest.mark.parametrize("status", [CLEAN_STATUS, "not json", ""])
+def test_a_deploy_with_no_runtime_arn_fails_and_leaves_the_shared_env_unchanged(
+    project: Path, status: str
+) -> None:
+    ready_to_deploy(project)
+    env_file = project.parent / ".env"
+    before = env_file.read_bytes()
+
+    result = run_agent(project, "deploy", STUB_STATUS_JSON=status)
+
+    assert result.returncode == 1
+    assert (
+        "the deploy finished, but agentcore status shows no runtime ARN for target 'default'"
+        in result.stdout
+    )
+    assert "supervisor-agent/../.env is unchanged." in result.stdout
+    assert env_file.read_bytes() == before
+
+
+def test_a_failed_write_leaves_the_shared_env_unchanged(project: Path, tmp_path: Path) -> None:
+    ready_to_deploy(project)
+    # The temporary file goes next to the file the link names, in a folder
+    # that refuses new files.
+    folder = tmp_path / "locked"
+    folder.mkdir()
+    target = folder / "fleet.env"
+    (project.parent / ".env").rename(target)
+    (project.parent / ".env").symlink_to(target)
+    before = target.read_bytes()
+    folder.chmod(0o555)
+    try:
+        result = run_agent(project, "deploy")
+    finally:
+        folder.chmod(0o755)
+
+    assert result.returncode == 1
+    assert "could not write AGENT_ARN and AWS_REGION" in result.stdout
+    assert f"Set AGENT_ARN={RUNTIME_ARN} and AWS_REGION=us-west-2 there." in result.stdout
+    assert target.read_bytes() == before
+    assert sorted(path.name for path in folder.iterdir()) == ["fleet.env"]
+    assert_no_secret_printed(result)
+
+
+# destroy removes AGENT_ARN, and keeps AWS_REGION, which the pipeline and
+# the local server read too.
+DEPLOYED_ENV = [
+    b"NEO4J_PASSWORD=fleet-password\n",
+    b"export AGENT_ARN=" + RUNTIME_ARN.encode() + b"\r\n",
+    b"# AGENT_ARN=a commented line stays\n",
+    b"AWS_REGION=us-west-2\n",
+    b"AGENT_ARN_NOTE=not the same name\n",
+    b"AGENT_ARN=" + OLD_ARN.encode(),
+]
+DESTROYED_ENV = b"".join(DEPLOYED_ENV[i] for i in (0, 2, 3, 4))
+
+
+def test_destroy_removes_only_the_agent_arn_lines(project: Path) -> None:
+    env_file = write_shared_env(project, b"".join(DEPLOYED_ENV))
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_bytes() == DESTROYED_ENV
+    assert f"Removed AGENT_ARN from {env_file.resolve()}" in result.stdout
+    assert_no_secret_printed(result)
+    assert leftover_temp_files(project) == []
+
+
+def test_destroy_of_an_absent_stack_removes_the_agent_arn_too(project: Path) -> None:
+    env_file = write_shared_env(project, b"".join(DEPLOYED_ENV))
+
+    result = run_agent(project, "destroy", STUB_STACK_BEFORE_DEPLOY="")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert ABSENT_MESSAGE in result.stdout
+    assert env_file.read_bytes() == DESTROYED_ENV
+
+
+def test_destroy_leaves_a_shared_env_without_agent_arn_as_it_was(project: Path) -> None:
+    env_file = write_shared_env(project, b"AWS_REGION=us-west-2\nMODEL_ID=m")
+    inode = env_file.stat().st_ino
+
+    result = run_destroy(project)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_bytes() == b"AWS_REGION=us-west-2\nMODEL_ID=m"
+    # The file was not written again.
+    assert env_file.stat().st_ino == inode
+    assert f"{env_file.resolve()} has no AGENT_ARN line to remove" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("stdin", "stub_env"),
+    [
+        # The teardown fails.
+        ("", {"STUB_DEPLOY_EXIT": "3"}),
+        # The stack is left behind.
+        ("", {"STUB_STACK_STATUS": "DELETE_FAILED"}),
+        # The account check fails.
+        ("", {"STUB_CALLER_ACCOUNT": "999988887777"}),
+        # The destroy is cancelled at the prompt.
+        ("n\n", {}),
+    ],
+)
+def test_a_destroy_that_does_not_finish_leaves_the_shared_env_unchanged(
+    project: Path, stdin: str, stub_env: dict[str, str]
+) -> None:
+    env_file = write_shared_env(project, b"".join(DEPLOYED_ENV))
+    args = ("destroy",) if stdin else ("destroy", "--yes")
+
+    result = run_agent(
+        project, *args, stdin=stdin, STUB_STACK_BEFORE_DEPLOY="CREATE_COMPLETE", **stub_env
+    )
+
+    assert result.returncode != 0
+    assert env_file.read_bytes() == b"".join(DEPLOYED_ENV)
 
 
 def test_start_runs_without_a_credentials_file(project: Path) -> None:

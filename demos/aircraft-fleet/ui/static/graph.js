@@ -66,6 +66,7 @@ export class EvidenceGraph {
           layout: d3ForceLayoutType,
           backgroundColor: '#f7faf7',
           allowDynamicMinZoom: true,
+          disableWebWorkers: true,
         }, { onLayoutDone: () => this.fit() });
         this.interactions = [
           new PanInteraction(this.nvl), new ZoomInteraction(this.nvl), new DragNodeInteraction(this.nvl),

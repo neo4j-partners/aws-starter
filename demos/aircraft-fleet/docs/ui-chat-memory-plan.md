@@ -74,27 +74,33 @@ All answered on 2026-11-24.
 
 ## Phase 1: Starter dropdown
 
-**Status:** In progress. Built as bd6ec11 on branch ui-starters, which is not merged. The tests pass. The local live run is still open.
+**Status:** Complete. Built as bd6ec11 and merged to local main in 56678af on 2026-11-24. It is not pushed.
+
+**Validation:** On the merge, 478 Python tests pass and 1 is skipped, and the 9 UI tests pass. A local run on 2026-11-24 asked all six starters through the UI's chat route against the local supervisor. Each one completed and drew graph evidence, from 13 to 50 nodes for its first graph query. A headless Chrome check against a stub chat route confirmed the keyboard and screen reader behavior and the disabled state.
 
 **Outcome:** The welcome panel lists about six starter questions in a dropdown, and choosing one asks it.
 
-- [ ] The dropdown replaces the button, works from the keyboard and with a screen reader, and is disabled while a question runs.
-- [ ] Each prompt asks for the IDs the evidence graph needs.
-- [ ] Tests cover the list, and the READMEs name the dropdown.
+- [x] The dropdown replaces the button, works from the keyboard and with a screen reader, and is disabled while a question runs.
+- [x] Each prompt asks for the IDs the evidence graph needs.
+- [x] Tests cover the list, and the READMEs name the dropdown.
 
 **Done when:** The tests pass, and each starter shows graph evidence in a local run.
 
 ## Phase 2: Follow-up questions
 
-**Status:** In progress. Built as 0b35f8d on branch ui-followups, cut from ui-starters, which is not merged. The tests pass. The local live run is still open, and Haiku 4.5 access in the account is unchecked.
+**Status:** Complete. Built as 0b35f8d and merged to local main in 56678af on 2026-11-24. It is not pushed.
+
+**Validation:** The same local run returned three follow-up questions for every starter, each about the answer's aircraft or faults. No follow-up call failed or timed out, so Haiku 4.5 access works in the account. A headless Chrome check against a stub chat route confirmed the links render as text, send their question, and are disabled during a run.
+
+**Notes:** Some follow-ups ask for data the graph does not hold, such as oil analysis results or vibration frequency signatures after the manual starter.
 
 **Outcome:** Each answer ends with about three follow-up links, and clicking one asks it.
 
-- [ ] The supervisor sends a follow-up event after the answer, from one small structured model call.
-- [ ] A failed or slow follow-up call drops the links and leaves the answer intact.
-- [ ] The UI shows the links under the answer and disables them while a question runs.
-- [ ] The CLI and older clients ignore the event.
-- [ ] Tests cover the event, the failure path, and the links.
+- [x] The supervisor sends a follow-up event after the answer, from one small structured model call.
+- [x] A failed or slow follow-up call drops the links and leaves the answer intact.
+- [x] The UI shows the links under the answer and disables them while a question runs.
+- [x] The CLI and older clients ignore the event.
+- [x] Tests cover the event, the failure path, and the links.
 
 **Done when:** The tests pass, and a local run shows follow-up links that relate to the answer.
 

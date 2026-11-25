@@ -1,5 +1,6 @@
 """Serve the fleet demo and relay a local or deployed supervisor's SSE stream."""
 
+import hashlib
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager, retr
 import httpx
 import urllib3.exceptions
 import uvicorn
+from auth import RequireLogin, callback, load_login, login, logout, ready
 from botocore.exceptions import BotoCoreError, ClientError
 from dotenv import load_dotenv
 from evidence import load_evidence
@@ -27,6 +29,7 @@ from neo4j import Driver, GraphDatabase
 from neo4j.exceptions import DriverError, Neo4jError
 from pydantic import BaseModel, StringConstraints, ValidationError
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.routing import Mount, Route
@@ -46,6 +49,8 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
     load_dotenv(os.environ.get("FLEET_ENV_FILE") or ROOT.parent / ".env")
     # Check the mode now, so a cloud mode with no ARN stops the UI at startup.
     supervisor_mode()
+    # Check the login mode too, so a Cognito mode with a missing setting stops here.
+    app.state.login = load_login()
     driver = None
     auth = None
     if uri := os.getenv("NEO4J_URI"):
@@ -93,9 +98,26 @@ def supervisor_mode() -> str:
     return mode
 
 
-def supervisor_stream(turn: ChatRequest) -> AbstractContextManager[Iterator[dict[str, Any]]]:
-    payload = {"prompt": turn.prompt, "trace": True}
-    session_id = str(turn.session_id)
+def runtime_session_id(session_id: UUID, user_id: str | None) -> str:
+    """Return the supervisor session ID for a browser session.
+
+    With no user, it is the browser's ID, as local runs always sent. With a
+    signed-in user, it is a hash of the user and the browser's ID, so one user
+    who sends another user's session ID still gets a session of their own. Both
+    forms meet the Runtime's 33-character minimum.
+    """
+    if user_id is None:
+        return str(session_id)
+    return hashlib.sha256(f"{user_id}\x00{session_id}".encode()).hexdigest()
+
+
+def supervisor_stream(
+    turn: ChatRequest, user_id: str | None
+) -> AbstractContextManager[Iterator[dict[str, Any]]]:
+    payload: dict[str, Any] = {"prompt": turn.prompt, "trace": True}
+    if user_id is not None:
+        payload["user_id"] = user_id
+    session_id = runtime_session_id(turn.session_id, user_id)
     if supervisor_mode() == "cloud":
         return stream_deployed(
             payload, os.environ["AGENT_ARN"], os.getenv("AWS_REGION"), session_id
@@ -110,12 +132,15 @@ def _frame(event: dict[str, Any]) -> str:
 
 
 def relay(
-    turn: ChatRequest, driver: Driver | None, auth: RotatingLoginAuthManager | None
+    turn: ChatRequest,
+    driver: Driver | None,
+    auth: RotatingLoginAuthManager | None,
+    user_id: str | None = None,
 ) -> Iterator[str]:
     database = os.getenv("NEO4J_DATABASE", "neo4j")
     terminal = False
     try:
-        with supervisor_stream(turn) as events:
+        with supervisor_stream(turn, user_id) as events:
             for event in events:
                 if event.get("type") == "tool_complete":
                     ids = event.pop("evidence_ids", [])
@@ -156,8 +181,10 @@ async def chat(request: Request) -> JSONResponse | StreamingResponse:
             {"error": "A valid session ID and a question are required."},
             status_code=400,
         )
+    # RequireLogin sets the Cognito user. With no login, there is none.
+    user_id = getattr(request.state, "user_id", None)
     return StreamingResponse(
-        relay(turn, request.app.state.driver, request.app.state.auth),
+        relay(turn, request.app.state.driver, request.app.state.auth, user_id),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -171,8 +198,13 @@ app = Starlette(
     routes=[
         Route("/", index),
         Route("/api/chat", chat, methods=["POST"]),
+        Route("/auth/login", login),
+        Route("/auth/callback", callback),
+        Route("/auth/logout", logout),
+        Route("/ready", ready),
         Mount("/static", StaticFiles(directory=ROOT / "static")),
     ],
+    middleware=[Middleware(RequireLogin)],
     lifespan=lifespan,
 )
 

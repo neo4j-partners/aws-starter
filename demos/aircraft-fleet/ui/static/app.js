@@ -141,6 +141,11 @@ async function sendQuestion(question) {
       body: JSON.stringify({ prompt: question, session_id: sessionId }),
       signal: turn.signal,
     });
+    if (response.status === 401) {
+      // The hosted UI's session expired. Sign in again. Local runs never get a 401.
+      window.location.assign('/auth/login');
+      return;
+    }
     if (!response.ok) throw new Error('The fleet UI could not send this question.');
     for await (const event of streamEvents(response)) {
       if (turn.signal.aborted) return;

@@ -130,7 +130,7 @@ def ui_on_fake_neo4j(
     monkeypatch.setattr(
         ui_server,
         "supervisor_stream",
-        lambda _turn: nullcontext(iter(copy.deepcopy(EVIDENCE_TURN))),
+        lambda _turn, _user_id: nullcontext(iter(copy.deepcopy(EVIDENCE_TURN))),
     )
     return fake_neo4j
 
@@ -194,7 +194,9 @@ def test_a_failed_secret_read_marks_the_graph_unavailable(
     def fail(*_args: object) -> None:
         raise ui_server.ConfigError("Could not read the Neo4j secret.")
 
-    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext(iter(events)))
+    monkeypatch.setattr(
+        ui_server, "supervisor_stream", lambda _turn, _user_id: nullcontext(iter(events))
+    )
     monkeypatch.setattr(ui_server, "load_evidence", fail)
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
@@ -234,7 +236,9 @@ def test_a_node_with_no_id_marks_the_graph_unavailable_and_keeps_streaming(
         {"type": "chunk", "data": "Two aircraft."},
         {"type": "complete", "response": "Two aircraft."},
     ]
-    monkeypatch.setattr(ui_server, "supervisor_stream", lambda _turn: nullcontext(iter(events)))
+    monkeypatch.setattr(
+        ui_server, "supervisor_stream", lambda _turn, _user_id: nullcontext(iter(events))
+    )
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
     frames = list(ui_server.relay(turn, driver=OneNodeDriver(), auth=static_login(monkeypatch)))
@@ -256,7 +260,7 @@ def test_a_stream_that_fails_partway_ends_with_an_error(
         raise urllib3.exceptions.ProtocolError("Connection broken")
 
     monkeypatch.setattr(
-        ui_server, "supervisor_stream", lambda _turn: nullcontext(drop_after_one_chunk())
+        ui_server, "supervisor_stream", lambda _turn, _user_id: nullcontext(drop_after_one_chunk())
     )
     turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
 
@@ -287,7 +291,7 @@ def opened_streams(ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch) -> li
 
 
 def open_turn(ui_server: ModuleType) -> None:
-    ui_server.supervisor_stream(ui_server.ChatRequest(prompt="hi", session_id=uuid4()))
+    ui_server.supervisor_stream(ui_server.ChatRequest(prompt="hi", session_id=uuid4()), None)
 
 
 def test_an_unset_mode_relays_the_local_supervisor_even_with_an_agent_arn(

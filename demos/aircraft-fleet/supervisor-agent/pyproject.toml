@@ -32,6 +32,8 @@ dependencies = [
     # (uv run --project ../supervisor-agent).
     "starlette>=1.10.0",
     "uvicorn>=0.54.0",
+    # ui/auth.py verifies Cognito ID tokens. The crypto extra adds RS256.
+    "pyjwt[crypto]>=2.15.1",
 ]
 
 # Console entry points. The server runs in the foreground of its own

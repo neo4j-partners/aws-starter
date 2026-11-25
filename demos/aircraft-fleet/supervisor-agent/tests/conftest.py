@@ -2,9 +2,9 @@
 
 This runs before any test module imports ``fleet_supervisor``. It points
 ``FLEET_ENV_FILE`` at an empty file so the real aircraft-fleet .env is never
-loaded. It also clears the fleet graph, graph settings, memory, and
-supervisor mode variables, so a developer's shell cannot change what the tests
-see.
+loaded. It also clears the fleet graph, graph settings, memory, supervisor
+mode, and UI login variables, so a developer's shell cannot change what the
+tests see.
 """
 
 import asyncio
@@ -42,6 +42,10 @@ _CLEARED_VARS = (
     "MEMORY_API_KEY",
     "AGENT_ARN",
     "FLEET_SUPERVISOR_MODE",
+    "FLEET_UI_AUTH",
+    "COGNITO_USER_POOL_ID",
+    "COGNITO_CLIENT_ID_PARAMETER",
+    "COGNITO_DOMAIN",
 )
 
 os.environ["FLEET_ENV_FILE"] = os.devnull

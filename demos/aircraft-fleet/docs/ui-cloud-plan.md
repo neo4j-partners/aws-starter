@@ -48,43 +48,7 @@ Each of these was checked in the code or the AWS docs.
 
 1. **The app checks the login.** The function URL is public, and the app requires a Cognito session on every route except login and its callback. A request without a login is rejected before it reaches Bedrock or Neo4j. CloudFront with an origin access control is dropped for now. It adds a distribution, and the frontend would have to hash each POST body. Add it if the UI is shared beyond a small group.
 2. **Memory is per user.** The hosted UI sends the Cognito user's ID as `user_id`, so each person gets their own memory. Without it, every signed-in user would share the `anonymous` memory, and one user's learned facts would reach another. Local runs keep `anonymous`.
-3. **Measure, then pick the packaging.** The UI imports `fleet_supervisor`, whose dependencies include Strands, ADOT, neo4j-graphrag, and agent memory. That set may exceed the 250 MB unzipped limit for a zip package. This is a hypothesis. Phase 2's first task measures it. A zip with the Web Adapter layer is used if it fits, and an arm64 container image if not.
-
-## Deliberately not doing
-
-- **No custom domain or WAF.** The function URL is enough for a demo. Both can sit on CloudFront later.
-- **No change to the supervisor's runtime or its stack.** The UI only calls the runtime that already exists.
-- **No new Neo4j users or secrets.** The UI reuses the read-only login the deployed supervisor already uses.
-- **No splitting `fleet_supervisor` into a smaller client package.** It would shrink the UI's image, but it is a bigger refactor than this needs. Revisit it only if packaging forces it.
-- **No hosted CLI.** The CLI stays a local tool.
-- **No change to `agentcore` CLI settings or to X-Ray indexing.**
-
-## Where to look
-
-- **Deploy and destroy:** the `deploy`, `destroy`, and `runtime_arn` parts of `supervisor-agent/agent.sh`.
-- **Cloud vs local choice:** `supervisor_stream` in `ui/server.py`, and the `--remote` handling in `fleet_supervisor/client/cli.py`.
-- **Deployed call:** `stream_deployed` in `fleet_supervisor/client/transport.py`.
-- **Memory user:** the payload handling in `fleet_supervisor/server.py`.
-- **Docs:** Steps 2 and 3 in the fleet `README.md`, the UI `README.md`, `docs/architecture/deployment.md`, and `docs/images/deployment-topology.svg`.
-
-## Assumptions
-
-- The AgentCore runtime `fleetsupervisor_default_supervisor` stays deployed in `us-east-1` while Phase 2 is built and tested.
-- The account's SCP blocks the default CDK bootstrap. The UI stack uses the account's existing scoped bootstrap.
-- Lambda Web Adapter and every new package meet the one-week release-age rule. No existing lock is re-resolved.
-
-## Risks
-
-- **Size:** The image could be large and slow to start cold. Phase 2 measures the cold start before the docs promise anything.
-- **Timeout:** A Lambda function runs at most 15 minutes, and the stream reader waits up to 300 seconds. The function timeout must cover the longest answer.
-- **Cost of a public URL:** Even with app-level login, anyone can call the function URL and cost a small invocation. Decision 1 accepts this for now.
-- **`.env` edits:** Deploy and destroy rewrite a file that holds passwords. The edit must change only the two lines, keep every other line byte for byte, and never print values.
-
-## Phase 2 decisions (answered 2026-11-24)
-
-1. **The app checks the login.** The function URL is public, and the app requires a Cognito session on every route except login and its callback. A request without a login is rejected before it reaches Bedrock or Neo4j. CloudFront with an origin access control is dropped for now. It adds a distribution, and the frontend would have to hash each POST body. Add it if the UI is shared beyond a small group.
-2. **Memory is per user.** The hosted UI sends the Cognito user's ID as `user_id`, so each person gets their own memory. Without it, every signed-in user would share the `anonymous` memory, and one user's learned facts would reach another. Local runs keep `anonymous`.
-3. **Measure, then pick the packaging.** The UI imports `fleet_supervisor`, whose dependencies include Strands, ADOT, neo4j-graphrag, and agent memory. That set may exceed the 250 MB unzipped limit for a zip package. This is a hypothesis. Phase 2's first task measures it. A zip with the Web Adapter layer is used if it fits, and an arm64 container image if not.
+3. **The function is an arm64 container image.** Measured on 2026-11-24: the supervisor's dependencies install to 283 MB for Linux arm64. Most of that is scipy at 120 MB, numpy at 52 MB, and botocore at 26 MB. That is over the 250 MB unzipped limit for a zip package, so a zip with the Web Adapter layer is dropped.
 
 ## Deliberately not doing
 
@@ -137,15 +101,15 @@ Each of these was checked in the code or the AWS docs.
 
 ## Phase 2: The UI on Lambda with response streaming
 
-**Status:** In progress. The stack, its commands, and its tests are built (2b). The app side is in 2a. Nothing is deployed yet.
+**Status:** In progress. The app side (branch ui-cloud-2a) and the stack, its commands, and its tests (branch ui-cloud-2b) are built and pass together: 455 Python tests and 25 CDK tests. Nothing is deployed yet.
 
 **Outcome:** One command deploys the UI. A signed-in user opens the function URL and gets a streamed answer and the evidence graph from the deployed supervisor. A request without a login gets no answer and causes no Bedrock or Neo4j call.
 
 - [x] Measure the UI's installed dependency size to settle zip vs container image. The deps install to 283 MB for Linux arm64, so the function is an arm64 container image.
 - [x] A `ui/` CDK app defines the function, the streaming function URL, the Cognito user pool and app client, and the role.
 - [x] The role can invoke only the fleet runtime and read only the fleet login secret.
-- [ ] The app requires a Cognito session on every route except login and its callback.
-- [ ] The UI sends the signed-in user's ID as `user_id`.
+- [x] The app requires a Cognito session on every route except login and its callback.
+- [x] The UI sends the signed-in user's ID as `user_id`.
 - [x] The function's timeout covers the stream reader's 300-second wait.
 - [x] Commands deploy, check, and destroy the UI stack, and print the URL after a deploy. `ui/deploy.sh` also has `add-user`.
 - [x] CDK tests check streaming mode, the role's scope, and that self sign-up is off.

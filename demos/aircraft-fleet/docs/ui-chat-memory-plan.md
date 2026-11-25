@@ -69,6 +69,8 @@ All answered on 2026-11-24.
 ## Risks
 
 - **Scoping entities:** Entities have no direct owner today. The fork must find each entity's user through the messages it was extracted from, and that query must stay fast.
+- **Shared entries:** Scoping decides which entities and facts a user recalls, not what they say. An entity two users mention is one node, and its description can hold text extracted from the other user's conversation. A deduplicated fact is one node too, so one user's write can change the object another user sees. The user accepted this for fleet.11 on 2026-11-24. For the fleet, the shared entities are mostly aircraft, systems, and faults.
+- **Scoped recall depth:** A scoped search asks the index for ten candidates per hit and then keeps the user's own. A user who owns a small share of the nearest entries can get fewer hits than the limit. That is fine for a few demo users.
 - **Follow-up latency:** The follow-up call runs after the answer, so the links appear about a second after it. A failed call must never fail the answer.
 - **Stream compatibility:** Older UIs and the CLI must ignore the new event types.
 
@@ -106,16 +108,16 @@ All answered on 2026-11-24.
 
 ## Phase 3: Fork release with user-scoped search and exposed recall
 
-**Status:** In progress (olliz, worktree fleet-user-scope off fleet-fixes).
+**Status:** Complete. Released on 2026-11-24 as python-v0.8.0+fleet.11, a prerelease on fleet-fixes at 779555a6. It is three commits on fleet.10 (c3283c36), so it keeps `Neo4jConfig.auth_manager`. On that commit, the fork's checks pass, 3155 unit tests pass, and 624 integration tests pass, including 14 new two-user isolation tests. The downloaded wheel's sha256 is 525f884b50fee3a46e19a2c68acde34e76d72ba4390bf30218ace75df624cdb4.
 
 **Outcome:** A fleet.11 prerelease lets a caller limit entity and fact search to one user and read the entries the session manager last recalled.
 
-- [ ] Entity and fact search can be limited to one user's entries. Without a user, it behaves as today.
-- [ ] Storing a fact with a user links the fact to that user. Without a user, it stores the fact as today.
-- [ ] The Strands session manager passes its user to every recall search.
-- [ ] The session manager keeps the entries it last recalled, with their IDs and types, for the caller to read.
-- [ ] Fork tests cover both users' isolation and the recalled entries.
-- [ ] The push, the tag, and the prerelease each get a separate approval.
+- [x] Entity and fact search can be limited to one user's entries. Without a user, it behaves as today.
+- [x] Storing a fact with a user links the fact to that user. Without a user, it stores the fact as today.
+- [x] The Strands session manager passes its user to every recall search.
+- [x] The session manager keeps the entries it last recalled, with their IDs and types, for the caller to read.
+- [x] Fork tests cover both users' isolation and the recalled entries.
+- [x] The push, the tag, and the prerelease each get a separate approval.
 
 **Done when:** The fork's tests pass, and the prerelease wheel is published.
 

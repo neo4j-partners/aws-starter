@@ -7,12 +7,14 @@ from types import SimpleNamespace
 
 import anyio
 import pytest
+from botocore.exceptions import ClientError
 from neo4j.exceptions import AuthError
 from neo4j_agent_memory.core.exceptions import ConnectionError as MemoryConnectionError
 from strands.types.exceptions import SessionException
 
 from fleet_supervisor import server
 from fleet_supervisor.core.config import ConfigError
+from fleet_supervisor.core.followups import suggest_followups
 from tests.conftest import collect
 
 
@@ -686,6 +688,92 @@ def test_streams_agent_chunk_and_complete(supervisor):
         {"type": "complete"},
     ]
     assert supervisor.prompts == ["How many flights?"]
+
+
+@pytest.fixture
+def suggested(monkeypatch):
+    """Record each follow-up call and answer it with ``suggested.questions``."""
+    calls: list[tuple[str, str]] = []
+
+    async def fake_suggest_followups(question: str, answer: str) -> list[str]:
+        calls.append((question, answer))
+        return fake.questions
+
+    fake = SimpleNamespace(calls=calls, questions=["Which tails?", "What fault?"])
+    monkeypatch.setattr(server, "suggest_followups", fake_suggest_followups)
+    return fake
+
+
+def test_followups_are_sent_after_the_answer_and_before_complete(supervisor, suggested):
+    payload = {"prompt": "How many flights?", "followups": True}
+
+    events = collect(server.invoke(payload, SimpleNamespace(session_id="s1")))
+
+    assert events == [
+        {"type": "agent", "name": "Operations Agent"},
+        {"type": "chunk", "data": "42 flights"},
+        {"type": "followups", "questions": ["Which tails?", "What fault?"]},
+        {"type": "complete"},
+    ]
+    assert suggested.calls == [("How many flights?", "42 flights")]
+
+
+@pytest.mark.parametrize("flag", [None, False, "true"], ids=["unset", "false", "string"])
+def test_followups_are_not_requested_without_the_flag(supervisor, suggested, flag):
+    payload = {"prompt": "How many flights?"}
+    if flag is not None:
+        payload["followups"] = flag
+
+    events = collect(server.invoke(payload, SimpleNamespace(session_id="s1")))
+
+    assert [event["type"] for event in events] == ["agent", "chunk", "complete"]
+    assert suggested.calls == []
+
+
+def test_no_followups_event_when_the_call_returns_none(supervisor, suggested):
+    suggested.questions = []
+
+    events = collect(
+        server.invoke({"prompt": "q", "followups": True}, SimpleNamespace(session_id="s1"))
+    )
+
+    assert [event["type"] for event in events] == ["agent", "chunk", "complete"]
+
+
+def test_an_answer_with_no_text_asks_for_no_followups(supervisor, suggested):
+    supervisor.events = [{"data": "  "}]
+
+    events = collect(
+        server.invoke({"prompt": "q", "followups": True}, SimpleNamespace(session_id="s1"))
+    )
+
+    assert events[-1] == {"type": "complete"}
+    assert suggested.calls == []
+
+
+def test_a_failed_followup_call_leaves_the_answer_intact(supervisor, monkeypatch, caplog):
+    """The real follow-up function, with a model that is throttled."""
+
+    class ThrottledModel:
+        async def structured_output(self, *_args, **_kwargs):
+            raise ClientError({"Error": {"Code": "ThrottlingException"}}, "Converse")
+            yield
+
+    async def throttled(question: str, answer: str) -> list[str]:
+        return await suggest_followups(question, answer, model_factory=ThrottledModel)
+
+    monkeypatch.setattr(server, "suggest_followups", throttled)
+
+    events = collect(
+        server.invoke({"prompt": "q", "followups": True}, SimpleNamespace(session_id="s1"))
+    )
+
+    assert events == [
+        {"type": "agent", "name": "Operations Agent"},
+        {"type": "chunk", "data": "42 flights"},
+        {"type": "complete"},
+    ]
+    assert "Follow-up questions failed" in caplog.text
 
 
 def test_model_and_schema_are_read_on_every_request(supervisor):

@@ -42,6 +42,7 @@ The [`supervisor-agent/`](./supervisor-agent/) project is a Strands supervisor w
 
 The [`ui/`](./ui/) project pairs the supervisor chat with a live evidence graph
 and a tool call trace. Select a finished tool call to highlight its evidence.
+Each answer ends with suggested follow-up questions that you can select to ask.
 
 ## Quick start
 

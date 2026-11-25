@@ -114,7 +114,7 @@ def runtime_session_id(session_id: UUID, user_id: str | None) -> str:
 def supervisor_stream(
     turn: ChatRequest, user_id: str | None
 ) -> AbstractContextManager[Iterator[dict[str, Any]]]:
-    payload: dict[str, Any] = {"prompt": turn.prompt, "trace": True}
+    payload: dict[str, Any] = {"prompt": turn.prompt, "trace": True, "followups": True}
     if user_id is not None:
         payload["user_id"] = user_id
     session_id = runtime_session_id(turn.session_id, user_id)

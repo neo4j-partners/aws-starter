@@ -15,8 +15,10 @@ import neo4j
 import pytest
 import urllib3.exceptions
 
+from fleet_supervisor.client import transport
 from fleet_supervisor.core.graph.retrieval import RotatingLoginAuthManager
 from tests.fake_bolt import FakeNeo4j
+from tests.test_transport import _FakeRuntimeClient, sse
 
 UI_DIR = Path(__file__).resolve().parents[2] / "ui"
 
@@ -272,6 +274,23 @@ def test_a_stream_that_fails_partway_ends_with_an_error(
     ]
 
 
+FOLLOWUPS = {"type": "followups", "questions": ["Which tails?", "What fault?"]}
+
+
+def test_the_followups_event_is_relayed_before_complete(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events = [{"type": "chunk", "data": "Two aircraft"}, FOLLOWUPS, {"type": "complete"}]
+    monkeypatch.setattr(
+        ui_server, "supervisor_stream", lambda _turn, _user_id: nullcontext(iter(events))
+    )
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=None, auth=None))
+
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == events
+
+
 ARN = "arn:aws:bedrock-agentcore:us-east-1:0:runtime/fleet"
 
 
@@ -316,6 +335,23 @@ def test_cloud_mode_relays_the_deployed_supervisor(
     open_turn(ui_server)
 
     assert opened_streams == [("cloud", ARN, "us-west-2")]
+
+
+def test_cloud_mode_asks_for_followups_and_relays_them(
+    ui_server: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The deployed runtime's reader passes the followups event through to the browser."""
+    events = [{"type": "chunk", "data": "Two aircraft"}, FOLLOWUPS, {"type": "complete"}]
+    fake = _FakeRuntimeClient(sse(*events))
+    monkeypatch.setattr(transport.boto3, "client", lambda *args, **kwargs: fake)
+    monkeypatch.setenv("FLEET_SUPERVISOR_MODE", "cloud")
+    monkeypatch.setenv("AGENT_ARN", ARN)
+    turn = ui_server.ChatRequest(prompt="Find hydraulic issues", session_id=uuid4())
+
+    frames = list(ui_server.relay(turn, driver=None, auth=None))
+
+    assert json.loads(fake.kwargs["payload"])["followups"] is True
+    assert [json.loads(frame.removeprefix("data: ")) for frame in frames] == events
 
 
 def test_the_ui_reads_cloud_mode_and_the_arn_from_the_env_file(

@@ -2,7 +2,8 @@
 
 The browser shows the supervisor's answer, an interactive Neo4j graph, and
 the specialist and tool calls for the current question. Select a completed
-tool call to highlight its evidence. Start a new chat to clear the graph and
+tool call to highlight its evidence. Each answer ends with up to three
+suggested follow-up questions. Start a new chat to clear the graph and
 open a new AgentCore conversation.
 
 From `demos/aircraft-fleet/`, start the configured supervisor in one terminal.
@@ -36,6 +37,13 @@ or component IDs in its graph query results. The canvas uses those IDs to draw
 the paths from aircraft through systems and components to events and flights.
 The list lives in `static/index.html`. Each option's text is its label, and
 its value is the full prompt.
+
+After each answer, the supervisor suggests up to three follow-up questions.
+They show as links under the answer, and selecting one asks it. The links
+are disabled while a question runs. They come from a short model call after
+the answer, so they appear a moment later. When that call fails or runs
+slow, the answer shows with no links. `static/followups.js` renders them as
+text. Run its tests from `ui/` with `npm test`.
 
 The UI server logs in to the fleet graph the same way the supervisor's graph
 tools do, using the shared fleet `.env`. It reads `NEO4J_PASSWORD_SECRET_ARN`

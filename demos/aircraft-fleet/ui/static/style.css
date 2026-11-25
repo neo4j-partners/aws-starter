@@ -124,6 +124,19 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visi
 .message-body.formatted pre { overflow: auto; }
 .message-body.formatted table { display: block; overflow: auto; border-collapse: collapse; }
 .message-body.formatted :is(th, td) { padding: 4px 7px; border: 1px solid var(--border); }
+.followups { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.followups ul { display: grid; gap: 4px; padding: 0; list-style: none; }
+.followup {
+  padding: 3px 0;
+  border: 0;
+  color: var(--accent);
+  background: none;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 13px;
+}
+.followup:hover:not(:disabled) { color: #164d39; }
 .composer { display: flex; align-items: end; gap: 8px; border-top: 1px solid var(--border); padding: 12px; }
 .composer textarea { flex: 1; min-width: 0; resize: vertical; padding: 9px 10px; border: 1px solid #c6d4c9; border-radius: 8px; font-size: 14px; color: inherit; }
 

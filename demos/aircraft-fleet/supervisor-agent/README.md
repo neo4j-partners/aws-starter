@@ -99,12 +99,21 @@ covers the read-only guard, hybrid search, and the errors the model sees.
 | `{"type": "agent", "name": ...}` | A specialist was called |
 | `{"type": "tool", "name": ...}` | A specialist called a graph tool |
 | `{"type": "chunk", "data": ...}` | Text of the supervisor's answer |
+| `{"type": "followups", "questions": [...]}` | Up to three suggested follow-up questions, sent after the answer |
 | `{"type": "complete"}` | The answer is finished |
 | `{"type": "error", "error": ...}` | The request failed. The message is generic, and the details are in the server log. |
 
 A payload with `"trace": true` adds a `call_id` and a `parent_id` to the
 `agent` and `tool` events. It also adds a `tool_complete` event when a
 specialist or graph tool call finishes. The UI uses the trace.
+
+A payload with `"followups": true` adds the `followups` event. After the
+answer, the server makes one small structured call to `FOLLOWUP_MODEL_ID`.
+The call sees only the question and the final answer. It never reads or
+writes memory, and its questions are not stored. A call that fails or runs
+past `FOLLOWUP_TIMEOUT_S` is logged, and the stream ends with no `followups`
+event. The UI asks for follow-ups. The CLI does not, and it ignores the
+event.
 
 ## Create the secrets
 
@@ -337,6 +346,7 @@ Then delete the `AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET` line from
 | `fleet_supervisor/core/memory.py` | The memory client, the per-request session managers, and shutdown |
 | `fleet_supervisor/core/events.py` | The mapping from Strands stream events to client events |
 | `fleet_supervisor/core/tool_stream.py` | The `tool_complete` events for traced requests |
+| `fleet_supervisor/core/followups.py` | The follow-up question call |
 | `fleet_supervisor/setup_secrets.py` | `fleet-supervisor-secrets`, which creates the two deploy secrets |
 | `fleet_supervisor/client/cli.py` | `fleet-supervisor-cli`, which asks the local server, or the deployed agent with `--remote`, one question |
 | `fleet_supervisor/client/invoke.py` | `fleet-supervisor-invoke`, for cloud calls and load testing |
@@ -375,6 +385,8 @@ Then delete the `AGENTCORE_CREDENTIAL_FLEET_GATEWAY_CLIENT_SECRET` line from
 | `TEXT2CYPHER_TIMEOUT_S` | `30` | The transaction timeout for each generated query |
 | `TEXT2CYPHER_MAX_ROWS` | `200` | The row cap for each generated query |
 | `TEXT2CYPHER_MAX_TOKENS` | `2048` | The output token limit for Cypher generation |
+| `FOLLOWUP_MODEL_ID` | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | The Bedrock model for suggested follow-up questions |
+| `FOLLOWUP_TIMEOUT_S` | `5` | Seconds the follow-up call may take before the links are dropped |
 | `AGENT_ARN` | unset | The deployed agent for `--remote` and `load-test` |
 | `FLEET_ENV_FILE` | `../.env` | The shared env file the server and the secrets script load |
 

@@ -55,6 +55,7 @@ from strands.types.exceptions import SessionException  # noqa: E402
 from fleet_supervisor.core.agents import build_supervisor  # noqa: E402
 from fleet_supervisor.core.config import LOCAL_PORT, MODEL_ID  # noqa: E402
 from fleet_supervisor.core.events import EventMapper  # noqa: E402
+from fleet_supervisor.core.followups import suggest_followups  # noqa: E402
 from fleet_supervisor.core.graph import close, get_graph_schema  # noqa: E402
 from fleet_supervisor.core.memory import (  # noqa: E402
     MemoryClientError,
@@ -291,9 +292,12 @@ async def invoke(payload: Any, context):
         # A finished turn raises a failed flush from the loop below, and a
         # disconnect raises it from the close.
         stream = mapper.stream(supervisor, prompt)
+        answer: list[str] = []
         try:
             async for event in stream:
                 for client_event in mapper.map(event):
+                    if client_event["type"] == "chunk":
+                        answer.append(client_event["data"])
                     yield client_event
         except GeneratorExit:
             # The client disconnected. A flush error must not replace
@@ -313,6 +317,13 @@ async def invoke(payload: Any, context):
         finally:
             await stream.aclose()
         logger.info("Session %s handled by %s", session_id, mapper.specialists or "supervisor only")
+        # Only clients that ask for follow-ups get the extra model call.
+        if (
+            payload.get("followups") is True
+            and (text := "".join(answer).strip())
+            and (questions := await suggest_followups(prompt, text))
+        ):
+            yield {"type": "followups", "questions": questions}
         yield {"type": "complete"}
     except Exception:
         # Log the details here; the client gets a generic message only.

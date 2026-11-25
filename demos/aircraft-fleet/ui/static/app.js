@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
+import { renderFollowUps } from './followups.js';
 import { EvidenceGraph } from './graph.js';
 
 const transcript = document.getElementById('transcript');
@@ -121,6 +122,9 @@ function updateComposer() {
   send.disabled = Boolean(controller || !promptInput.value.trim());
   starter.disabled = Boolean(controller);
   starterSend.disabled = Boolean(controller);
+  for (const followup of transcript.querySelectorAll('.followup')) {
+    followup.disabled = Boolean(controller);
+  }
 }
 
 async function sendQuestion(question) {
@@ -135,6 +139,7 @@ async function sendQuestion(question) {
   appendMessage('user', question);
   const answer = appendMessage('assistant', 'Working…');
   let text = '';
+  let followups = [];
   let complete = false;
 
   try {
@@ -165,6 +170,9 @@ async function sendQuestion(question) {
         case 'tool_complete':
           finishCall(event);
           break;
+        case 'followups':
+          followups = event.questions;
+          break;
         case 'complete':
           complete = true;
           break;
@@ -177,6 +185,8 @@ async function sendQuestion(question) {
       FORBID_TAGS: ['img', 'style'],
     });
     answer.classList.add('formatted');
+    const links = renderFollowUps(document, followups, sendQuestion);
+    if (links) answer.after(links);
     transcript.scrollTop = transcript.scrollHeight;
   } catch (error) {
     if (turn.signal.aborted) return;

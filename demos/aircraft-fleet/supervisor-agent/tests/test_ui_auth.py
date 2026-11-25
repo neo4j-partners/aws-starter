@@ -456,7 +456,7 @@ def test_a_signed_in_user_sends_the_user_and_a_session_of_their_own(
     ui_server.supervisor_stream(turn, SUB)
 
     (payload, mine), (_, theirs), (_, mine_again) = opened
-    assert payload == {"prompt": "hi", "trace": True, "user_id": SUB}
+    assert payload == {"prompt": "hi", "trace": True, "followups": True, "user_id": SUB}
     assert mine == hashlib.sha256(f"{SUB}\x00{browser_session}".encode()).hexdigest()
     assert len(mine) >= 33
     assert theirs != mine
@@ -472,4 +472,6 @@ def test_a_local_run_sends_no_user_and_the_browser_session_unchanged(
         ui_server.ChatRequest(prompt="hi", session_id=browser_session), None
     )
 
-    assert opened == [({"prompt": "hi", "trace": True}, "12345678-1234-4234-8234-123456789abc")]
+    assert opened == [
+        ({"prompt": "hi", "trace": True, "followups": True}, "12345678-1234-4234-8234-123456789abc")
+    ]

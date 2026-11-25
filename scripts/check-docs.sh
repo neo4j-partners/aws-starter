@@ -65,6 +65,15 @@ GATEWAY_PATTERN_PATHS=(
     "patterns/gateway-rbac-interceptor/"
     "CLAUDE.md"
 )
+# The fleet UI has its own deploy.sh too. These paths hold it and the docs
+# that describe it.
+FLEET_UI_DEPLOY_PATHS=(
+    "demos/aircraft-fleet/ui/"
+    "demos/aircraft-fleet/README.md"
+    "demos/aircraft-fleet/docs/architecture/deployment.md"
+    "demos/aircraft-fleet/docs/images/deployment-topology.svg"
+    "demos/aircraft-fleet/docs/ui-cloud-plan.md"
+)
 
 # Retired everywhere except the end-to-end test plan, whose run history
 # records the old fleet_agent Runtime and the old fleet-agent/ folder. The
@@ -201,7 +210,7 @@ check_names() {
         check_pattern "$name" || found=1
     done
     for name in "${RETIRED_OUTSIDE_GATEWAY_PATTERN[@]}"; do
-        check_pattern "$name" "${GATEWAY_PATTERN_PATHS[@]}" || found=1
+        check_pattern "$name" "${GATEWAY_PATTERN_PATHS[@]}" "${FLEET_UI_DEPLOY_PATHS[@]}" || found=1
     done
     for name in "${RETIRED_OUTSIDE_E2E_HISTORY[@]}"; do
         check_pattern "$name" "${E2E_HISTORY_PATHS[@]}" || found=1

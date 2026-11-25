@@ -101,7 +101,9 @@ Each of these was checked in the code or the AWS docs.
 
 ## Phase 2: The UI on Lambda with response streaming
 
-**Status:** In progress. The app side (branch ui-cloud-2a) and the stack, its commands, and its tests (branch ui-cloud-2b) are built and pass together: 455 Python tests and 25 CDK tests. Nothing is deployed yet.
+**Status:** In progress. The app side (branch ui-cloud-2a) and the stack, its commands, and its tests (branch ui-cloud-2b) are built and pass together: 455 Python tests and 25 CDK tests. Both branches were merged to main and pushed on 2026-11-24. The `FleetUi` stack is deployed in `us-east-1`, and one user is added.
+
+**Notes:** On 2026-11-24, requests to the hosted URL with no session behaved as designed. `GET /ready` returned 200, and `GET /` redirected to `/auth/login`. `POST /api/chat` and `GET /static/bundle.js` returned 401. `/auth/login` redirected to the Cognito managed login with PKCE and the `openid` scope. The remaining checks need a signed-in browser or the function logs. The two-user memory check waits for the user-scoped recall in [the chat and memory plan](./ui-chat-memory-plan.md), because entity and fact recall spans every user today. A redeploy with `./deploy.sh deploy` updates the stack in place and keeps the URL, the user pool, and its users.
 
 **Outcome:** One command deploys the UI. A signed-in user opens the function URL and gets a streamed answer and the evidence graph from the deployed supervisor. A request without a login gets no answer and causes no Bedrock or Neo4j call.
 

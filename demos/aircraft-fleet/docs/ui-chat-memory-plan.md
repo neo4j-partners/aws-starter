@@ -123,15 +123,17 @@ All answered on 2026-11-24.
 
 ## Phase 4: Supervisor on fleet.11, and the Memory view
 
-**Status:** Pending. It waits for Phase 3. The age exception for fleet.11 is approved.
+**Status:** In progress. Merged to main as 052687e (ca5b535 from qaz) on 2026-11-24, not pushed. The supervisor is on fleet.11, and uv.lock changed only neo4j-agent-memory, under the approved age exception. 495 Python tests and 22 UI tests pass, and the docs check passes. The local run is done. The two-user check waits for the redeploy.
+
+**Notes:** The local run on 2026-11-24 asked the six starters and two entity questions as `anonymous`. Every answer sent the memory event before its first chunk. The six starters recalled nothing, which is correct. They are general questions, and no entity scored above the 0.675 threshold, with a best of 0.59, because an entity embeds only its short name. "What happened on flight AC1016?" recalled AC1016 at 0.82 and AC1017 at 0.70. "Which SkyWays aircraft are B737-800s?" recalled B737-800, SkyWays, and AMM-B737-2024-001. So a question that names an entity shows memory, and look-alike IDs such as AC1017 can come with it.
 
 **Outcome:** Recall is per user, and the graph panel shows a Memory view of what was recalled.
 
-- [ ] The supervisor pins fleet.11 and passes the user to recall.
-- [ ] The supervisor sends the recalled entries as a stream event.
-- [ ] The graph panel has two views, current evidence and memory, and the UI switches between them.
-- [ ] A question with no recall shows an empty Memory view with a short note.
-- [ ] Tests cover the event, both views, and that one user's recall holds no other user's entries.
+- [x] The supervisor pins fleet.11 and passes the user to recall.
+- [x] The supervisor sends the recalled entries as a stream event.
+- [x] The graph panel has two views, current evidence and memory, and the UI switches between them.
+- [x] A question with no recall shows an empty Memory view with a short note.
+- [x] Tests cover the event, both views, and that one user's recall holds no other user's entries.
 
 **Done when:**
 
